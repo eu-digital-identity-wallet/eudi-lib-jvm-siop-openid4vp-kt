@@ -1,4 +1,4 @@
-package niscy.eudiw.openid4vp
+package eu.europa.ec.euidw.openid4vp
 
 import kotlinx.serialization.SerialName
 import eu.europa.ec.euidw.prex.PresentationDefinition

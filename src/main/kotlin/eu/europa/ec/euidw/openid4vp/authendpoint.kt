@@ -1,5 +1,7 @@
-package niscy.eudiw.openid4vp
+package eu.europa.ec.euidw.openid4vp
 
+import niscy.eudiw.openid4vp.AuthorizationRequestValidationError
+import niscy.eudiw.openid4vp.AuthorizationRequestValidationException
 import java.net.URL
 
 
@@ -23,10 +25,10 @@ interface AuthorizationResponseData
 
 sealed interface AuthorizationResponse {
 
-    sealed interface Success :AuthorizationResponse
+    sealed interface Success : AuthorizationResponse
 
     data class DirectPost(val url: HttpsUrl, val data: AuthorizationResponseData): Success
-    data class DirectPostJwt(val url: HttpsUrl, val string: Jwt):Success
+    data class DirectPostJwt(val url: HttpsUrl, val string: Jwt): Success
 
 
     sealed interface Failed: AuthorizationResponse
@@ -38,13 +40,13 @@ sealed interface AuthorizationResponse {
 interface OpenId4VPAuthorizationEndPoint {
 
 
-    fun authorize(url: URL):  AuthorizationResponse {
+    fun authorize(url: URL): AuthorizationResponse {
        return  authorize(AuthorizationRequest.make(url).getOrThrow())
     }
 
-    fun authorize(auth: AuthorizationRequest):  AuthorizationResponse {
+    fun authorize(auth: AuthorizationRequest): AuthorizationResponse {
         return when(auth){
-            is AuthorizationRequest.Oauth2-> authorize(auth.data)
+            is AuthorizationRequest.Oauth2 -> authorize(auth.data)
                 .fold(onFailure = {t->
                                   if (t is AuthorizationRequestValidationException) {
                                       AuthorizationResponse.Invalid(t.error)

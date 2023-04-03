@@ -1,4 +1,4 @@
-package niscy.eudiw.openid4vp
+package eu.europa.ec.euidw.openid4vp
 
 //
 // Helper methods

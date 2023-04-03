@@ -1,5 +1,6 @@
 package niscy.eudiw.openid4vp
 
+import eu.europa.ec.euidw.openid4vp.*
 import eu.europa.ec.euidw.prex.JsonString
 import eu.europa.ec.euidw.prex.PresentationExchange
 

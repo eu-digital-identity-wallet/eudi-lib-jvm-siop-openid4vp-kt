@@ -1,5 +1,9 @@
 package niscy.eudiw.openid4vp
 
+import eu.europa.ec.euidw.openid4vp.HttpGet
+import eu.europa.ec.euidw.openid4vp.PresentationDefinitionSource
+import eu.europa.ec.euidw.openid4vp.WalletOpenId4VPConfig
+import eu.europa.ec.euidw.openid4vp.success
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import java.lang.IllegalStateException
 

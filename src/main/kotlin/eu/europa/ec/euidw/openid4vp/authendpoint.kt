@@ -1,8 +1,10 @@
 package eu.europa.ec.euidw.openid4vp
 
-import niscy.eudiw.openid4vp.AuthorizationRequestValidationError
-import niscy.eudiw.openid4vp.AuthorizationRequestValidationException
+import com.eygraber.uri.Uri
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import java.net.URL
+import java.net.URLDecoder
 
 
 sealed interface AuthorizationRequest {
@@ -15,7 +17,32 @@ sealed interface AuthorizationRequest {
     }
 
     companion object {
-        fun make(url: URL): Result<AuthorizationRequest> = TODO()
+
+        private val json: Json by lazy { Json }
+        fun make(uriStr: String): Result<AuthorizationRequest> = runCatching {
+            val uri = Uri.parse(uriStr)
+            when {
+                uri.getQueryParameter("request") != null -> TODO()
+                uri.getQueryParameter("request_uri") != null -> TODO()
+                else -> makeOauth2(uri).getOrThrow()
+            }
+        }
+
+        private fun makeOauth2(uri: Uri): Result<Oauth2> = runCatching {
+
+            Oauth2(
+                AuthorizationRequestData(
+                    responseType = uri.getQueryParameter("response_type"),
+                    presentationDefinition = uri.getQueryParameter("presentation_definition"),
+                    presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
+                    scope = uri.getQueryParameter("scope"),
+                    nonce = uri.getQueryParameter("nonce"),
+                    responseMode = uri.getQueryParameter("response_mode"),
+                    clientIdScheme = uri.getQueryParameter("client_id_scheme"),
+                    clientMetaData = uri.getQueryParameter("client_metadata"),
+                    clientId = uri.getQueryParameter("client_id")
+                ))
+        }
     }
 }
 
@@ -40,7 +67,7 @@ sealed interface AuthorizationResponse {
 interface OpenId4VPAuthorizationEndPoint {
 
 
-    fun authorize(url: URL): AuthorizationResponse {
+    fun authorize(url: String): AuthorizationResponse {
        return  authorize(AuthorizationRequest.make(url).getOrThrow())
     }
 

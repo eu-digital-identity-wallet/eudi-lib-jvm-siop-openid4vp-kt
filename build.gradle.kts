@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.8.0"
+    kotlin("jvm") version "1.8.10"
     kotlin("plugin.serialization") version "1.8.10"
     `java-library`
     `maven-publish`
@@ -13,8 +13,11 @@ repositories {
     mavenLocal()
 }
 
+
+val presentationExchangeVersion = "1.0-SNAPSHOT"
 dependencies {
-    implementation("eu.europa.ec.euidw:presentation-exchange-kt:1.0-SNAPSHOT")
+    implementation("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")
+    implementation("com.eygraber:uri-kmp:0.0.11")
     testImplementation(kotlin("test"))
 }
 

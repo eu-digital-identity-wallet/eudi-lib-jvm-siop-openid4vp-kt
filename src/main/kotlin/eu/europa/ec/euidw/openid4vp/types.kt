@@ -1,7 +1,7 @@
 package eu.europa.ec.euidw.openid4vp
 
-import kotlinx.serialization.json.JsonObject
 import eu.europa.ec.euidw.prex.PresentationDefinition
+import kotlinx.serialization.json.JsonObject
 import java.net.URL
 
 /**
@@ -65,7 +65,19 @@ enum class ClientIdScheme {
 
     EntityId,
 
-    DID
+    DID;
+
+    companion object {
+
+        fun make(s: String): ClientIdScheme? = when (s) {
+            "pre-registered" -> PreRegistered
+            "redirect_uri" -> RedirectUri
+            "entity_id" -> EntityId
+            "did" -> DID
+            else -> null
+        }
+    }
+
 }
 
 
@@ -91,12 +103,14 @@ data class AuthorizationRequestData(
     val responseType: String? = null,
     val presentationDefinition: String? = null,
     val presentationDefinitionUri: String? = null,
-    val clientMetaData: JsonObject? = null,
+    val clientMetaData: String? = null,
     val clientMetadataUri: String? = null,
     val clientIdScheme: String? = null,
+    val clientId: String? = null,
     val nonce: String?,
     val scope: String? = null,
-    val responseMode: String? = null
+    val responseMode: String? = null,
+    val state: String? = null
 )
 
 data class ValidatedAuthorizationRequestData(
@@ -106,7 +120,8 @@ data class ValidatedAuthorizationRequestData(
     val clientIdScheme: ClientIdScheme? = null,
     val nonce: Nonce,
     val scope: Scope?,
-    val responseMode: ResponseMode = ResponseMode.Fragment
+    val responseMode: ResponseMode = ResponseMode.Fragment,
+    val state: String?
 )
 
 data class ResolvedAuthorizationRequestData(

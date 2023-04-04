@@ -1,15 +1,21 @@
-package niscy.eudiw.openid4vp
+package eu.europa.ec.euidw.openid4vp
 
-import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.euidw.prex.JsonParser
 import eu.europa.ec.euidw.prex.JsonString
-import eu.europa.ec.euidw.prex.PresentationExchange
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import java.net.URLDecoder
 
 sealed interface AuthorizationRequestValidationError {
 
     data class UnsupportedResponseType(val value: String) : AuthorizationRequestValidationError
-    object MissingResponseType: AuthorizationRequestValidationError
+    object MissingResponseType : AuthorizationRequestValidationError
     object MissingPresentationDefinition : AuthorizationRequestValidationError
     object NonHttpsPresentationDefinitionUri : AuthorizationRequestValidationError
+
+    object MissingNonce : AuthorizationRequestValidationError
+    data class InvalidClientIdScheme(val value: String) : AuthorizationRequestValidationError
 
 }
 
@@ -20,21 +26,26 @@ internal fun <T> AuthorizationRequestValidationError.asFailure(): Result<T> =
 class AuthorizationRequestValidationException(val error: AuthorizationRequestValidationError) : RuntimeException()
 
 
+internal class AuthorizationRequestValidator(private val presentationExchangeParser: JsonParser) {
 
-internal class AuthorizationRequestValidator(private val presentationExchange: PresentationExchange) {
+    fun validate(authorizationRequest: AuthorizationRequestData): Result<ValidatedAuthorizationRequestData> =
+        runCatching {
+            ValidatedAuthorizationRequestData(
+                responseType = responseType(authorizationRequest).getOrThrow(),
+                presentationDefinitionSource = presentationDefinitionSource(authorizationRequest).getOrThrow(),
+                clientIdScheme = clientIdScheme(authorizationRequest).getOrThrow(),
+                clientMetaDataSource = clientMetaDataSource(authorizationRequest).getOrThrow(),
+                nonce = nonce(authorizationRequest).getOrThrow(),
+                responseMode = ResponseMode.Fragment,
+                scope = null,
+                state = authorizationRequest.state
+            )
+        }
 
-    fun validate(authorizationRequest: AuthorizationRequestData): Result<ValidatedAuthorizationRequestData> = runCatching {
+    private fun nonce(ar: AuthorizationRequestData): Result<Nonce> =
+        if (ar.nonce != null) ar.nonce.success()
+        else AuthorizationRequestValidationError.MissingNonce.asFailure()
 
-        ValidatedAuthorizationRequestData(
-            responseType = responseType(authorizationRequest).getOrThrow(),
-            presentationDefinitionSource = presentationDefinitionSource(authorizationRequest).getOrThrow(),
-            clientIdScheme = clientIdScheme(authorizationRequest).getOrThrow(),
-            clientMetaDataSource = clientMetaDataSource(authorizationRequest).getOrThrow(),
-            nonce = TODO(),
-            responseMode = TODO(),
-            scope = TODO()
-        )
-    }
 
     private fun responseType(ar: AuthorizationRequestData): Result<ResponseType> {
         return when (ar.responseType?.trim()) {
@@ -50,12 +61,12 @@ internal class AuthorizationRequestValidator(private val presentationExchange: P
 
         return when {
             !ar.presentationDefinition.isNullOrEmpty() && ar.presentationDefinitionUri.isNullOrEmpty() ->
-                PresentationExchange.jsonParser.decodePresentationDefinition(
+                presentationExchangeParser.decodePresentationDefinition(
                     JsonString(ar.presentationDefinition)
                 ).map { PresentationDefinitionSource.PassByValue(it) }
 
             ar.presentationDefinition.isNullOrEmpty() && !ar.presentationDefinitionUri.isNullOrEmpty() ->
-                HttpsUrl.make(ar.presentationDefinitionUri!!).fold(
+                HttpsUrl.make(ar.presentationDefinitionUri).fold(
                     onSuccess = { PresentationDefinitionSource.FetchByReference(it).success() },
                     onFailure = { AuthorizationRequestValidationError.NonHttpsPresentationDefinitionUri.asFailure() }
                 )
@@ -65,9 +76,24 @@ internal class AuthorizationRequestValidator(private val presentationExchange: P
         }
     }
 
-    private fun clientIdScheme(ar: AuthorizationRequestData): Result<ClientIdScheme> = TODO()
+    private fun clientIdScheme(ar: AuthorizationRequestData): Result<ClientIdScheme?> =
+        if (ar.clientIdScheme.isNullOrEmpty()) Result.success(null)
+        else ClientIdScheme.make(ar.clientIdScheme)?.success() ?: AuthorizationRequestValidationError.InvalidClientIdScheme(ar.clientIdScheme).asFailure()
 
-    private fun clientMetaDataSource(ar: AuthorizationRequestData): Result<ClientMetaDataSource> = TODO()
+
+
+    private fun clientMetaDataSource(ar: AuthorizationRequestData): Result<ClientMetaDataSource?> = runCatching {
+
+        when {
+            !ar.clientMetaData.isNullOrEmpty() && ar.clientMetadataUri.isNullOrEmpty() -> {
+                val decoded = URLDecoder.decode(ar.clientMetaData, "UTF-8")
+                val j = Json.parseToJsonElement(decoded).jsonObject
+                return ClientMetaDataSource.PassByValue(j).success()
+            }
+            else -> TODO()
+        }
+
+    }
 
 
 }

@@ -1,10 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
-import com.eygraber.uri.Uri
 import eu.europa.ec.euidw.prex.PresentationExchange
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import java.net.URLDecoder
 import java.net.URLEncoder
 
 

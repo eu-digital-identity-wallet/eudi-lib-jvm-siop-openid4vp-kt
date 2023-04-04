@@ -1,6 +1,9 @@
 package eu.europa.ec.euidw.openid4vp
 
 import eu.europa.ec.euidw.prex.PresentationDefinition
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 
@@ -80,9 +83,22 @@ enum class ClientIdScheme {
 
 }
 
-
+/**
+ * @see <a href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html</a>
+ */
 sealed interface ResponseMode {
-    object Fragment : ResponseMode
+
+    /**
+     * In this mode, Authorization Response parameters are encoded
+     * in the query string added to the redirect_uri when redirecting back to the Client.
+     */
+    data class Query(val redirectUri: HttpsUrl) : ResponseMode
+
+    /**
+     * In this mode, Authorization Response parameters
+     * are encoded in the fragment added to the redirect_uri when redirecting back to the Client.
+     */
+    data class Fragment(val redirectUri: HttpsUrl) : ResponseMode
     data class DirectPost(val responseURI: HttpsUrl) : ResponseMode
 }
 
@@ -94,39 +110,48 @@ enum class ResponseType {
     VpAndIdToken // VP in AuthorizationResponse
 }
 
-@JvmInline
-value class Scope(val value: String)
-typealias Nonce = String
 
 
-data class AuthorizationRequestData(
-    val responseType: String? = null,
-    val presentationDefinition: String? = null,
-    val presentationDefinitionUri: String? = null,
-    val clientMetaData: String? = null,
-    val clientMetadataUri: String? = null,
-    val clientIdScheme: String? = null,
-    val clientId: String? = null,
-    val nonce: String?,
+/**
+ * The data of an OpenID4VP authorization request
+ * without any validation and regardless of the way they sent to the wallet
+ */
+@Serializable
+data class OpenID4VPRequestData(
+    @SerialName("response_type") val responseType: String? = null,
+    @SerialName("presentation_definition") val presentationDefinition: String? = null,
+    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null,
+    @SerialName("client_metadata") val clientMetaData: String? = null,
+    @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
+    @SerialName("client_id_scheme") val clientIdScheme: String? = null,
+    @SerialName("client_id") val clientId: String? = null,
+    @Required val nonce: String? = null,
     val scope: String? = null,
-    val responseMode: String? = null,
-    val state: String? = null
+    val state: String? = null,
+    @SerialName("response_mode") val responseMode: String? = null,
+    @SerialName("response_uri") val responseUri: String? = null,
+    @SerialName("redirect_uri") val redirectUri: String? = null
 )
 
-data class ValidatedAuthorizationRequestData(
+data class ValidatedOpenID4VPRequestData(
     val responseType: ResponseType,
-    val presentationDefinitionSource: PresentationDefinitionSource? = null,
-    val clientMetaDataSource: ClientMetaDataSource? = null,
-    val clientIdScheme: ClientIdScheme? = null,
-    val nonce: Nonce,
-    val scope: Scope?,
-    val responseMode: ResponseMode = ResponseMode.Fragment,
+    val presentationDefinitionSource: PresentationDefinitionSource,
+    val clientMetaDataSource: ClientMetaDataSource? ,
+    val clientIdScheme: ClientIdScheme?,
+    val clientId: String,
+    val nonce: String,
+    val scope: String?,
+    val responseMode: ResponseMode,
     val state: String?
 )
 
-data class ResolvedAuthorizationRequestData(
+
+data class ResolvedOpenID4VPRequestData(
+    val responseType: ResponseType,
     val presentationDefinition: PresentationDefinition,
-    val clientMetaData: ClientMetaData? = null,
-    val nonce: Nonce,
-    val responseMode: ResponseMode = ResponseMode.Fragment
+    val clientMetaData: ClientMetaData,
+    val clientId : String,
+    val nonce: String,
+    val responseMode: ResponseMode,
+    val state: String?
 )

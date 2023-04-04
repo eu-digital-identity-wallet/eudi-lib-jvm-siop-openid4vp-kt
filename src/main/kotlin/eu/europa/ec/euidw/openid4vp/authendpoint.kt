@@ -2,18 +2,15 @@ package eu.europa.ec.euidw.openid4vp
 
 import com.eygraber.uri.Uri
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import java.net.URL
-import java.net.URLDecoder
 
 
 sealed interface AuthorizationRequest {
 
-    data class Oauth2(val data: AuthorizationRequestData): AuthorizationRequest
+    data class Oauth2(val data: OpenID4VPRequestData) : AuthorizationRequest
 
     sealed interface JwtSecuredAuthorizationRequest : AuthorizationRequest {
-        data class PassByValue(val jwt: String): JwtSecuredAuthorizationRequest
-        data class PassByReference(val jwtURI: HttpsUrl): JwtSecuredAuthorizationRequest
+        data class PassByValue(val jwt: Jwt) : JwtSecuredAuthorizationRequest
+        data class PassByReference(val jwtURI: HttpsUrl) : JwtSecuredAuthorizationRequest
     }
 
     companion object {
@@ -24,14 +21,13 @@ sealed interface AuthorizationRequest {
             when {
                 uri.getQueryParameter("request") != null -> TODO()
                 uri.getQueryParameter("request_uri") != null -> TODO()
-                else -> makeOauth2(uri).getOrThrow()
+                else -> makeOauth2(uri)
             }
         }
 
-        private fun makeOauth2(uri: Uri): Result<Oauth2> = runCatching {
-
+        private fun makeOauth2(uri: Uri): Oauth2 =
             Oauth2(
-                AuthorizationRequestData(
+                OpenID4VPRequestData(
                     responseType = uri.getQueryParameter("response_type"),
                     presentationDefinition = uri.getQueryParameter("presentation_definition"),
                     presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
@@ -40,10 +36,14 @@ sealed interface AuthorizationRequest {
                     responseMode = uri.getQueryParameter("response_mode"),
                     clientIdScheme = uri.getQueryParameter("client_id_scheme"),
                     clientMetaData = uri.getQueryParameter("client_metadata"),
-                    clientId = uri.getQueryParameter("client_id")
-                ))
-        }
+                    clientId = uri.getQueryParameter("client_id"),
+                    responseUri = uri.getQueryParameter("response_uri"),
+                    redirectUri = uri.getQueryParameter("redirect_uri"),
+                    state = uri.getQueryParameter("state")
+                )
+            )
     }
+
 }
 
 typealias Jwt = String
@@ -54,44 +54,19 @@ sealed interface AuthorizationResponse {
 
     sealed interface Success : AuthorizationResponse
 
-    data class DirectPost(val url: HttpsUrl, val data: AuthorizationResponseData): Success
-    data class DirectPostJwt(val url: HttpsUrl, val string: Jwt): Success
+    data class DirectPost(val url: HttpsUrl, val data: AuthorizationResponseData) : Success
+    data class DirectPostJwt(val url: HttpsUrl, val string: Jwt) : Success
 
 
-    sealed interface Failed: AuthorizationResponse
-    data class Invalid(val error: AuthorizationRequestValidationError): Failed
+    sealed interface Failed : AuthorizationResponse
+    data class Invalid(val error: AuthorizationRequestValidationError) : Failed
 }
-
 
 
 interface OpenId4VPAuthorizationEndPoint {
 
 
-    fun authorize(url: String): AuthorizationResponse {
-       return  authorize(AuthorizationRequest.make(url).getOrThrow())
-    }
+    fun authorize(url: String): AuthorizationResponse
 
-    fun authorize(auth: AuthorizationRequest): AuthorizationResponse {
-        return when(auth){
-            is AuthorizationRequest.Oauth2 -> authorize(auth.data)
-                .fold(onFailure = {t->
-                                  if (t is AuthorizationRequestValidationException) {
-                                      AuthorizationResponse.Invalid(t.error)
-                                  } else throw t
-                }, onSuccess = {data->
-                    val url: HttpsUrl = TODO()
-                    AuthorizationResponse.DirectPost(url, data)
-                })
-            else -> throw IllegalArgumentException("Not supported")
-        }
-    }
-
-
-    fun AuthorizationResponseData.asJwt(): Jwt
-
-
-    fun authorize(requestData: AuthorizationRequestData) : Result<AuthorizationResponseData>{
-        TODO()
-    }
 }
 

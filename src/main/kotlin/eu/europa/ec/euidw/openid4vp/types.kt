@@ -38,10 +38,25 @@ sealed interface PresentationDefinitionSource {
      * The resource MUST be exposed without further need to authenticate or authorize
      */
     data class FetchByReference(val url: HttpsUrl) : PresentationDefinitionSource
-    data class Scopes(val scopes: List<String>) : PresentationDefinitionSource
+    data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
 typealias ClientMetaData = JsonObject
+
+@JvmInline
+value class Scope private constructor(val value:String){
+    fun items(): List<String> =  itemsOf(value)
+    companion object{
+        fun make(s: String): Scope? {
+            val trimmed = s.trim()
+            val scopeItems : List<String> = itemsOf(trimmed)
+            return if (scopeItems.isEmpty()) null
+            else Scope(trimmed)
+        }
+
+        private fun itemsOf(s: String): List<String> = s.split(" ")
+    }
+}
 
 sealed interface ClientMetaDataSource {
     data class PassByValue(val metaData: ClientMetaData) : ClientMetaDataSource
@@ -140,7 +155,7 @@ data class ValidatedOpenID4VPRequestData(
     val clientIdScheme: ClientIdScheme?,
     val clientId: String,
     val nonce: String,
-    val scope: String?,
+    val scope: Scope?,
     val responseMode: ResponseMode,
     val state: String?
 )
@@ -153,5 +168,6 @@ data class ResolvedOpenID4VPRequestData(
     val clientId : String,
     val nonce: String,
     val responseMode: ResponseMode,
-    val state: String?
+    val state: String?,
+    val scope: Scope?
 )

@@ -4,12 +4,7 @@ import kotlinx.serialization.SerialName
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.SupportedClaimFormat
 
-data class ScopeAliasToPresentationDefinitions(val value: Map<String, PresentationDefinition>) {
 
-    companion object {
-        val NONE: ScopeAliasToPresentationDefinitions = ScopeAliasToPresentationDefinitions(emptyMap())
-    }
-}
 
 sealed interface SupportedClientIdScheme {
     val scheme: ClientIdScheme
@@ -45,9 +40,9 @@ data class WalletOpenId4VPMetaData(
 
 data class WalletOpenId4VPConfig(
     val presentationDefinitionUriSupported: Boolean = false,
-    val scopeAliasToPresentationDefinitions: ScopeAliasToPresentationDefinitions = ScopeAliasToPresentationDefinitions.NONE,
     val supportedClientIdScheme: SupportedClientIdScheme,
-    val vpFormatsSupported : List<SupportedClaimFormat<*>>
+    val vpFormatsSupported : List<SupportedClaimFormat<*>>,
+    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap()
 
 ) {
 
@@ -55,9 +50,4 @@ data class WalletOpenId4VPConfig(
         require(vpFormatsSupported.isNotEmpty())
     }
 
-    fun metaData(): WalletOpenId4VPMetaData = WalletOpenId4VPMetaData(
-        presentationDefinitionUriSupported = presentationDefinitionUriSupported,
-        vpFormatsSupported = VPFormatsFormatsSupported(vpFormatsSupported),
-        client_id_schemes_supported = TODO()
-    )
 }

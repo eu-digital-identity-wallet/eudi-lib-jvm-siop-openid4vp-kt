@@ -1,5 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
+import eu.europa.ec.euidw.openid4vp.AuthorizationRequestValidationError.*
 import eu.europa.ec.euidw.prex.JsonParser
 import eu.europa.ec.euidw.prex.JsonString
 import kotlinx.serialization.json.Json
@@ -7,133 +8,173 @@ import kotlinx.serialization.json.jsonObject
 import java.net.URLDecoder
 
 sealed interface AuthorizationRequestValidationError {
+
+    //
+    // Response Type errors
+    //
     data class UnsupportedResponseType(val value: String) : AuthorizationRequestValidationError
-    data class UnsupportedResponseMode(val value: String?) : AuthorizationRequestValidationError
     object MissingResponseType : AuthorizationRequestValidationError
+
+    //
+    // Response Mode errors
+    //
+    data class UnsupportedResponseMode(val value: String?) : AuthorizationRequestValidationError
+
+    //
+    // Presentation Definition errors
+    //
     object MissingPresentationDefinition : AuthorizationRequestValidationError
-    object NonHttpsPresentationDefinitionUri : AuthorizationRequestValidationError
-    object NonHttpsRedirectUri : AuthorizationRequestValidationError
+    data class InvalidPresentationDefinition(val cause: Throwable): AuthorizationRequestValidationError
+    object InvalidPresentationDefinitionUri : AuthorizationRequestValidationError
+    object InvalidRedirectUri : AuthorizationRequestValidationError
     object MissingRedirectUri : AuthorizationRequestValidationError
     object MissingResponseUri : AuthorizationRequestValidationError
-    object NonHttpsResponseUri : AuthorizationRequestValidationError
+    object InvalidResponseUri : AuthorizationRequestValidationError
     object ResponseUriMustNotBeProvided : AuthorizationRequestValidationError
     object RedirectUriMustNotBeProvided : AuthorizationRequestValidationError
     object MissingNonce : AuthorizationRequestValidationError
-    object MissingClientId: AuthorizationRequestValidationError
+    object MissingClientId : AuthorizationRequestValidationError
+
+    object InvalidClientMetaDataUri : AuthorizationRequestValidationError
+    object OneOfClientMedataOrUri : AuthorizationRequestValidationError
     data class InvalidClientIdScheme(val value: String) : AuthorizationRequestValidationError
-    object DirectPostMissingOrInvalidResponseUri : AuthorizationRequestValidationError
 
 }
 
+internal fun AuthorizationRequestValidationError.asException(): AuthorizationRequestValidationException =
+    AuthorizationRequestValidationException(this)
+
 internal fun <T> AuthorizationRequestValidationError.asFailure(): Result<T> =
-    Result.failure(AuthorizationRequestValidationException(this))
+    Result.failure(asException())
 
 
-class AuthorizationRequestValidationException(val error: AuthorizationRequestValidationError) : RuntimeException()
+data class AuthorizationRequestValidationException(val error: AuthorizationRequestValidationError) : RuntimeException()
 
 
 internal class AuthorizationRequestValidator(private val presentationExchangeParser: JsonParser) {
 
     fun validate(authorizationRequest: OpenID4VPRequestData): Result<ValidatedOpenID4VPRequestData> = runCatching {
+        val scope = authorizationRequest.scope?.let { Scope.make(it) }
         val nonce = requiredNonce(authorizationRequest).getOrThrow()
-        val responseType = authorizationRequest.requiredResponseType().getOrThrow()
+        val responseType = requiredResponseType(authorizationRequest).getOrThrow()
         val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
-        val clientIdScheme = authorizationRequest.parseClientIdScheme().getOrThrow()
-        val clientId = authorizationRequest.requiredClientId().getOrThrow()
-        val presentationDefinitionSource = parsePresentationDefinitionSource(authorizationRequest).getOrThrow()
+        val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow()
+        val clientId = requiredClientId(authorizationRequest).getOrThrow()
+        val presentationDefinitionSource = parsePresentationDefinitionSource(authorizationRequest, scope).getOrThrow()
+        val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
 
         ValidatedOpenID4VPRequestData(
             responseType = responseType,
             presentationDefinitionSource = presentationDefinitionSource,
             clientIdScheme = clientIdScheme,
-            clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow(),
+            clientMetaDataSource = clientMetaDataSource,
             nonce = nonce,
             responseMode = responseMode,
-            scope = authorizationRequest.scope,
+            scope = scope,
             state = authorizationRequest.state,
             clientId = clientId
         )
     }
 
 
+    private fun requiredResponseMode(unvalidated: OpenID4VPRequestData): Result<ResponseMode> {
 
-    private fun requiredResponseMode(openID4VPRequestData: OpenID4VPRequestData): Result<ResponseMode> {
-        fun requiredRedirectUriAndNotProvidedResponseUri(): Result<HttpsUrl> {
-            if (openID4VPRequestData.responseUri != null) AuthorizationRequestValidationError.ResponseUriMustNotBeProvided.asFailure<HttpsUrl>()
-            return openID4VPRequestData.redirectUri?.let { HttpsUrl.make(it) }
-                ?: AuthorizationRequestValidationError.MissingRedirectUri.asFailure()
-        }
+        fun requiredRedirectUriAndNotProvidedResponseUri(): Result<HttpsUrl> =
+            if (unvalidated.responseUri != null) ResponseUriMustNotBeProvided.asFailure()
+            else when (val uri = unvalidated.redirectUri) {
+                null -> MissingRedirectUri.asFailure()
+                else -> HttpsUrl.make(uri).mapError { InvalidRedirectUri.asException() }
+            }
 
-        fun requiredResponseUriAndNotProvidedRedirectUri(): Result<HttpsUrl> {
-            if (openID4VPRequestData.redirectUri != null) AuthorizationRequestValidationError.RedirectUriMustNotBeProvided.asFailure<HttpsUrl>()
-            return openID4VPRequestData.responseUri?.let { HttpsUrl.make(it) }
-                ?: AuthorizationRequestValidationError.MissingResponseUri.asFailure()
-        }
+        fun requiredResponseUriAndNotProvidedRedirectUri(): Result<HttpsUrl> =
+            if (unvalidated.redirectUri != null) RedirectUriMustNotBeProvided.asFailure()
+            else when (val uri = unvalidated.responseUri) {
+                null -> MissingResponseUri.asFailure()
+                else -> HttpsUrl.make(uri).mapError { InvalidResponseUri.asException() }
+            }
 
-        return when (openID4VPRequestData.responseMode) {
+        return when (unvalidated.responseMode) {
             "direct_post" -> requiredResponseUriAndNotProvidedRedirectUri().map { ResponseMode.DirectPost(it) }
             "query" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Query(it) }
             "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
-            else -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
+            null -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
+            else -> UnsupportedResponseMode(unvalidated.responseMode).asFailure()
         }
-
-
     }
 
 
+    private fun requiredNonce(unvalidated: OpenID4VPRequestData): Result<String> =
+        unvalidated.nonce?.success() ?: MissingNonce.asFailure()
 
-    private fun requiredNonce(openID4VPRequestData: OpenID4VPRequestData): Result<String> =
-        openID4VPRequestData.nonce?.success() ?: AuthorizationRequestValidationError.MissingNonce.asFailure()
 
-
-    private fun OpenID4VPRequestData.requiredResponseType(): Result<ResponseType> {
-        return when (responseType?.trim()) {
-            null -> AuthorizationRequestValidationError.MissingResponseType.asFailure()
+    private fun requiredResponseType(unvalidated: OpenID4VPRequestData): Result<ResponseType> =
+        when (val rt = unvalidated.responseType?.trim()) {
             "vp_token" -> ResponseType.VpToken.success()
             "vp_token id_token" -> ResponseType.VpAndIdToken.success()
             "id_token" -> ResponseType.IdToken.success()
-            else -> AuthorizationRequestValidationError.UnsupportedResponseType(responseType).asFailure()
+            null -> MissingResponseType.asFailure()
+            else -> UnsupportedResponseType(rt).asFailure()
         }
-    }
 
 
-    private fun parsePresentationDefinitionSource(openID4VPRequestData: OpenID4VPRequestData): Result<PresentationDefinitionSource> {
+    private fun parsePresentationDefinitionSource(unvalidated: OpenID4VPRequestData, scope: Scope?): Result<PresentationDefinitionSource> {
+        val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
+        val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
+        val hasScope = null != scope
+
+        fun requiredPd() = runCatching {
+            val pd = presentationExchangeParser.decodePresentationDefinition(
+                JsonString(unvalidated.presentationDefinition!!)
+            ).mapError { InvalidPresentationDefinition(it).asException() }.getOrThrow()
+            PresentationDefinitionSource.PassByValue(pd)
+        }
+
+
+        fun requiredPdUri() = runCatching {
+            val pdUri = HttpsUrl.make(unvalidated.presentationDefinitionUri!!).getOrThrow()
+            PresentationDefinitionSource.FetchByReference(pdUri)
+        }.mapError { InvalidPresentationDefinitionUri.asException() }
+
+        fun requiredScope() = PresentationDefinitionSource.Implied(scope!!).success()
 
         return when {
-            !openID4VPRequestData.presentationDefinition.isNullOrEmpty() && openID4VPRequestData.presentationDefinitionUri.isNullOrEmpty() ->
-                presentationExchangeParser.decodePresentationDefinition(
-                    JsonString(openID4VPRequestData.presentationDefinition)
-                ).map { PresentationDefinitionSource.PassByValue(it) }
-
-            openID4VPRequestData.presentationDefinition.isNullOrEmpty() && !openID4VPRequestData.presentationDefinitionUri.isNullOrEmpty() ->
-                HttpsUrl.make(openID4VPRequestData.presentationDefinitionUri).fold(
-                    onSuccess = { PresentationDefinitionSource.FetchByReference(it).success() },
-                    onFailure = { AuthorizationRequestValidationError.NonHttpsPresentationDefinitionUri.asFailure() }
-                )
-
-            openID4VPRequestData.scope != null -> TODO()
-            else -> AuthorizationRequestValidationError.MissingPresentationDefinition.asFailure()
+            hasPd && !hasPdUri -> requiredPd()
+            !hasPd && hasPdUri -> requiredPdUri()
+            hasScope -> requiredScope()
+            else -> MissingPresentationDefinition.asFailure()
         }
     }
 
-    private fun OpenID4VPRequestData.parseClientIdScheme(): Result<ClientIdScheme?> =
-        if (clientIdScheme.isNullOrEmpty()) Result.success(null)
-        else ClientIdScheme.make(clientIdScheme)?.success()
-            ?: AuthorizationRequestValidationError.InvalidClientIdScheme(clientIdScheme).asFailure()
+    private fun optionalClientIdScheme(unvalidated: OpenID4VPRequestData): Result<ClientIdScheme?> =
+        if (unvalidated.clientIdScheme.isNullOrEmpty()) Result.success(null)
+        else ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
+            ?: InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
 
-    private fun OpenID4VPRequestData.requiredClientId(): Result<String> =
-        clientId?.success() ?: AuthorizationRequestValidationError.MissingClientId.asFailure()
+    private fun requiredClientId(unvalidated: OpenID4VPRequestData): Result<String> =
+        unvalidated.clientId?.success() ?: MissingClientId.asFailure()
 
-    private fun optionalClientMetaDataSource(ar: OpenID4VPRequestData): Result<ClientMetaDataSource?> = runCatching {
+    private fun optionalClientMetaDataSource(unvalidated: OpenID4VPRequestData): Result<ClientMetaDataSource?> {
 
-        when {
-            !ar.clientMetaData.isNullOrEmpty() && ar.clientMetadataUri.isNullOrEmpty() -> {
-                val decoded = URLDecoder.decode(ar.clientMetaData, "UTF-8")
-                val j = Json.parseToJsonElement(decoded).jsonObject
-                return ClientMetaDataSource.PassByValue(j).success()
-            }
+        val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
+        val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
 
-            else -> TODO()
+        fun requiredClientMetaData() = runCatching {
+            val decoded = URLDecoder.decode(unvalidated.clientMetaData, "UTF-8")
+            val j = Json.parseToJsonElement(decoded).jsonObject
+            ClientMetaDataSource.PassByValue(j)
+        }
+        fun requiredClientMetaDataUri() = runCatching {
+            val uri = HttpsUrl.make(unvalidated.clientMetadataUri!!)
+                .mapError { InvalidClientMetaDataUri.asException() }
+                .getOrThrow()
+            ClientMetaDataSource.FetchByReference(uri)
+        }
+
+        return when {
+            hasCMD && !hasCMDUri -> requiredClientMetaData()
+            !hasCMD && hasCMDUri -> requiredClientMetaDataUri()
+            hasCMD && hasCMDUri -> OneOfClientMedataOrUri.asFailure()
+            else -> Result.success(null)
         }
 
     }

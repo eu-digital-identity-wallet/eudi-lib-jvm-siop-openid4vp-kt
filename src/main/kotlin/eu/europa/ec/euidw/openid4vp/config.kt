@@ -1,9 +1,13 @@
 package eu.europa.ec.euidw.openid4vp
 
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import eu.europa.ec.euidw.prex.ClaimFormat
 import kotlinx.serialization.SerialName
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.SupportedClaimFormat
-
+import java.util.*
 
 
 sealed interface SupportedClientIdScheme {
@@ -11,17 +15,20 @@ sealed interface SupportedClientIdScheme {
         get() = when (this) {
             is Preregistered -> ClientIdScheme.PreRegistered
             is RedirectUri -> ClientIdScheme.RedirectUri
+            is IsoX509 -> ClientIdScheme.ISO_X509
         }
     val preregisteredClients: List<ClientMetaData>
         get() = when (this) {
             is Preregistered -> clients
             is RedirectUri -> emptyList()
+            is IsoX509 -> emptyList()
         }
 
     fun isClientIdSupported(clientIdScheme: ClientIdScheme): Boolean = clientIdScheme == scheme
 
     data class Preregistered(val clients: List<ClientMetaData>) : SupportedClientIdScheme
     object RedirectUri : SupportedClientIdScheme
+    object IsoX509 : SupportedClientIdScheme
 
 }
 
@@ -41,13 +48,19 @@ data class WalletOpenId4VPMetaData(
 data class WalletOpenId4VPConfig(
     val presentationDefinitionUriSupported: Boolean = false,
     val supportedClientIdScheme: SupportedClientIdScheme,
-    val vpFormatsSupported : List<SupportedClaimFormat<*>>,
-    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap()
-
+    val vpFormatsSupported : List<SupportedClaimFormat<in ClaimFormat>>,
+    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+    val holderEmail : String = "example@euidw.com",
+    val holderName : String = "Holder Name",
+    val rsaJWK: RSAKey = RSAKeyGenerator(2048)
+        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
+        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
+        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
+        .generate()
 ) {
 
-    init {
-        require(vpFormatsSupported.isNotEmpty())
-    }
+//    init {
+//        require(vpFormatsSupported.isNotEmpty())
+//    }
 
 }

@@ -29,13 +29,13 @@ val presentationExchangeVersion = "1.0-SNAPSHOT"
 val nimbusSdkVersion = "10.9"
 
 dependencies {
-    implementation("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")
+    api("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")
     implementation("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
     implementation("com.eygraber:uri-kmp:0.0.11")
-    api("io.ktor:ktor-client-core:$ktor_version")
-    api("io.ktor:ktor-client-content-negotiation:$ktor_version")
-    api("io.ktor:ktor-client-serialization:$ktor_version")
-    api("io.ktor:ktor-client-okhttp:$ktor_version")
+    implementation("io.ktor:ktor-client-core:$ktor_version")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+    implementation("io.ktor:ktor-client-serialization:$ktor_version")
+    implementation("io.ktor:ktor-client-okhttp:$ktor_version")
     testImplementation(kotlin("test"))
 }
 
@@ -44,7 +44,10 @@ tasks.test {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain{
+        languageVersion.set(JavaLanguageVersion.of(17))
+        vendor.set(JvmVendorSpec.ADOPTIUM)
+    }
 }
 
 publishing {

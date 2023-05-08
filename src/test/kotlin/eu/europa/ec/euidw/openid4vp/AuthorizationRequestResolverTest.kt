@@ -1,5 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
+import com.nimbusds.oauth2.sdk.id.State
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -31,6 +32,11 @@ class AuthorizationRequestResolverTest {
 
     private val resolver = AuthorizationRequestResolver.make(walletConfig)
 
+    private fun genState(): String {
+        return State().value
+    }
+
+
     @Test
     fun `vp token auth request`() = runBlocking {
         val authRequest =
@@ -40,6 +46,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}"+
                     "&presentation_definition=$pd" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
@@ -57,6 +64,8 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}"+
+                    "&scope=openid"+
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
         val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
@@ -73,6 +82,8 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
+                    "&scope=openid"+
+                    "&state=${genState()}"+
                     "&presentation_definition=$pd" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
@@ -100,6 +111,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}"+
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
 
@@ -116,6 +128,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}"+
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
         exception = assertFailsWith<AuthorizationRequestValidationException> {
@@ -133,6 +146,7 @@ class AuthorizationRequestResolverTest {
                     "response_type=id_token" +
                     "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_id_scheme=redirect_uri" +
+                    "&state=${genState()}"+
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
@@ -152,11 +166,12 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}"+
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
 
         val exception = assertFailsWith<AuthorizationRequestValidationException> {
-            val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
+            val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
             resolver.resolveRequest(authReq).getOrThrow()
         }
         assertTrue { exception.error is SiopId4VPRequestValidationError.MissingClientId }

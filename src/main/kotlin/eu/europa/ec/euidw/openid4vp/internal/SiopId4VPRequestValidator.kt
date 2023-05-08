@@ -21,9 +21,9 @@ sealed interface ValidatedSiopId4VPRequestObject {
         val clientIdScheme: ClientIdScheme?,
         val clientId: String,
         val nonce: String,
-        val scope: Scope?,
+        val scope: Scope,
         val responseMode: ResponseMode,
-        val state: String?
+        val state: String
     ) : ValidatedSiopId4VPRequestObject
 
     data class VpTokenRequestObject(
@@ -33,7 +33,7 @@ sealed interface ValidatedSiopId4VPRequestObject {
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
-        val state: String?
+        val state: String
     ) : ValidatedSiopId4VPRequestObject
 
     data class IdAndVPTokenRequestObject(
@@ -43,9 +43,9 @@ sealed interface ValidatedSiopId4VPRequestObject {
         val clientIdScheme: ClientIdScheme?,
         val clientId: String,
         val nonce: String,
-        val scope: Scope?,
+        val scope: Scope,
         val responseMode: ResponseMode,
-        val state: String?
+        val state: String
     ) : ValidatedSiopId4VPRequestObject
 
 }
@@ -57,13 +57,14 @@ object SiopId4VPRequestValidator{
 
     fun validate(authorizationRequest: RequestObject): Result<ValidatedSiopId4VPRequestObject> =
         runCatching {
-            val scope = authorizationRequest.scope?.let { Scope.make(it) }
+            fun scope() = requiredScope(authorizationRequest)
+            val state = requiredState(authorizationRequest).getOrThrow()
             val nonce = requiredNonce(authorizationRequest).getOrThrow()
             val responseType = requiredResponseType(authorizationRequest).getOrThrow()
             val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
             val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow()
             val clientId = requiredClientId(authorizationRequest).getOrThrow()
-            val presentationDefinitionSource = optionalPresentationDefinitionSource(authorizationRequest, responseType, scope)
+            val presentationDefinitionSource = optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
             val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
             val idTokenType = optionalIdTokenType(authorizationRequest).getOrThrow()
 
@@ -74,9 +75,9 @@ object SiopId4VPRequestValidator{
                 clientIdScheme,
                 clientId,
                 nonce,
-                scope,
+                scope().getOrThrow(),
                 responseMode,
-                state = null
+                state
             )
 
             fun idToken() = ValidatedSiopId4VPRequestObject.IdTokenRequestObject(
@@ -85,9 +86,9 @@ object SiopId4VPRequestValidator{
                 clientIdScheme,
                 clientId,
                 nonce,
-                scope,
+                scope().getOrThrow(),
                 responseMode,
-                state = null
+                state
             )
 
             fun vpToken() = ValidatedSiopId4VPRequestObject.VpTokenRequestObject(
@@ -97,7 +98,7 @@ object SiopId4VPRequestValidator{
                 clientId,
                 nonce,
                 responseMode,
-                state = null
+                state
             )
 
             when (responseType) {
@@ -105,7 +106,7 @@ object SiopId4VPRequestValidator{
                 ResponseType.IdToken -> idToken()
                 ResponseType.VpToken ->
                     // If scope is defined and its value is "openid" then id token must also be returned
-                    if (scope?.value == "openid") idAndVpToken()
+                    if (scope().getOrNull()?.value == "openid") idAndVpToken()
                     else vpToken()
             }
         }
@@ -113,12 +114,12 @@ object SiopId4VPRequestValidator{
     private fun optionalPresentationDefinitionSource(
         authorizationRequest: RequestObject,
         responseType: ResponseType,
-        scope: Scope?
+        scopeProvider: ()-> Scope?
     ): Result<PresentationDefinitionSource?> {
-        return when  {
-            responseType == ResponseType.VpToken || responseType == ResponseType.VpAndIdToken ->
-                parsePresentationDefinitionSource(authorizationRequest, scope)
-            else -> Result.success(null)
+        return when (responseType) {
+            ResponseType.VpToken, ResponseType.VpAndIdToken ->
+                parsePresentationDefinitionSource(authorizationRequest, scopeProvider.invoke())
+            ResponseType.IdToken -> Result.success(null)
         }
     }
 
@@ -164,6 +165,12 @@ object SiopId4VPRequestValidator{
     }
 
 
+    private fun requiredState(unvalidated: RequestObject): Result<String> =
+        unvalidated.state?.success()
+            ?: SiopId4VPRequestValidationError.MissingState.asFailure()
+    private fun requiredScope(unvalidated: RequestObject): Result<Scope> =
+        unvalidated.scope?.let { Scope.make(it) }?.success()
+            ?: SiopId4VPRequestValidationError.MissingScope.asFailure()
     private fun requiredNonce(unvalidated: RequestObject): Result<String> =
         unvalidated.nonce?.success() ?: SiopId4VPRequestValidationError.MissingNonce.asFailure()
 

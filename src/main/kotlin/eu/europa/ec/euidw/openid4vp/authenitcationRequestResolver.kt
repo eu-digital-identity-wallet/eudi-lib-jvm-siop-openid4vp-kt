@@ -5,6 +5,7 @@ import com.nimbusds.jose.shaded.gson.Gson
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils
 import com.nimbusds.oauth2.sdk.util.JSONUtils
+import com.nimbusds.openid.connect.sdk.AuthenticationRequest
 import eu.europa.ec.euidw.openid4vp.internal.SiopId4VPRequestResolver
 import eu.europa.ec.euidw.openid4vp.internal.SiopId4VPRequestValidator
 import eu.europa.ec.euidw.openid4vp.internal.ValidatedSiopId4VPRequestObject
@@ -82,8 +83,8 @@ sealed interface ResolvedRequestObject {
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
-        val state: String?,
-        val scope: Scope?
+        val state: String,
+        val scope: Scope
     ) : ResolvedRequestObject
 
     data class VpTokenRequestObject(
@@ -93,7 +94,7 @@ sealed interface ResolvedRequestObject {
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
-        val state: String?,
+        val state: String,
     ) : ResolvedRequestObject
 
     data class IdAndVPTokenRequestObject(
@@ -103,8 +104,8 @@ sealed interface ResolvedRequestObject {
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
-        val state: String?,
-        val scope: Scope?
+        val state: String,
+        val scope: Scope
     ) : ResolvedRequestObject
 }
 

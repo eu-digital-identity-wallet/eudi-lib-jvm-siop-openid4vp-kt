@@ -25,7 +25,9 @@ sealed interface SiopId4VPRequestValidationError {
     object InvalidResponseUri : SiopId4VPRequestValidationError
     object ResponseUriMustNotBeProvided : SiopId4VPRequestValidationError
     object RedirectUriMustNotBeProvided : SiopId4VPRequestValidationError
+    object MissingState : SiopId4VPRequestValidationError
     object MissingNonce : SiopId4VPRequestValidationError
+    object MissingScope : SiopId4VPRequestValidationError
     object MissingClientId : SiopId4VPRequestValidationError
 
     object InvalidClientMetaDataUri : SiopId4VPRequestValidationError

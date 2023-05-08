@@ -1,5 +1,5 @@
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version("0.4.0")
 }
-rootProject.name = "openid4vp-kt"
+rootProject.name = "siop-openid4vp-kt"
 

@@ -1,27 +1,11 @@
 package eu.europa.ec.euidw.openid4vp
 
+import eu.europa.ec.euidw.openid4vp.internal.utils.HttpsUrl
+import eu.europa.ec.euidw.prex.Claim
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import java.net.URL
-
-/**
- * Represents an HTTPS URL
- */
-@JvmInline
-value class HttpsUrl private constructor(val value: URL) {
-    init {
-        require("https" == value.protocol) { "Only https is supported" }
-    }
-
-    companion object {
-        fun make(s: String): Result<HttpsUrl> = runCatching { HttpsUrl(URL(s)) }
-        fun make(url: URL): Result<HttpsUrl> = runCatching { HttpsUrl(url) }
-    }
-}
-
 
 sealed interface PresentationDefinitionSource {
 
@@ -41,15 +25,23 @@ sealed interface PresentationDefinitionSource {
     data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
-typealias ClientMetaData = JsonObject
+@Serializable
+data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
+    @SerialName("jwks_uri") val jwksUri : String,
+    @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg : String,
+    @SerialName("id_token_encrypted_response_alg")val idTokenEncryptedResponseAlg : String,
+    @SerialName("id_token_encrypted_response_enc") val idTokenEncryptedResponseEnc: String,
+    @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported : List<String>
+)
 
 @JvmInline
-value class Scope private constructor(val value:String){
-    fun items(): List<String> =  itemsOf(value)
-    companion object{
+value class Scope private constructor(val value: String) {
+    fun items(): List<String> = itemsOf(value)
+
+    companion object {
         fun make(s: String): Scope? {
             val trimmed = s.trim()
-            val scopeItems : List<String> = itemsOf(trimmed)
+            val scopeItems: List<String> = itemsOf(trimmed)
             return if (scopeItems.isEmpty()) null
             else Scope(trimmed)
         }
@@ -83,7 +75,9 @@ enum class ClientIdScheme {
 
     EntityId,
 
-    DID;
+    DID,
+
+    ISO_X509;
 
     companion object {
 
@@ -92,6 +86,7 @@ enum class ClientIdScheme {
             "redirect_uri" -> RedirectUri
             "entity_id" -> EntityId
             "did" -> DID
+            "iso_x509" -> ISO_X509
             else -> null
         }
     }
@@ -115,59 +110,75 @@ sealed interface ResponseMode {
      */
     data class Fragment(val redirectUri: HttpsUrl) : ResponseMode
     data class DirectPost(val responseURI: HttpsUrl) : ResponseMode
+    data class DirectPostJwt(val responseURI: HttpsUrl) : ResponseMode
 }
 
 
 enum class ResponseType {
-    VpToken,// VP in AuthorizationResponse
-    IdToken, // Initiates SIOP
-    Code, // VP via  Token end point
-    VpAndIdToken // VP in AuthorizationResponse
+    VpToken,
+    IdToken,
+    VpAndIdToken
 }
-
-
 
 /**
  * The data of an OpenID4VP authorization request
  * without any validation and regardless of the way they sent to the wallet
  */
 @Serializable
-data class OpenID4VPRequestData(
-    @SerialName("response_type") val responseType: String? = null,
-    @SerialName("presentation_definition") val presentationDefinition: String? = null,
-    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null,
+data class SiopId4VPRequestObject(
     @SerialName("client_metadata") val clientMetaData: String? = null,
     @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
     @SerialName("client_id_scheme") val clientIdScheme: String? = null,
-    @SerialName("client_id") val clientId: String? = null,
     @Required val nonce: String? = null,
-    val scope: String? = null,
-    val state: String? = null,
+    @SerialName("client_id") val clientId: String? = null,
+    @SerialName("response_type") val responseType: String? = null,
     @SerialName("response_mode") val responseMode: String? = null,
     @SerialName("response_uri") val responseUri: String? = null,
-    @SerialName("redirect_uri") val redirectUri: String? = null
+    @SerialName("presentation_definition") val presentationDefinition: String? = null,
+    @SerialName("redirect_uri") val redirectUri: String? = null,
+    val scope: String? = null,
+    @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
+    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null, // Not utilized from ISO-23330-4
+    val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
+    @SerialName("id_token_type") val idTokenType: String? = null
 )
 
-data class ValidatedOpenID4VPRequestData(
-    val responseType: ResponseType,
-    val presentationDefinitionSource: PresentationDefinitionSource,
-    val clientMetaDataSource: ClientMetaDataSource? ,
-    val clientIdScheme: ClientIdScheme?,
-    val clientId: String,
-    val nonce: String,
-    val scope: Scope?,
-    val responseMode: ResponseMode,
-    val state: String?
-)
+typealias Jwt = String
+enum class IdTokenType {
+    SubjectSigned,
+    AttesterSigned
+}
 
+sealed interface Consensus {
 
-data class ResolvedOpenID4VPRequestData(
-    val responseType: ResponseType,
-    val presentationDefinition: PresentationDefinition,
-    val clientMetaData: ClientMetaData,
-    val clientId : String,
-    val nonce: String,
-    val responseMode: ResponseMode,
-    val state: String?,
-    val scope: Scope?
-)
+    interface NegativeConsensus : Consensus
+    sealed interface PositiveConsensus : Consensus {
+        object IdTokenConsensus : PositiveConsensus
+
+        data class VPTokenConsensus(
+            val approvedClaims: List<Claim>
+        ) : PositiveConsensus
+
+        data class IdAndVPTokenConsensus(
+            val approvedClaims: List<Claim>
+        ) : PositiveConsensus
+    }
+}
+
+sealed interface RequestConsensus {
+    data class ReleaseClaims(
+        val claims : List<ReleaseClaim>
+    ) : RequestConsensus {
+        data class ReleaseClaim(
+            val claim : Claim,
+            val attributes : List<String>
+        )
+    }
+
+    data class ReleaseIdentity(
+        val requester : String,
+        val reason : String
+    ) :RequestConsensus
+
+    object NoClaims : RequestConsensus
+}

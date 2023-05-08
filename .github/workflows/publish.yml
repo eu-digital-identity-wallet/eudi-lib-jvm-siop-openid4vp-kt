@@ -1,0 +1,22 @@
+name: Publish package to GitHub Packages
+on:
+  push:
+    branches:
+      - 'main'
+      - 'releases/**'
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@ccb4328a959376b642e027874838f60f8e596de3
+      - name: Publish package
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

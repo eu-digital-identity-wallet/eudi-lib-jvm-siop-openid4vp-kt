@@ -26,7 +26,7 @@ repositories {
 
 val ktor_version = "2.3.0"
 val presentationExchangeVersion = "1.0-SNAPSHOT"
-val nimbusSdkVersion = "10.8"
+val nimbusSdkVersion = "10.9"
 
 dependencies {
     implementation("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")

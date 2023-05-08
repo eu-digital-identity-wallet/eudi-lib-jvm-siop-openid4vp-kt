@@ -28,7 +28,7 @@ sealed interface PresentationDefinitionSource {
 
 @Serializable
 data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
-    @SerialName("jwks_uri") val jwksUri: String?,
+    @SerialName("jwks_uri") val jwksUri: String?=null,
     @SerialName("jwks") val jwks: JsonObject?=null,
     @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String,
     @SerialName("id_token_encrypted_response_alg") val idTokenEncryptedResponseAlg: String,

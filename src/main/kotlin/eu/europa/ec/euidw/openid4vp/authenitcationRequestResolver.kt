@@ -1,6 +1,7 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.eygraber.uri.Uri
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
@@ -72,7 +73,7 @@ sealed interface ResolvedRequestObject {
 
     data class IdTokenRequestObject(
         val idTokenType: List<IdTokenType>,
-        val clientMetaData: ClientMetaData,
+        val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
@@ -83,7 +84,7 @@ sealed interface ResolvedRequestObject {
     data class VpTokenRequestObject(
 
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: ClientMetaData,
+        val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
@@ -93,7 +94,7 @@ sealed interface ResolvedRequestObject {
     data class IdAndVPTokenRequestObject(
         val idTokenType: List<IdTokenType>,
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: ClientMetaData,
+        val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
@@ -119,4 +120,3 @@ interface AuthorizationRequestResolver {
             AuthorizationRequestResolverImpl(walletOpenId4VPConfig)
     }
 }
-

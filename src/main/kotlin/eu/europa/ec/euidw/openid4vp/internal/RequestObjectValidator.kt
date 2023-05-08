@@ -13,43 +13,50 @@ import kotlinx.serialization.json.decodeFromJsonElement
 
 internal sealed interface ValidatedRequestObject {
 
+    val clientId: String
+    val clientIdScheme: ClientIdScheme?
+    val clientMetaDataSource: ClientMetaDataSource?
+    val nonce: String
+    val responseMode: ResponseMode
+    val state: String
+
     data class IdTokenRequestObject(
         val idTokenType: List<IdTokenType>,
-        val clientMetaDataSource: ClientMetaDataSource?,
-        val clientIdScheme: ClientIdScheme?,
-        val clientId: String,
-        val nonce: String,
+        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientIdScheme: ClientIdScheme?,
+        override val clientId: String,
+        override val nonce: String,
         val scope: Scope,
-        val responseMode: ResponseMode,
-        val state: String
+        override val responseMode: ResponseMode,
+        override val state: String
     ) : ValidatedRequestObject
 
     data class VpTokenRequestObject(
         val presentationDefinitionSource: PresentationDefinitionSource,
-        val clientMetaDataSource: ClientMetaDataSource?,
-        val clientIdScheme: ClientIdScheme?,
-        val clientId: String,
-        val nonce: String,
-        val responseMode: ResponseMode,
-        val state: String
+        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientIdScheme: ClientIdScheme?,
+        override val clientId: String,
+        override val nonce: String,
+        override val responseMode: ResponseMode,
+        override val state: String
     ) : ValidatedRequestObject
 
     data class IdAndVPTokenRequestObject(
         val idTokenType: List<IdTokenType>,
         val presentationDefinitionSource: PresentationDefinitionSource,
-        val clientMetaDataSource: ClientMetaDataSource?,
-        val clientIdScheme: ClientIdScheme?,
-        val clientId: String,
-        val nonce: String,
+        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientIdScheme: ClientIdScheme?,
+        override val clientId: String,
+        override val nonce: String,
         val scope: Scope,
-        val responseMode: ResponseMode,
-        val state: String
+        override val responseMode: ResponseMode,
+        override val state: String
     ) : ValidatedRequestObject
 
 }
 
 
-internal object RequestObjectValidator{
+internal object RequestObjectValidator {
 
     private val presentationExchangeParser: JsonParser = PresentationExchange.jsonParser
 
@@ -62,13 +69,15 @@ internal object RequestObjectValidator{
             val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
             val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow()
             val clientId = requiredClientId(authorizationRequest).getOrThrow()
-            val presentationDefinitionSource = optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
+            val presentationDefinitionSource =
+                optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
             val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
             val idTokenType = optionalIdTokenType(authorizationRequest).getOrThrow()
 
             fun idAndVpToken() = ValidatedRequestObject.IdAndVPTokenRequestObject(
                 idTokenType,
-                presentationDefinitionSource.getOrThrow() ?: throw IllegalStateException("Presentation definition missing"),
+                presentationDefinitionSource.getOrThrow()
+                    ?: throw IllegalStateException("Presentation definition missing"),
                 clientMetaDataSource,
                 clientIdScheme,
                 clientId,
@@ -90,7 +99,8 @@ internal object RequestObjectValidator{
             )
 
             fun vpToken() = ValidatedRequestObject.VpTokenRequestObject(
-                presentationDefinitionSource.getOrThrow() ?: throw IllegalStateException("Presentation definition missing"),
+                presentationDefinitionSource.getOrThrow()
+                    ?: throw IllegalStateException("Presentation definition missing"),
                 clientMetaDataSource,
                 clientIdScheme,
                 clientId,
@@ -112,11 +122,12 @@ internal object RequestObjectValidator{
     private fun optionalPresentationDefinitionSource(
         authorizationRequest: RequestObject,
         responseType: ResponseType,
-        scopeProvider: ()-> Scope?
+        scopeProvider: () -> Scope?
     ): Result<PresentationDefinitionSource?> {
         return when (responseType) {
             ResponseType.VpToken, ResponseType.VpAndIdToken ->
                 parsePresentationDefinitionSource(authorizationRequest, scopeProvider.invoke())
+
             ResponseType.IdToken -> Result.success(null)
         }
     }
@@ -166,9 +177,11 @@ internal object RequestObjectValidator{
     private fun requiredState(unvalidated: RequestObject): Result<String> =
         unvalidated.state?.success()
             ?: RequestValidationError.MissingState.asFailure()
+
     private fun requiredScope(unvalidated: RequestObject): Result<Scope> =
         unvalidated.scope?.let { Scope.make(it) }?.success()
             ?: RequestValidationError.MissingScope.asFailure()
+
     private fun requiredNonce(unvalidated: RequestObject): Result<String> =
         unvalidated.nonce?.success() ?: RequestValidationError.MissingNonce.asFailure()
 
@@ -176,8 +189,8 @@ internal object RequestObjectValidator{
     private fun requiredResponseType(unvalidated: RequestObject): Result<ResponseType> =
         when (val rt = unvalidated.responseType?.trim()) {
             "vp_token" -> ResponseType.VpToken.success()
-            "vp_token id_token"  -> ResponseType.VpAndIdToken.success()
-            "id_token vp_token"  -> ResponseType.VpAndIdToken.success()
+            "vp_token id_token" -> ResponseType.VpAndIdToken.success()
+            "id_token vp_token" -> ResponseType.VpAndIdToken.success()
             "id_token" -> ResponseType.IdToken.success()
             null -> RequestValidationError.MissingResponseType.asFailure()
             else -> RequestValidationError.UnsupportedResponseType(rt).asFailure()
@@ -191,7 +204,7 @@ internal object RequestObjectValidator{
         val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
         val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
         val hasScope = null != scope
-        val json = Json {ignoreUnknownKeys=true}
+        val json = Json { ignoreUnknownKeys = true }
 
         fun requiredPd() = runCatching {
             val pd = runCatching {

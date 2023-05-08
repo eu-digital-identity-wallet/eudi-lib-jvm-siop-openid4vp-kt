@@ -10,49 +10,57 @@ import eu.europa.ec.euidw.prex.PresentationExchange
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 
-sealed interface ValidatedSiopId4VPRequestObject {
+
+internal sealed interface ValidatedRequestObject {
+
+    val clientId: String
+    val clientIdScheme: ClientIdScheme?
+    val clientMetaDataSource: ClientMetaDataSource?
+    val nonce: String
+    val responseMode: ResponseMode
+    val state: String
 
     data class IdTokenRequestObject(
         val idTokenType: List<IdTokenType>,
-        val clientMetaDataSource: ClientMetaDataSource?,
-        val clientIdScheme: ClientIdScheme?,
-        val clientId: String,
-        val nonce: String,
+        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientIdScheme: ClientIdScheme?,
+        override val clientId: String,
+        override val nonce: String,
         val scope: Scope,
-        val responseMode: ResponseMode,
-        val state: String
-    ) : ValidatedSiopId4VPRequestObject
+        override val responseMode: ResponseMode,
+        override val state: String
+    ) : ValidatedRequestObject
 
     data class VpTokenRequestObject(
         val presentationDefinitionSource: PresentationDefinitionSource,
-        val clientMetaDataSource: ClientMetaDataSource?,
-        val clientIdScheme: ClientIdScheme?,
-        val clientId: String,
-        val nonce: String,
-        val responseMode: ResponseMode,
-        val state: String
-    ) : ValidatedSiopId4VPRequestObject
+        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientIdScheme: ClientIdScheme?,
+        override val clientId: String,
+        override val nonce: String,
+        override val responseMode: ResponseMode,
+        override val state: String
+    ) : ValidatedRequestObject
 
     data class IdAndVPTokenRequestObject(
         val idTokenType: List<IdTokenType>,
         val presentationDefinitionSource: PresentationDefinitionSource,
-        val clientMetaDataSource: ClientMetaDataSource?,
-        val clientIdScheme: ClientIdScheme?,
-        val clientId: String,
-        val nonce: String,
+        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientIdScheme: ClientIdScheme?,
+        override val clientId: String,
+        override val nonce: String,
         val scope: Scope,
-        val responseMode: ResponseMode,
-        val state: String
-    ) : ValidatedSiopId4VPRequestObject
+        override val responseMode: ResponseMode,
+        override val state: String
+    ) : ValidatedRequestObject
 
 }
 
 
-object SiopId4VPRequestValidator{
+internal object RequestObjectValidator {
 
     private val presentationExchangeParser: JsonParser = PresentationExchange.jsonParser
 
-    fun validate(authorizationRequest: RequestObject): Result<ValidatedSiopId4VPRequestObject> =
+    fun validate(authorizationRequest: RequestObject): Result<ValidatedRequestObject> =
         runCatching {
             fun scope() = requiredScope(authorizationRequest)
             val state = requiredState(authorizationRequest).getOrThrow()
@@ -61,13 +69,15 @@ object SiopId4VPRequestValidator{
             val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
             val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow()
             val clientId = requiredClientId(authorizationRequest).getOrThrow()
-            val presentationDefinitionSource = optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
+            val presentationDefinitionSource =
+                optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
             val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
             val idTokenType = optionalIdTokenType(authorizationRequest).getOrThrow()
 
-            fun idAndVpToken() = ValidatedSiopId4VPRequestObject.IdAndVPTokenRequestObject(
+            fun idAndVpToken() = ValidatedRequestObject.IdAndVPTokenRequestObject(
                 idTokenType,
-                presentationDefinitionSource.getOrThrow() ?: throw IllegalStateException("Presentation definition missing"),
+                presentationDefinitionSource.getOrThrow()
+                    ?: throw IllegalStateException("Presentation definition missing"),
                 clientMetaDataSource,
                 clientIdScheme,
                 clientId,
@@ -77,7 +87,7 @@ object SiopId4VPRequestValidator{
                 state
             )
 
-            fun idToken() = ValidatedSiopId4VPRequestObject.IdTokenRequestObject(
+            fun idToken() = ValidatedRequestObject.IdTokenRequestObject(
                 idTokenType,
                 clientMetaDataSource,
                 clientIdScheme,
@@ -88,8 +98,9 @@ object SiopId4VPRequestValidator{
                 state
             )
 
-            fun vpToken() = ValidatedSiopId4VPRequestObject.VpTokenRequestObject(
-                presentationDefinitionSource.getOrThrow() ?: throw IllegalStateException("Presentation definition missing"),
+            fun vpToken() = ValidatedRequestObject.VpTokenRequestObject(
+                presentationDefinitionSource.getOrThrow()
+                    ?: throw IllegalStateException("Presentation definition missing"),
                 clientMetaDataSource,
                 clientIdScheme,
                 clientId,
@@ -111,11 +122,12 @@ object SiopId4VPRequestValidator{
     private fun optionalPresentationDefinitionSource(
         authorizationRequest: RequestObject,
         responseType: ResponseType,
-        scopeProvider: ()-> Scope?
+        scopeProvider: () -> Scope?
     ): Result<PresentationDefinitionSource?> {
         return when (responseType) {
             ResponseType.VpToken, ResponseType.VpAndIdToken ->
                 parsePresentationDefinitionSource(authorizationRequest, scopeProvider.invoke())
+
             ResponseType.IdToken -> Result.success(null)
         }
     }
@@ -138,17 +150,17 @@ object SiopId4VPRequestValidator{
     private fun requiredResponseMode(unvalidated: RequestObject): Result<ResponseMode> {
 
         fun requiredRedirectUriAndNotProvidedResponseUri(): Result<HttpsUrl> =
-            if (unvalidated.responseUri != null) SiopId4VPRequestValidationError.ResponseUriMustNotBeProvided.asFailure()
+            if (unvalidated.responseUri != null) RequestValidationError.ResponseUriMustNotBeProvided.asFailure()
             else when (val uri = unvalidated.redirectUri) {
-                null -> SiopId4VPRequestValidationError.MissingRedirectUri.asFailure()
-                else -> HttpsUrl.make(uri).mapError { SiopId4VPRequestValidationError.InvalidRedirectUri.asException() }
+                null -> RequestValidationError.MissingRedirectUri.asFailure()
+                else -> HttpsUrl.make(uri).mapError { RequestValidationError.InvalidRedirectUri.asException() }
             }
 
         fun requiredResponseUriAndNotProvidedRedirectUri(): Result<HttpsUrl> =
-            if (unvalidated.redirectUri != null) SiopId4VPRequestValidationError.RedirectUriMustNotBeProvided.asFailure()
+            if (unvalidated.redirectUri != null) RequestValidationError.RedirectUriMustNotBeProvided.asFailure()
             else when (val uri = unvalidated.responseUri) {
-                null -> SiopId4VPRequestValidationError.MissingResponseUri.asFailure()
-                else -> HttpsUrl.make(uri).mapError { SiopId4VPRequestValidationError.InvalidResponseUri.asException() }
+                null -> RequestValidationError.MissingResponseUri.asFailure()
+                else -> HttpsUrl.make(uri).mapError { RequestValidationError.InvalidResponseUri.asException() }
             }
 
         return when (unvalidated.responseMode) {
@@ -157,29 +169,31 @@ object SiopId4VPRequestValidator{
             "query" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Query(it) }
             "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
             null -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
-            else -> SiopId4VPRequestValidationError.UnsupportedResponseMode(unvalidated.responseMode).asFailure()
+            else -> RequestValidationError.UnsupportedResponseMode(unvalidated.responseMode).asFailure()
         }
     }
 
 
     private fun requiredState(unvalidated: RequestObject): Result<String> =
         unvalidated.state?.success()
-            ?: SiopId4VPRequestValidationError.MissingState.asFailure()
+            ?: RequestValidationError.MissingState.asFailure()
+
     private fun requiredScope(unvalidated: RequestObject): Result<Scope> =
         unvalidated.scope?.let { Scope.make(it) }?.success()
-            ?: SiopId4VPRequestValidationError.MissingScope.asFailure()
+            ?: RequestValidationError.MissingScope.asFailure()
+
     private fun requiredNonce(unvalidated: RequestObject): Result<String> =
-        unvalidated.nonce?.success() ?: SiopId4VPRequestValidationError.MissingNonce.asFailure()
+        unvalidated.nonce?.success() ?: RequestValidationError.MissingNonce.asFailure()
 
 
     private fun requiredResponseType(unvalidated: RequestObject): Result<ResponseType> =
         when (val rt = unvalidated.responseType?.trim()) {
             "vp_token" -> ResponseType.VpToken.success()
-            "vp_token id_token"  -> ResponseType.VpAndIdToken.success()
-            "id_token vp_token"  -> ResponseType.VpAndIdToken.success()
+            "vp_token id_token" -> ResponseType.VpAndIdToken.success()
+            "id_token vp_token" -> ResponseType.VpAndIdToken.success()
             "id_token" -> ResponseType.IdToken.success()
-            null -> SiopId4VPRequestValidationError.MissingResponseType.asFailure()
-            else -> SiopId4VPRequestValidationError.UnsupportedResponseType(rt).asFailure()
+            null -> RequestValidationError.MissingResponseType.asFailure()
+            else -> RequestValidationError.UnsupportedResponseType(rt).asFailure()
         }
 
 
@@ -190,12 +204,12 @@ object SiopId4VPRequestValidator{
         val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
         val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
         val hasScope = null != scope
-        val json = Json {ignoreUnknownKeys=true}
+        val json = Json { ignoreUnknownKeys = true }
 
         fun requiredPd() = runCatching {
             val pd = runCatching {
                 json.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition!!)
-            }.mapError { SiopId4VPRequestValidationError.InvalidPresentationDefinition(it).asException() }.getOrThrow()
+            }.mapError { RequestValidationError.InvalidPresentationDefinition(it).asException() }.getOrThrow()
             PresentationDefinitionSource.PassByValue(pd)
         }
 
@@ -203,7 +217,7 @@ object SiopId4VPRequestValidator{
         fun requiredPdUri() = runCatching {
             val pdUri = HttpsUrl.make(unvalidated.presentationDefinitionUri!!).getOrThrow()
             PresentationDefinitionSource.FetchByReference(pdUri)
-        }.mapError { SiopId4VPRequestValidationError.InvalidPresentationDefinitionUri.asException() }
+        }.mapError { RequestValidationError.InvalidPresentationDefinitionUri.asException() }
 
         fun requiredScope() = PresentationDefinitionSource.Implied(scope!!).success()
 
@@ -211,17 +225,17 @@ object SiopId4VPRequestValidator{
             hasPd && !hasPdUri -> requiredPd()
             !hasPd && hasPdUri -> requiredPdUri()
             hasScope -> requiredScope()
-            else -> SiopId4VPRequestValidationError.MissingPresentationDefinition.asFailure()
+            else -> RequestValidationError.MissingPresentationDefinition.asFailure()
         }
     }
 
     private fun optionalClientIdScheme(unvalidated: RequestObject): Result<ClientIdScheme?> =
         if (unvalidated.clientIdScheme.isNullOrEmpty()) Result.success(null)
         else ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
-            ?: SiopId4VPRequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
+            ?: RequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
 
     private fun requiredClientId(unvalidated: RequestObject): Result<String> =
-        unvalidated.clientId?.success() ?: SiopId4VPRequestValidationError.MissingClientId.asFailure()
+        unvalidated.clientId?.success() ?: RequestValidationError.MissingClientId.asFailure()
 
     private fun optionalClientMetaDataSource(unvalidated: RequestObject): Result<ClientMetaDataSource?> {
 
@@ -234,7 +248,7 @@ object SiopId4VPRequestValidator{
 
         fun requiredClientMetaDataUri() = runCatching {
             val uri = HttpsUrl.make(unvalidated.clientMetadataUri!!)
-                .mapError { SiopId4VPRequestValidationError.InvalidClientMetaDataUri.asException() }
+                .mapError { RequestValidationError.InvalidClientMetaDataUri.asException() }
                 .getOrThrow()
             ClientMetaDataSource.FetchByReference(uri)
         }
@@ -242,7 +256,7 @@ object SiopId4VPRequestValidator{
         return when {
             hasCMD && !hasCMDUri -> requiredClientMetaData()
             !hasCMD && hasCMDUri -> requiredClientMetaDataUri()
-            hasCMD && hasCMDUri -> SiopId4VPRequestValidationError.OneOfClientMedataOrUri.asFailure()
+            hasCMD && hasCMDUri -> RequestValidationError.OneOfClientMedataOrUri.asFailure()
             else -> Result.success(null)
         }
 

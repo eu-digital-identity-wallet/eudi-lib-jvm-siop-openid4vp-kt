@@ -9,6 +9,7 @@ import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.net.URLEncoder
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -49,7 +50,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&presentation_definition=$pd" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
@@ -67,7 +68,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&scope=openid"+
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
@@ -85,8 +86,8 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&scope=openid"+
-                    "&state=${genState()}"+
+                    "&scope=openid" +
+                    "&state=${genState()}" +
                     "&presentation_definition=$pd" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
@@ -114,7 +115,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
 
@@ -122,7 +123,7 @@ class AuthorizationRequestResolverTest {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.UnsupportedResponseType }
+        assertTrue { exception.error is RequestValidationError.UnsupportedResponseType }
 
         authRequest =
             "https://client.example.org/universal-link?" +
@@ -138,7 +139,7 @@ class AuthorizationRequestResolverTest {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.UnsupportedResponseType }
+        assertTrue { exception.error is RequestValidationError.UnsupportedResponseType }
 
     }
 
@@ -149,7 +150,7 @@ class AuthorizationRequestResolverTest {
                     "response_type=id_token" +
                     "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_id_scheme=redirect_uri" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
@@ -158,7 +159,7 @@ class AuthorizationRequestResolverTest {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.MissingNonce }
+        assertTrue { exception.error is RequestValidationError.MissingNonce }
     }
 
     @Test
@@ -177,7 +178,17 @@ class AuthorizationRequestResolverTest {
             val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.MissingClientId }
+        assertTrue { exception.error is RequestValidationError.MissingClientId }
+    }
+
+    @Test
+    @Ignore
+    fun foo() = runBlocking {
+        val url =
+            "http://localhost:8080/wallet/request.jwt/Bvo17WHtOgypXkE8VLEi85afu5Bf20ew1dnIFPmNgxSimtCdOQxo37VwYWLr0ZRfJ9XaVuJNSFGa3Azrm032pA"
+        val authRequestStr = "eudi-wallet://authorize?client_id=Verifier" +
+                "&request_uri=${URLEncoder.encode(url, "UTF-8")}"
+        resolver.resolveRequest(authRequestStr).also { println(it) }.getOrThrow()
     }
 
     @OptIn(ExperimentalSerializationApi::class)

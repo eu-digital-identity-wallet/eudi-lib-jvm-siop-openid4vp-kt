@@ -1,6 +1,7 @@
 package eu.europa.ec.euidw.openid4vp.internal
 
 import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.euidw.openid4vp.PresentationDefinitionSource.*
 import eu.europa.ec.euidw.openid4vp.internal.utils.HttpGet
 import eu.europa.ec.euidw.openid4vp.internal.utils.HttpsUrl
 import eu.europa.ec.euidw.openid4vp.internal.utils.mapError
@@ -12,7 +13,7 @@ import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 
-object PresentationDefinitionResolver {
+internal object PresentationDefinitionResolver {
 
     private val ktorHttpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {}
@@ -27,9 +28,9 @@ object PresentationDefinitionResolver {
 
     suspend fun resolve(presentationDefinitionSource: PresentationDefinitionSource, walletOpenId4VPConfig: WalletOpenId4VPConfig): Result<PresentationDefinition> =
         when (presentationDefinitionSource) {
-            is PresentationDefinitionSource.PassByValue -> presentationDefinitionSource.presentationDefinition.success()
-            is PresentationDefinitionSource.Implied -> lookupKnownPresentationDefinitions(presentationDefinitionSource.scope, walletOpenId4VPConfig)
-            is PresentationDefinitionSource.FetchByReference -> fetch(presentationDefinitionSource.url, walletOpenId4VPConfig)
+            is PassByValue -> presentationDefinitionSource.presentationDefinition.success()
+            is Implied -> lookupKnownPresentationDefinitions(presentationDefinitionSource.scope, walletOpenId4VPConfig)
+            is FetchByReference -> fetch(presentationDefinitionSource.url, walletOpenId4VPConfig)
         }
 
     private fun lookupKnownPresentationDefinitions(scope: Scope, walletOpenId4VPConfig: WalletOpenId4VPConfig): Result<PresentationDefinition> =

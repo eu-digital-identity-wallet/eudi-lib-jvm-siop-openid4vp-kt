@@ -11,8 +11,9 @@ import java.net.URL
 object ClientMetadataValidator {
 
     fun validate(clientMetadata : ClientMetaData) : Result<OIDCClientMetadata> {
+        val isValid = hasRequiredJwksSource(clientMetadata) && hasSubjectSyntaxTypes(clientMetadata)
         return when {
-            hasRequiredJwksSource(clientMetadata) && hasSubjectSyntaxTypes(clientMetadata) ->  Result.success(valid(clientMetadata))
+            isValid ->  Result.success(valid(clientMetadata))
             else -> Result.failure(IllegalStateException("Client metadata wrong syntax"))
         }
     }
@@ -32,7 +33,7 @@ object ClientMetadataValidator {
         if (!cmtd.jwksUri.isNullOrEmpty()) {
             vJwkSet = JWKSet.load(URL(cmtd.jwksUri))
         } else {
-            vJwkSet = JWKSet.parse(cmtd.jwks)
+            vJwkSet = JWKSet.parse(cmtd.jwks?.toString())
         }
         return OIDCClientMetadata().apply {
             idTokenJWSAlg = JWSAlgorithm.parse(cmtd.idTokenSignedResponseAlg)

@@ -12,7 +12,7 @@ import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 
-object PresentationDefinitionResolver {
+internal object PresentationDefinitionResolver {
 
     private val ktorHttpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {}

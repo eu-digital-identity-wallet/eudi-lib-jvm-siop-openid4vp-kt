@@ -12,7 +12,7 @@ import io.ktor.client.request.*
 import java.lang.IllegalArgumentException
 
 
-object ClientMetaDataResolver {
+internal object ClientMetaDataResolver {
 
     private val ktorHttpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {}

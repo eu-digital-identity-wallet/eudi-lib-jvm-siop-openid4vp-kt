@@ -9,6 +9,7 @@ import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.net.URLEncoder
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -46,7 +47,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&presentation_definition=$pd" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
@@ -64,8 +65,8 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
-                    "&scope=openid"+
+                    "&state=${genState()}" +
+                    "&scope=openid" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
         val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
@@ -82,8 +83,8 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&scope=openid"+
-                    "&state=${genState()}"+
+                    "&scope=openid" +
+                    "&state=${genState()}" +
                     "&presentation_definition=$pd" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
@@ -111,7 +112,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
 
@@ -119,7 +120,7 @@ class AuthorizationRequestResolverTest {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.UnsupportedResponseType }
+        assertTrue { exception.error is RequestValidationError.UnsupportedResponseType }
 
         authRequest =
             "https://client.example.org/universal-link?" +
@@ -128,14 +129,14 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
         exception = assertFailsWith<AuthorizationRequestValidationException> {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.UnsupportedResponseType }
+        assertTrue { exception.error is RequestValidationError.UnsupportedResponseType }
 
     }
 
@@ -146,7 +147,7 @@ class AuthorizationRequestResolverTest {
                     "response_type=id_token" +
                     "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_id_scheme=redirect_uri" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
@@ -155,7 +156,7 @@ class AuthorizationRequestResolverTest {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.MissingNonce }
+        assertTrue { exception.error is RequestValidationError.MissingNonce }
     }
 
     @Test
@@ -166,7 +167,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&client_metadata=%7B%22jwks_uri%22%3A%20%22https%3A%2F%2Fjwk%22%2C%22id_token_signed_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%22subject_syntax_types_supported%22%3A%20%5B%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%22did%3Aexample%22%2C%22did%3Akey%22%5D%7D"
 
 
@@ -174,7 +175,17 @@ class AuthorizationRequestResolverTest {
             val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
             resolver.resolveRequest(authReq).getOrThrow()
         }
-        assertTrue { exception.error is SiopId4VPRequestValidationError.MissingClientId }
+        assertTrue { exception.error is RequestValidationError.MissingClientId }
+    }
+
+    @Test
+    @Ignore
+    fun foo() = runBlocking {
+        val url =
+            "http://localhost:8080/wallet/request.jwt/Bvo17WHtOgypXkE8VLEi85afu5Bf20ew1dnIFPmNgxSimtCdOQxo37VwYWLr0ZRfJ9XaVuJNSFGa3Azrm032pA"
+        val authRequestStr = "eudi-wallet://authorize?client_id=Verifier" +
+                "&request_uri=${URLEncoder.encode(url, "UTF-8")}"
+        resolver.resolveRequest(authRequestStr).also { println(it) }.getOrThrow()
     }
 
     @OptIn(ExperimentalSerializationApi::class)

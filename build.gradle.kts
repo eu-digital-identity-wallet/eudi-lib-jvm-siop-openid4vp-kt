@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.8.10"
-    kotlin("plugin.serialization") version "1.8.10"
+    kotlin("jvm") version "1.8.21"
+    kotlin("plugin.serialization") version "1.8.21"
     `java-library`
     `maven-publish`
 }
@@ -10,12 +10,23 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven {
+        name = "NiscyEudiwPackages"
+        url = uri("https://maven.pkg.github.com/niscy-eudiw/*")
+        credentials {
+            username = System.getenv("GH_PKG_USER")
+            password = System.getenv("GH_PKG_TOKEN")
+        }
+        mavenContent{
+            snapshotsOnly()
+        }
+    }
     mavenLocal()
 }
 
 val ktor_version = "2.2.4"
 val presentationExchangeVersion = "1.0-SNAPSHOT"
-val nimbusSdkVersion = "10.7.1"
+val nimbusSdkVersion = "10.8"
 
 dependencies {
     implementation("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")

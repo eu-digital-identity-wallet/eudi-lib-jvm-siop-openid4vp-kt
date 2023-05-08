@@ -1,18 +1,20 @@
-# OpenID4VP first release
+# SIOPv2 OpenID4VP 
 
-## Cross device & Same Device
+This is a Kotlin library, targeting JVM, that supports the SIOPv2 (draft 12) and OpenId4VP (draft 18) protocols.
+In particular, the library focus on the wallet's role and in addition focuses on the 
+usage of those two protocols as they are constraint by ISO 23220-4 and ISO-18013-7
 
-SDK should be agnostic of this. That's a wallet's concern.
-For a simple application (not the wallet) that demonstrates the SDK usage,
-we can assume the cross device scenario.
 
-What this means for the SDK?
+## Cross device & Same Device scenarios
+
+Library focuses on the same device scenario as described in ISO-23220-4 (Appendix B)
+
 It can be assumed that the `AuthorizationRequest` contains a `response_mode`
-equal to `direct_post`
+equal to `direct_post.jwt`
 
 ## Supported `response_mode`
 
-A Wallet can take the form a a web or mobile application.
+A Wallet can take the form a web or mobile application.
 Protocol describes flows for both. Given that we are focusing on a mobile wallet we could
 assume that `AuthorizationRequest` contains always a `response_mode` equal to `direct_post`
 

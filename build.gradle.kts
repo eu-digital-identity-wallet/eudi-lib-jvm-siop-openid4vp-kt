@@ -24,7 +24,7 @@ repositories {
     mavenLocal()
 }
 
-val ktor_version = "2.2.4"
+val ktor_version = "2.3.0"
 val presentationExchangeVersion = "1.0-SNAPSHOT"
 val nimbusSdkVersion = "10.8"
 

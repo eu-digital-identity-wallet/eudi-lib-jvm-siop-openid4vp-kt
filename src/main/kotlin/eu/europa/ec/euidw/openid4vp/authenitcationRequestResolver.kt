@@ -3,6 +3,7 @@ package eu.europa.ec.euidw.openid4vp
 import com.eygraber.uri.Uri
 import com.nimbusds.jose.shaded.gson.Gson
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import com.nimbusds.oauth2.sdk.util.JSONObjectUtils
 import com.nimbusds.oauth2.sdk.util.JSONUtils
 import com.nimbusds.openid.connect.sdk.AuthenticationRequest
@@ -79,7 +80,7 @@ sealed interface ResolvedRequestObject {
 
     data class IdTokenRequestObject(
         val idTokenType: List<IdTokenType>,
-        val clientMetaData: ClientMetaData,
+        val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
@@ -90,7 +91,7 @@ sealed interface ResolvedRequestObject {
     data class VpTokenRequestObject(
 
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: ClientMetaData,
+        val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,
@@ -100,7 +101,7 @@ sealed interface ResolvedRequestObject {
     data class IdAndVPTokenRequestObject(
         val idTokenType: List<IdTokenType>,
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: ClientMetaData,
+        val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         val responseMode: ResponseMode,

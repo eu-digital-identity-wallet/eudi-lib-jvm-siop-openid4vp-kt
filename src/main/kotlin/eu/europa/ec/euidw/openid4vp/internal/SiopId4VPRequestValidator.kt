@@ -9,9 +9,6 @@ import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.PresentationExchange
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonObject
-import java.net.URLDecoder
-
 
 sealed interface ValidatedSiopId4VPRequestObject {
 

@@ -47,3 +47,22 @@ kotlin {
     jvmToolchain(17)
 }
 
+publishing {
+    publications {
+        create<MavenPublication>("library") {
+            from(components["java"])
+        }
+    }
+    repositories {
+
+        maven {
+            name = "NiscyEudiwPackages"
+            url = uri("https://maven.pkg.github.com/niscy-eudiw/siop-openid4vp-kt")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+
+        }
+    }
+}

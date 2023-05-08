@@ -5,6 +5,7 @@ import eu.europa.ec.euidw.openid4vp.internal.utils.HttpsUrl
 import eu.europa.ec.euidw.openid4vp.internal.utils.mapError
 import eu.europa.ec.euidw.openid4vp.internal.utils.success
 import eu.europa.ec.euidw.prex.JsonParser
+import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.PresentationExchange
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -54,7 +55,7 @@ object SiopId4VPRequestValidator{
 
     private val presentationExchangeParser: JsonParser = PresentationExchange.jsonParser
 
-    fun validate(authorizationRequest: SiopId4VPRequestObject): Result<ValidatedSiopId4VPRequestObject> =
+    fun validate(authorizationRequest: RequestObject): Result<ValidatedSiopId4VPRequestObject> =
         runCatching {
             val scope = authorizationRequest.scope?.let { Scope.make(it) }
             val nonce = requiredNonce(authorizationRequest).getOrThrow()
@@ -110,7 +111,7 @@ object SiopId4VPRequestValidator{
         }
 
     private fun optionalPresentationDefinitionSource(
-        authorizationRequest: SiopId4VPRequestObject,
+        authorizationRequest: RequestObject,
         responseType: ResponseType,
         scope: Scope?
     ): Result<PresentationDefinitionSource?> {
@@ -122,7 +123,7 @@ object SiopId4VPRequestValidator{
     }
 
 
-    private fun optionalIdTokenType(unvalidated: SiopId4VPRequestObject): Result<List<IdTokenType>> = runCatching {
+    private fun optionalIdTokenType(unvalidated: RequestObject): Result<List<IdTokenType>> = runCatching {
 
         unvalidated.idTokenType
             ?.split(" ")
@@ -136,7 +137,7 @@ object SiopId4VPRequestValidator{
             } ?: emptyList()
     }
 
-    private fun requiredResponseMode(unvalidated: SiopId4VPRequestObject): Result<ResponseMode> {
+    private fun requiredResponseMode(unvalidated: RequestObject): Result<ResponseMode> {
 
         fun requiredRedirectUriAndNotProvidedResponseUri(): Result<HttpsUrl> =
             if (unvalidated.responseUri != null) SiopId4VPRequestValidationError.ResponseUriMustNotBeProvided.asFailure()
@@ -163,11 +164,11 @@ object SiopId4VPRequestValidator{
     }
 
 
-    private fun requiredNonce(unvalidated: SiopId4VPRequestObject): Result<String> =
+    private fun requiredNonce(unvalidated: RequestObject): Result<String> =
         unvalidated.nonce?.success() ?: SiopId4VPRequestValidationError.MissingNonce.asFailure()
 
 
-    private fun requiredResponseType(unvalidated: SiopId4VPRequestObject): Result<ResponseType> =
+    private fun requiredResponseType(unvalidated: RequestObject): Result<ResponseType> =
         when (val rt = unvalidated.responseType?.trim()) {
             "vp_token" -> ResponseType.VpToken.success()
             "vp_token id_token"  -> ResponseType.VpAndIdToken.success()
@@ -179,17 +180,18 @@ object SiopId4VPRequestValidator{
 
 
     private fun parsePresentationDefinitionSource(
-        unvalidated: SiopId4VPRequestObject,
+        unvalidated: RequestObject,
         scope: Scope?
     ): Result<PresentationDefinitionSource> {
         val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
         val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
         val hasScope = null != scope
+        val json = Json {ignoreUnknownKeys=true}
 
         fun requiredPd() = runCatching {
-            val pd = presentationExchangeParser.decodePresentationDefinition(
-                unvalidated.presentationDefinition!!
-            ).mapError { SiopId4VPRequestValidationError.InvalidPresentationDefinition(it).asException() }.getOrThrow()
+            val pd = runCatching {
+                json.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition!!)
+            }.mapError { SiopId4VPRequestValidationError.InvalidPresentationDefinition(it).asException() }.getOrThrow()
             PresentationDefinitionSource.PassByValue(pd)
         }
 
@@ -209,23 +211,21 @@ object SiopId4VPRequestValidator{
         }
     }
 
-    private fun optionalClientIdScheme(unvalidated: SiopId4VPRequestObject): Result<ClientIdScheme?> =
+    private fun optionalClientIdScheme(unvalidated: RequestObject): Result<ClientIdScheme?> =
         if (unvalidated.clientIdScheme.isNullOrEmpty()) Result.success(null)
         else ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
             ?: SiopId4VPRequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
 
-    private fun requiredClientId(unvalidated: SiopId4VPRequestObject): Result<String> =
+    private fun requiredClientId(unvalidated: RequestObject): Result<String> =
         unvalidated.clientId?.success() ?: SiopId4VPRequestValidationError.MissingClientId.asFailure()
 
-    private fun optionalClientMetaDataSource(unvalidated: SiopId4VPRequestObject): Result<ClientMetaDataSource?> {
+    private fun optionalClientMetaDataSource(unvalidated: RequestObject): Result<ClientMetaDataSource?> {
 
         val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
         val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
 
         fun requiredClientMetaData() = runCatching {
-            val decoded = URLDecoder.decode(unvalidated.clientMetaData, "UTF-8")
-            val j = Json.parseToJsonElement(decoded).jsonObject
-            ClientMetaDataSource.PassByValue(Json.decodeFromJsonElement<ClientMetaData>(j))
+            ClientMetaDataSource.PassByValue(Json.decodeFromJsonElement<ClientMetaData>(unvalidated.clientMetaData!!))
         }
 
         fun requiredClientMetaDataUri() = runCatching {

@@ -6,6 +6,7 @@ import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 sealed interface PresentationDefinitionSource {
 
@@ -27,11 +28,12 @@ sealed interface PresentationDefinitionSource {
 
 @Serializable
 data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
-    @SerialName("jwks_uri") val jwksUri : String,
-    @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg : String,
-    @SerialName("id_token_encrypted_response_alg")val idTokenEncryptedResponseAlg : String,
+    @SerialName("jwks_uri") val jwksUri: String?,
+    @SerialName("jwks") val jwks: JsonObject?=null,
+    @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String,
+    @SerialName("id_token_encrypted_response_alg") val idTokenEncryptedResponseAlg: String,
     @SerialName("id_token_encrypted_response_enc") val idTokenEncryptedResponseEnc: String,
-    @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported : List<String>
+    @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>
 )
 
 @JvmInline
@@ -125,8 +127,8 @@ enum class ResponseType {
  * without any validation and regardless of the way they sent to the wallet
  */
 @Serializable
-data class SiopId4VPRequestObject(
-    @SerialName("client_metadata") val clientMetaData: String? = null,
+data class RequestObject(
+    @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
     @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
     @SerialName("client_id_scheme") val clientIdScheme: String? = null,
     @Required val nonce: String? = null,
@@ -134,16 +136,17 @@ data class SiopId4VPRequestObject(
     @SerialName("response_type") val responseType: String? = null,
     @SerialName("response_mode") val responseMode: String? = null,
     @SerialName("response_uri") val responseUri: String? = null,
-    @SerialName("presentation_definition") val presentationDefinition: String? = null,
+    @SerialName("presentation_definition") val presentationDefinition: JsonObject? = null,
+    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null, // Not utilized from ISO-23330-4
     @SerialName("redirect_uri") val redirectUri: String? = null,
     val scope: String? = null,
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
-    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null, // Not utilized from ISO-23330-4
     val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
     @SerialName("id_token_type") val idTokenType: String? = null
 )
 
 typealias Jwt = String
+
 enum class IdTokenType {
     SubjectSigned,
     AttesterSigned
@@ -167,18 +170,18 @@ sealed interface Consensus {
 
 sealed interface RequestConsensus {
     data class ReleaseClaims(
-        val claims : List<ReleaseClaim>
+        val claims: List<ReleaseClaim>
     ) : RequestConsensus {
         data class ReleaseClaim(
-            val claim : Claim,
-            val attributes : List<String>
+            val claim: Claim,
+            val attributes: List<String>
         )
     }
 
     data class ReleaseIdentity(
-        val requester : String,
-        val reason : String
-    ) :RequestConsensus
+        val requester: String,
+        val reason: String
+    ) : RequestConsensus
 
     object NoClaims : RequestConsensus
 }

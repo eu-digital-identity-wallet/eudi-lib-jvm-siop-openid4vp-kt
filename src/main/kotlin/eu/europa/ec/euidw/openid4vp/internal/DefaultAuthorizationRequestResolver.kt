@@ -7,13 +7,6 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.NotSecured
-import eu.europa.ec.euidw.openid4vp.internal.utils.HttpGet
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -37,7 +30,7 @@ internal class AuthorizationRequestResolverImpl(
         is JwtSecured -> {
             val jwt = when (request) {
                 is PassByValue -> request.jwt
-                is PassByReference -> httpGetter.get(request.jwtURI).getOrThrow()
+                is PassByReference -> HttpGet.ktor<String>().get(request.jwtURI).getOrThrow()
             }
             val requestObject = requestObjectFromJwt(jwt)
             // Make sure that clientId of the initial request is the same
@@ -47,19 +40,6 @@ internal class AuthorizationRequestResolverImpl(
         }
     }
 
-
-    private val httpGetter: HttpGet<String> by lazy {
-        val ktorHttpClient = HttpClient(OkHttp) {
-            install(ContentNegotiation) {}
-        }
-        HttpGet { url ->
-            runCatching {
-                val response = ktorHttpClient.get(url.value)
-                if (response.status == HttpStatusCode.OK) response.body()
-                else throw RuntimeException("Failed to get ${url}. Http Code = ${response.status}")
-            }
-        }
-    }
 
 }
 

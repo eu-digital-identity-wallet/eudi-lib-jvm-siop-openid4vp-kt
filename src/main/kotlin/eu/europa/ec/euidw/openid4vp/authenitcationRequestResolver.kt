@@ -5,7 +5,7 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
-import eu.europa.ec.euidw.openid4vp.internal.utils.HttpsUrl
+import eu.europa.ec.euidw.openid4vp.internal.HttpsUrl
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -28,7 +28,8 @@ sealed interface AuthorizationRequest {
 
         fun make(uriStr: String): Result<AuthorizationRequest> = runCatching {
             val uri = Uri.parse(uriStr)
-            fun clientId(): String = uri.getQueryParameter("client_id")
+            fun clientId(): String =
+                uri.getQueryParameter("client_id")
                 ?: throw RequestValidationError.MissingClientId.asException()
 
             val requestValue = uri.getQueryParameter("request")
@@ -39,11 +40,11 @@ sealed interface AuthorizationRequest {
                 !requestUriValue.isNullOrEmpty() -> HttpsUrl.make(requestUriValue)
                     .map { PassByReference(clientId(), it) }.getOrThrow()
 
-                else -> makeOauth2(uri)
+                else -> notSecured(uri)
             }
         }
 
-        private fun makeOauth2(uri: Uri): NotSecured {
+        private fun notSecured(uri: Uri): NotSecured {
 
             fun jsonObject(p: String): JsonObject? =
                 uri.getQueryParameter(p)?.let { json.parseToJsonElement(it).jsonObject }

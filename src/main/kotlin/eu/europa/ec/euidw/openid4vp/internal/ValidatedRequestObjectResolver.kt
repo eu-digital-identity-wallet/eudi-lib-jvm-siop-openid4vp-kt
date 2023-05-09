@@ -5,7 +5,6 @@ import eu.europa.ec.euidw.openid4vp.PresentationDefinitionSource
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject
 import eu.europa.ec.euidw.openid4vp.WalletOpenId4VPConfig
 import eu.europa.ec.euidw.openid4vp.internal.ValidatedRequestObject.*
-import eu.europa.ec.euidw.openid4vp.internal.utils.success
 import eu.europa.ec.euidw.prex.PresentationDefinition
 
 internal object ValidatedRequestObjectResolver {

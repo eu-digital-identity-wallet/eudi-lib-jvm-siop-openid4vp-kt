@@ -1,4 +1,4 @@
-package eu.europa.ec.euidw.openid4vp.internal.utils
+package eu.europa.ec.euidw.openid4vp.internal
 
 //
 // Helper methods

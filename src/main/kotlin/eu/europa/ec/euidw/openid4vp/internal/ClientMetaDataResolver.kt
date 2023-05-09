@@ -5,14 +5,6 @@ import eu.europa.ec.euidw.openid4vp.ClientMetaData
 import eu.europa.ec.euidw.openid4vp.ClientMetaDataSource
 import eu.europa.ec.euidw.openid4vp.ResolutionError
 import eu.europa.ec.euidw.openid4vp.ResolutionException
-import eu.europa.ec.euidw.openid4vp.internal.utils.HttpGet
-import eu.europa.ec.euidw.openid4vp.internal.utils.HttpsUrl
-import eu.europa.ec.euidw.openid4vp.internal.utils.mapError
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
 
 
 internal object ClientMetaDataResolver {
@@ -30,19 +22,8 @@ internal object ClientMetaDataResolver {
     }
 
     private suspend fun fetch(url: HttpsUrl): Result<ClientMetaData> =
-        httpGetter.get(url).mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
-
-    private val httpGetter: HttpGet<ClientMetaData> by lazy {
-        val ktorHttpClient = HttpClient(OkHttp) {
-            install(ContentNegotiation) {}
-        }
-        object : HttpGet<ClientMetaData> {
-            override suspend fun get(url: HttpsUrl): Result<ClientMetaData> =
-                runCatching {
-                    ktorHttpClient.get(url.value).body()
-                }
-        }
-    }
+        HttpGet.ktor<ClientMetaData>().get(url)
+            .mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
 
 }
 

@@ -1,6 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
-import eu.europa.ec.euidw.openid4vp.internal.utils.HttpsUrl
+import eu.europa.ec.euidw.openid4vp.internal.HttpsUrl
 import eu.europa.ec.euidw.prex.Claim
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.Required

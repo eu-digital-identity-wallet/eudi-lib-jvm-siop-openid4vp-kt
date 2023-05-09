@@ -30,7 +30,7 @@ val nimbusSdkVersion = "10.9"
 
 dependencies {
     api("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")
-    implementation("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
+    api("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
     implementation("com.eygraber:uri-kmp:0.0.11")
     implementation("io.ktor:ktor-client-core:$ktor_version")
     implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")

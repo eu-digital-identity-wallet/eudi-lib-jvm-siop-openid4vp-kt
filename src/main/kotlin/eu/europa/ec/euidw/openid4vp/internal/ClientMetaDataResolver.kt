@@ -7,6 +7,7 @@ import eu.europa.ec.euidw.openid4vp.*
 internal class ClientMetaDataResolver(private val getClientMetaData: HttpGet<ClientMetaData>) {
 
 
+
     suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): Result<OIDCClientMetadata> {
 
         val clientMetaData = when (clientMetaDataSource) {

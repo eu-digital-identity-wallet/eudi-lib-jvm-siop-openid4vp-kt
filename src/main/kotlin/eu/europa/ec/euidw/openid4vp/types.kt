@@ -35,6 +35,11 @@ data class ClientMetaData( // By OpenID Connect Dynamic Client Registration spec
     @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>
 )
 
+enum class SubjectSyntaxType {
+    JWKThumbprint,
+    DecentralizedIdentifier
+}
+
 @JvmInline
 value class Scope private constructor(val value: String) {
     fun items(): List<String> = itemsOf(value)

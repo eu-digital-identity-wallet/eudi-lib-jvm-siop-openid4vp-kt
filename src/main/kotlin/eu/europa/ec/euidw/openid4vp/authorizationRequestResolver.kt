@@ -101,6 +101,9 @@ sealed interface AuthorizationRequest {
  */
 sealed interface ResolvedRequestObject {
 
+    val responseMode: ResponseMode
+    val state: String
+
     /**
      * SIOPv2 Authorization request for issuing an id_token
      */
@@ -109,8 +112,8 @@ sealed interface ResolvedRequestObject {
         val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
-        val responseMode: ResponseMode,
-        val state: String,
+        override val responseMode: ResponseMode,
+        override val state: String,
         val scope: Scope
     ) : ResolvedRequestObject
 
@@ -118,13 +121,12 @@ sealed interface ResolvedRequestObject {
      * OpenId4VP Authorization request for presenting a vp_token
      */
     data class VpTokenRequestObject(
-
         val presentationDefinition: PresentationDefinition,
         val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
-        val responseMode: ResponseMode,
-        val state: String,
+        override val responseMode: ResponseMode,
+        override val state: String,
     ) : ResolvedRequestObject
 
     /**
@@ -136,8 +138,8 @@ sealed interface ResolvedRequestObject {
         val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
-        val responseMode: ResponseMode,
-        val state: String,
+        override val responseMode: ResponseMode,
+        override val state: String,
         val scope: Scope
     ) : ResolvedRequestObject
 }

@@ -5,7 +5,9 @@ import io.ktor.client.call.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.serialization.kotlinx.json.*
 import java.net.URL
+import kotlin.contracts.contract
 
 internal fun interface HttpGet<out R> {
     suspend fun get(url: HttpsUrl): Result<R>
@@ -15,7 +17,7 @@ internal fun interface HttpGet<out R> {
             client: HttpClient = ktorHttpClient
         ): HttpGet<R> = object : HttpGet<R> {
             override suspend fun get(url: HttpsUrl): Result<R> = runCatching {
-                client.use { it.get(url.value).body() }
+                client.get(url.value).body()
             }
         }
     }
@@ -24,7 +26,7 @@ internal fun interface HttpGet<out R> {
 
 internal val ktorHttpClient: HttpClient by lazy {
     HttpClient(OkHttp) {
-        install(ContentNegotiation) {}
+        install(ContentNegotiation) {json() }
         expectSuccess = true
     }
 }

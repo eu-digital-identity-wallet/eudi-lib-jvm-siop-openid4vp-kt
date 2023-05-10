@@ -6,6 +6,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.euidw.openid4vp.asFailure
 import java.net.URL
 
 internal class ClientMetadataValidator(

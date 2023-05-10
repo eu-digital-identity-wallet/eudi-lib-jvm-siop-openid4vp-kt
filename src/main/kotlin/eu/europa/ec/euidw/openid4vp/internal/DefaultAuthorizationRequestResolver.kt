@@ -7,12 +7,15 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.NotSecured
+import io.ktor.client.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 internal class AuthorizationRequestResolverImpl(
-    private val walletOpenId4VPConfig: WalletOpenId4VPConfig
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    private val getRequestObjectJwt: HttpGet<String>,
+    private val validatedRequestObjectResolver: ValidatedRequestObjectResolver
 ) : AuthorizationRequestResolver {
 
 
@@ -21,7 +24,7 @@ internal class AuthorizationRequestResolverImpl(
     ): Result<ResolvedRequestObject> = runCatching {
         val requestObject = requestObjectOf(request)
         val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
-        ValidatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
+        validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
     }
 
 
@@ -30,7 +33,7 @@ internal class AuthorizationRequestResolverImpl(
         is JwtSecured -> {
             val jwt = when (request) {
                 is PassByValue -> request.jwt
-                is PassByReference -> HttpGet.ktor<String>().get(request.jwtURI).getOrThrow()
+                is PassByReference -> getRequestObjectJwt.get(request.jwtURI).getOrThrow()
             }
             val requestObject = requestObjectFromJwt(jwt)
             // Make sure that clientId of the initial request is the same
@@ -38,6 +41,25 @@ internal class AuthorizationRequestResolverImpl(
             require(request.clientId == requestObject.clientId) { "Invalid client_id. Expected ${request.clientId} found ${requestObject.clientId}" }
             requestObject
         }
+    }
+
+    companion object {
+        internal fun make(
+            client: HttpClient,
+            walletOpenId4VPConfig: WalletOpenId4VPConfig
+        ): AuthorizationRequestResolverImpl = AuthorizationRequestResolverImpl(
+            walletOpenId4VPConfig = walletOpenId4VPConfig,
+            getRequestObjectJwt = HttpGet.ktor(client),
+            validatedRequestObjectResolver = ValidatedRequestObjectResolver(
+                presentationDefinitionResolver = PresentationDefinitionResolver(
+                    getPresentationDefinition = HttpGet.ktor(client)
+                ),
+                clientMetaDataResolver = ClientMetaDataResolver(
+                    getClientMetaData = HttpGet.ktor(client)
+                )
+            )
+
+        )
     }
 
 

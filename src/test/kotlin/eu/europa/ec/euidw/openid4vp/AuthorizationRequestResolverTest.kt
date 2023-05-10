@@ -1,6 +1,7 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.euidw.openid4vp.internal.createHttpClient
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -9,7 +10,6 @@ import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.net.URLEncoder
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -18,11 +18,6 @@ class AuthorizationRequestResolverTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
 
-    private val walletConfig = WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
-        supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
-        vpFormatsSupported = emptyList()
-    )
 
     private val pd = readFileAsText("presentation-definition/basic_example.json")
         ?.replace("\r\n", "")
@@ -31,11 +26,20 @@ class AuthorizationRequestResolverTest {
         ?.replace("  ", "")
         ?.also { URLEncoder.encode(it, "UTF-8") }
 
-    private val resolver = AuthorizationRequestResolver.make(walletConfig)
+    private val walletConfig = WalletOpenId4VPConfig(
+        presentationDefinitionUriSupported = true,
+        supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
+        vpFormatsSupported = emptyList()
+    )
 
-    private val CLIENT_METADATA_JWKS_INLINE = "%7B%20%22jwks%22%3A%20%7B%20%22keys%22%3A%20%5B%20%7B%20%22kty%22%3A%20%22RSA%22%2C%20%22e%22%3A%20%22AQAB%22%2C%20%22use%22%3A%20%22sig%22%2C%20%22kid%22%3A%20%22a4e1bbe6-26e8-480b-a364-f43497894453%22%2C%20%22iat%22%3A%201683559586%2C%20%22n%22%3A%20%22xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew%22%20%7D%20%5D%20%7D%2C%20%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%20%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%20%22subject_syntax_types_supported%22%3A%20%5B%20%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%20%22did%3Aexample%22%2C%20%22did%3Akey%22%20%5D%2C%20%22id_token_signed_response_alg%22%3A%20%22RS256%22%20%7D"
 
-    private val CLIENT_METADATA_JWKS_URI = "%7B%20%22jwks%22%3A%20%7B%20%22keys%22%3A%20%5B%20%7B%20%22kty%22%3A%20%22RSA%22%2C%20%22e%22%3A%20%22AQAB%22%2C%20%22use%22%3A%20%22sig%22%2C%20%22kid%22%3A%20%22a4e1bbe6-26e8-480b-a364-f43497894453%22%2C%20%22iat%22%3A%201683559586%2C%20%22n%22%3A%20%22xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew%22%20%7D%20%5D%20%7D%2C%20%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%20%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%20%22subject_syntax_types_supported%22%3A%20%5B%20%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%20%22did%3Aexample%22%2C%20%22did%3Akey%22%20%5D%2C%20%22id_token_signed_response_alg%22%3A%20%22RS256%22%20%7D"
+    private val resolver = AuthorizationRequestResolver.make(createHttpClient(),  walletConfig)
+
+    private val CLIENT_METADATA_JWKS_INLINE =
+        "%7B%20%22jwks%22%3A%20%7B%20%22keys%22%3A%20%5B%20%7B%20%22kty%22%3A%20%22RSA%22%2C%20%22e%22%3A%20%22AQAB%22%2C%20%22use%22%3A%20%22sig%22%2C%20%22kid%22%3A%20%22a4e1bbe6-26e8-480b-a364-f43497894453%22%2C%20%22iat%22%3A%201683559586%2C%20%22n%22%3A%20%22xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew%22%20%7D%20%5D%20%7D%2C%20%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%20%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%20%22subject_syntax_types_supported%22%3A%20%5B%20%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%20%22did%3Aexample%22%2C%20%22did%3Akey%22%20%5D%2C%20%22id_token_signed_response_alg%22%3A%20%22RS256%22%20%7D"
+
+    private val CLIENT_METADATA_JWKS_URI =
+        "%7B%20%22jwks%22%3A%20%7B%20%22keys%22%3A%20%5B%20%7B%20%22kty%22%3A%20%22RSA%22%2C%20%22e%22%3A%20%22AQAB%22%2C%20%22use%22%3A%20%22sig%22%2C%20%22kid%22%3A%20%22a4e1bbe6-26e8-480b-a364-f43497894453%22%2C%20%22iat%22%3A%201683559586%2C%20%22n%22%3A%20%22xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew%22%20%7D%20%5D%20%7D%2C%20%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%20%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%20%22subject_syntax_types_supported%22%3A%20%5B%20%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%20%22did%3Aexample%22%2C%20%22did%3Akey%22%20%5D%2C%20%22id_token_signed_response_alg%22%3A%20%22RS256%22%20%7D"
 
     private fun genState(): String {
         return State().value
@@ -69,7 +73,7 @@ class AuthorizationRequestResolverTest {
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     "&state=${genState()}" +
-                    "&scope=openid"+
+                    "&scope=openid" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
         val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
@@ -132,7 +136,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
         exception = assertFailsWith<AuthorizationRequestValidationException> {
@@ -170,7 +174,7 @@ class AuthorizationRequestResolverTest {
                     "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}"+
+                    "&state=${genState()}" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
 
@@ -179,16 +183,6 @@ class AuthorizationRequestResolverTest {
             resolver.resolveRequest(authReq).getOrThrow()
         }
         assertTrue { exception.error is RequestValidationError.MissingClientId }
-    }
-
-    @Test
-    @Ignore
-    fun foo() = runBlocking {
-        val url =
-            "http://localhost:8080/wallet/request.jwt/Bvo17WHtOgypXkE8VLEi85afu5Bf20ew1dnIFPmNgxSimtCdOQxo37VwYWLr0ZRfJ9XaVuJNSFGa3Azrm032pA"
-        val authRequestStr = "eudi-wallet://authorize?client_id=Verifier" +
-                "&request_uri=${URLEncoder.encode(url, "UTF-8")}"
-        resolver.resolveRequest(authRequestStr).also { println(it) }.getOrThrow()
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -200,3 +194,4 @@ class AuthorizationRequestResolverTest {
         AuthorizationRequestResolverTest::class.java.classLoader.getResourceAsStream(f)
 
 }
+

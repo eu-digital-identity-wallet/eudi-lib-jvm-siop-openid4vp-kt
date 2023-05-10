@@ -4,7 +4,7 @@ import eu.europa.ec.euidw.openid4vp.*
 import eu.europa.ec.euidw.openid4vp.PresentationDefinitionSource.*
 import eu.europa.ec.euidw.prex.PresentationDefinition
 
-internal object PresentationDefinitionResolver {
+internal class PresentationDefinitionResolver(private val getPresentationDefinition: HttpGet<PresentationDefinition>) {
 
 
     suspend fun resolve(
@@ -31,7 +31,7 @@ internal object PresentationDefinitionResolver {
         walletOpenId4VPConfig: WalletOpenId4VPConfig
     ): Result<PresentationDefinition> =
         if (walletOpenId4VPConfig.presentationDefinitionUriSupported)
-            HttpGet.ktor<PresentationDefinition>().get(url)
+            getPresentationDefinition.get(url)
                 .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
         else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
 }

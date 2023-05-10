@@ -7,7 +7,10 @@ import eu.europa.ec.euidw.openid4vp.WalletOpenId4VPConfig
 import eu.europa.ec.euidw.openid4vp.internal.ValidatedRequestObject.*
 import eu.europa.ec.euidw.prex.PresentationDefinition
 
-internal object ValidatedRequestObjectResolver {
+internal class ValidatedRequestObjectResolver(
+    private val presentationDefinitionResolver: PresentationDefinitionResolver,
+    private val clientMetaDataResolver: ClientMetaDataResolver,
+    ) {
 
     suspend fun resolve(
         validated: ValidatedRequestObject,
@@ -69,12 +72,12 @@ internal object ValidatedRequestObjectResolver {
         presentationDefinitionSource: PresentationDefinitionSource,
         walletOpenId4VPConfig: WalletOpenId4VPConfig
     ): Result<PresentationDefinition> {
-        return PresentationDefinitionResolver.resolve(presentationDefinitionSource, walletOpenId4VPConfig)
+        return presentationDefinitionResolver.resolve(presentationDefinitionSource, walletOpenId4VPConfig)
     }
 
     private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): Result<OIDCClientMetadata> {
         return validated.clientMetaDataSource?.let {
-            ClientMetaDataResolver.resolve(it)
+            clientMetaDataResolver.resolve(it)
         } ?: throw IllegalArgumentException("Missing client metadata")
 
 

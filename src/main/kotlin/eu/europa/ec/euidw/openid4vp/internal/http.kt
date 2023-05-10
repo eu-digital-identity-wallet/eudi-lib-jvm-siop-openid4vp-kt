@@ -7,14 +7,13 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.serialization.kotlinx.json.*
 import java.net.URL
-import kotlin.contracts.contract
 
 internal fun interface HttpGet<out R> {
     suspend fun get(url: HttpsUrl): Result<R>
 
     companion object {
         inline fun <reified R> ktor(
-            client: HttpClient = ktorHttpClient
+            client: HttpClient
         ): HttpGet<R> = object : HttpGet<R> {
             override suspend fun get(url: HttpsUrl): Result<R> = runCatching {
                 client.get(url.value).body()
@@ -24,12 +23,13 @@ internal fun interface HttpGet<out R> {
 }
 
 
-internal val ktorHttpClient: HttpClient by lazy {
-    HttpClient(OkHttp) {
-        install(ContentNegotiation) {json() }
+//internal val ktorHttpClient: HttpClient by lazy { createHttpClient() }
+
+internal fun createHttpClient(): HttpClient =
+    HttpClient {
+        install(ContentNegotiation) { json() }
         expectSuccess = true
     }
-}
 
 /**
  * Represents an HTTPS URL

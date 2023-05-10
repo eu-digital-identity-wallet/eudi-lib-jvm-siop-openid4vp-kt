@@ -7,7 +7,7 @@ import eu.europa.ec.euidw.openid4vp.ResolutionError
 import eu.europa.ec.euidw.openid4vp.ResolutionException
 
 
-internal object ClientMetaDataResolver {
+internal class ClientMetaDataResolver(private val getClientMetaData: HttpGet<ClientMetaData>) {
 
 
     suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): Result<OIDCClientMetadata> {
@@ -17,12 +17,11 @@ internal object ClientMetaDataResolver {
             is ClientMetaDataSource.FetchByReference -> fetch(clientMetaDataSource.url).getOrThrow()
 
         }
-
         return ClientMetadataValidator.validate(clientMetaData)
     }
 
     private suspend fun fetch(url: HttpsUrl): Result<ClientMetaData> =
-        HttpGet.ktor<ClientMetaData>().get(url)
+        getClientMetaData.get(url)
             .mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
 
 }

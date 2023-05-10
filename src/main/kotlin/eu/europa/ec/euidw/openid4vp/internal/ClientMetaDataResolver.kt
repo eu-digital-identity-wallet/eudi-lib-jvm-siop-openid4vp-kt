@@ -1,10 +1,7 @@
 package eu.europa.ec.euidw.openid4vp.internal
 
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
-import eu.europa.ec.euidw.openid4vp.ClientMetaData
-import eu.europa.ec.euidw.openid4vp.ClientMetaDataSource
-import eu.europa.ec.euidw.openid4vp.ResolutionError
-import eu.europa.ec.euidw.openid4vp.ResolutionException
+import eu.europa.ec.euidw.openid4vp.*
 
 
 internal class ClientMetaDataResolver(private val getClientMetaData: HttpGet<ClientMetaData>) {

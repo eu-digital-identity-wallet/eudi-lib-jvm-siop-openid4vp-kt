@@ -5,7 +5,6 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
-import eu.europa.ec.euidw.openid4vp.internal.HttpsUrl
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import io.ktor.client.*
 import kotlinx.serialization.json.Json
@@ -31,7 +30,7 @@ sealed interface AuthorizationRequest {
             val uri = Uri.parse(uriStr)
             fun clientId(): String =
                 uri.getQueryParameter("client_id")
-                ?: throw RequestValidationError.MissingClientId.asException()
+                    ?: throw RequestValidationError.MissingClientId.asException()
 
             val requestValue = uri.getQueryParameter("request")
             val requestUriValue = uri.getQueryParameter("request_uri")
@@ -119,9 +118,19 @@ interface AuthorizationRequestResolver {
 
     companion object {
         fun make(client: HttpClient, walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationRequestResolver =
-            AuthorizationRequestResolverImpl.make(client,walletOpenId4VPConfig)
+            AuthorizationRequestResolverImpl.make(client, walletOpenId4VPConfig)
 
-
+        fun make(
+            getRequestObjectJwt: HttpGet<String>,
+            getPresentationDefinition: HttpGet<PresentationDefinition>,
+            getClientMetaData: HttpGet<ClientMetaData>,
+            walletOpenId4VPConfig: WalletOpenId4VPConfig
+        ): AuthorizationRequestResolver = AuthorizationRequestResolverImpl.make(
+            getRequestObjectJwt,
+            getPresentationDefinition,
+            getClientMetaData,
+            walletOpenId4VPConfig
+        )
 
     }
 }

@@ -1,6 +1,5 @@
 package eu.europa.ec.euidw.openid4vp
 
-import eu.europa.ec.euidw.openid4vp.internal.HttpsUrl
 import eu.europa.ec.euidw.prex.Claim
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.Required
@@ -28,8 +27,8 @@ sealed interface PresentationDefinitionSource {
 
 @Serializable
 data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
-    @SerialName("jwks_uri") val jwksUri: String?=null,
-    @SerialName("jwks") val jwks: JsonObject?=null,
+    @SerialName("jwks_uri") val jwksUri: String? = null,
+    @SerialName("jwks") val jwks: JsonObject? = null,
     @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String,
     @SerialName("id_token_encrypted_response_alg") val idTokenEncryptedResponseAlg: String,
     @SerialName("id_token_encrypted_response_enc") val idTokenEncryptedResponseEnc: String,

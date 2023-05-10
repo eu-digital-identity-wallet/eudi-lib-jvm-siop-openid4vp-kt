@@ -209,7 +209,7 @@ class AuthorizationRequestResolverTest {
                 SubjectSyntaxType.DecentralizedIdentifier.parse("did:test"))
         )
 
-        val resolver = AuthorizationRequestResolver.make(createHttpClient(),  walletConfig)
+        val resolver = AuthorizationRequestResolver.ktor(walletConfig)
 
         val exception = assertFailsWith<AuthorizationRequestValidationException> {
             val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()

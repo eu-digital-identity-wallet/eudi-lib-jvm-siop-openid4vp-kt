@@ -19,12 +19,12 @@ internal class DefaultAuthorizationResponseBuilder(
 ) : AuthorizationResponseBuilder {
 
     override suspend fun buildResponse(
-        requestObject: ResolvedRequestObject,
+        request: ResolvedRequestObject,
         consensus: Consensus
     ): AuthorizationResponse {
-        val responseData = buildResponseData(requestObject, consensus)
-        return when (val responseMode = requestObject.responseMode) {
-            is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, requestObject.state, responseData)
+        val responseData = buildResponseData(request, consensus)
+        return when (val responseMode = request.responseMode) {
+            is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
             is ResponseMode.DirectPostJwt -> TODO("Not yet implemented")
             is ResponseMode.Fragment -> TODO("Not yet implemented")
             is ResponseMode.Query -> TODO("Not yet implemented")
@@ -32,20 +32,20 @@ internal class DefaultAuthorizationResponseBuilder(
     }
 
     private fun buildResponseData(
-        resolvedRequest: ResolvedRequestObject,
+        request: ResolvedRequestObject,
         consensus: Consensus
     ): AuthorizationResponseData {
 
         return when (consensus) {
             is Consensus.PositiveConsensus -> {
-                when (resolvedRequest) {
-                    is ResolvedRequestObject.IdTokenRequestObject -> buildIDTokenResponseData(resolvedRequest,consensus)
-                    is ResolvedRequestObject.VpTokenRequestObject -> buildVPTokenResponseData(resolvedRequest,consensus)
-                    is ResolvedRequestObject.IdAndVPTokenRequestObject -> buildIDAndVPTokenResponseData(resolvedRequest,consensus)
+                when (request) {
+                    is ResolvedRequestObject.IdTokenRequestObject -> buildIDTokenResponseData(request,consensus)
+                    is ResolvedRequestObject.VpTokenRequestObject -> buildVPTokenResponseData(request,consensus)
+                    is ResolvedRequestObject.IdAndVPTokenRequestObject -> buildIDAndVPTokenResponseData(request,consensus)
                 }
             }
 
-            else -> AuthorizationResponseData.NoConsensusResponseData("User has not approved request")
+            else -> AuthorizationResponseData.NoConsensusResponseData("User has not approved request", request.state)
         }
 
     }
@@ -55,7 +55,7 @@ internal class DefaultAuthorizationResponseBuilder(
         consensus: Consensus.PositiveConsensus
     ): AuthorizationResponseData.IdTokenResponseData {
         return when (consensus) {
-            is Consensus.PositiveConsensus.IdTokenConsensus -> AuthorizationResponseData.IdTokenResponseData(buildIdToken(request))
+            is Consensus.PositiveConsensus.IdTokenConsensus -> AuthorizationResponseData.IdTokenResponseData(buildIdToken(request), request.state)
             else -> throw IllegalStateException("")
         }
     }

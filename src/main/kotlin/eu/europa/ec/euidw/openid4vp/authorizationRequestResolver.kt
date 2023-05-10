@@ -4,36 +4,48 @@ import com.eygraber.uri.Uri
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
+import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.IdAndVPTokenRequestObject
+import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.VpTokenRequestObject
 import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
 import eu.europa.ec.euidw.prex.PresentationDefinition
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import java.io.Closeable
-import java.net.URL
 
+/**
+ * OAUTH2 authorization request
+ *
+ * This is merely a data carrier structure which doesn't enforce any rules.
+ */
 sealed interface AuthorizationRequest {
 
-    data class NotSecured(val data: RequestObject) : AuthorizationRequest
+    data class NotSecured(val requestObject: RequestObject) : AuthorizationRequest
 
+    /**
+     * JWT Secured authorization request (JAR)
+     */
     sealed interface JwtSecured : AuthorizationRequest {
+        /**
+         * The <em>client_id</em> of the relying party (verifier)
+         */
         val clientId: String
 
+        /**
+         * A JAR passed by value
+         */
         data class PassByValue(override val clientId: String, val jwt: Jwt) : JwtSecured
+
+        /**
+         * A JAR passed by reference
+         */
         data class PassByReference(override val clientId: String, val jwtURI: HttpsUrl) : JwtSecured
     }
 
     companion object {
 
-        private val json: Json = Json
-
+        /**
+         * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
+         */
         fun make(uriStr: String): Result<AuthorizationRequest> = runCatching {
             val uri = Uri.parse(uriStr)
             fun clientId(): String =
@@ -52,10 +64,13 @@ sealed interface AuthorizationRequest {
             }
         }
 
+        /**
+         * Populates a [NotSecured] from the query parameters of the given [uri]
+         */
         private fun notSecured(uri: Uri): NotSecured {
 
             fun jsonObject(p: String): JsonObject? =
-                uri.getQueryParameter(p)?.let { json.parseToJsonElement(it).jsonObject }
+                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
 
             return NotSecured(
                 RequestObject(
@@ -78,8 +93,17 @@ sealed interface AuthorizationRequest {
 
 }
 
+/**
+ * Represents an OAUTH2 authorization request. In particular
+ * either a [SIOPv2 for id_token][IdAndVPTokenRequestObject] or
+ * a [OpenId4VP for vp_token][VpTokenRequestObject] or
+ * a [SIOPv2 combined with OpenID4VP][IdAndVPTokenRequestObject]
+ */
 sealed interface ResolvedRequestObject {
 
+    /**
+     * SIOPv2 Authorization request for issuing an id_token
+     */
     data class IdTokenRequestObject(
         val idTokenType: List<IdTokenType>,
         val clientMetaData: OIDCClientMetadata,
@@ -90,6 +114,9 @@ sealed interface ResolvedRequestObject {
         val scope: Scope
     ) : ResolvedRequestObject
 
+    /**
+     * OpenId4VP Authorization request for presenting a vp_token
+     */
     data class VpTokenRequestObject(
 
         val presentationDefinition: PresentationDefinition,
@@ -100,6 +127,9 @@ sealed interface ResolvedRequestObject {
         val state: String,
     ) : ResolvedRequestObject
 
+    /**
+     * OpenId4VP combined with SIOPv2 request for presenting an id_token & vp_token
+     */
     data class IdAndVPTokenRequestObject(
         val idTokenType: List<IdTokenType>,
         val presentationDefinition: PresentationDefinition,
@@ -113,21 +143,36 @@ sealed interface ResolvedRequestObject {
 }
 
 
-
-
 fun interface AuthorizationRequestResolver {
+
+    /**
+     * Tries to validate and resolve the provided [uri] into
+     * a [ResolvedRequestObject]
+     */
     suspend fun resolveRequestUri(
-        uriStr: String
+        uri: String
     ): Result<ResolvedRequestObject> = runCatching {
-        val request = AuthorizationRequest.make(uriStr).getOrThrow()
+        val request = AuthorizationRequest.make(uri).getOrThrow()
         resolveRequest(request).getOrThrow()
     }
 
+    /**
+     * Tries to validate and resolve the provided [request] into
+     * a [ResolvedRequestObject]
+     */
     suspend fun resolveRequest(
         request: AuthorizationRequest
     ): Result<ResolvedRequestObject>
 
     companion object {
+
+        /**
+         * A factory method for obtaining an instance of [AuthorizationRequestResolver]
+         * Caller should provide a http client in terms of implementing the [HttpGet]
+         * interface.
+         *
+         * For an example implementation that uses ktor client please check [KtorAuthorizationRequestResolver]
+         */
         fun make(
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
@@ -140,7 +185,11 @@ fun interface AuthorizationRequestResolver {
             walletOpenId4VPConfig
         )
 
-        fun ktor( walletOpenId4VPConfig: WalletOpenId4VPConfig) : KtorAuthorizationRequestResolver {
+        /**
+         * A factory method for obtaining an instance of [AuthorizationRequestResolver] which
+         * uses the Ktor client for performing http calls
+         */
+        fun ktor(walletOpenId4VPConfig: WalletOpenId4VPConfig): KtorAuthorizationRequestResolver {
             return KtorAuthorizationRequestResolver(walletOpenId4VPConfig)
         }
 

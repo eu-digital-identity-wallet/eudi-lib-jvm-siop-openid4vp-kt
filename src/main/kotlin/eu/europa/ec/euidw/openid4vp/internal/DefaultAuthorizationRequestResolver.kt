@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
+// TODO Rename this into DefaultAuthorizationRequestResolver
 internal class AuthorizationRequestResolverImpl(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val getRequestObjectJwt: HttpGet<String>,
@@ -28,24 +29,37 @@ internal class AuthorizationRequestResolverImpl(
     }
 
 
-    private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject = when (request) {
-        is NotSecured -> request.data
-        is JwtSecured -> {
-            val jwt = when (request) {
-                is PassByValue -> request.jwt
-                is PassByReference -> getRequestObjectJwt.get(request.jwtURI.value).getOrThrow()
+    /**
+     * Extracts the [request object][RequestObject] of an [AuthorizationRequest]
+     */
+    private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject {
+
+        suspend fun fetchJwt(request: PassByReference): Jwt =
+            getRequestObjectJwt.get(request.jwtURI.value).getOrThrow()
+
+        return when (request) {
+            is NotSecured -> request.requestObject
+            is JwtSecured -> {
+                val jwt = when (request) {
+                    is PassByValue -> request.jwt
+                    is PassByReference -> fetchJwt(request)
+                }
+                val requestObject = requestObjectFromJwt(jwt)
+                // Make sure that clientId of the initial request is the same
+                // with the client id inside the request object
+                require(request.clientId == requestObject.clientId) { "Invalid client_id. Expected ${request.clientId} found ${requestObject.clientId}" }
+
+                // TODO remove warning as soon as signature validation is implemented
+                requestObject.also { println("Warning JWT signature not verified") }
             }
-            val requestObject = requestObjectFromJwt(jwt)
-            // Make sure that clientId of the initial request is the same
-            // with the client id inside the request object
-            require(request.clientId == requestObject.clientId) { "Invalid client_id. Expected ${request.clientId} found ${requestObject.clientId}" }
-            requestObject
         }
     }
 
     companion object {
 
-
+        /**
+         * Factory method for creating a [AuthorizationRequestResolverImpl]
+         */
         internal fun make(
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
@@ -69,8 +83,13 @@ internal class AuthorizationRequestResolverImpl(
 
 }
 
+/**
+ * Extracts the request object from a [jwt]
+ */
 private fun requestObjectFromJwt(jwt: Jwt): RequestObject {
 
+    // TODO Verify Signature
+    // TODO Support Encryption
     val signedJwt = SignedJWT.parse(jwt)
     fun Map<String, Any?>.asJsonObject(): JsonObject {
         val jsonStr = Gson().toJson(this)

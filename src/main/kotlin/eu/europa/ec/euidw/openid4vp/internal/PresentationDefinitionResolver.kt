@@ -4,7 +4,9 @@ import eu.europa.ec.euidw.openid4vp.*
 import eu.europa.ec.euidw.openid4vp.PresentationDefinitionSource.*
 import eu.europa.ec.euidw.prex.PresentationDefinition
 
-internal class PresentationDefinitionResolver(private val getPresentationDefinition: HttpGet<PresentationDefinition>) {
+internal class PresentationDefinitionResolver(
+    private val getPresentationDefinition: HttpGet<PresentationDefinition>
+) {
 
 
     suspend fun resolve(

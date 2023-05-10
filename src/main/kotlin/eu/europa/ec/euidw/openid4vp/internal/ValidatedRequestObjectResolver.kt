@@ -10,7 +10,7 @@ import eu.europa.ec.euidw.prex.PresentationDefinition
 internal class ValidatedRequestObjectResolver(
     private val presentationDefinitionResolver: PresentationDefinitionResolver,
     private val clientMetaDataResolver: ClientMetaDataResolver,
-    ) {
+) {
 
     suspend fun resolve(
         validated: ValidatedRequestObject,

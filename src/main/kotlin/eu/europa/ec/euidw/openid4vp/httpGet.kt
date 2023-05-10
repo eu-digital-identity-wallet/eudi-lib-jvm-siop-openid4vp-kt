@@ -5,6 +5,7 @@ import java.net.URL
 /**
  * Represents an HTTPS URL
  */
+
 @JvmInline
 value class HttpsUrl private constructor(val value: URL) {
 //    init {

@@ -33,7 +33,7 @@ internal class AuthorizationRequestResolverImpl(
         is JwtSecured -> {
             val jwt = when (request) {
                 is PassByValue -> request.jwt
-                is PassByReference -> getRequestObjectJwt.get(request.jwtURI).getOrThrow()
+                is PassByReference -> getRequestObjectJwt.get(request.jwtURI.value).getOrThrow()
             }
             val requestObject = requestObjectFromJwt(jwt)
             // Make sure that clientId of the initial request is the same

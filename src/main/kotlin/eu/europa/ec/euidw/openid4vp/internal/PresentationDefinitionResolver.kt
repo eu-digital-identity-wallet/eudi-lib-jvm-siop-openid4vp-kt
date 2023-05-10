@@ -31,7 +31,7 @@ internal class PresentationDefinitionResolver(private val getPresentationDefinit
         walletOpenId4VPConfig: WalletOpenId4VPConfig
     ): Result<PresentationDefinition> =
         if (walletOpenId4VPConfig.presentationDefinitionUriSupported)
-            getPresentationDefinition.get(url)
+            getPresentationDefinition.get(url.value)
                 .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
         else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
 }

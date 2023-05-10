@@ -18,7 +18,7 @@ internal class ClientMetaDataResolver(private val getClientMetaData: HttpGet<Cli
     }
 
     private suspend fun fetch(url: HttpsUrl): Result<ClientMetaData> =
-        getClientMetaData.get(url)
+        getClientMetaData.get(url.value)
             .mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
 
 }

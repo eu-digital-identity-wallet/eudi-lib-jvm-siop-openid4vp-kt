@@ -17,6 +17,6 @@ value class HttpsUrl private constructor(val value: URL) {
     }
 }
 fun interface HttpGet<out R> {
-    suspend fun get(url: HttpsUrl): Result<R> = get(url.value)
+
     suspend fun get(url: URL): Result<R>
 }

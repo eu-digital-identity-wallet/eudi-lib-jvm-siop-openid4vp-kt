@@ -16,7 +16,9 @@ value class HttpsUrl private constructor(val value: URL) {
         fun make(url: URL): Result<HttpsUrl> = runCatching { HttpsUrl(url) }
     }
 }
-fun interface HttpGet<out R> {
 
+
+
+fun interface HttpGet<out R> {
     suspend fun get(url: URL): Result<R>
 }

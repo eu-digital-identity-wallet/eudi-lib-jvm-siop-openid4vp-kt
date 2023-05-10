@@ -13,9 +13,14 @@ import java.net.URL
 
 class KtorAuthorizationRequestResolver(
     walletOpenId4VPConfig: WalletOpenId4VPConfig
-) : AuthorizationRequestResolver, Closeable {
+) : AuthorizationRequestResolver, Closeable  {
 
-    private val httpClient: HttpClient by lazy { jsonHttpClient() }
+    private val httpClient: HttpClient by lazy {
+        HttpClient {
+            install(ContentNegotiation) { json() }
+            expectSuccess = true
+        }
+    }
 
     private val proxy: AuthorizationRequestResolver by lazy {
         AuthorizationRequestResolverImpl.make(
@@ -39,12 +44,6 @@ class KtorAuthorizationRequestResolver(
     override fun close() {
         httpClient.close()
     }
-
-    private fun jsonHttpClient(): HttpClient = HttpClient {
-        install(ContentNegotiation) { json() }
-        expectSuccess = true
-    }
-
 
 }
 

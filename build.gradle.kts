@@ -32,11 +32,10 @@ dependencies {
     api("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")
     api("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
     implementation("com.eygraber:uri-kmp:0.0.11")
-    implementation("io.ktor:ktor-client-core:$ktor_version")
+    api("io.ktor:ktor-client-core:$ktor_version")
     implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
     implementation("io.ktor:ktor-client-serialization:$ktor_version")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-
     implementation("io.ktor:ktor-client-okhttp:$ktor_version")
     testImplementation(kotlin("test"))
 }

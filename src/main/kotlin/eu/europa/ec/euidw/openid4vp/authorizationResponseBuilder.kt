@@ -16,8 +16,7 @@ sealed interface AuthorizationResponse {
     data class InvalidRequest(val error: RequestValidationError, val state : String) : Failed
 
     data class FailedToResolveRequest(val error: ResolutionError, val state : String) : Failed
-    data class InvalidUrl(val url: String, val state : String) : Failed
-    data class UserRejection(val rejectionMessage: String, val state : String) : Failed
+    data class InvalidUrl(val url: String, val state : String) : Failed    data class UserRejection(val rejectionMessage: String, val state : String) : Failed
 }
 
 

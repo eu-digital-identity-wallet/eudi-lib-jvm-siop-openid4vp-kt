@@ -4,7 +4,6 @@ import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.euidw.openid4vp.internal.ClientMetadataValidator
-import eu.europa.ec.euidw.openid4vp.internal.HttpsUrl
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString

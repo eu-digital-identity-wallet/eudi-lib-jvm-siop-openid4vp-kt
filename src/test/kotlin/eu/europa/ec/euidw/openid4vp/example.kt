@@ -51,3 +51,4 @@ private fun resolver(client: HttpClient): AuthorizationRequestResolver {
     )
     return AuthorizationRequestResolver.make(client, walletConfig)
 }
+

@@ -122,5 +122,6 @@ interface AuthorizationRequestResolver {
             AuthorizationRequestResolverImpl.make(client,walletOpenId4VPConfig)
 
 
+
     }
 }

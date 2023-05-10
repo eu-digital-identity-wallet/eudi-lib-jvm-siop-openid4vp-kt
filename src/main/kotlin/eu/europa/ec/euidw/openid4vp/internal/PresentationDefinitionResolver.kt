@@ -38,5 +38,4 @@ internal class PresentationDefinitionResolver(
         else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
 }
 
-private fun ResolutionError.asException(): ResolutionException = ResolutionException(this)
-private fun <T> ResolutionError.asFailure(): Result<T> = Result.failure(asException())
+

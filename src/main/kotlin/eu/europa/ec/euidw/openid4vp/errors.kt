@@ -1,6 +1,7 @@
 package eu.europa.ec.euidw.openid4vp
 
-sealed interface RequestValidationError {
+sealed interface AuthorizationRequestError
+sealed interface RequestValidationError : AuthorizationRequestError{
 
     //
     // Response Type errors
@@ -38,7 +39,7 @@ sealed interface RequestValidationError {
 
 
 
-sealed interface ResolutionError {
+sealed interface ResolutionError : AuthorizationRequestError{
     data class PresentationDefinitionNotFoundForScope(val scope: Scope) : ResolutionError
     object FetchingPresentationDefinitionNotSupported : ResolutionError
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
@@ -47,20 +48,14 @@ sealed interface ResolutionError {
 }
 
 
+fun AuthorizationRequestError.asException(): AuthorizationRequestException =
+    AuthorizationRequestException(this)
 
-
-data class ResolutionException(val error: ResolutionError) : RuntimeException()
-
-
-
-internal fun RequestValidationError.asException(): AuthorizationRequestValidationException =
-    AuthorizationRequestValidationException(this)
-
-internal fun <T> RequestValidationError.asFailure(): Result<T> =
+fun <T> AuthorizationRequestError.asFailure(): Result<T> =
     Result.failure(asException())
 
 
-data class AuthorizationRequestValidationException(val error: RequestValidationError) : RuntimeException()
+data class AuthorizationRequestException(val error: AuthorizationRequestError) : RuntimeException()
 
 
 

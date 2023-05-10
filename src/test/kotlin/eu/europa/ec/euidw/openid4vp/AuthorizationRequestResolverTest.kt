@@ -122,7 +122,7 @@ class AuthorizationRequestResolverTest {
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
 
-        var exception = assertFailsWith<AuthorizationRequestValidationException> {
+        var exception = assertFailsWith<AuthorizationRequestException> {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
@@ -138,7 +138,7 @@ class AuthorizationRequestResolverTest {
                     "&state=${genState()}" +
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
-        exception = assertFailsWith<AuthorizationRequestValidationException> {
+        exception = assertFailsWith<AuthorizationRequestException> {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
@@ -158,7 +158,7 @@ class AuthorizationRequestResolverTest {
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
 
-        val exception = assertFailsWith<AuthorizationRequestValidationException> {
+        val exception = assertFailsWith<AuthorizationRequestException> {
             val authReq = AuthorizationRequest.make(authRequest).getOrThrow().also { println(it) }
             resolver.resolveRequest(authReq).getOrThrow()
         }
@@ -177,7 +177,7 @@ class AuthorizationRequestResolverTest {
                     "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
 
 
-        val exception = assertFailsWith<AuthorizationRequestValidationException> {
+        val exception = assertFailsWith<AuthorizationRequestException> {
             val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
             resolver.resolveRequest(authReq).getOrThrow()
         }

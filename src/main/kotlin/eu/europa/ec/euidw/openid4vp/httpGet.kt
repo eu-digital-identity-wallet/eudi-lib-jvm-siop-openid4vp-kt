@@ -19,7 +19,10 @@ value class HttpsUrl private constructor(val value: URL) {
 }
 
 
-
+/**
+ * An abstraction of an HTTP Get operation
+ * to obtain [R]
+ */
 fun interface HttpGet<out R> {
     suspend fun get(url: URL): Result<R>
 }

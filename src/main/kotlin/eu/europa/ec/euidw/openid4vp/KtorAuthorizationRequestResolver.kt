@@ -16,48 +16,71 @@ import java.net.URL
  *
  * Class implements also the [Closeable] interface so make sure that after using
  * the instance to either call [KtorAuthorizationRequestResolver.close] or use it via
- * [use] method
+ * [use] method.
+ *
+ * To properly instantiate this class a proper HTTP engine needs to be made
+ * available at runtime
+ *
+ * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
  */
 class KtorAuthorizationRequestResolver(
     walletOpenId4VPConfig: WalletOpenId4VPConfig
-) : AuthorizationRequestResolver, Closeable  {
+) : AuthorizationRequestResolver, Closeable {
 
     /**
      * The ktor http client
      */
     private val httpClient: HttpClient by lazy {
-        HttpClient {
-            install(ContentNegotiation) { json() }
-            expectSuccess = true
-        }
+        createKtorClient()
     }
 
+    /**
+     * The actual or proxied [AuthorizationRequestResolver]
+     */
     private val proxy: AuthorizationRequestResolver by lazy {
-        AuthorizationRequestResolverImpl.make(
-            getClientMetaData = ktorAdapter(httpClient),
-            getPresentationDefinition = ktorAdapter(httpClient),
-            getRequestObjectJwt = { url ->
-                runCatching {
-                    httpClient.get(url) {
-                        accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                    }.bodyAsText()
-                }
-            },
-            walletOpenId4VPConfig = walletOpenId4VPConfig
-        )
+        createResolver(walletOpenId4VPConfig, httpClient)
     }
 
     override suspend fun resolveRequest(request: AuthorizationRequest) =
         proxy.resolveRequest(request)
 
-    override fun close() {
-        httpClient.close()
-    }
+    override fun close() = httpClient.close()
 
 }
 
 /**
- * A factory method for creating an instance of [HttpGet] that delegates
+ * Factory method for creating a Ktor Http client
+ * The actual engine will be peeked up by whatever
+ * is available in classpath
+ *
+ * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
+ */
+private fun createKtorClient(): HttpClient =
+    HttpClient {
+        install(ContentNegotiation) { json() }
+        expectSuccess = true
+    }
+
+private fun createResolver(
+    walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    httpClient: HttpClient
+): AuthorizationRequestResolver {
+
+    return AuthorizationRequestResolverImpl.make(
+        getClientMetaData = ktorAdapter(httpClient),
+        getPresentationDefinition = ktorAdapter(httpClient),
+        getRequestObjectJwt = { url ->
+            runCatching {
+                httpClient.get(url) {
+                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                }.bodyAsText()
+            }
+        },
+        walletOpenId4VPConfig = walletOpenId4VPConfig
+    )
+}
+/**
+ * A factory method for creating an instance of [HttpGet] that delegates HTTP
  * calls to [httpClient]
  */
 private inline fun <reified R> ktorAdapter(httpClient: HttpClient): HttpGet<R> =

@@ -23,4 +23,3 @@ internal class ClientMetaDataResolver(private val getClientMetaData: HttpGet<Cli
 
 }
 
-private fun ResolutionError.asException(): ResolutionException = ResolutionException(this)

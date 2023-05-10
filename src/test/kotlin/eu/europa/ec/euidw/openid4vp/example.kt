@@ -1,12 +1,11 @@
 package eu.europa.ec.euidw.openid4vp
 
-import eu.europa.ec.euidw.openid4vp.internal.createHttpClient
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -14,10 +13,12 @@ import kotlinx.serialization.json.put
 import java.net.URLEncoder
 
 suspend fun main() {
-    createHttpClient().use { client ->
-        val initTransactionResponse =  initTransaction(client).also { println(it) }
-        val authRequestStr = formatURI(initTransactionResponse).also { println("Uri:${it}") }
-        resolveRequest(client, authRequestStr).also { println(it) }
+    val uri = createHttpClient().use { client ->
+        val initTransactionResponse = initTransaction(client).also { println(it) }
+        formatURI(initTransactionResponse).also { println("Uri:${it}") }
+    }
+    resolver().use { resolver ->
+        resolver.resolveRequestUri(uri).also { println(it) }.getOrThrow()
     }
 }
 
@@ -41,14 +42,17 @@ private fun formatURI(iniTransactionResponse: JsonObject): String {
 }
 
 
-private suspend fun resolveRequest(client: HttpClient, uri: String) = resolver(client).resolveRequest(uri).getOrThrow()
-
-private fun resolver(client: HttpClient): AuthorizationRequestResolver {
+private fun resolver(): KtorAuthorizationRequestResolver {
     val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
         supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
         vpFormatsSupported = emptyList()
     )
-    return AuthorizationRequestResolver.make(client, walletConfig)
+    return KtorAuthorizationRequestResolver(walletConfig)
+}
+
+private fun createHttpClient(): HttpClient = HttpClient {
+    install(ContentNegotiation) { json() }
+    expectSuccess = true
 }
 

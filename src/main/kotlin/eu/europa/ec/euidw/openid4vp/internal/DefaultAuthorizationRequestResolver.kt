@@ -8,7 +8,6 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByRefere
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.NotSecured
 import eu.europa.ec.euidw.prex.PresentationDefinition
-import io.ktor.client.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -45,11 +44,6 @@ internal class AuthorizationRequestResolverImpl(
     }
 
     companion object {
-        internal fun make(
-            client: HttpClient,
-            walletOpenId4VPConfig: WalletOpenId4VPConfig
-        ): AuthorizationRequestResolverImpl =
-            make(ktor(client), ktor(client), ktor(client), walletOpenId4VPConfig)
 
 
         internal fun make(

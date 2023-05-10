@@ -7,9 +7,17 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import java.io.Closeable
+import java.net.URL
 
 sealed interface AuthorizationRequest {
 
@@ -104,8 +112,11 @@ sealed interface ResolvedRequestObject {
     ) : ResolvedRequestObject
 }
 
-interface AuthorizationRequestResolver {
-    suspend fun resolveRequest(
+
+
+
+fun interface AuthorizationRequestResolver {
+    suspend fun resolveRequestUri(
         uriStr: String
     ): Result<ResolvedRequestObject> = runCatching {
         val request = AuthorizationRequest.make(uriStr).getOrThrow()
@@ -117,9 +128,6 @@ interface AuthorizationRequestResolver {
     ): Result<ResolvedRequestObject>
 
     companion object {
-        fun make(client: HttpClient, walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationRequestResolver =
-            AuthorizationRequestResolverImpl.make(client, walletOpenId4VPConfig)
-
         fun make(
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
@@ -131,6 +139,10 @@ interface AuthorizationRequestResolver {
             getClientMetaData,
             walletOpenId4VPConfig
         )
+
+        fun ktor( walletOpenId4VPConfig: WalletOpenId4VPConfig) : KtorAuthorizationRequestResolver {
+            return KtorAuthorizationRequestResolver(walletOpenId4VPConfig)
+        }
 
     }
 }

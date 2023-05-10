@@ -1,7 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.oauth2.sdk.id.State
-import eu.europa.ec.euidw.openid4vp.internal.createHttpClient
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -33,7 +32,7 @@ class AuthorizationRequestResolverTest {
     )
 
 
-    private val resolver = AuthorizationRequestResolver.make(createHttpClient(),  walletConfig)
+    private val resolver = KtorAuthorizationRequestResolver(walletConfig)
 
     private val CLIENT_METADATA_JWKS_INLINE =
         "%7B%20%22jwks%22%3A%20%7B%20%22keys%22%3A%20%5B%20%7B%20%22kty%22%3A%20%22RSA%22%2C%20%22e%22%3A%20%22AQAB%22%2C%20%22use%22%3A%20%22sig%22%2C%20%22kid%22%3A%20%22a4e1bbe6-26e8-480b-a364-f43497894453%22%2C%20%22iat%22%3A%201683559586%2C%20%22n%22%3A%20%22xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew%22%20%7D%20%5D%20%7D%2C%20%22id_token_encrypted_response_alg%22%3A%20%22RS256%22%2C%20%22id_token_encrypted_response_enc%22%3A%20%22A128CBC-HS256%22%2C%20%22subject_syntax_types_supported%22%3A%20%5B%20%22urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%22%2C%20%22did%3Aexample%22%2C%20%22did%3Akey%22%20%5D%2C%20%22id_token_signed_response_alg%22%3A%20%22RS256%22%20%7D"

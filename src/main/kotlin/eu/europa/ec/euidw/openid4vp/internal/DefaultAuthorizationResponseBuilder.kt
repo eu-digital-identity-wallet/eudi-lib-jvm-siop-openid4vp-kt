@@ -24,7 +24,7 @@ internal class DefaultAuthorizationResponseBuilder(
     ): AuthorizationResponse {
         val responseData = buildResponseData(requestObject, consensus)
         return when (val responseMode = requestObject.responseMode) {
-            is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData, requestObject.state)
+            is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, requestObject.state, responseData)
             is ResponseMode.DirectPostJwt -> TODO("Not yet implemented")
             is ResponseMode.Fragment -> TODO("Not yet implemented")
             is ResponseMode.Query -> TODO("Not yet implemented")

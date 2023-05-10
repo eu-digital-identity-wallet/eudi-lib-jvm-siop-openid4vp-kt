@@ -46,7 +46,8 @@ private fun resolver(): KtorAuthorizationRequestResolver {
     val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
         supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
-        vpFormatsSupported = emptyList()
+        vpFormatsSupported = emptyList(),
+        subjectSyntaxTypesSupported = emptyList()
     )
     return KtorAuthorizationRequestResolver(walletConfig)
 }

@@ -4,6 +4,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.ThumbprintUtils
 import com.nimbusds.jwt.JWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
@@ -84,12 +85,12 @@ internal class DefaultAuthorizationResponseBuilder(
         }
 
         fun buildJWKThumbprint() : String =
-            walletConfig.rsaJWK.computeThumbprint("SHA-256").toJSONString()
+            ThumbprintUtils.compute("SHA-256", walletConfig.rsaJWK).toJSONString()
 
         fun buildIssuerClaim() : String =
             when (walletConfig.preferredSubjectSyntaxType) {
-                SubjectSyntaxType.JWKThumbprint -> buildJWKThumbprint()
-                SubjectSyntaxType.DecentralizedIdentifier -> walletConfig.decentralizedIdentifier
+                is SubjectSyntaxType.JWKThumbprint -> buildJWKThumbprint()
+                is SubjectSyntaxType.DecentralizedIdentifier -> walletConfig.decentralizedIdentifier
             }
 
         fun computeTokenDates() : Pair<Date, Date> {

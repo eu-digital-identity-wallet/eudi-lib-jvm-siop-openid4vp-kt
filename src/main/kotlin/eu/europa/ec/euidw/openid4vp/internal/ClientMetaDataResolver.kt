@@ -4,9 +4,12 @@ import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.*
 
 
-internal class ClientMetaDataResolver(private val getClientMetaData: HttpGet<ClientMetaData>) {
+internal class ClientMetaDataResolver(
+    private val getClientMetaData: HttpGet<ClientMetaData>,
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig
+) {
 
-
+    private val validator : ClientMetadataValidator = ClientMetadataValidator(walletOpenId4VPConfig)
 
     suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): Result<OIDCClientMetadata> {
 
@@ -15,7 +18,7 @@ internal class ClientMetaDataResolver(private val getClientMetaData: HttpGet<Cli
             is ClientMetaDataSource.FetchByReference -> fetch(clientMetaDataSource.url).getOrThrow()
 
         }
-        return ClientMetadataValidator.validate(clientMetaData)
+        return validator.validate(clientMetaData)
     }
 
     private suspend fun fetch(url: HttpsUrl): Result<ClientMetaData> =

@@ -1,5 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
+import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.euidw.prex.Claim
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.Required
@@ -35,9 +36,34 @@ data class ClientMetaData( // By OpenID Connect Dynamic Client Registration spec
     @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>
 )
 
-enum class SubjectSyntaxType {
-    JWKThumbprint,
-    DecentralizedIdentifier
+sealed interface SubjectSyntaxType {
+
+    companion object {
+        fun isValid(value: String): Boolean = DecentralizedIdentifier.isValid(value) || JWKThumbprint.isValid(value)
+    }
+    data class DecentralizedIdentifier(
+        val method : String
+    ) : SubjectSyntaxType {
+        companion object {
+
+            fun isValid(value : String) : Boolean  =
+                !(value.isEmpty() || value.count { it == ':' } != 1 || value.split(':').any { it.isEmpty() })
+
+            fun parse(value : String) : DecentralizedIdentifier =
+                when {
+                    value.isEmpty() -> throw IllegalArgumentException("Cannot create DID from $value: Empty value passed")
+                    value.count { it == ':' } != 1 -> throw IllegalArgumentException("Cannot create DID from $value: Wrong syntax")
+                    value.split(':').any { it.isEmpty() } -> throw IllegalArgumentException("Cannot create DID from $value: DID components cannot be empty")
+                    else -> DecentralizedIdentifier(value.split(':')[1])
+                }
+        }
+
+    }
+
+    object JWKThumbprint : SubjectSyntaxType {
+        fun isValid(value : String) : Boolean = value != ThumbprintURI.PREFIX
+    }
+
 }
 
 @JvmInline

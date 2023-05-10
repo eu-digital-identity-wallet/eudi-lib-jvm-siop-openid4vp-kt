@@ -33,6 +33,9 @@ sealed interface RequestValidationError : AuthorizationRequestError{
 
     object InvalidClientMetaDataUri : RequestValidationError
     object OneOfClientMedataOrUri : RequestValidationError
+    object SubjectSyntaxTypesNoMatch : RequestValidationError
+    object MissingClientMetadataJwksSource : RequestValidationError
+    object SubjectSyntaxTypesWrongSyntax : RequestValidationError
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
 
 }

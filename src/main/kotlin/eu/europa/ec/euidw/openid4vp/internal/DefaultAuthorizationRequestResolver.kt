@@ -73,7 +73,8 @@ internal class AuthorizationRequestResolverImpl(
                     getPresentationDefinition = getPresentationDefinition
                 ),
                 clientMetaDataResolver = ClientMetaDataResolver(
-                    getClientMetaData = getClientMetaData
+                    getClientMetaData = getClientMetaData,
+                    walletOpenId4VPConfig = walletOpenId4VPConfig
                 )
             )
 

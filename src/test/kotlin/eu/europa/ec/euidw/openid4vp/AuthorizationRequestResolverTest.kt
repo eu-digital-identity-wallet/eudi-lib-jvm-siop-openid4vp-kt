@@ -28,7 +28,11 @@ class AuthorizationRequestResolverTest {
     private val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
         supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
-        vpFormatsSupported = emptyList()
+        vpFormatsSupported = emptyList(),
+        subjectSyntaxTypesSupported = listOf(
+            SubjectSyntaxType.JWKThumbprint,
+            SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
+            SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"))
     )
 
 
@@ -166,7 +170,7 @@ class AuthorizationRequestResolverTest {
     }
 
     @Test
-    fun `client_id validation`() = runBlocking {
+    fun `if client_id is missing reject the request`() = runBlocking {
         val authRequest =
             "https://client.example.org/universal-link?" +
                     "response_type=id_token" +
@@ -182,6 +186,36 @@ class AuthorizationRequestResolverTest {
             resolver.resolveRequest(authReq).getOrThrow()
         }
         assertTrue { exception.error is RequestValidationError.MissingClientId }
+    }
+
+    @Test
+    fun `when RP's subject_syntax_types_supported in client metadata don't match OP's reject the request`(): Unit = runBlocking {
+        val authRequest =
+            "https://client.example.org/universal-link?" +
+                    "response_type=id_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}" +
+                    "&scope=openid" +
+                    "&client_metadata=$CLIENT_METADATA_JWKS_INLINE"
+
+        val walletConfig = WalletOpenId4VPConfig(
+            presentationDefinitionUriSupported = true,
+            supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
+            vpFormatsSupported = emptyList(),
+            subjectSyntaxTypesSupported = listOf(
+                SubjectSyntaxType.DecentralizedIdentifier.parse("did:test"))
+        )
+
+        val resolver = AuthorizationRequestResolver.make(createHttpClient(),  walletConfig)
+
+        val exception = assertFailsWith<AuthorizationRequestValidationException> {
+            val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
+            resolver.resolveRequest(authReq).getOrThrow()
+        }
+        assertTrue { exception.error is RequestValidationError.SubjectSyntaxTypesNoMatch }
     }
 
     @OptIn(ExperimentalSerializationApi::class)

@@ -47,7 +47,7 @@ data class WalletOpenId4VPMetaData(
 )
 
 data class WalletOpenId4VPConfig(
-    val subjectSyntaxTypesSupported : List<SubjectSyntaxType> = listOf(SubjectSyntaxType.JWKThumbprint, SubjectSyntaxType.DecentralizedIdentifier),
+    val subjectSyntaxTypesSupported : List<SubjectSyntaxType>,
     val preferredSubjectSyntaxType : SubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
     val decentralizedIdentifier : String = "DID:example:12341512#$",
     val idTokenTTL : Duration = Duration.ofMinutes(10),

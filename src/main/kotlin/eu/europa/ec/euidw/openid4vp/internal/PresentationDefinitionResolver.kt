@@ -1,7 +1,7 @@
 package eu.europa.ec.euidw.openid4vp.internal
 
 import eu.europa.ec.euidw.openid4vp.*
-import eu.europa.ec.euidw.openid4vp.PresentationDefinitionSource.*
+import eu.europa.ec.euidw.openid4vp.internal.PresentationDefinitionSource.*
 import eu.europa.ec.euidw.prex.PresentationDefinition
 
 internal class PresentationDefinitionResolver(

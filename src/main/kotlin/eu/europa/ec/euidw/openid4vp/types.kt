@@ -1,30 +1,11 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.jose.jwk.ThumbprintURI
-import eu.europa.ec.euidw.prex.Claim
-import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-sealed interface PresentationDefinitionSource {
-
-    /**
-     * Presentation definition is passed by value (that is embedded to the authorization request)
-     * by the verifier
-     */
-    data class PassByValue(val presentationDefinition: PresentationDefinition) : PresentationDefinitionSource
-
-    /**
-     * Presentation Definition can be retrieved from the resource at the specified
-     * URL, rather than being passed by value.
-     * The Wallet will send a GET request without additional parameters.
-     * The resource MUST be exposed without further need to authenticate or authorize
-     */
-    data class FetchByReference(val url: HttpsUrl) : PresentationDefinitionSource
-    data class Implied(val scope: Scope) : PresentationDefinitionSource
-}
 
 @Serializable
 data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
@@ -41,19 +22,22 @@ sealed interface SubjectSyntaxType {
     companion object {
         fun isValid(value: String): Boolean = DecentralizedIdentifier.isValid(value) || JWKThumbprint.isValid(value)
     }
+
     data class DecentralizedIdentifier(
-        val method : String
+        val method: String
     ) : SubjectSyntaxType {
         companion object {
 
-            fun isValid(value : String) : Boolean  =
+            fun isValid(value: String): Boolean =
                 !(value.isEmpty() || value.count { it == ':' } != 1 || value.split(':').any { it.isEmpty() })
 
-            fun parse(value : String) : DecentralizedIdentifier =
+            fun parse(value: String): DecentralizedIdentifier =
                 when {
                     value.isEmpty() -> throw IllegalArgumentException("Cannot create DID from $value: Empty value passed")
                     value.count { it == ':' } != 1 -> throw IllegalArgumentException("Cannot create DID from $value: Wrong syntax")
-                    value.split(':').any { it.isEmpty() } -> throw IllegalArgumentException("Cannot create DID from $value: DID components cannot be empty")
+                    value.split(':')
+                        .any { it.isEmpty() } -> throw IllegalArgumentException("Cannot create DID from $value: DID components cannot be empty")
+
                     else -> DecentralizedIdentifier(value.split(':')[1])
                 }
         }
@@ -61,7 +45,7 @@ sealed interface SubjectSyntaxType {
     }
 
     object JWKThumbprint : SubjectSyntaxType {
-        fun isValid(value : String) : Boolean = value != ThumbprintURI.PREFIX
+        fun isValid(value: String): Boolean = value != ThumbprintURI.PREFIX
     }
 
 }
@@ -182,36 +166,3 @@ enum class IdTokenType {
     AttesterSigned
 }
 
-sealed interface Consensus {
-
-    interface NegativeConsensus : Consensus
-    sealed interface PositiveConsensus : Consensus {
-        object IdTokenConsensus : PositiveConsensus
-
-        data class VPTokenConsensus(
-            val approvedClaims: List<Claim>
-        ) : PositiveConsensus
-
-        data class IdAndVPTokenConsensus(
-            val approvedClaims: List<Claim>
-        ) : PositiveConsensus
-    }
-}
-
-sealed interface RequestConsensus {
-    data class ReleaseClaims(
-        val claims: List<ReleaseClaim>
-    ) : RequestConsensus {
-        data class ReleaseClaim(
-            val claim: Claim,
-            val attributes: List<String>
-        )
-    }
-
-    data class ReleaseIdentity(
-        val requester: String,
-        val reason: String
-    ) : RequestConsensus
-
-    object NoClaims : RequestConsensus
-}

@@ -8,6 +8,24 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 
 
+internal sealed interface PresentationDefinitionSource {
+
+    /**
+     * Presentation definition is passed by value (that is embedded to the authorization request)
+     * by the verifier
+     */
+    data class PassByValue(val presentationDefinition: PresentationDefinition) : PresentationDefinitionSource
+
+    /**
+     * Presentation Definition can be retrieved from the resource at the specified
+     * URL, rather than being passed by value.
+     * The Wallet will send a GET request without additional parameters.
+     * The resource MUST be exposed without further need to authenticate or authorize
+     */
+    data class FetchByReference(val url: HttpsUrl) : PresentationDefinitionSource
+    data class Implied(val scope: Scope) : PresentationDefinitionSource
+}
+
 internal sealed interface ValidatedRequestObject {
 
     val clientId: String

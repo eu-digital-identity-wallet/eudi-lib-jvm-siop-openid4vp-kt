@@ -1,7 +1,6 @@
 package eu.europa.ec.euidw.openid4vp.internal
 
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
-import eu.europa.ec.euidw.openid4vp.PresentationDefinitionSource
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject
 import eu.europa.ec.euidw.openid4vp.WalletOpenId4VPConfig
 import eu.europa.ec.euidw.openid4vp.internal.ValidatedRequestObject.*

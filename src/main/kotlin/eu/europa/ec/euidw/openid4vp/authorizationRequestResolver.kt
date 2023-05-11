@@ -6,7 +6,7 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByRefere
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.IdAndVPTokenRequestObject
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.VpTokenRequestObject
-import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
+import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationRequestResolver
 import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorAuthorizationRequestResolver
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json
@@ -239,7 +239,7 @@ fun interface AuthorizationRequestResolver {
             getPresentationDefinition: HttpGet<PresentationDefinition>,
             getClientMetaData: HttpGet<ClientMetaData>,
             walletOpenId4VPConfig: WalletOpenId4VPConfig
-        ): AuthorizationRequestResolver = AuthorizationRequestResolverImpl.make(
+        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
             getRequestObjectJwt,
             getPresentationDefinition,
             getClientMetaData,

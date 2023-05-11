@@ -12,8 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
-// TODO Rename this into DefaultAuthorizationRequestResolver
-internal class AuthorizationRequestResolverImpl(
+internal class DefaultAuthorizationRequestResolver(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val getRequestObjectJwt: HttpGet<String>,
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver
@@ -58,14 +57,14 @@ internal class AuthorizationRequestResolverImpl(
     companion object {
 
         /**
-         * Factory method for creating a [AuthorizationRequestResolverImpl]
+         * Factory method for creating a [DefaultAuthorizationRequestResolver]
          */
         internal fun make(
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
             getClientMetaData: HttpGet<ClientMetaData>,
             walletOpenId4VPConfig: WalletOpenId4VPConfig
-        ): AuthorizationRequestResolverImpl = AuthorizationRequestResolverImpl(
+        ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
             walletOpenId4VPConfig = walletOpenId4VPConfig,
             getRequestObjectJwt = getRequestObjectJwt,
             validatedRequestObjectResolver = ValidatedRequestObjectResolver(

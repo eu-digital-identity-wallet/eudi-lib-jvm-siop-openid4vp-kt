@@ -5,6 +5,20 @@ import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.euidw.prex.Claim
 import eu.europa.ec.euidw.prex.PresentationSubmission
 
+sealed interface AuthorizationResponse {
+    sealed interface DirectPostResponse : AuthorizationResponse
+    data class DirectPost(val responseUri: HttpsUrl, val data: AuthorizationResponseData) : DirectPostResponse
+    data class DirectPostJwt(val responseUri: HttpsUrl, val data: AuthorizationResponseData) : DirectPostResponse
+
+    sealed interface QueryResponse : AuthorizationResponse
+    data class Query(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : QueryResponse
+    data class QueryJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : QueryResponse
+
+    sealed interface FragmentResponse : AuthorizationResponse
+    data class Fragment(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : FragmentResponse
+    data class FragmentJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : FragmentResponse
+}
+
 
 sealed interface AuthorizationResponseData {
 
@@ -38,16 +52,6 @@ sealed interface AuthorizationResponseData {
     data class NoConsensusResponseData(val reason: String, override val state: String) : Failed
 
 }
-
-sealed interface AuthorizationResponse {
-    data class DirectPost(val responseUri: HttpsUrl, val data: AuthorizationResponseData) : AuthorizationResponse
-    data class DirectPostJwt(val responseUri: HttpsUrl, val data: AuthorizationResponseData) : AuthorizationResponse
-    data class Query(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : AuthorizationResponse
-    data class QueryJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : AuthorizationResponse
-    data class Fragment(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : AuthorizationResponse
-    data class FragmentJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : AuthorizationResponse
-}
-
 
 sealed interface Consensus {
 

@@ -7,6 +7,7 @@ import eu.europa.ec.euidw.prex.ClaimFormat
 import kotlinx.serialization.SerialName
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.SupportedClaimFormat
+import java.time.Duration
 import java.util.*
 
 
@@ -46,6 +47,10 @@ data class WalletOpenId4VPMetaData(
 )
 
 data class WalletOpenId4VPConfig(
+    val subjectSyntaxTypesSupported : List<SubjectSyntaxType>,
+    val preferredSubjectSyntaxType : SubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+    val decentralizedIdentifier : String = "DID:example:12341512#$",
+    val idTokenTTL : Duration = Duration.ofMinutes(10),
     val presentationDefinitionUriSupported: Boolean = false,
     val supportedClientIdScheme: SupportedClientIdScheme,
     val vpFormatsSupported : List<SupportedClaimFormat<in ClaimFormat>>,

@@ -26,6 +26,11 @@ internal sealed interface PresentationDefinitionSource {
     data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
+internal sealed interface ClientMetaDataSource {
+    data class PassByValue(val metaData: ClientMetaData) : ClientMetaDataSource
+    data class FetchByReference(val url: HttpsUrl) : ClientMetaDataSource
+}
+
 internal sealed interface ValidatedRequestObject {
 
     val clientId: String

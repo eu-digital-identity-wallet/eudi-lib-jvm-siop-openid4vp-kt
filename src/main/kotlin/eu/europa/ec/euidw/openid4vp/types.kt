@@ -1,5 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
+import com.eygraber.uri.Uri
 import com.nimbusds.jose.jwk.ThumbprintURI
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -30,6 +31,7 @@ sealed interface SubjectSyntaxType {
 
             fun isValid(value: String): Boolean =
                 !(value.isEmpty() || value.count { it == ':' } != 1 || value.split(':').any { it.isEmpty() })
+
 
             fun parse(value: String): DecentralizedIdentifier =
                 when {
@@ -64,11 +66,6 @@ value class Scope private constructor(val value: String) {
 
         private fun itemsOf(s: String): List<String> = s.split(" ")
     }
-}
-
-sealed interface ClientMetaDataSource {
-    data class PassByValue(val metaData: ClientMetaData) : ClientMetaDataSource
-    data class FetchByReference(val url: HttpsUrl) : ClientMetaDataSource
 }
 
 enum class ClientIdScheme {

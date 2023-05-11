@@ -211,7 +211,7 @@ class AuthorizationRequestResolverTest {
 
         val resolver = AuthorizationRequestResolver.ktor(walletConfig)
 
-        val exception = assertFailsWith<AuthorizationRequestValidationException> {
+        val exception = assertFailsWith<AuthorizationRequestException> {
             val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
             resolver.resolveRequest(authReq).getOrThrow()
         }

@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.Closeable
+import java.io.Serializable
 
 /**
  * OAUTH2 authorization request
@@ -101,7 +102,7 @@ sealed interface AuthorizationRequest {
  * a [OpenId4VP for vp_token][VpTokenRequestObject] or
  * a [SIOPv2 combined with OpenID4VP][IdAndVPTokenRequestObject]
  */
-sealed interface ResolvedRequestObject {
+sealed interface ResolvedRequestObject : Serializable {
 
     val responseMode: ResponseMode
     val state: String
@@ -146,7 +147,7 @@ sealed interface ResolvedRequestObject {
     ) : ResolvedRequestObject
 }
 
-sealed interface AuthorizationRequestError
+sealed interface AuthorizationRequestError : Serializable
 sealed interface RequestValidationError : AuthorizationRequestError {
 
     //

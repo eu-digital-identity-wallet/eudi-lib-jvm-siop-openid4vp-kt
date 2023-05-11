@@ -1,6 +1,5 @@
 package eu.europa.ec.euidw.openid4vp
 
-import com.eygraber.uri.Uri
 import com.nimbusds.jose.jwk.ThumbprintURI
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -109,7 +108,7 @@ enum class ClientIdScheme {
 /**
  * @see <a href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html</a>
  */
-sealed interface ResponseMode {
+sealed interface ResponseMode : java.io.Serializable {
 
     /**
      * In this mode, Authorization Response parameters are encoded

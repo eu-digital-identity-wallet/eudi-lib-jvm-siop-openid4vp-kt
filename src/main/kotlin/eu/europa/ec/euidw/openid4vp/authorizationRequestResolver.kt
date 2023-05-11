@@ -7,10 +7,12 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.IdAndVPTokenRequestObject
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.VpTokenRequestObject
 import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
+import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorAuthorizationRequestResolver
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import java.io.Closeable
 
 /**
  * OAUTH2 authorization request
@@ -187,13 +189,25 @@ fun interface AuthorizationRequestResolver {
             walletOpenId4VPConfig
         )
 
+        @Deprecated(
+            "Please use ManagedAuthorizationRequestResolver",
+            replaceWith = ReplaceWith("ManagedAuthorizationRequestResolver.ktor(walletOpenId4VPConfig)")
+        )
+        fun ktor(walletOpenId4VPConfig: WalletOpenId4VPConfig): ManagedAuthorizationRequestResolver {
+            return ManagedAuthorizationRequestResolver.ktor(walletOpenId4VPConfig)
+        }
+
+    }
+}
+
+interface ManagedAuthorizationRequestResolver : AuthorizationRequestResolver, Closeable {
+    companion object {
         /**
          * A factory method for obtaining an instance of [AuthorizationRequestResolver] which
          * uses the Ktor client for performing http calls
          */
-        fun ktor(walletOpenId4VPConfig: WalletOpenId4VPConfig): KtorAuthorizationRequestResolver {
+        fun ktor(walletOpenId4VPConfig: WalletOpenId4VPConfig): ManagedAuthorizationRequestResolver {
             return KtorAuthorizationRequestResolver(walletOpenId4VPConfig)
         }
-
     }
 }

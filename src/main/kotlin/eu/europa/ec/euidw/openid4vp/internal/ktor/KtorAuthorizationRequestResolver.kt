@@ -1,5 +1,6 @@
-package eu.europa.ec.euidw.openid4vp
+package eu.europa.ec.euidw.openid4vp.internal.ktor
 
+import eu.europa.ec.euidw.openid4vp.*
 import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -8,13 +9,12 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import java.io.Closeable
 import java.net.URL
 
 /**
  * An implementation of [AuthorizationRequestResolver] which uses Ktor client
  *
- * Class implements also the [Closeable] interface so make sure that after using
+ * Class implements also the [java.lang.AutoCloseable] interface so make sure that after using
  * the instance to either call [KtorAuthorizationRequestResolver.close] or use it via
  * [use] method.
  *
@@ -23,9 +23,9 @@ import java.net.URL
  *
  * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
  */
-class KtorAuthorizationRequestResolver(
+internal class KtorAuthorizationRequestResolver(
     walletOpenId4VPConfig: WalletOpenId4VPConfig
-) : AuthorizationRequestResolver, Closeable {
+) : ManagedAuthorizationRequestResolver {
 
     /**
      * The ktor http client
@@ -79,6 +79,7 @@ private fun createResolver(
         walletOpenId4VPConfig = walletOpenId4VPConfig
     )
 }
+
 /**
  * A factory method for creating an instance of [HttpGet] that delegates HTTP
  * calls to [httpClient]

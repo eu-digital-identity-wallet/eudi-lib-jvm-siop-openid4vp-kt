@@ -42,14 +42,14 @@ private fun formatURI(iniTransactionResponse: JsonObject): String {
 }
 
 
-private fun resolver(): KtorAuthorizationRequestResolver {
+private fun resolver(): ManagedAuthorizationRequestResolver {
     val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
         supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
         vpFormatsSupported = emptyList(),
         subjectSyntaxTypesSupported = emptyList()
     )
-    return KtorAuthorizationRequestResolver(walletConfig)
+    return ManagedAuthorizationRequestResolver.ktor(walletConfig)
 }
 
 private fun createHttpClient(): HttpClient = HttpClient {

@@ -18,7 +18,7 @@ suspend fun main() {
         formatURI(initTransactionResponse).also { println("Uri:${it}") }
     }
     resolver().use { resolver ->
-        resolver.resolveRequestUri(uri).also { println(it) }.getOrThrow()
+        resolver.resolveRequestUri(uri).also { println(it) }
     }
 }
 

@@ -4,6 +4,8 @@ import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.euidw.openid4vp.internal.ClientMetadataValidator
+import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationResponseBuilder
+import eu.europa.ec.euidw.openid4vp.utils.SiopIdTokenBuilder
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -32,13 +34,13 @@ class AuthorizationResponseBuilderTest {
         return State().value
     }
 
-    private val BUILDER = AuthorizationResponseBuilder.make(walletConfig)
+    private val BUILDER = DefaultAuthorizationResponseBuilder()
 
     @Test
     fun `id token request should produce a response with id token JWT`(): Unit = runBlocking {
-        val validated = ClientMetadataValidator(walletConfig).validate(clientMetaData)
+        val validated = ClientMetadataValidator.validate(clientMetaData)
 
-        val idTokenRequestObject = ResolvedRequestObject.IdTokenRequestObject(
+        val siopAuthRequestObject = ResolvedRequestObject.SiopAuthentication(
             idTokenType=  listOf(IdTokenType.AttesterSigned),
             clientMetaData=  validated.getOrThrow(),
             clientId= "https%3A%2F%2Fclient.example.org%2Fcb",
@@ -48,12 +50,16 @@ class AuthorizationResponseBuilderTest {
             scope= Scope.make("openid") ?: throw IllegalStateException()
         )
 
-        val buildResponse = BUILDER.buildResponse(idTokenRequestObject, Consensus.PositiveConsensus.IdTokenConsensus)
+        val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
+            idToken= SiopIdTokenBuilder.build(siopAuthRequestObject, walletConfig)
+        )
+
+        val buildResponse = BUILDER.buildResponse(siopAuthRequestObject, idTokenConsensus)
 
         when (buildResponse) {
             is AuthorizationResponse.DirectPost ->
                 when (val data = buildResponse.data) {
-                    is AuthorizationResponseData.IdTokenResponseData ->
+                    is AuthorizationResponsePayload.SiopAuthenticationResponse ->
                         when (val idToken = data.idToken) {
                             is SignedJWT -> {
                                 assertTrue("Id Token signature could not be verified") {

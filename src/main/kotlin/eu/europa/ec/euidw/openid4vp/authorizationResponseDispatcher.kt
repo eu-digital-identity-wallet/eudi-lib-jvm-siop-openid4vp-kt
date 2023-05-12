@@ -9,7 +9,7 @@ interface AuthorizationResponseDispatcher {
     companion object {
         fun make(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-            httpPost : HttpPost<AuthorizationResponseData>,
+            httpPost : HttpPost<AuthorizationResponsePayload>,
             httpFormPost : HttpFormPost
         ) : AuthorizationResponseDispatcher {
             return DefaultAuthorizationResponseDispatcher(walletOpenId4VPConfig, httpPost, httpFormPost)

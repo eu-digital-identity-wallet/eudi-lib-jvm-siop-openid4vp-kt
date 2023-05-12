@@ -26,7 +26,7 @@ internal class ValidatedRequestObjectResolver(
     ): Result<ResolvedRequestObject> {
         val presentationDefinition =
             resolvePd(validated.presentationDefinitionSource, walletOpenId4VPConfig).getOrThrow()
-        return ResolvedRequestObject.IdAndVPTokenRequestObject(
+        return ResolvedRequestObject.SiopOpenId4VPAuthentication(
             idTokenType = validated.idTokenType,
             presentationDefinition = presentationDefinition,
             clientMetaData = resolveClientMetaData(validated).getOrThrow(),
@@ -45,7 +45,7 @@ internal class ValidatedRequestObjectResolver(
         val presentationDefinition =
             resolvePd(validated.presentationDefinitionSource, walletOpenId4VPConfig)
                 .getOrThrow()
-        return ResolvedRequestObject.VpTokenRequestObject(
+        return ResolvedRequestObject.OpenId4VPAuthorization(
             presentationDefinition = presentationDefinition,
             clientMetaData = resolveClientMetaData(validated).getOrThrow(),
             clientId = validated.clientId,
@@ -56,7 +56,7 @@ internal class ValidatedRequestObjectResolver(
     }
 
     private suspend fun resolveIdTokenRequest(validated: IdTokenRequestObject): Result<ResolvedRequestObject> =
-        ResolvedRequestObject.IdTokenRequestObject(
+        ResolvedRequestObject.SiopAuthentication(
             idTokenType = validated.idTokenType,
             clientMetaData = resolveClientMetaData(validated).getOrThrow(),
             clientId = validated.clientId,

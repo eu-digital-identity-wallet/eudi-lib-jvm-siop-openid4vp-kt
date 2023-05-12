@@ -11,6 +11,7 @@ import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import java.lang.IllegalStateException
 
 internal class DefaultAuthorizationRequestResolver(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
@@ -21,11 +22,19 @@ internal class DefaultAuthorizationRequestResolver(
 
     override suspend fun resolveRequest(
         request: AuthorizationRequest
-    ): Result<ResolvedRequestObject> = runCatching {
+    ): Resolution = runCatching {
         val requestObject = requestObjectOf(request)
         val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
         validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
-    }
+
+    }.fold(
+        onSuccess = { Resolution.Success(it) },
+        onFailure = {
+            when (it) {
+                is AuthorizationRequestException -> Resolution.Invalid(it.error)
+                else -> throw it
+            }
+        })
 
 
     /**
@@ -72,8 +81,7 @@ internal class DefaultAuthorizationRequestResolver(
                     getPresentationDefinition = getPresentationDefinition
                 ),
                 clientMetaDataResolver = ClientMetaDataResolver(
-                    getClientMetaData = getClientMetaData,
-                    walletOpenId4VPConfig = walletOpenId4VPConfig
+                    getClientMetaData = getClientMetaData
                 )
             )
 

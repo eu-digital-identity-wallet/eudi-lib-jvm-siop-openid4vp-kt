@@ -1,7 +1,7 @@
 package eu.europa.ec.euidw.openid4vp.internal.dispatch
 
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponse
-import eu.europa.ec.euidw.openid4vp.AuthorizationResponseData
+import eu.europa.ec.euidw.openid4vp.AuthorizationResponsePayload
 import eu.europa.ec.euidw.openid4vp.HttpFormPost
 
 internal class DirectPostResponseDispatcher(
@@ -17,17 +17,14 @@ internal class DirectPostResponseDispatcher(
         TODO()
     }
 
-    private fun AuthorizationResponseData.asFormParameters() : Map<String, String> {
+    private fun AuthorizationResponsePayload.asFormParameters() : Map<String, String> {
         when (this) {
-            is AuthorizationResponseData.IdAndVPTokenResponseData -> TODO()
-            is AuthorizationResponseData.IdTokenResponseData -> TODO()
-            is AuthorizationResponseData.VPTokenResponseData -> TODO()
+            is AuthorizationResponsePayload.SiopOpenId4VPAuthenticationResponse -> TODO()
+            is AuthorizationResponsePayload.SiopAuthenticationResponse -> TODO()
+            is AuthorizationResponsePayload.OpenId4VPAuthorizationResponse -> TODO()
 
-            is AuthorizationResponseData.FailedToResolveRequest -> TODO()
-            is AuthorizationResponseData.InvalidRequest -> TODO()
-            is AuthorizationResponseData.InvalidUrl -> TODO()
-            is AuthorizationResponseData.NoConsensusResponseData -> TODO()
-            is AuthorizationResponseData.UserRejection -> TODO()
+            is AuthorizationResponsePayload.InvalidRequest -> TODO()
+            is AuthorizationResponsePayload.NoConsensusResponseData -> TODO()
         }
     }
 

@@ -14,108 +14,42 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
 
-internal class DefaultAuthorizationResponseBuilder(
-    val walletConfig: WalletOpenId4VPConfig
-) : AuthorizationResponseBuilder {
+internal class DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
 
     override suspend fun buildResponse(
-        request: ResolvedRequestObject,
-        consensus: Consensus
+        request: ResolvedRequestObject.SiopAuthentication,
+        consensus: Consensus.PositiveConsensus.IdTokenConsensus
     ): AuthorizationResponse {
-        val responseData = buildResponseData(request, consensus)
-        return when (val responseMode = request.responseMode) {
+        val payload = AuthorizationResponsePayload.SiopAuthenticationResponse(consensus.idToken, request.state)
+        return toAuthorizationResponse(request.responseMode, payload)
+    }
+
+    override suspend fun buildResponse(
+        requestObject: ResolvedRequestObject.OpenId4VPAuthorization,
+        consensus: Consensus.PositiveConsensus.VPTokenConsensus
+    ): AuthorizationResponse {
+        TODO("Not yet implemented")
+    }
+    override suspend fun buildResponse(
+        requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
+        consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus
+    ): AuthorizationResponse {
+        TODO("Not yet implemented")
+    }
+
+    private fun toAuthorizationResponse(
+        responseMode: ResponseMode,
+        responseData: AuthorizationResponsePayload
+    ): AuthorizationResponse {
+        return when (responseMode) {
             is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
-            is ResponseMode.DirectPostJwt -> TODO("Not yet implemented")
-            is ResponseMode.Fragment -> TODO("Not yet implemented")
-            is ResponseMode.Query -> TODO("Not yet implemented")
+            is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData)
+            is ResponseMode.Fragment -> AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
+            is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData)
+            is ResponseMode.Query -> AuthorizationResponse.Query(responseMode.redirectUri, responseData)
+            is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData)
         }
     }
 
-    private fun buildResponseData(
-        request: ResolvedRequestObject,
-        consensus: Consensus
-    ): AuthorizationResponseData {
 
-        return when (consensus) {
-            is Consensus.PositiveConsensus -> {
-                when (request) {
-                    is ResolvedRequestObject.IdTokenRequestObject -> buildIDTokenResponseData(request,consensus)
-                    is ResolvedRequestObject.VpTokenRequestObject -> buildVPTokenResponseData(request,consensus)
-                    is ResolvedRequestObject.IdAndVPTokenRequestObject -> buildIDAndVPTokenResponseData(request,consensus)
-                }
-            }
-
-            else -> AuthorizationResponseData.NoConsensusResponseData("User has not approved request", request.state)
-        }
-
-    }
-
-    private fun buildIDTokenResponseData(
-        request: ResolvedRequestObject.IdTokenRequestObject,
-        consensus: Consensus.PositiveConsensus
-    ): AuthorizationResponseData.IdTokenResponseData {
-        return when (consensus) {
-            is Consensus.PositiveConsensus.IdTokenConsensus -> AuthorizationResponseData.IdTokenResponseData(buildIdToken(request), request.state)
-            else -> throw IllegalStateException("")
-        }
-    }
-
-    private fun buildVPTokenResponseData(
-        request: ResolvedRequestObject.VpTokenRequestObject,
-        consensus: Consensus.PositiveConsensus
-    ): AuthorizationResponseData.VPTokenResponseData {
-        TODO("Not yet implemented")
-    }
-
-    private fun buildIDAndVPTokenResponseData(
-        request: ResolvedRequestObject.IdAndVPTokenRequestObject,
-        consensus: Consensus.PositiveConsensus
-    ): AuthorizationResponseData.IdAndVPTokenResponseData {
-        TODO("Not yet implemented")
-    }
-
-
-    private fun buildIdToken(request: ResolvedRequestObject.IdTokenRequestObject) : JWT {
-
-        fun sign(claimSet: IDTokenClaimsSet): Result<JWT> = runCatching {
-            val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(walletConfig.rsaJWK.keyID).build()
-            val signedJWT = SignedJWT(header, claimSet.toJWTClaimsSet())
-            signedJWT.sign(RSASSASigner(walletConfig.rsaJWK))
-            signedJWT
-        }
-
-        fun buildJWKThumbprint() : String =
-            ThumbprintUtils.compute("SHA-256", walletConfig.rsaJWK).toJSONString()
-
-        fun buildIssuerClaim() : String =
-            when (walletConfig.preferredSubjectSyntaxType) {
-                is SubjectSyntaxType.JWKThumbprint -> buildJWKThumbprint()
-                is SubjectSyntaxType.DecentralizedIdentifier -> walletConfig.decentralizedIdentifier
-            }
-
-        fun computeTokenDates() : Pair<Date, Date> {
-            val now = LocalDateTime.now()
-            val iat = Date.from(now.atZone(ZoneId.systemDefault()).toInstant())
-            val expLocalDate = now.plusMinutes(walletConfig.idTokenTTL.toMinutes())
-            val exp = Date.from(expLocalDate.atZone(ZoneId.systemDefault()).toInstant())
-            return iat to exp
-        }
-
-        val subjectJwk = JWKSet(walletConfig.rsaJWK).toPublicJWKSet()
-
-        val claimSet = with(JWTClaimsSet.Builder()) {
-            issuer( buildIssuerClaim() )
-            subject( buildIssuerClaim() ) // By SIOPv2 draft 12 issuer = subject
-            audience( request.clientId )
-            val (iat, exp) = computeTokenDates()
-            issueTime(iat)
-            expirationTime(exp)
-            claim("sub_jwk", subjectJwk.toJSONObject())
-            claim("email", walletConfig.holderEmail)
-            claim("name", walletConfig.holderName)
-            build()
-        }
-
-        return sign(IDTokenClaimsSet(claimSet)).getOrThrow()
-    }
 }

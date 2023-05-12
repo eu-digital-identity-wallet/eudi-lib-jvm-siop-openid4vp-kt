@@ -5,7 +5,7 @@ import eu.europa.ec.euidw.openid4vp.internal.dispatch.DirectPostResponseDispatch
 
 internal class DefaultAuthorizationResponseDispatcher(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val httpPost : HttpPost<AuthorizationResponseData>,
+    private val httpPost : HttpPost<AuthorizationResponsePayload>,
     private val httpFormPost : HttpFormPost,
 ) : AuthorizationResponseDispatcher {
 

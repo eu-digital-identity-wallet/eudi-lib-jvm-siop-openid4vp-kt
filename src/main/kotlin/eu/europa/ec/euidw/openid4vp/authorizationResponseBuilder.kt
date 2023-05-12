@@ -7,63 +7,68 @@ import eu.europa.ec.euidw.prex.PresentationSubmission
 
 sealed interface AuthorizationResponse {
     sealed interface DirectPostResponse : AuthorizationResponse
-    data class DirectPost(val responseUri: HttpsUrl, val data: AuthorizationResponseData) : DirectPostResponse
-    data class DirectPostJwt(val responseUri: HttpsUrl, val data: AuthorizationResponseData) : DirectPostResponse
+    data class DirectPost(val responseUri: HttpsUrl, val data: AuthorizationResponsePayload) : DirectPostResponse
+    data class DirectPostJwt(val responseUri: HttpsUrl, val data: AuthorizationResponsePayload) : DirectPostResponse
 
     sealed interface QueryResponse : AuthorizationResponse
-    data class Query(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : QueryResponse
-    data class QueryJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : QueryResponse
+    data class Query(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : QueryResponse
+    data class QueryJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : QueryResponse
 
     sealed interface FragmentResponse : AuthorizationResponse
-    data class Fragment(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : FragmentResponse
-    data class FragmentJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponseData) : FragmentResponse
+    data class Fragment(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : FragmentResponse
+    data class FragmentJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : FragmentResponse
 }
 
 
-sealed interface AuthorizationResponseData {
+sealed interface AuthorizationResponsePayload {
 
     val state: String
 
-    sealed interface Success : AuthorizationResponseData
+    sealed interface Success : AuthorizationResponsePayload
 
-    data class IdTokenResponseData(
+    data class SiopAuthenticationResponse(
         val idToken: JWT,
         override val state: String
     ) : Success
 
-    data class VPTokenResponseData(
+    data class OpenId4VPAuthorizationResponse(
         val verifiableCredential: List<Jwt>,
         val presentationSubmission: PresentationSubmission,
         override val state: String
     ) : Success
 
-    data class IdAndVPTokenResponseData(
+    data class SiopOpenId4VPAuthenticationResponse(
         val idToken: JWT,
         val verifiableCredential: List<Jwt>,
         val presentationSubmission: PresentationSubmission,
         override val state: String
     ) : Success
 
-    sealed interface Failed : AuthorizationResponseData
-    data class InvalidRequest(val error: RequestValidationError, override val state: String) : Failed
-    data class FailedToResolveRequest(val error: ResolutionError, override val state: String) : Failed
-    data class InvalidUrl(val url: String, override val state: String) : Failed
-    data class UserRejection(val rejectionMessage: String, override val state: String) : Failed
-    data class NoConsensusResponseData(val reason: String, override val state: String) : Failed
-
+    sealed interface Failed : AuthorizationResponsePayload
+    data class InvalidRequest(
+        val error: AuthorizationRequestError,
+        override val state: String
+    ) : Failed
+    data class NoConsensusResponseData(
+        val reason: String?,
+        override val state: String
+    ) : Failed
 }
 
 sealed interface Consensus {
 
     interface NegativeConsensus : Consensus
     sealed interface PositiveConsensus : Consensus {
-        object IdTokenConsensus : PositiveConsensus
+        data class IdTokenConsensus(
+            val idToken: JWT
+        ) : PositiveConsensus
 
         data class VPTokenConsensus(
             val approvedClaims: List<Claim>
         ) : PositiveConsensus
 
         data class IdAndVPTokenConsensus(
+            val idToken: JWT,
             val approvedClaims: List<Claim>
         ) : PositiveConsensus
     }
@@ -90,13 +95,19 @@ sealed interface RequestConsensus {
 interface AuthorizationResponseBuilder {
 
     suspend fun buildResponse(
-        requestObject: ResolvedRequestObject,
-        consensus: Consensus
+        requestObject: ResolvedRequestObject.SiopAuthentication,
+        consensus: Consensus.PositiveConsensus.IdTokenConsensus
+    ): AuthorizationResponse
+    suspend fun buildResponse(
+        requestObject: ResolvedRequestObject.OpenId4VPAuthorization,
+        consensus: Consensus.PositiveConsensus.VPTokenConsensus
+    ): AuthorizationResponse
+    suspend fun buildResponse(
+        requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
+        consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus
     ): AuthorizationResponse
 
-    companion object {
-        fun make(walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationResponseBuilder =
-            DefaultAuthorizationResponseBuilder(walletOpenId4VPConfig)
-    }
+    // TODO: Consider build error response
+
 }
 

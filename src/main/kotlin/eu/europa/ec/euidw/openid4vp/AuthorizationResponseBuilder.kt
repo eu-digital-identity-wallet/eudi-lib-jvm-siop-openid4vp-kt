@@ -1,11 +1,11 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.jwt.JWT
-import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.euidw.prex.Claim
 import eu.europa.ec.euidw.prex.PresentationSubmission
+import java.io.Serializable
 
-sealed interface AuthorizationResponse {
+sealed interface AuthorizationResponse : Serializable {
     sealed interface DirectPostResponse : AuthorizationResponse
     data class DirectPost(val responseUri: HttpsUrl, val data: AuthorizationResponsePayload) : DirectPostResponse
     data class DirectPostJwt(val responseUri: HttpsUrl, val data: AuthorizationResponsePayload) : DirectPostResponse
@@ -21,7 +21,7 @@ sealed interface AuthorizationResponse {
 }
 
 
-sealed interface AuthorizationResponsePayload {
+sealed interface AuthorizationResponsePayload : Serializable{
 
     val state: String
 
@@ -56,7 +56,7 @@ sealed interface AuthorizationResponsePayload {
     ) : Failed
 }
 
-sealed interface Consensus {
+sealed interface Consensus : Serializable{
 
     interface NegativeConsensus : Consensus
     sealed interface PositiveConsensus : Consensus {
@@ -75,7 +75,7 @@ sealed interface Consensus {
     }
 }
 
-sealed interface RequestConsensus {
+sealed interface RequestConsensus : Serializable{
     data class ReleaseClaims(
         val claims: List<ReleaseClaim>
     ) : RequestConsensus {

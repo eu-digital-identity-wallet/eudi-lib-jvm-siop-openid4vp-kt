@@ -5,7 +5,6 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.euidw.openid4vp.internal.ClientMetadataValidator
 import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationResponseBuilder
-import eu.europa.ec.euidw.openid4vp.utils.SiopIdTokenBuilder
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json

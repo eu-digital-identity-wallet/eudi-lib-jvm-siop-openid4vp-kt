@@ -2,7 +2,6 @@ package eu.europa.ec.euidw.openid4vp
 
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.DirectPostResponseDispatcher
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.RedirectResponseDispatcher
-import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorAuthorizationRequestResolver
 import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorDirectPostResponseDispatcher
 import java.io.Closeable
 import java.net.URL

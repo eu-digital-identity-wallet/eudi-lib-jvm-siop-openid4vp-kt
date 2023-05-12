@@ -1,6 +1,5 @@
 package eu.europa.ec.euidw.openid4vp
 
-import com.eygraber.uri.Uri
 import com.nimbusds.jose.jwk.ThumbprintURI
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName

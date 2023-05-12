@@ -1,4 +1,4 @@
-package eu.europa.ec.euidw.openid4vp.utils
+package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
@@ -9,16 +9,19 @@ import com.nimbusds.jwt.JWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
-import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject
-import eu.europa.ec.euidw.openid4vp.SubjectSyntaxType
-import eu.europa.ec.euidw.openid4vp.WalletOpenId4VPConfig
-import java.time.LocalDateTime
+import java.time.Clock
+import java.time.Instant
 import java.time.ZoneId
 import java.util.*
 
 object SiopIdTokenBuilder {
 
-    fun build(request: ResolvedRequestObject.SiopAuthentication, walletConfig: WalletOpenId4VPConfig): JWT {
+
+    fun build(
+        request: ResolvedRequestObject.SiopAuthentication,
+        walletConfig: WalletOpenId4VPConfig,
+        clock: Clock = Clock.systemDefaultZone()
+    ): JWT {
 
         fun sign(claimSet: IDTokenClaimsSet): Result<JWT> = runCatching {
             val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(walletConfig.rsaJWK.keyID).build()
@@ -36,21 +39,24 @@ object SiopIdTokenBuilder {
                 is SubjectSyntaxType.DecentralizedIdentifier -> walletConfig.decentralizedIdentifier
             }
 
-        fun computeTokenDates(): Pair<Date, Date> {
-            val now = LocalDateTime.now()
-            val iat = Date.from(now.atZone(ZoneId.systemDefault()).toInstant())
-            val expLocalDate = now.plusMinutes(walletConfig.idTokenTTL.toMinutes())
-            val exp = Date.from(expLocalDate.atZone(ZoneId.systemDefault()).toInstant())
-            return iat to exp
+        fun computeTokenDates(clock: Clock): Pair<Date, Date> {
+            val iat = clock.instant()
+            val exp = iat.plusMillis(walletConfig.idTokenTTL.toMillis())
+            fun Instant.toDate() = Date.from(atZone(ZoneId.systemDefault()).toInstant())
+            return iat.toDate() to exp.toDate()
         }
 
         val subjectJwk = JWKSet(walletConfig.rsaJWK).toPublicJWKSet()
 
+        val (iat, exp) = computeTokenDates(clock)
+
+
+        // TODO Consider using IDTokenClaimsSet instead of generic JWTClaimSet
+        //  It is more type-safe and expresses by definition IdToken
         val claimSet = with(JWTClaimsSet.Builder()) {
             issuer(buildIssuerClaim())
             subject(buildIssuerClaim()) // By SIOPv2 draft 12 issuer = subject
             audience(request.clientId)
-            val (iat, exp) = computeTokenDates()
             issueTime(iat)
             expirationTime(exp)
             claim("sub_jwk", subjectJwk.toJSONObject())

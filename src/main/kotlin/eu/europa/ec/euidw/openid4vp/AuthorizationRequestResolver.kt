@@ -13,7 +13,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.Closeable
-import java.lang.IllegalStateException
 
 /**
  * OAUTH2 authorization request

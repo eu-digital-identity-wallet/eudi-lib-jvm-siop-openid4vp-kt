@@ -1,27 +1,15 @@
 package eu.europa.ec.euidw.openid4vp.internal
 
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
-import com.nimbusds.jose.crypto.RSASSASigner
-import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.jose.jwk.ThumbprintUtils
-import com.nimbusds.jwt.JWT
-import com.nimbusds.jwt.JWTClaimsSet
-import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import eu.europa.ec.euidw.openid4vp.*
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.util.*
 
 internal class DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
 
     override suspend fun buildResponse(
-        request: ResolvedRequestObject.SiopAuthentication,
+        requestObject: ResolvedRequestObject.SiopAuthentication,
         consensus: Consensus.PositiveConsensus.IdTokenConsensus
     ): AuthorizationResponse {
-        val payload = AuthorizationResponsePayload.SiopAuthenticationResponse(consensus.idToken, request.state)
-        return toAuthorizationResponse(request.responseMode, payload)
+        val payload = AuthorizationResponsePayload.SiopAuthenticationResponse(consensus.idToken, requestObject.state)
+        return toAuthorizationResponse(requestObject.responseMode, payload)
     }
 
     override suspend fun buildResponse(

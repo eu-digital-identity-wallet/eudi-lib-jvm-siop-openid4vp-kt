@@ -1,10 +1,9 @@
 package eu.europa.ec.euidw.openid4vp.internal.ktor
 
-import eu.europa.ec.euidw.openid4vp.AuthorizationResponse
+import eu.europa.ec.euidw.openid4vp.AuthorizationResponse.DirectPostResponse
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponseDispatcher
 import eu.europa.ec.euidw.openid4vp.HttpFormPost
 import eu.europa.ec.euidw.openid4vp.ManagedAuthorizationResponseDispatcher
-import eu.europa.ec.euidw.openid4vp.internal.dispatch.DirectPostResponseDispatcher
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -12,7 +11,9 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 
-class KtorDirectPostResponseDispatcher : ManagedAuthorizationResponseDispatcher {
+class KtorDirectPostResponseDispatcher<in A : DirectPostResponse>(
+    proxyFactory: (HttpFormPost) -> AuthorizationResponseDispatcher<A, Unit>
+) : ManagedAuthorizationResponseDispatcher<A> {
 
     /**
      * The ktor http client
@@ -24,13 +25,11 @@ class KtorDirectPostResponseDispatcher : ManagedAuthorizationResponseDispatcher 
     /**
      * The actual or proxied [AuthorizationResponseDispatcher]
      */
-    private val proxy: AuthorizationResponseDispatcher<AuthorizationResponse.DirectPostResponse, Unit> by lazy {
-        DirectPostResponseDispatcher(httpFormPost = ktorAdapter(httpClient))
+    private val proxy: AuthorizationResponseDispatcher<A, Unit> by lazy {
+        proxyFactory(ktorAdapter(httpClient))
     }
 
-    override suspend fun dispatch(response: AuthorizationResponse.DirectPostResponse) {
-        proxy.dispatch(response)
-    }
+    override suspend fun dispatch(response: A) = proxy.dispatch(response)
 
     override fun close() = httpClient.close()
 
@@ -62,7 +61,7 @@ private fun ktorAdapter(httpClient: HttpClient): HttpFormPost =
         response.body<String>()
     }
 
-fun Map<String, String>.toFormParameters() : Parameters {
+fun Map<String, String>.toFormParameters(): Parameters {
     return Parameters.build {
         this@toFormParameters.entries.forEach { append(it.key, it.value) }
     }

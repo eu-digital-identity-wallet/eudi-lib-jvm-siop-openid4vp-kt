@@ -9,6 +9,7 @@ enum class AuthenticationResponseErrorCode(
     val description: String
 ) {
 
+
     /**
      * OpenId4VP Error Codes
      */
@@ -29,6 +30,10 @@ enum class AuthenticationResponseErrorCode(
     INVALID_REGISTRATION_OBJECT("invalid_registration_object", "invalid_registration_object"),
 
     PROCESSING_FAILURE("processing_error", "processing_error");
+
+    operator fun component1(): String = code
+    operator fun component2(): String = description
+
     companion object {
         fun fromError(error: AuthorizationRequestError): AuthenticationResponseErrorCode {
             return when (error) {

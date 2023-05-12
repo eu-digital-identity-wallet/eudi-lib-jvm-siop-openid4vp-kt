@@ -4,8 +4,8 @@ import com.eygraber.uri.Uri
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
-import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
+import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationRequestResolver
 import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorAuthorizationRequestResolver
 import eu.europa.ec.euidw.prex.PresentationDefinition
@@ -20,7 +20,7 @@ import java.io.Serializable
  *
  * This is merely a data carrier structure which doesn't enforce any rules.
  */
-sealed interface AuthorizationRequest {
+sealed interface AuthorizationRequest : Serializable {
 
     data class NotSecured(val requestObject: RequestObject) : AuthorizationRequest
 
@@ -154,7 +154,9 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     // Response Type errors
     //
     data class UnsupportedResponseType(val value: String) : RequestValidationError
-    object MissingResponseType : RequestValidationError
+    object MissingResponseType : RequestValidationError {
+        override fun toString(): String = "MissingResponseType"
+    }
 
     //
     // Response Mode errors
@@ -164,7 +166,10 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     //
     // Presentation Definition errors
     //
-    object MissingPresentationDefinition : RequestValidationError
+    object MissingPresentationDefinition : RequestValidationError {
+        override fun toString(): String = "MissingPresentationDefinition"
+    }
+
     data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
     object InvalidPresentationDefinitionUri : RequestValidationError
     object InvalidRedirectUri : RequestValidationError
@@ -229,7 +234,6 @@ fun interface AuthorizationRequestResolver {
                 else -> throw it
             }
         })
-
 
 
     /**

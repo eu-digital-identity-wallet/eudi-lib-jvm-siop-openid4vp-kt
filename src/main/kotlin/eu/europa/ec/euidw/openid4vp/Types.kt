@@ -15,9 +15,9 @@ data class ClientMetaData( // By OpenID Connect Dynamic Client Registration spec
     @SerialName("id_token_encrypted_response_alg") val idTokenEncryptedResponseAlg: String,
     @SerialName("id_token_encrypted_response_enc") val idTokenEncryptedResponseEnc: String,
     @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>
-)
+) : java.io.Serializable
 
-sealed interface SubjectSyntaxType {
+sealed interface SubjectSyntaxType : java.io.Serializable {
 
     companion object {
         fun isValid(value: String): Boolean = DecentralizedIdentifier.isValid(value) || JWKThumbprint.isValid(value)
@@ -155,7 +155,7 @@ data class RequestObject(
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
     val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
     @SerialName("id_token_type") val idTokenType: String? = null
-)
+) : java.io.Serializable
 
 typealias Jwt = String
 

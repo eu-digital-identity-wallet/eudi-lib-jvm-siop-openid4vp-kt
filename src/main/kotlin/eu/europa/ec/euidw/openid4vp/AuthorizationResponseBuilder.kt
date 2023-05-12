@@ -21,7 +21,7 @@ sealed interface AuthorizationResponse : Serializable {
 }
 
 
-sealed interface AuthorizationResponsePayload : Serializable{
+sealed interface AuthorizationResponsePayload : Serializable {
 
     val state: String
 
@@ -50,13 +50,14 @@ sealed interface AuthorizationResponsePayload : Serializable{
         val error: AuthorizationRequestError,
         override val state: String
     ) : Failed
+
     data class NoConsensusResponseData(
         val reason: String?,
         override val state: String
     ) : Failed
 }
 
-sealed interface Consensus : Serializable{
+sealed interface Consensus : Serializable {
 
     interface NegativeConsensus : Consensus
     sealed interface PositiveConsensus : Consensus {
@@ -75,7 +76,7 @@ sealed interface Consensus : Serializable{
     }
 }
 
-sealed interface RequestConsensus : Serializable{
+sealed interface RequestConsensus : Serializable {
     data class ReleaseClaims(
         val claims: List<ReleaseClaim>
     ) : RequestConsensus {
@@ -99,10 +100,12 @@ interface AuthorizationResponseBuilder {
         requestObject: ResolvedRequestObject.SiopAuthentication,
         consensus: Consensus.PositiveConsensus.IdTokenConsensus
     ): AuthorizationResponse
+
     suspend fun buildResponse(
         requestObject: ResolvedRequestObject.OpenId4VPAuthorization,
         consensus: Consensus.PositiveConsensus.VPTokenConsensus
     ): AuthorizationResponse
+
     suspend fun buildResponse(
         requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
         consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus

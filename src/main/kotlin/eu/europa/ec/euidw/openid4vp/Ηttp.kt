@@ -26,3 +26,7 @@ value class HttpsUrl private constructor(val value: URL) {
 fun interface HttpGet<out R> {
     suspend fun get(url: URL): Result<R>
 }
+
+fun interface HttpFormPost {
+    suspend fun post(url: URL, formParameters : Map<String, String>) : String
+}

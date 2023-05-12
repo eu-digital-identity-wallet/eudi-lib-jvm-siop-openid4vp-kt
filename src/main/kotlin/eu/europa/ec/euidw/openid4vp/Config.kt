@@ -42,7 +42,7 @@ data class WalletOpenId4VPMetaData(
      */
     @SerialName("presentation_definition_uri_supported") val presentationDefinitionUriSupported: Boolean = true,
     @SerialName("vp_formats_supported") val vpFormatsSupported: VPFormatsFormatsSupported,
-    val client_id_schemes_supported: List<ClientIdScheme>
+    @SerialName("client_id_schemes_supported") val clientIdSchemesSupported: List<ClientIdScheme>
 
 )
 
@@ -61,7 +61,7 @@ data class WalletOpenId4VPConfig(
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
         .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
         .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
-        .generate()
+        .generate() // FIXME Remove this from here.
 ) {
 
 //    init {

@@ -4,9 +4,9 @@ import com.eygraber.uri.Uri
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
-import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.IdAndVPTokenRequestObject
-import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.VpTokenRequestObject
-import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
+import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
+import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
+import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationRequestResolver
 import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorAuthorizationRequestResolver
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json
@@ -98,9 +98,9 @@ sealed interface AuthorizationRequest {
 
 /**
  * Represents an OAUTH2 authorization request. In particular
- * either a [SIOPv2 for id_token][IdAndVPTokenRequestObject] or
- * a [OpenId4VP for vp_token][VpTokenRequestObject] or
- * a [SIOPv2 combined with OpenID4VP][IdAndVPTokenRequestObject]
+ * either a [SIOPv2 for id_token][SiopOpenId4VPAuthentication] or
+ * a [OpenId4VP for vp_token][OpenId4VPAuthorization] or
+ * a [SIOPv2 combined with OpenID4VP][SiopOpenId4VPAuthentication]
  */
 sealed interface ResolvedRequestObject : Serializable {
 
@@ -110,7 +110,7 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * SIOPv2 Authentication request for issuing an id_token
      */
-    data class IdTokenRequestObject(
+    data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
         val clientMetaData: OIDCClientMetadata,
         val clientId: String,
@@ -123,7 +123,7 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * OpenId4VP Authorization request for presenting a vp_token
      */
-    data class VpTokenRequestObject(
+    data class OpenId4VPAuthorization(
         val presentationDefinition: PresentationDefinition,
         val clientMetaData: OIDCClientMetadata,
         val clientId: String,
@@ -135,7 +135,7 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * OpenId4VP combined with SIOPv2 request for presenting an id_token & vp_token
      */
-    data class IdAndVPTokenRequestObject(
+    data class SiopOpenId4VPAuthentication(
         val idTokenType: List<IdTokenType>,
         val presentationDefinition: PresentationDefinition,
         val clientMetaData: OIDCClientMetadata,
@@ -182,6 +182,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     object OneOfClientMedataOrUri : RequestValidationError
     object SubjectSyntaxTypesNoMatch : RequestValidationError
     object MissingClientMetadataJwksSource : RequestValidationError
+    object BothJwkUriAndInlineJwks : RequestValidationError
     object SubjectSyntaxTypesWrongSyntax : RequestValidationError
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
 
@@ -193,6 +194,8 @@ sealed interface ResolutionError : AuthorizationRequestError {
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
     data class UnableToFetchClientMetadata(val cause: Throwable) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
+    data class ClientMetadataJwkUriUnparsable(val cause: Throwable) : ResolutionError
+    data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
 }
 
 
@@ -205,26 +208,35 @@ fun <T> AuthorizationRequestError.asFailure(): Result<T> =
 
 data class AuthorizationRequestException(val error: AuthorizationRequestError) : RuntimeException()
 
+sealed interface Resolution {
+    data class Success(val data: ResolvedRequestObject) : Resolution
+    data class Invalid(val error: AuthorizationRequestError) : Resolution
+}
+
 fun interface AuthorizationRequestResolver {
 
     /**
      * Tries to validate and resolve the provided [uri] into
      * a [ResolvedRequestObject]
      */
-    suspend fun resolveRequestUri(
-        uri: String
-    ): Result<ResolvedRequestObject> = runCatching {
-        val request = AuthorizationRequest.make(uri).getOrThrow()
-        resolveRequest(request).getOrThrow()
-    }
+    suspend fun resolveRequestUri(uri: String): Resolution = runCatching {
+        AuthorizationRequest.make(uri).getOrThrow()
+    }.fold(
+        onSuccess = { resolveRequest(it) },
+        onFailure = {
+            when (it) {
+                is AuthorizationRequestException -> Resolution.Invalid(it.error)
+                else -> throw it
+            }
+        })
+
+
 
     /**
      * Tries to validate and resolve the provided [request] into
      * a [ResolvedRequestObject]
      */
-    suspend fun resolveRequest(
-        request: AuthorizationRequest
-    ): Result<ResolvedRequestObject>
+    suspend fun resolveRequest(request: AuthorizationRequest): Resolution
 
     companion object {
 
@@ -240,7 +252,7 @@ fun interface AuthorizationRequestResolver {
             getPresentationDefinition: HttpGet<PresentationDefinition>,
             getClientMetaData: HttpGet<ClientMetaData>,
             walletOpenId4VPConfig: WalletOpenId4VPConfig
-        ): AuthorizationRequestResolver = AuthorizationRequestResolverImpl.make(
+        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
             getRequestObjectJwt,
             getPresentationDefinition,
             getClientMetaData,

@@ -1,7 +1,7 @@
 package eu.europa.ec.euidw.openid4vp.internal.ktor
 
 import eu.europa.ec.euidw.openid4vp.*
-import eu.europa.ec.euidw.openid4vp.internal.AuthorizationRequestResolverImpl
+import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationRequestResolver
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -66,7 +66,7 @@ private fun createResolver(
     httpClient: HttpClient
 ): AuthorizationRequestResolver {
 
-    return AuthorizationRequestResolverImpl.make(
+    return DefaultAuthorizationRequestResolver.make(
         getClientMetaData = ktorAdapter(httpClient),
         getPresentationDefinition = ktorAdapter(httpClient),
         getRequestObjectJwt = { url ->

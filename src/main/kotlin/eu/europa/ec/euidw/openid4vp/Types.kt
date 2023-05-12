@@ -115,12 +115,14 @@ sealed interface ResponseMode : java.io.Serializable {
      * in the query string added to the redirect_uri when redirecting back to the Client.
      */
     data class Query(val redirectUri: HttpsUrl) : ResponseMode
+    data class QueryJwt(val redirectUri: HttpsUrl) : ResponseMode
 
     /**
      * In this mode, Authorization Response parameters
      * are encoded in the fragment added to the redirect_uri when redirecting back to the Client.
      */
     data class Fragment(val redirectUri: HttpsUrl) : ResponseMode
+    data class FragmentJwt(val redirectUri: HttpsUrl) : ResponseMode
     data class DirectPost(val responseURI: HttpsUrl) : ResponseMode
     data class DirectPostJwt(val responseURI: HttpsUrl) : ResponseMode
 }

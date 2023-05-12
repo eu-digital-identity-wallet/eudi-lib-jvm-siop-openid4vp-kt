@@ -10,11 +10,12 @@ sealed interface AuthorizationResponse {
     data class DirectPost(val responseUri: HttpsUrl, val data: AuthorizationResponsePayload) : DirectPostResponse
     data class DirectPostJwt(val responseUri: HttpsUrl, val data: AuthorizationResponsePayload) : DirectPostResponse
 
-    sealed interface QueryResponse : AuthorizationResponse
+    sealed interface RedirectResponse : AuthorizationResponse
+    sealed interface QueryResponse : RedirectResponse
     data class Query(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : QueryResponse
     data class QueryJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : QueryResponse
 
-    sealed interface FragmentResponse : AuthorizationResponse
+    sealed interface FragmentResponse : RedirectResponse
     data class Fragment(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : FragmentResponse
     data class FragmentJwt(val redirectUri: HttpsUrl, val data: AuthorizationResponsePayload) : FragmentResponse
 }

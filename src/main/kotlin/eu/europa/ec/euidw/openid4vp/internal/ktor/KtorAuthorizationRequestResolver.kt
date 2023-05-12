@@ -1,15 +1,14 @@
 package eu.europa.ec.euidw.openid4vp.internal.ktor
 
-import eu.europa.ec.euidw.openid4vp.*
-import eu.europa.ec.euidw.openid4vp.internal.DefaultAuthorizationRequestResolver
+import eu.europa.ec.euidw.openid4vp.AuthorizationRequest
+import eu.europa.ec.euidw.openid4vp.AuthorizationRequestResolver
+import eu.europa.ec.euidw.openid4vp.ManagedAuthorizationRequestResolver
+import eu.europa.ec.euidw.openid4vp.WalletOpenId4VPConfig
+import eu.europa.ec.euidw.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import java.net.URL
 
 /**
  * An implementation of [AuthorizationRequestResolver] which uses Ktor client
@@ -30,9 +29,7 @@ internal class KtorAuthorizationRequestResolver(
     /**
      * The ktor http client
      */
-    private val httpClient: HttpClient by lazy {
-        createKtorClient()
-    }
+    private val httpClient: HttpClient by lazy { HttpKtorAdapter.createKtorClient() }
 
     /**
      * The actual or proxied [AuthorizationRequestResolver]
@@ -48,27 +45,14 @@ internal class KtorAuthorizationRequestResolver(
 
 }
 
-/**
- * Factory method for creating a Ktor Http client
- * The actual engine will be peeked up by whatever
- * is available in classpath
- *
- * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
- */
-private fun createKtorClient(): HttpClient =
-    HttpClient {
-        install(ContentNegotiation) { json() }
-        expectSuccess = true
-    }
 
 private fun createResolver(
     walletOpenId4VPConfig: WalletOpenId4VPConfig,
     httpClient: HttpClient
-): AuthorizationRequestResolver {
-
-    return DefaultAuthorizationRequestResolver.make(
-        getClientMetaData = ktorAdapter(httpClient),
-        getPresentationDefinition = ktorAdapter(httpClient),
+): AuthorizationRequestResolver =
+    DefaultAuthorizationRequestResolver.make(
+        getClientMetaData = HttpKtorAdapter.httpGet(httpClient),
+        getPresentationDefinition = HttpKtorAdapter.httpGet(httpClient),
         getRequestObjectJwt = { url ->
             runCatching {
                 httpClient.get(url) {
@@ -78,15 +62,4 @@ private fun createResolver(
         },
         walletOpenId4VPConfig = walletOpenId4VPConfig
     )
-}
 
-/**
- * A factory method for creating an instance of [HttpGet] that delegates HTTP
- * calls to [httpClient]
- */
-private inline fun <reified R> ktorAdapter(httpClient: HttpClient): HttpGet<R> =
-    object : HttpGet<R> {
-        override suspend fun get(url: URL): Result<R> = runCatching {
-            httpClient.get(url).body<R>()
-        }
-    }

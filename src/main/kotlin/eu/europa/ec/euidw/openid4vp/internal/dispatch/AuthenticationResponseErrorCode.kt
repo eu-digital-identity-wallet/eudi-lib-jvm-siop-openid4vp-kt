@@ -18,7 +18,10 @@ enum class AuthenticationResponseErrorCode(
     INVALID_CLIENT("invalid_client", "invalid_client"),
     VP_FORMATS_NOT_SUPPORTED("vp_formats_not_supported", "vp_formats_not_supported"),
     INVALID_PRESENTATION_DEFINITION_URI("invalid_presentation_definition_uri", "invalid_presentation_definition_uri"),
-    INVALID_PRESENTATION_DEFINITION_REFERENCE("invalid_presentation_definition_reference", "invalid_presentation_definition_reference"),
+    INVALID_PRESENTATION_DEFINITION_REFERENCE(
+        "invalid_presentation_definition_reference",
+        "invalid_presentation_definition_reference"
+    ),
 
     /**
      * SIOPv2 Error Codes
@@ -41,7 +44,8 @@ enum class AuthenticationResponseErrorCode(
                 MissingNonce, MissingPresentationDefinition, MissingRedirectUri, MissingResponseType,
                 MissingResponseUri, MissingScope, MissingState, OneOfClientMedataOrUri, RedirectUriMustNotBeProvided,
                 ResponseUriMustNotBeProvided, is UnsupportedResponseMode, is UnsupportedResponseType
-                        -> INVALID_REQUEST
+                -> INVALID_REQUEST
+
                 BothJwkUriAndInlineJwks, MissingClientMetadataJwksSource -> INVALID_REGISTRATION_OBJECT
                 SubjectSyntaxTypesNoMatch, SubjectSyntaxTypesWrongSyntax -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
                 is ClientMetadataJwkUriUnparsable, InvalidClientMetaDataUri -> INVALID_REGISTRATION_URI
@@ -49,7 +53,7 @@ enum class AuthenticationResponseErrorCode(
                 InvalidPresentationDefinitionUri -> INVALID_PRESENTATION_DEFINITION_URI
                 is ClientMetadataJwkResolutionFailed, FetchingPresentationDefinitionNotSupported, is PresentationDefinitionNotFoundForScope,
                 is UnableToFetchClientMetadata, is UnableToFetchPresentationDefinition, is UnableToFetchRequestObject
-                        -> PROCESSING_FAILURE
+                -> PROCESSING_FAILURE
             }
         }
     }

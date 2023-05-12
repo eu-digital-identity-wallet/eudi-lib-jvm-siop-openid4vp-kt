@@ -1,7 +1,8 @@
-package eu.europa.ec.euidw.openid4vp.internal
+package eu.europa.ec.euidw.openid4vp.internal.request
 
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.euidw.openid4vp.internal.mapError
 
 
 internal class ClientMetaDataResolver(

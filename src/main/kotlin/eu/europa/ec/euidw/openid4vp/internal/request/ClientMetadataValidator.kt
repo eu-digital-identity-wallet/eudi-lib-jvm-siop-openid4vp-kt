@@ -1,4 +1,4 @@
-package eu.europa.ec.euidw.openid4vp.internal
+package eu.europa.ec.euidw.openid4vp.internal.request
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
@@ -12,7 +12,7 @@ import java.text.ParseException
 
 internal object ClientMetadataValidator {
 
-    suspend fun validate(clientMetadata : ClientMetaData) : Result<OIDCClientMetadata> = runCatching {
+    suspend fun validate(clientMetadata: ClientMetaData): Result<OIDCClientMetadata> = runCatching {
 
         val jwkSets = parseRequiredJwks(clientMetadata).getOrThrow()
         val types = parseRequiredSubjectSyntaxTypes(clientMetadata).getOrThrow()
@@ -48,6 +48,7 @@ internal object ClientMetadataValidator {
                     ResolutionError.ClientMetadataJwkUriUnparsable(ex).asFailure()
                 }
             }
+
             else -> {
                 // TODO this should be launched in coroutine, since it is blocking
                 return try {
@@ -61,7 +62,7 @@ internal object ClientMetadataValidator {
         }
     }
 
-    private fun parseRequiredSubjectSyntaxTypes(clientMetadata: ClientMetaData) : Result<List<SubjectSyntaxType>> {
+    private fun parseRequiredSubjectSyntaxTypes(clientMetadata: ClientMetaData): Result<List<SubjectSyntaxType>> {
         val listNotEmpty = clientMetadata.subjectSyntaxTypesSupported.isNotEmpty()
         val allValidTypes = clientMetadata.subjectSyntaxTypesSupported.all(SubjectSyntaxType::isValid)
         return when {
@@ -73,6 +74,7 @@ internal object ClientMetadataValidator {
                     }
                 })
             }
+
             else -> RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
         }
     }

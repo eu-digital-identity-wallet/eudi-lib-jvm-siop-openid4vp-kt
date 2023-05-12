@@ -1,4 +1,4 @@
-package eu.europa.ec.euidw.openid4vp.internal
+package eu.europa.ec.euidw.openid4vp.internal.response
 
 import eu.europa.ec.euidw.openid4vp.*
 
@@ -18,6 +18,7 @@ internal class DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilde
     ): AuthorizationResponse {
         TODO("Not yet implemented")
     }
+
     override suspend fun buildResponse(
         requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
         consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus

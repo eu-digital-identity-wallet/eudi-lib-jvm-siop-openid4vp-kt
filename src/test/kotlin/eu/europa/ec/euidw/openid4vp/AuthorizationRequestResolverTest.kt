@@ -137,6 +137,7 @@ class AuthorizationRequestResolverTest {
         resolution.validateInvalid<RequestValidationError.UnsupportedResponseType>()
 
     }
+
     @Test
     fun `response type provided is miss-spelled`() = runBlocking {
         val authRequest =
@@ -231,19 +232,22 @@ class AuthorizationRequestResolverTest {
     private fun load(f: String): InputStream? =
         AuthorizationRequestResolverTest::class.java.classLoader.getResourceAsStream(f)
 
-    private inline fun <reified T : ResolvedRequestObject>  Resolution.validateSuccess() {
+    private inline fun <reified T : ResolvedRequestObject> Resolution.validateSuccess() {
         when (this) {
             is Resolution.Success -> assertTrue("${T::class} data expected") {
                 this.data is T
             }
+
             else -> fail("Invalid resolution found while expected success")
         }
     }
-    private inline fun <reified T : RequestValidationError>  Resolution.validateInvalid() {
+
+    private inline fun <reified T : RequestValidationError> Resolution.validateInvalid() {
         when (this) {
             is Resolution.Invalid -> assertTrue("${T::class} error expected") {
                 this.error is T
             }
+
             else -> fail("Success resolution found while expected Invalid")
         }
     }

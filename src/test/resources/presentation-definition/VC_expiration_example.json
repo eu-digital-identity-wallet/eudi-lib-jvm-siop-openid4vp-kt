@@ -5,14 +5,19 @@
   "constraints": {
     "fields": [
       {
-        "path": ["$.credentialSchema.id", "$.vc.credentialSchema.id"],
+        "path": [
+          "$.credentialSchema.id",
+          "$.vc.credentialSchema.id"
+        ],
         "filter": {
           "type": "string",
           "const": "https://yourwatchful.gov/drivers-license-schema.json"
         }
       },
       {
-        "path": ["$.expirationDate"],
+        "path": [
+          "$.expirationDate"
+        ],
         "filter": {
           "type": "string",
           "format": "date-time"

@@ -1,7 +1,9 @@
-package eu.europa.ec.euidw.openid4vp.internal
+package eu.europa.ec.euidw.openid4vp.internal.request
 
 import eu.europa.ec.euidw.openid4vp.*
-import eu.europa.ec.euidw.openid4vp.internal.PresentationDefinitionSource.*
+import eu.europa.ec.euidw.openid4vp.internal.mapError
+import eu.europa.ec.euidw.openid4vp.internal.request.PresentationDefinitionSource.*
+import eu.europa.ec.euidw.openid4vp.internal.success
 import eu.europa.ec.euidw.prex.PresentationDefinition
 
 internal class PresentationDefinitionResolver(

@@ -14,7 +14,7 @@ import kotlinx.serialization.json.Json
 
 
 internal class DirectPostDispatcher(
-    private val httpFormPost: HttpFormPost
+    private val httpFormPost: HttpFormPost<Unit>
 ) : AuthorizationResponseDispatcher<DirectPost, Unit> {
 
     override suspend fun dispatch(response: DirectPost) {
@@ -24,7 +24,7 @@ internal class DirectPostDispatcher(
 }
 
 internal class DirectPostJwtDispatcher(
-    private val httpFormPost: HttpFormPost
+    private val httpFormPost: HttpFormPost<Unit>
 ) : AuthorizationResponseDispatcher<DirectPostJwt, Unit> {
 
     override suspend fun dispatch(response: DirectPostJwt) {

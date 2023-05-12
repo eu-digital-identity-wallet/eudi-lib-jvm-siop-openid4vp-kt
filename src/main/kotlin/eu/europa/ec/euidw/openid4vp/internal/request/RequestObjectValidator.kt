@@ -1,6 +1,8 @@
-package eu.europa.ec.euidw.openid4vp.internal
+package eu.europa.ec.euidw.openid4vp.internal.request
 
 import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.euidw.openid4vp.internal.mapError
+import eu.europa.ec.euidw.openid4vp.internal.success
 import eu.europa.ec.euidw.prex.JsonParser
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.PresentationExchange

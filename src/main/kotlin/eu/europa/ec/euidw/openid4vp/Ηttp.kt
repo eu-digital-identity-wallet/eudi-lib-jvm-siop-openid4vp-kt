@@ -27,6 +27,6 @@ fun interface HttpGet<out R> {
     suspend fun get(url: URL): Result<R>
 }
 
-fun interface HttpFormPost {
-    suspend fun post(url: URL, formParameters : Map<String, String>) : String
+fun interface HttpFormPost<out R> {
+    suspend fun post(url: URL, formParameters: Map<String, String>): R
 }

@@ -1,4 +1,4 @@
-package eu.europa.ec.euidw.openid4vp.internal
+package eu.europa.ec.euidw.openid4vp.internal.request
 
 import com.nimbusds.jose.shaded.gson.Gson
 import com.nimbusds.jwt.SignedJWT
@@ -11,7 +11,6 @@ import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import java.lang.IllegalStateException
 
 internal class DefaultAuthorizationRequestResolver(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,

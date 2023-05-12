@@ -4,9 +4,9 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.euidw.prex.ClaimFormat
-import kotlinx.serialization.SerialName
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.SupportedClaimFormat
+import kotlinx.serialization.SerialName
 import java.time.Duration
 import java.util.*
 
@@ -47,16 +47,16 @@ data class WalletOpenId4VPMetaData(
 )
 
 data class WalletOpenId4VPConfig(
-    val subjectSyntaxTypesSupported : List<SubjectSyntaxType>,
-    val preferredSubjectSyntaxType : SubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-    val decentralizedIdentifier : String = "DID:example:12341512#$",
-    val idTokenTTL : Duration = Duration.ofMinutes(10),
+    val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
+    val preferredSubjectSyntaxType: SubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+    val decentralizedIdentifier: String = "DID:example:12341512#$",
+    val idTokenTTL: Duration = Duration.ofMinutes(10),
     val presentationDefinitionUriSupported: Boolean = false,
     val supportedClientIdScheme: SupportedClientIdScheme,
-    val vpFormatsSupported : List<SupportedClaimFormat<in ClaimFormat>>,
+    val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
-    val holderEmail : String = "example@euidw.com",
-    val holderName : String = "Holder Name",
+    val holderEmail: String = "example@euidw.com",
+    val holderName: String = "Holder Name",
     val rsaJWK: RSAKey = RSAKeyGenerator(2048)
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
         .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)

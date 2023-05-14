@@ -2,7 +2,7 @@ package eu.europa.ec.euidw.openid4vp.internal.response
 
 import eu.europa.ec.euidw.openid4vp.*
 
-internal class DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
+internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
 
     override suspend fun buildResponse(
         requestObject: ResolvedRequestObject.SiopAuthentication,

@@ -35,7 +35,7 @@ class AuthorizationResponseBuilderTest {
         return State().value
     }
 
-    private val BUILDER = DefaultAuthorizationResponseBuilder()
+
 
     @Test
     fun `id token request should produce a response with id token JWT`(): Unit = runBlocking {
@@ -55,7 +55,7 @@ class AuthorizationResponseBuilderTest {
             idToken = SiopIdTokenBuilder.build(siopAuthRequestObject, walletConfig)
         )
 
-        val buildResponse = BUILDER.buildResponse(siopAuthRequestObject, idTokenConsensus)
+        val buildResponse = DefaultAuthorizationResponseBuilder.buildResponse(siopAuthRequestObject, idTokenConsensus)
 
         when (buildResponse) {
             is AuthorizationResponse.DirectPost ->

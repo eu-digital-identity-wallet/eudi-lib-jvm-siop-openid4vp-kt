@@ -1,6 +1,10 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.jwt.JWT
+import eu.europa.ec.euidw.openid4vp.Consensus.NegativeConsensus
+import eu.europa.ec.euidw.openid4vp.Consensus.PositiveConsensus
+import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.*
+import eu.europa.ec.euidw.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.euidw.prex.Claim
 import eu.europa.ec.euidw.prex.PresentationSubmission
 import java.io.Serializable
@@ -59,7 +63,10 @@ sealed interface AuthorizationResponsePayload : Serializable {
 
 sealed interface Consensus : Serializable {
 
-    interface NegativeConsensus : Consensus
+    object NegativeConsensus : Consensus {
+        override fun toString(): String = "NegativeConsensus"
+    }
+
     sealed interface PositiveConsensus : Consensus {
         data class IdTokenConsensus(
             val idToken: JWT
@@ -96,22 +103,52 @@ sealed interface RequestConsensus : Serializable {
 
 interface AuthorizationResponseBuilder {
 
+    suspend fun build(
+        requestObject: ResolvedRequestObject,
+        consensus: Consensus
+    ): AuthorizationResponse =
+
+        if (consensus is NegativeConsensus) buildNoConsensusResponse(requestObject)
+        else when (requestObject) {
+            is SiopAuthentication -> when (consensus) {
+                is PositiveConsensus.IdTokenConsensus -> buildResponse(requestObject, consensus)
+                else -> error("Unexpected consensus")
+            }
+
+            is OpenId4VPAuthorization -> when (consensus) {
+                is PositiveConsensus.VPTokenConsensus -> buildResponse(requestObject, consensus)
+                else -> error("Unexpected consensus")
+            }
+
+            is SiopOpenId4VPAuthentication -> when (consensus) {
+                is PositiveConsensus.IdAndVPTokenConsensus -> buildResponse(requestObject, consensus)
+                else -> error("Unexpected consensus")
+            }
+        }
+    
+
     suspend fun buildResponse(
-        requestObject: ResolvedRequestObject.SiopAuthentication,
-        consensus: Consensus.PositiveConsensus.IdTokenConsensus
+        requestObject: SiopAuthentication,
+        consensus: PositiveConsensus.IdTokenConsensus
     ): AuthorizationResponse
 
     suspend fun buildResponse(
-        requestObject: ResolvedRequestObject.OpenId4VPAuthorization,
-        consensus: Consensus.PositiveConsensus.VPTokenConsensus
+        requestObject: OpenId4VPAuthorization,
+        consensus: PositiveConsensus.VPTokenConsensus
     ): AuthorizationResponse
 
     suspend fun buildResponse(
-        requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
-        consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus
+        requestObject: SiopOpenId4VPAuthentication,
+        consensus: PositiveConsensus.IdAndVPTokenConsensus
     ): AuthorizationResponse
 
     // TODO: Consider build error response
+    suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
+        TODO()
+    }
 
+    companion object {
+        val Default: AuthorizationResponseBuilder = DefaultAuthorizationResponseBuilder
+    }
 }
 

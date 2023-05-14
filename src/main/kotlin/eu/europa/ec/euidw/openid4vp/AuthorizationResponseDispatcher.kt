@@ -25,7 +25,5 @@ interface ManagedAuthorizationResponseDispatcher<in A : DirectPostResponse> :
 
         fun directPostJwt(): ManagedAuthorizationResponseDispatcher<DirectPostJwt> =
             KtorDirectPostResponseDispatcher { DirectPostJwtDispatcher(it) }
-
-
     }
 }

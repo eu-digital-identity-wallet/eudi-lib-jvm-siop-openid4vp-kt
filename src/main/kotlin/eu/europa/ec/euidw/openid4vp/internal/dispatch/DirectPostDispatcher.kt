@@ -9,6 +9,8 @@ import eu.europa.ec.euidw.openid4vp.HttpFormPost
 import eu.europa.ec.euidw.openid4vp.Jwt
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.AuthenticationResponseErrorCode.Companion.fromError
 import eu.europa.ec.euidw.prex.PresentationSubmission
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -17,7 +19,7 @@ internal class DirectPostDispatcher(
     private val httpFormPost: HttpFormPost<Unit>
 ) : AuthorizationResponseDispatcher<DirectPost, Unit> {
 
-    override suspend fun dispatch(response: DirectPost) {
+    override suspend fun dispatch(response: DirectPost) = withContext(Dispatchers.IO) {
         val formParameters = Form.from(response.data)
         httpFormPost.post(response.responseUri.value, formParameters)
     }
@@ -27,7 +29,7 @@ internal class DirectPostJwtDispatcher(
     private val httpFormPost: HttpFormPost<Unit>
 ) : AuthorizationResponseDispatcher<DirectPostJwt, Unit> {
 
-    override suspend fun dispatch(response: DirectPostJwt) {
+    override suspend fun dispatch(response: DirectPostJwt) = withContext(Dispatchers.IO) {
         TODO("Not yet implemented")
     }
 }

@@ -8,6 +8,8 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByRefere
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.NotSecured
 import eu.europa.ec.euidw.prex.PresentationDefinition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -39,10 +41,13 @@ internal class DefaultAuthorizationRequestResolver(
     /**
      * Extracts the [request object][RequestObject] of an [AuthorizationRequest]
      */
-    private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject {
+    private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject  {
 
         suspend fun fetchJwt(request: PassByReference): Jwt =
-            getRequestObjectJwt.get(request.jwtURI.value).getOrThrow()
+            withContext(Dispatchers.IO) {
+                getRequestObjectJwt.get(request.jwtURI.value).getOrThrow()
+            }
+
 
         return when (request) {
             is NotSecured -> request.requestObject

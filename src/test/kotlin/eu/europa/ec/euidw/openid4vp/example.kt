@@ -16,13 +16,8 @@ import java.net.URLEncoder
 
 fun main(): Unit = runBlocking {
 
-
     val uri = VerifierApp.initTransaction()
-    val wallet = Wallet()
-    val response = wallet.process(uri)
-
-    println(response)
-
+    Wallet().handle(uri).also { println(it) }
 
 }
 
@@ -71,40 +66,13 @@ object VerifierApp {
 private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultConfig) {
 
 
-    suspend fun resolve(uri: URI): Resolution = withContext(Dispatchers.IO) {
-        resolver().use { resolver ->
-            resolver.resolveRequestUri(uri.toString()).also { println(it) }
+    suspend fun handle(uri: URI): DispatchOutcome =
+        withContext(Dispatchers.IO) {
+            SiopOpenId4Vp.handle(walletConfig, uri.toString()) { holderConsent(it) }
         }
-    }
 
-
-    suspend fun process(uri: URI) = withContext(Dispatchers.IO){
-        // Step 1 : wallet resolves the URI
-        // Step 2 : if resolution is Success, wallet asks for holder's consent
-        // Step 3 : wallet builds
-        val resolution : Resolution = resolve(uri)
-        val (request, consensus) = when (resolution) {
-            is Resolution.Invalid -> {
-                println("Invalid request ${resolution.error}")
-                throw resolution.error.asException()
-            }
-
-            is Resolution.Success -> resolution.data to holderConsent(resolution.data)
-        }
-        val response = AuthorizationResponseBuilder.Default.build(request, consensus)
-        val outcome = Dispatcher.Default.dispatch(response)
-
-
-    }
-
-    private fun resolver(): ManagedAuthorizationRequestResolver {
-        return ManagedAuthorizationRequestResolver.ktor(walletConfig)
-    }
-
-    fun holderConsent(request: ResolvedRequestObject): Consensus {
-
-
-        return when (request) {
+    suspend fun holderConsent(request: ResolvedRequestObject): Consensus = withContext(Dispatchers.Default) {
+        when (request) {
             is ResolvedRequestObject.SiopAuthentication -> {
 
                 fun showScreen() = true
@@ -113,7 +81,7 @@ private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultCo
                 if (userConsent) {
                     val idToken = SiopIdTokenBuilder.build(request, walletConfig)
                     Consensus.PositiveConsensus.IdTokenConsensus(idToken)
-                }else {
+                } else {
                     Consensus.NegativeConsensus
                 }
             }
@@ -121,8 +89,6 @@ private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultCo
             else -> Consensus.NegativeConsensus
         }
     }
-
-
 }
 
 private val DefaultConfig = WalletOpenId4VPConfig(

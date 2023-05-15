@@ -214,7 +214,7 @@ fun <T> AuthorizationRequestError.asFailure(): Result<T> =
 data class AuthorizationRequestException(val error: AuthorizationRequestError) : RuntimeException()
 
 sealed interface Resolution {
-    data class Success(val data: ResolvedRequestObject) : Resolution
+    data class Success(val requestObject: ResolvedRequestObject) : Resolution
     data class Invalid(val error: AuthorizationRequestError) : Resolution
 }
 
@@ -262,14 +262,6 @@ fun interface AuthorizationRequestResolver {
             getClientMetaData,
             walletOpenId4VPConfig
         )
-
-        @Deprecated(
-            "Please use ManagedAuthorizationRequestResolver",
-            replaceWith = ReplaceWith("ManagedAuthorizationRequestResolver.ktor(walletOpenId4VPConfig)")
-        )
-        fun ktor(walletOpenId4VPConfig: WalletOpenId4VPConfig): ManagedAuthorizationRequestResolver {
-            return ManagedAuthorizationRequestResolver.ktor(walletOpenId4VPConfig)
-        }
 
     }
 }

@@ -215,7 +215,7 @@ class AuthorizationRequestResolverTest {
                 )
             )
 
-            val resolver = AuthorizationRequestResolver.ktor(walletConfig)
+            val resolver = ManagedAuthorizationRequestResolver.ktor(walletConfig)
 
 
             val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
@@ -235,7 +235,7 @@ class AuthorizationRequestResolverTest {
     private inline fun <reified T : ResolvedRequestObject> Resolution.validateSuccess() {
         when (this) {
             is Resolution.Success -> assertTrue("${T::class} data expected") {
-                this.data is T
+                this.requestObject is T
             }
 
             else -> fail("Invalid resolution found while expected success")

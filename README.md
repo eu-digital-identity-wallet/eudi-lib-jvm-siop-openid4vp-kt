@@ -5,7 +5,45 @@ In particular, the library focus on the wallet's role and in addition focuses on
 usage of those two protocols as they are constraint by ISO 23220-4 and ISO-18013-7
 
 
-## Cross device & Same Device scenarios
+
+
+## Usage
+
+### Resolve an authorization request URI 
+
+Wallet receives an OAUTH2 Authorization request, formed by the Verifier, that may represent either 
+
+- a SIOPv2 authentication request, or 
+- a OpenID4VP authorization request,  
+- or a combined SIOP & OpenID4VP request
+
+In the same device  scenario the aforementioned authorization request reaches the wallet in terms of 
+a deep link. Similarly, in the cross device scenario, the request would be obtained via scanning a QR Code.
+
+Regardless of the scenario, wallet must take the URI (of the deep link or the QR Code) that represents the 
+authorization request and ask the SDK to validate the URI (that is to make sure that it represents one of the supported
+requests mentioned aforementioned) and in addition gather from Verifier additional information that may be included by
+reference (such as `presentation_definition_uri`, `client_metadata_uri` etc)
+
+```kotlin
+import eu.europa.ec.euidw.openid4vp.*
+
+val walletConfig: WalletOpenId4VPConfig =  ...
+val authorizationRequestUri : String = ...
+
+suspend fun holderConsent(request: ResolvedRequestObject): Consensus {
+    // provided by wallet 
+}
+val outcome = SiopOpenId4Vp.handle(walletConfig, authorizationRequestUri) { holderConsent(it) }
+
+```
+
+
+
+
+
+
+## Assumptions
 
 Library focuses on the same device scenario as described in ISO-23220-4 (Appendix B)
 
@@ -44,9 +82,6 @@ This is mandatory when supporting `client_id_scheme` equal to `did`.
 
 Out of scope: RFC9101, for JWT-Secured Authorization Requests (JAR)
 
-## Supported formats
-
-TBD?
 
 ## Supported response types
 

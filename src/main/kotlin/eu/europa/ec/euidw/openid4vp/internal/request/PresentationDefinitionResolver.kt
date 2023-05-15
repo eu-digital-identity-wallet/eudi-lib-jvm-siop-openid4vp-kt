@@ -5,6 +5,8 @@ import eu.europa.ec.euidw.openid4vp.internal.mapError
 import eu.europa.ec.euidw.openid4vp.internal.request.PresentationDefinitionSource.*
 import eu.europa.ec.euidw.openid4vp.internal.success
 import eu.europa.ec.euidw.prex.PresentationDefinition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal class PresentationDefinitionResolver(
     private val getPresentationDefinition: HttpGet<PresentationDefinition>
@@ -35,8 +37,10 @@ internal class PresentationDefinitionResolver(
         walletOpenId4VPConfig: WalletOpenId4VPConfig
     ): Result<PresentationDefinition> =
         if (walletOpenId4VPConfig.presentationDefinitionUriSupported)
-            getPresentationDefinition.get(url.value)
-                .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
+            withContext(Dispatchers.IO) {
+                getPresentationDefinition.get(url.value)
+                    .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
+            }
         else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
 }
 

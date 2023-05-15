@@ -6,6 +6,8 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
@@ -30,7 +32,7 @@ internal object ClientMetadataValidator {
 
     }
 
-    private fun parseRequiredJwks(clientMetadata: ClientMetaData): Result<JWKSet> {
+    private suspend fun parseRequiredJwks(clientMetadata: ClientMetaData): Result<JWKSet> {
         val bothJwksSourcesDefined = !clientMetadata.jwks.isNullOrEmpty() && !clientMetadata.jwksUri.isNullOrEmpty()
         val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
 
@@ -51,12 +53,14 @@ internal object ClientMetadataValidator {
 
             else -> {
                 // TODO this should be launched in coroutine, since it is blocking
-                return try {
-                    Result.success(JWKSet.load(URL(clientMetadata.jwksUri)))
-                } catch (ex: IOException) {
-                    ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
-                } catch (ex: ParseException) {
-                    ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
+                return withContext(Dispatchers.IO) {
+                    try {
+                        Result.success(JWKSet.load(URL(clientMetadata.jwksUri)))
+                    } catch (ex: IOException) {
+                        ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
+                    } catch (ex: ParseException) {
+                        ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
+                    }
                 }
             }
         }

@@ -82,7 +82,8 @@ private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultCo
         // Step 1 : wallet resolves the URI
         // Step 2 : if resolution is Success, wallet asks for holder's consent
         // Step 3 : wallet builds
-        val (request, consensus) = when (val resolution = resolve(uri)) {
+        val resolution : Resolution = resolve(uri)
+        val (request, consensus) = when (resolution) {
             is Resolution.Invalid -> {
                 println("Invalid request ${resolution.error}")
                 throw resolution.error.asException()
@@ -96,20 +97,32 @@ private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultCo
 
     }
 
+    private fun resolver(): ManagedAuthorizationRequestResolver {
+        return ManagedAuthorizationRequestResolver.ktor(walletConfig)
+    }
+
     fun holderConsent(request: ResolvedRequestObject): Consensus {
+
+
         return when (request) {
             is ResolvedRequestObject.SiopAuthentication -> {
-                val idToken = SiopIdTokenBuilder.build(request, walletConfig)
-                Consensus.PositiveConsensus.IdTokenConsensus(idToken)
+
+                fun showScreen() = true
+
+                val userConsent: Boolean = showScreen();
+                if (userConsent) {
+                    val idToken = SiopIdTokenBuilder.build(request, walletConfig)
+                    Consensus.PositiveConsensus.IdTokenConsensus(idToken)
+                }else {
+                    Consensus.NegativeConsensus
+                }
             }
 
             else -> Consensus.NegativeConsensus
         }
     }
 
-    private fun resolver(): ManagedAuthorizationRequestResolver {
-        return ManagedAuthorizationRequestResolver.ktor(walletConfig)
-    }
+
 }
 
 private val DefaultConfig = WalletOpenId4VPConfig(

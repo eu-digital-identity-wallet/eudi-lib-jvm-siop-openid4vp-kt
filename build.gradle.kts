@@ -38,6 +38,8 @@ dependencies {
     api("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-okhttp:$ktor_version")
+    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    testImplementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
 
 }
 

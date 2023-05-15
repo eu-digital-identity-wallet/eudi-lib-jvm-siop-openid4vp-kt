@@ -31,7 +31,7 @@ object SiopIdTokenBuilder {
         }
 
         fun buildJWKThumbprint(): String =
-            ThumbprintUtils.compute("SHA-256", walletConfig.rsaJWK).toJSONString()
+            ThumbprintUtils.compute("SHA-256", walletConfig.rsaJWK).toString()
 
         fun buildIssuerClaim(): String =
             when (walletConfig.preferredSubjectSyntaxType) {

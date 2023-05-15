@@ -38,7 +38,7 @@ class AuthorizationResponseBuilderTest {
 
 
     @Test
-    fun `id token request should produce a response with id token JWT`(): Unit = runBlocking {
+    fun `id token request should produce a response with id token JWT`() : Unit = runBlocking {
         val validated = ClientMetadataValidator.validate(clientMetaData)
 
         val siopAuthRequestObject = ResolvedRequestObject.SiopAuthentication(
@@ -55,11 +55,11 @@ class AuthorizationResponseBuilderTest {
             idToken = SiopIdTokenBuilder.build(siopAuthRequestObject, walletConfig)
         )
 
-        val buildResponse = DefaultAuthorizationResponseBuilder.buildResponse(siopAuthRequestObject, idTokenConsensus)
+        val response = DefaultAuthorizationResponseBuilder.buildResponse(siopAuthRequestObject, idTokenConsensus)
 
-        when (buildResponse) {
+        when (response) {
             is AuthorizationResponse.DirectPost ->
-                when (val data = buildResponse.data) {
+                when (val data = response.data) {
                     is AuthorizationResponsePayload.SiopAuthenticationResponse ->
                         when (val idToken = data.idToken) {
                             is SignedJWT -> {

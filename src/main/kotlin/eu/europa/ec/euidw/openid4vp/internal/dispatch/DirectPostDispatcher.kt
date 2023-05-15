@@ -2,7 +2,7 @@ package eu.europa.ec.euidw.openid4vp.internal.dispatch
 
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponse.DirectPost
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponse.DirectPostJwt
-import eu.europa.ec.euidw.openid4vp.AuthorizationResponseDispatcher
+
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponsePayload
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponsePayload.*
 import eu.europa.ec.euidw.openid4vp.HttpFormPost

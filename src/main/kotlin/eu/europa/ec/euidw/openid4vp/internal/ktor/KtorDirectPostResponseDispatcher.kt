@@ -1,12 +1,12 @@
 package eu.europa.ec.euidw.openid4vp.internal.ktor
 
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponse.DirectPostResponse
-import eu.europa.ec.euidw.openid4vp.AuthorizationResponseDispatcher
 import eu.europa.ec.euidw.openid4vp.HttpFormPost
-import eu.europa.ec.euidw.openid4vp.ManagedAuthorizationResponseDispatcher
+import eu.europa.ec.euidw.openid4vp.internal.dispatch.AuthorizationResponseDispatcher
+import eu.europa.ec.euidw.openid4vp.internal.dispatch.ManagedAuthorizationResponseDispatcher
 import io.ktor.client.*
 
-class KtorDirectPostResponseDispatcher<in A : DirectPostResponse>(
+internal class KtorDirectPostResponseDispatcher<in A : DirectPostResponse>(
     proxyFactory: (HttpFormPost<Unit>) -> AuthorizationResponseDispatcher<A, Unit>
 ) : ManagedAuthorizationResponseDispatcher<A> {
 

@@ -2,7 +2,7 @@ package eu.europa.ec.euidw.openid4vp.internal.dispatch
 
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponse
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponse.RedirectResponse
-import eu.europa.ec.euidw.openid4vp.AuthorizationResponseDispatcher
+
 import java.net.URL
 
 object RedirectResponseDispatcher : AuthorizationResponseDispatcher<RedirectResponse, URL> {

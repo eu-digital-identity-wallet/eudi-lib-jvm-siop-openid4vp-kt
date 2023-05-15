@@ -54,14 +54,7 @@ data class WalletOpenId4VPConfig(
     val presentationDefinitionUriSupported: Boolean = false,
     val supportedClientIdScheme: SupportedClientIdScheme,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
-    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
-    val holderEmail: String = "example@euidw.com",
-    val holderName: String = "Holder Name",
-    val rsaJWK: RSAKey = RSAKeyGenerator(2048)
-        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
-        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
-        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
-        .generate() // FIXME Remove this from here.
+    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap()
 ) {
 
 //    init {

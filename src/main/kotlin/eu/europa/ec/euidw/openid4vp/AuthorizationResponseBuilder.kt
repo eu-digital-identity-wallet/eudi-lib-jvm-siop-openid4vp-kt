@@ -32,7 +32,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
     sealed interface Success : AuthorizationResponsePayload
 
     data class SiopAuthenticationResponse(
-        val idToken: JWT,
+        val idToken: Jwt,
         override val state: String
     ) : Success
 
@@ -43,7 +43,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
     ) : Success
 
     data class SiopOpenId4VPAuthenticationResponse(
-        val idToken: JWT,
+        val idToken: Jwt,
         val verifiableCredential: List<Jwt>,
         val presentationSubmission: PresentationSubmission,
         override val state: String
@@ -69,7 +69,7 @@ sealed interface Consensus : Serializable {
 
     sealed interface PositiveConsensus : Consensus {
         data class IdTokenConsensus(
-            val idToken: JWT
+            val idToken: String
         ) : PositiveConsensus
 
         data class VPTokenConsensus(

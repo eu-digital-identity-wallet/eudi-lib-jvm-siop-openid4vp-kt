@@ -31,10 +31,8 @@ import eu.europa.ec.euidw.openid4vp.*
 val walletConfig: WalletOpenId4VPConfig =  ...
 val authorizationRequestUri : String = ...
 
-suspend fun holderConsent(request: ResolvedRequestObject): Consensus {
-    // provided by wallet 
-}
-val outcome = SiopOpenId4Vp.handle(walletConfig, authorizationRequestUri) { holderConsent(it) }
+
+val resolution = SiopOpenId4Vp.resolveRequestUri(walletConfig, authorizationRequestUri) 
 
 ```
 

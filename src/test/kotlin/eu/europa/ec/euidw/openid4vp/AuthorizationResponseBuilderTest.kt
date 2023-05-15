@@ -36,9 +36,8 @@ class AuthorizationResponseBuilderTest {
     }
 
 
-
     @Test
-    fun `id token request should produce a response with id token JWT`() : Unit = runBlocking {
+    fun `id token request should produce a response with id token JWT`(): Unit = runBlocking {
         val validated = ClientMetadataValidator.validate(clientMetaData)
 
         val siopAuthRequestObject = ResolvedRequestObject.SiopAuthentication(
@@ -51,8 +50,15 @@ class AuthorizationResponseBuilderTest {
             scope = Scope.make("openid") ?: throw IllegalStateException()
         )
 
+        val rsaJWK = SiopIdTokenBuilder.randomKey()
+
         val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
-            idToken = SiopIdTokenBuilder.build(siopAuthRequestObject, walletConfig)
+            idToken = SiopIdTokenBuilder.build(
+                request = siopAuthRequestObject,
+                idToken = IdToken("foo@bar.com", "foo bar"),
+                rsaJWK = rsaJWK,
+                walletConfig = walletConfig
+            )
         )
 
         val response = DefaultAuthorizationResponseBuilder.buildResponse(siopAuthRequestObject, idTokenConsensus)
@@ -60,17 +66,12 @@ class AuthorizationResponseBuilderTest {
         when (response) {
             is AuthorizationResponse.DirectPost ->
                 when (val data = response.data) {
-                    is AuthorizationResponsePayload.SiopAuthenticationResponse ->
-                        when (val idToken = data.idToken) {
-                            is SignedJWT -> {
-                                assertTrue("Id Token signature could not be verified") {
-                                    idToken.verify(RSASSAVerifier(walletConfig.rsaJWK))
-                                }
-                            }
-
-                            else -> fail("Generated token not a a signed JWT as expected")
+                    is AuthorizationResponsePayload.SiopAuthenticationResponse -> {
+                        val idToken = data.idToken
+                        assertTrue("Id Token signature could not be verified") {
+                            SignedJWT.parse(idToken).verify(RSASSAVerifier(rsaJWK))
                         }
-
+                    }
                     else -> fail("Authorization response data not of expected type: AuthorizationResponseData.IdTokenResponseData")
                 }
 

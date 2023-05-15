@@ -4,34 +4,53 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.ThumbprintUtils
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
+import java.io.Serializable
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import java.util.*
 
+data class IdToken(
+    val holderEmail: String,
+    val holderName: String,
+) : Serializable
+
+
 object SiopIdTokenBuilder {
+
+
+    fun randomKey(): RSAKey = RSAKeyGenerator(2048)
+        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
+        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
+        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
+        .generate()
 
 
     fun build(
         request: ResolvedRequestObject.SiopAuthentication,
+        idToken: IdToken,
         walletConfig: WalletOpenId4VPConfig,
+        rsaJWK: RSAKey,
         clock: Clock = Clock.systemDefaultZone()
-    ): JWT {
+    ): String {
 
         fun sign(claimSet: IDTokenClaimsSet): Result<JWT> = runCatching {
-            val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(walletConfig.rsaJWK.keyID).build()
+            val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.keyID).build()
             val signedJWT = SignedJWT(header, claimSet.toJWTClaimsSet())
-            signedJWT.sign(RSASSASigner(walletConfig.rsaJWK))
+            signedJWT.sign(RSASSASigner(rsaJWK))
             signedJWT
         }
 
         fun buildJWKThumbprint(): String =
-            ThumbprintUtils.compute("SHA-256", walletConfig.rsaJWK).toString()
+            ThumbprintUtils.compute("SHA-256", rsaJWK).toString()
 
         fun buildIssuerClaim(): String =
             when (walletConfig.preferredSubjectSyntaxType) {
@@ -46,7 +65,7 @@ object SiopIdTokenBuilder {
             return iat.toDate() to exp.toDate()
         }
 
-        val subjectJwk = JWKSet(walletConfig.rsaJWK).toPublicJWKSet()
+        val subjectJwk = JWKSet(rsaJWK).toPublicJWKSet()
 
         val (iat, exp) = computeTokenDates(clock)
 
@@ -60,12 +79,12 @@ object SiopIdTokenBuilder {
             issueTime(iat)
             expirationTime(exp)
             claim("sub_jwk", subjectJwk.toJSONObject())
-            claim("email", walletConfig.holderEmail)
-            claim("name", walletConfig.holderName)
+            claim("email", idToken.holderEmail)
+            claim("name", idToken.holderName)
             build()
         }
 
-        return sign(IDTokenClaimsSet(claimSet)).getOrThrow()
+        return sign(IDTokenClaimsSet(claimSet)).getOrThrow().serialize()
     }
 
 }

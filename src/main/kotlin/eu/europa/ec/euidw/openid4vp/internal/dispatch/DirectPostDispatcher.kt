@@ -45,7 +45,7 @@ private object Form {
 
     fun from(p: AuthorizationResponsePayload): Map<String, String> = when (p) {
         is SiopAuthenticationResponse -> mapOf(
-            ID_TOKEN_FORM_PARAM to p.idToken.serialize(),
+            ID_TOKEN_FORM_PARAM to p.idToken,
             STATE_FORM_PARAM to p.state
         )
 
@@ -58,7 +58,7 @@ private object Form {
         )
 
         is SiopOpenId4VPAuthenticationResponse -> mapOf(
-            ID_TOKEN_FORM_PARAM to p.idToken.serialize(),
+            ID_TOKEN_FORM_PARAM to p.idToken,
             VP_TOKEN_FORM_PARAM to Json.encodeToString<List<Jwt>>(p.verifiableCredential),
             PRESENTATION_SUBMISSION_FORM_PARAM to Json.encodeToString<PresentationSubmission>(
                 p.presentationSubmission

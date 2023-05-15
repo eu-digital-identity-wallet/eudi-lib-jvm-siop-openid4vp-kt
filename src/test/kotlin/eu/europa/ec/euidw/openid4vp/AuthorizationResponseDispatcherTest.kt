@@ -20,7 +20,6 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import java.io.Closeable
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.fail
 
 class AuthorizationResponseDispatcherTest {
@@ -47,7 +46,7 @@ class AuthorizationResponseDispatcherTest {
     }
 
     @Test
-    fun `dispatch direct post response`() : Unit = runBlocking {
+    fun `dispatch direct post response`(): Unit = runBlocking {
         val validated = ClientMetadataValidator.validate(clientMetaData)
 
         val stateVal = genState()
@@ -62,7 +61,17 @@ class AuthorizationResponseDispatcherTest {
             scope = Scope.make("openid") ?: throw IllegalStateException()
         )
 
-        val idToken = SiopIdTokenBuilder.build(siopAuthRequestObject, walletConfig)
+        val walletKeyPair = SiopIdTokenBuilder.randomKey()
+        val idToken = SiopIdTokenBuilder.build(
+            siopAuthRequestObject,
+            IdToken(
+                holderEmail = "foo@bar.com",
+                holderName = "Foo bar"
+            ),
+
+            walletConfig,
+            walletKeyPair
+        )
 
         val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
             idToken = idToken
@@ -81,9 +90,12 @@ class AuthorizationResponseDispatcherTest {
                             val idTokenTxt = formParameters["idToken"].toString()
                             val state = formParameters["state"].toString()
 
-                            assertEquals("application/x-www-form-urlencoded; charset=UTF-8", call.request.headers.get("Content-Type"))
+                            assertEquals(
+                                "application/x-www-form-urlencoded; charset=UTF-8",
+                                call.request.headers["Content-Type"]
+                            )
                             assertEquals(stateVal, state)
-                            assertEquals(idToken.serialize(), idTokenTxt)
+                            assertEquals(idToken, idTokenTxt)
 
                             call.respondText("ok")
                         }

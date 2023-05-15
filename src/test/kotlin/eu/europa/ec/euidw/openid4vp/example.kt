@@ -1,5 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
+import com.nimbusds.jose.jwk.RSAKey
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -63,7 +64,16 @@ object VerifierApp {
     }
 }
 
-private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultConfig) {
+private class Wallet(
+    private val holder : IdToken = IdToken(
+        holderEmail = "foo@bar.com",
+        holderName = "Foo Bar"
+    ),
+    private val walletConfig: WalletOpenId4VPConfig = DefaultConfig,
+    private val walletKeyPair : RSAKey = SiopIdTokenBuilder.randomKey()
+) {
+
+
 
 
     suspend fun handle(uri: URI): DispatchOutcome =
@@ -79,7 +89,7 @@ private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultCo
 
                 val userConsent: Boolean = showScreen();
                 if (userConsent) {
-                    val idToken = SiopIdTokenBuilder.build(request, walletConfig)
+                    val idToken = SiopIdTokenBuilder.build(request, holder,  walletConfig, walletKeyPair)
                     Consensus.PositiveConsensus.IdTokenConsensus(idToken)
                 } else {
                     Consensus.NegativeConsensus

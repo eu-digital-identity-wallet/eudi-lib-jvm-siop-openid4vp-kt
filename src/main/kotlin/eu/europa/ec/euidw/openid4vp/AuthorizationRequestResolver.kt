@@ -147,7 +147,16 @@ sealed interface ResolvedRequestObject : Serializable {
     ) : ResolvedRequestObject
 }
 
+/**
+ * Errors that can occur while validating & resolving
+ * an [AuthorizationRequest]
+ */
 sealed interface AuthorizationRequestError : Serializable
+
+/**
+ * Validation errors that can occur while validating
+ * an [AuthorizationRequest]
+ */
 sealed interface RequestValidationError : AuthorizationRequestError {
 
     //
@@ -171,28 +180,81 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     }
 
     data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
-    object InvalidPresentationDefinitionUri : RequestValidationError
-    object InvalidRedirectUri : RequestValidationError
-    object MissingRedirectUri : RequestValidationError
-    object MissingResponseUri : RequestValidationError
-    object InvalidResponseUri : RequestValidationError
-    object ResponseUriMustNotBeProvided : RequestValidationError
-    object RedirectUriMustNotBeProvided : RequestValidationError
-    object MissingState : RequestValidationError
-    object MissingNonce : RequestValidationError
-    object MissingScope : RequestValidationError
-    object MissingClientId : RequestValidationError
+    object InvalidPresentationDefinitionUri : RequestValidationError {
+        override fun toString(): String = "InvalidPresentationDefinitionUri"
+    }
 
-    object InvalidClientMetaDataUri : RequestValidationError
-    object OneOfClientMedataOrUri : RequestValidationError
-    object SubjectSyntaxTypesNoMatch : RequestValidationError
-    object MissingClientMetadataJwksSource : RequestValidationError
-    object BothJwkUriAndInlineJwks : RequestValidationError
-    object SubjectSyntaxTypesWrongSyntax : RequestValidationError
+    object InvalidRedirectUri : RequestValidationError {
+        override fun toString(): String = "InvalidRedirectUri"
+    }
+
+    object MissingRedirectUri : RequestValidationError {
+        override fun toString(): String = "MissingRedirectUri"
+    }
+
+    object MissingResponseUri : RequestValidationError {
+        override fun toString(): String = "MissingResponseUri"
+    }
+
+    object InvalidResponseUri : RequestValidationError {
+        override fun toString(): String = "InvalidResponseUri"
+    }
+
+    object ResponseUriMustNotBeProvided : RequestValidationError {
+        override fun toString(): String = "ResponseUriMustNotBeProvided"
+    }
+
+    object RedirectUriMustNotBeProvided : RequestValidationError {
+        override fun toString(): String = "RedirectUriMustNotBeProvided"
+    }
+
+    object MissingState : RequestValidationError {
+        override fun toString(): String = "MissingState"
+    }
+
+    object MissingNonce : RequestValidationError {
+        override fun toString(): String = "MissingNonce"
+    }
+
+    object MissingScope : RequestValidationError {
+        override fun toString(): String = "MissingScope"
+    }
+
+    object MissingClientId : RequestValidationError {
+        override fun toString(): String = "MissingClientId"
+    }
+
+    object InvalidClientMetaDataUri : RequestValidationError {
+        override fun toString(): String = "InvalidClientMetaDataUri"
+    }
+
+    object OneOfClientMedataOrUri : RequestValidationError {
+        override fun toString(): String = "OneOfClientMedataOrUri"
+    }
+
+    object SubjectSyntaxTypesNoMatch : RequestValidationError {
+        override fun toString(): String = "SubjectSyntaxTypesNoMatch"
+    }
+
+    object MissingClientMetadataJwksSource : RequestValidationError {
+        override fun toString(): String = "MissingClientMetadataJwksSource"
+    }
+
+    object BothJwkUriAndInlineJwks : RequestValidationError {
+        override fun toString(): String = "BothJwkUriAndInlineJwks"
+    }
+
+    object SubjectSyntaxTypesWrongSyntax : RequestValidationError {
+        override fun toString(): String = "SubjectSyntaxTypesWrongSyntax"
+    }
+
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
 
 }
 
+/**
+ * Errors that can occur while resolving an [AuthorizationRequest]
+ */
 sealed interface ResolutionError : AuthorizationRequestError {
     data class PresentationDefinitionNotFoundForScope(val scope: Scope) : ResolutionError
     object FetchingPresentationDefinitionNotSupported : ResolutionError
@@ -203,36 +265,62 @@ sealed interface ResolutionError : AuthorizationRequestError {
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
 }
 
+/**
+ * An exception indicating an expected [error] while validating and/or resolving
+ * an [AuthorizationRequest]
+ */
+data class AuthorizationRequestException(val error: AuthorizationRequestError) : RuntimeException()
 
+/**
+ * Convenient method that lifts an [AuthorizationRequestError] into
+ * a [AuthorizationRequestException]
+ */
 fun AuthorizationRequestError.asException(): AuthorizationRequestException =
     AuthorizationRequestException(this)
 
+
+/**
+ * Convenient method that lifts an [AuthorizationRequestError] into
+ * [Result] context (wrapping an [AuthorizationRequestException])
+ */
 fun <T> AuthorizationRequestError.asFailure(): Result<T> =
     Result.failure(asException())
 
-
-data class AuthorizationRequestException(val error: AuthorizationRequestError) : RuntimeException()
-
+/**
+ * The outcome of [validating & resolving][AuthorizationRequestResolver.resolveRequestUri]
+ * an [AuthorizationRequest].
+ */
 sealed interface Resolution {
+    /**
+     * Represents the success of validating & resolving an [AuthorizationRequest]
+     * into a [requestObject]
+     */
     data class Success(val requestObject: ResolvedRequestObject) : Resolution
+
+    /**
+     * Represents the failure of validating or resolving an [AuthorizationRequest]
+     * due to [error]
+     */
     data class Invalid(val error: AuthorizationRequestError) : Resolution
 }
 
+/**
+ * An interface that describes a service
+ * that accepts an [authorization request][AuthorizationRequest], validates it and resolves it (that is
+ * fetches parts of the authorization request that are provided by reference)
+ *
+ */
 fun interface AuthorizationRequestResolver {
 
     /**
      * Tries to validate and request the provided [uri] into
      * a [ResolvedRequestObject]
      */
-    suspend fun resolveRequestUri(uri: String): Resolution = runCatching {
-        AuthorizationRequest.make(uri).getOrThrow()
-    }.fold(
-        onSuccess = { resolveRequest(it) },
-        onFailure = {
-            when (it) {
-                is AuthorizationRequestException -> Resolution.Invalid(it.error)
-                else -> throw it
-            }
+    suspend fun resolveRequestUri(uri: String): Resolution = AuthorizationRequest.make(uri).fold(
+        onSuccess = { request -> resolveRequest(request) },
+        onFailure = { throwable ->
+            if (throwable is AuthorizationRequestException) Resolution.Invalid(throwable.error)
+            else throw throwable
         })
 
 

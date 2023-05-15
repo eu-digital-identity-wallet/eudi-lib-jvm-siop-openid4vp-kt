@@ -19,19 +19,9 @@ fun main(): Unit = runBlocking {
 
     val uri = VerifierApp.initTransaction()
     val wallet = Wallet()
-
-
-    val (request, consensus) = when (val resolution = wallet.resolve(uri)) {
-        is Resolution.Invalid -> {
-            println("Invalid request ${resolution.error}")
-            throw resolution.error.asException()
-        }
-        is Resolution.Success -> resolution.data to wallet.holderConsent(resolution.data)
-    }
-    val response = AuthorizationResponseBuilder.Default.build(request, consensus)
+    val response = wallet.process(uri)
 
     println(response)
-
 
 
 }
@@ -87,13 +77,33 @@ private class Wallet(private val walletConfig: WalletOpenId4VPConfig = DefaultCo
         }
     }
 
-     fun holderConsent(request: ResolvedRequestObject): Consensus {
+
+    suspend fun process(uri: URI) = withContext(Dispatchers.IO){
+        // Step 1 : wallet resolves the URI
+        // Step 2 : if resolution is Success, wallet asks for holder's consent
+        // Step 3 : wallet builds
+        val (request, consensus) = when (val resolution = resolve(uri)) {
+            is Resolution.Invalid -> {
+                println("Invalid request ${resolution.error}")
+                throw resolution.error.asException()
+            }
+
+            is Resolution.Success -> resolution.data to holderConsent(resolution.data)
+        }
+        val response = AuthorizationResponseBuilder.Default.build(request, consensus)
+        val outcome = Dispatcher.Default.dispatch(response)
+
+
+    }
+
+    fun holderConsent(request: ResolvedRequestObject): Consensus {
         return when (request) {
             is ResolvedRequestObject.SiopAuthentication -> {
                 val idToken = SiopIdTokenBuilder.build(request, walletConfig)
                 Consensus.PositiveConsensus.IdTokenConsensus(idToken)
             }
-            else->Consensus.NegativeConsensus
+
+            else -> Consensus.NegativeConsensus
         }
     }
 
@@ -110,12 +120,7 @@ private val DefaultConfig = WalletOpenId4VPConfig(
 )
 
 
-object Holder {
 
-
-
-
-}
 
 
 

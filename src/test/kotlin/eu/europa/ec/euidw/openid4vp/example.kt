@@ -87,7 +87,7 @@ private class Wallet(
 
     suspend fun handle(uri: URI): DispatchOutcome =
         withContext(Dispatchers.IO) {
-            SiopOpenId4Vp.handle(walletConfig, uri.toString()) {Consensus.NegativeConsensus }
+            SiopOpenId4Vp.handle(walletConfig, uri.toString()) { holderConsent(it) }
         }
 
     suspend fun holderConsent(request: ResolvedRequestObject): Consensus = withContext(Dispatchers.Default) {

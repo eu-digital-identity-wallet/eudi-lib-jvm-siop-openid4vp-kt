@@ -64,9 +64,9 @@ class AuthorizationResponseDispatcherTest {
         val walletKeyPair = SiopIdTokenBuilder.randomKey()
         val idToken = SiopIdTokenBuilder.build(
             siopAuthRequestObject,
-            IdToken(
-                holderEmail = "foo@bar.com",
-                holderName = "Foo bar"
+            HolderInfo(
+                email = "foo@bar.com",
+                name = "Foo bar"
             ),
 
             walletConfig,

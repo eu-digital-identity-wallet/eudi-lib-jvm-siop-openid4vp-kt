@@ -18,14 +18,21 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.*
 
-data class IdToken(
-    val holderEmail: String,
-    val holderName: String,
+data class HolderInfo(
+    val email: String,
+    val name: String,
 ) : Serializable
 
 
 object SiopIdTokenBuilder {
 
+    fun decode(jwt: String): HolderInfo? = runCatching {
+        return with(SignedJWT.parse(jwt).jwtClaimsSet) {
+            val email = getStringClaim("email")!!
+            val name = getStringClaim("name")!!
+            HolderInfo(email = email, name = name)
+        }
+    }.getOrNull()
 
     fun randomKey(): RSAKey = RSAKeyGenerator(2048)
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
@@ -36,7 +43,7 @@ object SiopIdTokenBuilder {
 
     fun build(
         request: ResolvedRequestObject.SiopAuthentication,
-        idToken: IdToken,
+        holderInfo: HolderInfo,
         walletConfig: WalletOpenId4VPConfig,
         rsaJWK: RSAKey,
         clock: Clock = Clock.systemDefaultZone()
@@ -72,6 +79,7 @@ object SiopIdTokenBuilder {
 
         // TODO Consider using IDTokenClaimsSet instead of generic JWTClaimSet
         //  It is more type-safe and expresses by definition IdToken
+
         val claimSet = with(JWTClaimsSet.Builder()) {
             issuer(buildIssuerClaim())
             subject(buildIssuerClaim()) // By SIOPv2 draft 12 issuer = subject
@@ -79,8 +87,8 @@ object SiopIdTokenBuilder {
             issueTime(iat)
             expirationTime(exp)
             claim("sub_jwk", subjectJwk.toJSONObject())
-            claim("email", idToken.holderEmail)
-            claim("name", idToken.holderName)
+            claim("email", holderInfo.email)
+            claim("name", holderInfo.name)
             build()
         }
 

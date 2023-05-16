@@ -74,9 +74,9 @@ object VerifierApp {
 }
 
 private class Wallet(
-    private val holder : IdToken = IdToken(
-        holderEmail = "foo@bar.com",
-        holderName = "Foo Bar"
+    private val holder : HolderInfo = HolderInfo(
+        email = "foo@bar.com",
+        name = "Foo Bar"
     ),
     private val walletConfig: WalletOpenId4VPConfig = DefaultConfig,
     private val walletKeyPair : RSAKey = SiopIdTokenBuilder.randomKey()
@@ -87,7 +87,7 @@ private class Wallet(
 
     suspend fun handle(uri: URI): DispatchOutcome =
         withContext(Dispatchers.IO) {
-            SiopOpenId4Vp.handle(walletConfig, uri.toString()) { holderConsent(it) }
+            SiopOpenId4Vp.handle(walletConfig, uri.toString()) {Consensus.NegativeConsensus }
         }
 
     suspend fun holderConsent(request: ResolvedRequestObject): Consensus = withContext(Dispatchers.Default) {

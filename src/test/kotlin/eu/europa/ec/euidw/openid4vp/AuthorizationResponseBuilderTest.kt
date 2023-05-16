@@ -55,7 +55,7 @@ class AuthorizationResponseBuilderTest {
         val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
             idToken = SiopIdTokenBuilder.build(
                 request = siopAuthRequestObject,
-                idToken = IdToken("foo@bar.com", "foo bar"),
+                holderInfo = HolderInfo("foo@bar.com", "foo bar"),
                 rsaJWK = rsaJWK,
                 walletConfig = walletConfig
             )

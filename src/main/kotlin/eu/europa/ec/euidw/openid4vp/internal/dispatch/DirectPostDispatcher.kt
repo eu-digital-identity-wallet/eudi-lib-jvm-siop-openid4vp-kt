@@ -39,7 +39,7 @@ private object Form {
     private const val PRESENTATION_SUBMISSION_FORM_PARAM = "presentation_submission"
     private const val VP_TOKEN_FORM_PARAM = "vp_token"
     private const val STATE_FORM_PARAM = "state"
-    private const val ID_TOKEN_FORM_PARAM = "idToken"
+    private const val ID_TOKEN_FORM_PARAM = "id_token"
     private const val ERROR_FORM_PARAM = "error"
     private const val ERROR_DESCRIPTION_FORM_PARAM = "error_description"
 

@@ -75,7 +75,15 @@ private object Form {
             )
         }
 
-        is NoConsensusResponseData -> TODO()
+        is NoConsensusResponseData -> {
+            val (erroCode, description) = AuthenticationResponseErrorCode.USER_CANCELLED
+            mapOf(
+                ERROR_FORM_PARAM to erroCode,
+                ERROR_DESCRIPTION_FORM_PARAM to description,
+                STATE_FORM_PARAM to p.state
+            )
+        }
+
     }
 }
 

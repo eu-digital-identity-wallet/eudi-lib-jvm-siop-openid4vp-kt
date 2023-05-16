@@ -31,7 +31,7 @@ object SiopOpenId4Vp {
         holderConsensus: suspend (ResolvedRequestObject) -> Consensus
     ): DispatchOutcome =
         when (val authorizationRequestResolution = resolveRequestUri(walletOpenId4VPConfig, uri)) {
-            is Resolution.Invalid -> TODO("Implement handle of Invalid Resolution")
+            is Resolution.Invalid -> throw authorizationRequestResolution.error.asException()
             is Resolution.Success -> {
                 val requestObject = authorizationRequestResolution.requestObject
                 val consensus = holderConsensus(requestObject)

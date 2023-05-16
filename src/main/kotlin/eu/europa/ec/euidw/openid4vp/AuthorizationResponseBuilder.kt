@@ -186,10 +186,7 @@ interface AuthorizationResponseBuilder {
         consensus: PositiveConsensus.IdAndVPTokenConsensus
     ): AuthorizationResponse
 
-    suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
-        TODO("buildNoConsensusResponse")
-    }
-
+    suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse
     companion object {
         val Default: AuthorizationResponseBuilder = DefaultAuthorizationResponseBuilder
     }

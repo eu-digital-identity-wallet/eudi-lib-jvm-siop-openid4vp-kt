@@ -27,7 +27,7 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
     }
 
     override suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
-        val payload = AuthorizationResponsePayload.NoConsensusResponseData(reason="No holder consensus", state = requestObject.state)
+        val payload = AuthorizationResponsePayload.NoConsensusResponseData(requestObject.state)
         return toAuthorizationResponse(requestObject.responseMode, payload)
     }
 

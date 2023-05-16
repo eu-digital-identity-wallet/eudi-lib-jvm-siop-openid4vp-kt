@@ -64,7 +64,6 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * holder's [negative consensus][Consensus.NegativeConsensus]
      */
     data class NoConsensusResponseData(
-        val reason: String?,
         override val state: String
     ) : Failed
 }

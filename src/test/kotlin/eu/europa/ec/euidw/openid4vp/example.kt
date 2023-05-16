@@ -17,19 +17,21 @@ import java.net.URLEncoder
 
 fun main(): Unit = runBlocking {
 
-    val uri = VerifierApp.initTransaction()
+    val (presentationId, uri) = VerifierApp.initTransaction()
     Wallet().handle(uri).also { println(it) }
+
+    VerifierApp.getWalletResponse(presentationId).also { println(it) }
 
 }
 
 object VerifierApp {
 
-    suspend fun initTransaction(): URI = coroutineScope {
+    suspend fun initTransaction(): Pair<String, URI> = coroutineScope {
         val jobName = CoroutineName("wallet-initTransaction")
         withContext(Dispatchers.IO + jobName) {
             createHttpClient().use { client ->
                 val initTransactionResponse = initTransaction(client).also { println(it) }
-                formatURI(initTransactionResponse).also { println("Uri:${it}") }
+                initTransactionResponse["presentation_id"]!!.jsonPrimitive.content to formatURI(initTransactionResponse).also { println("Uri:${it}") }
             }
         }
     }
@@ -58,6 +60,13 @@ object VerifierApp {
         )
     }
 
+    suspend fun getWalletResponse(presentationId: String) : JsonObject{
+        return createHttpClient().use {
+            it.get("http://localhost:8080/ui/presentations/$presentationId") {
+                accept(ContentType.Application.Json)
+            }
+        }.body<JsonObject>()
+    }
     private fun createHttpClient(): HttpClient = HttpClient {
         install(ContentNegotiation) { json() }
         expectSuccess = true

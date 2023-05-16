@@ -1,6 +1,8 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -14,75 +16,98 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.net.URI
 import java.net.URLEncoder
+import java.security.interfaces.RSAPublicKey
 
 fun main(): Unit = runBlocking {
 
-    val (presentationId, uri) = VerifierApp.initTransaction()
-    Wallet().handle(uri).also { println(it) }
+    val walletKeyPair = SiopIdTokenBuilder.randomKey()
+    val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")
+    val wallet = Wallet(walletKeyPair = walletKeyPair, holder = holder)
+    val verifier = VerifierApp.make(walletKeyPair.toRSAPublicKey())
 
-    VerifierApp.getWalletResponse(presentationId).also { println(it) }
+    wallet.handle(verifier.uri)
 
+    val idTokenClaims = verifier.getWalletResponse()
+
+
+    println("Verifier got id_token with payload $idTokenClaims")
 }
 
-object VerifierApp {
+class VerifierApp private constructor(
+    private val walletPublicKey: RSAPublicKey,
+    val presentationId: String,
+    val uri: URI
+) {
 
-    suspend fun initTransaction(): Pair<String, URI> = coroutineScope {
-        val jobName = CoroutineName("wallet-initTransaction")
-        withContext(Dispatchers.IO + jobName) {
-            createHttpClient().use { client ->
-                val initTransactionResponse = initTransaction(client).also { println(it) }
-                initTransactionResponse["presentation_id"]!!.jsonPrimitive.content to formatURI(initTransactionResponse).also { println("Uri:${it}") }
-            }
-        }
-    }
-
-    private suspend fun initTransaction(client: HttpClient): JsonObject =
-        client.post(" http://localhost:8080/ui/presentations") {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-            setBody(buildJsonObject {
-                put("type", "id_token")
-                put("id_token_type", "subject_signed_id_token")
-            })
-
-        }.body<JsonObject>()
-
-    private fun formatURI(iniTransactionResponse: JsonObject): URI {
-        val clientId = iniTransactionResponse["client_id"]!!.jsonPrimitive.content
-        val requestUri = iniTransactionResponse["request_uri"]!!.jsonPrimitive.content
-        return URI(
-            "eudi-wallet://authorize?client_id=${clientId}&request_uri=${
-                URLEncoder.encode(
-                    requestUri,
-                    "UTF-8"
-                )
-            }"
-        )
-    }
-
-    suspend fun getWalletResponse(presentationId: String) : JsonObject{
-        return createHttpClient().use {
-            it.get("http://localhost:8080/ui/presentations/$presentationId") {
+    suspend fun getWalletResponse(): IDTokenClaimsSet? {
+        val walletResponse = createHttpClient().use {
+            it.get("http://localhost:8080/ui/presentations/${presentationId!!}") {
                 accept(ContentType.Application.Json)
             }
         }.body<JsonObject>()
+
+        val idTokenClaims = walletResponse["id_token"]?.jsonPrimitive?.content?.let {
+            val claims = SiopIdTokenBuilder.decodeAndVerify(
+                it,
+                walletPublicKey
+            )
+            IDTokenClaimsSet(claims)
+        }
+        return idTokenClaims
     }
-    private fun createHttpClient(): HttpClient = HttpClient {
-        install(ContentNegotiation) { json() }
-        expectSuccess = true
+
+    companion object {
+
+
+        suspend fun make(walletPublicKey: RSAPublicKey): VerifierApp = coroutineScope {
+            val jobName = CoroutineName("wallet-initTransaction")
+            withContext(Dispatchers.IO + jobName) {
+                createHttpClient().use { client ->
+                    val initTransactionResponse = make(client).also { println(it) }
+                    val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
+                    val uri = formatURI(initTransactionResponse)
+                    VerifierApp(walletPublicKey, presentationId, uri)
+                }
+            }
+        }
+
+        private suspend fun make(client: HttpClient): JsonObject =
+            client.post(" http://localhost:8080/ui/presentations") {
+                contentType(ContentType.Application.Json)
+                accept(ContentType.Application.Json)
+                setBody(buildJsonObject {
+                    put("type", "id_token")
+                    put("id_token_type", "subject_signed_id_token")
+                })
+
+            }.body<JsonObject>()
+
+        private fun formatURI(iniTransactionResponse: JsonObject): URI {
+            val clientId = iniTransactionResponse["client_id"]!!.jsonPrimitive.content
+            val requestUri = iniTransactionResponse["request_uri"]!!.jsonPrimitive.content
+
+            return URI(
+                "eudi-wallet://authorize?client_id=${clientId}&request_uri=${
+                    URLEncoder.encode(
+                        requestUri,
+                        "UTF-8"
+                    )
+                }"
+            )
+        }
+
+        private fun createHttpClient(): HttpClient = HttpClient {
+            install(ContentNegotiation) { json() }
+            expectSuccess = true
+        }
     }
 }
 
 private class Wallet(
-    private val holder : HolderInfo = HolderInfo(
-        email = "foo@bar.com",
-        name = "Foo Bar"
-    ),
+    private val holder: HolderInfo,
     private val walletConfig: WalletOpenId4VPConfig = DefaultConfig,
-    private val walletKeyPair : RSAKey = SiopIdTokenBuilder.randomKey()
+    private val walletKeyPair: RSAKey
 ) {
-
-
 
 
     suspend fun handle(uri: URI): DispatchOutcome =
@@ -98,7 +123,7 @@ private class Wallet(
 
                 val userConsent: Boolean = showScreen();
                 if (userConsent) {
-                    val idToken = SiopIdTokenBuilder.build(request, holder,  walletConfig, walletKeyPair)
+                    val idToken = SiopIdTokenBuilder.build(request, holder, walletConfig, walletKeyPair)
                     Consensus.PositiveConsensus.IdTokenConsensus(idToken)
                 } else {
                     Consensus.NegativeConsensus

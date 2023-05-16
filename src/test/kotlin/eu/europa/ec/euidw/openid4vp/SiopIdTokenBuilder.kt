@@ -3,6 +3,7 @@ package eu.europa.ec.euidw.openid4vp
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
@@ -13,6 +14,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import java.io.Serializable
+import java.security.interfaces.RSAPublicKey
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -32,6 +34,16 @@ object SiopIdTokenBuilder {
             val name = getStringClaim("name")!!
             HolderInfo(email = email, name = name)
         }
+    }.getOrNull()
+
+    fun decodeAndVerify(jwt: String, walletPublicKey : RSAPublicKey): JWTClaimsSet? = runCatching {
+        val verifier  = RSASSAVerifier(walletPublicKey)
+        val signedJwt  = SignedJWT.parse(jwt)
+
+        if (!signedJwt.verify(verifier)) {
+            error("Oops signature doesn't match")
+        }
+        signedJwt.jwtClaimsSet
     }.getOrNull()
 
     fun randomKey(): RSAKey = RSAKeyGenerator(2048)

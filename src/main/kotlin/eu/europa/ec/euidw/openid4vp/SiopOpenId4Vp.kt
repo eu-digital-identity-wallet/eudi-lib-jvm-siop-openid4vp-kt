@@ -2,24 +2,29 @@ package eu.europa.ec.euidw.openid4vp
 
 object SiopOpenId4Vp {
 
+    @JvmStatic
     suspend fun resolveRequestUri(walletOpenId4VPConfig: WalletOpenId4VPConfig, uri: String): Resolution =
         resolver(walletOpenId4VPConfig).use { resolver -> resolver.resolveRequestUri(uri) }
+    @JvmStatic
     suspend fun resolveRequest(
         walletOpenId4VPConfig: WalletOpenId4VPConfig,
         authorizationRequest: AuthorizationRequest
     ): Resolution =
         resolver(walletOpenId4VPConfig).use { resolver -> resolver.resolveRequest(authorizationRequest) }
 
+    @JvmStatic
     suspend fun buildAuthorizationResponse(
         requestObject: ResolvedRequestObject,
         consensus: Consensus
     ): AuthorizationResponse =
         AuthorizationResponseBuilder.Default.build(requestObject, consensus)
 
+    @JvmStatic
     suspend fun dispatchAuthorizationResponse(response: AuthorizationResponse): DispatchOutcome =
         Dispatcher.Default.dispatch(response)
 
 
+    @JvmStatic
     suspend fun handle(
         walletOpenId4VPConfig: WalletOpenId4VPConfig,
         uri: String,
@@ -35,6 +40,7 @@ object SiopOpenId4Vp {
             }
         }
 
+    @JvmStatic
     private fun resolver(walletOpenId4VPConfig: WalletOpenId4VPConfig): ManagedAuthorizationRequestResolver =
         ManagedAuthorizationRequestResolver.ktor(walletOpenId4VPConfig)
 }

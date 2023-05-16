@@ -7,12 +7,12 @@ import eu.europa.ec.euidw.openid4vp.internal.dispatch.ManagedAuthorizationRespon
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.RedirectResponseDispatcher
 import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorDirectPostResponseDispatcher
 import java.io.Serializable
-import java.net.URL
+import java.net.URI
 
 
 sealed interface DispatchOutcome : Serializable {
+    data class RedirectURI(val value: URI) : DispatchOutcome
 
-    data class RedirectUrl(val value: URL) : DispatchOutcome
     object VerifierResponse : DispatchOutcome {
         override fun toString(): String = "VerifierResponse"
     }
@@ -46,7 +46,7 @@ interface Dispatcher {
 
                     is RedirectResponse -> {
                         val uri = RedirectResponseDispatcher.dispatch(response)
-                        DispatchOutcome.RedirectUrl(uri)
+                        DispatchOutcome.RedirectURI(uri)
                     }
                 }
             }

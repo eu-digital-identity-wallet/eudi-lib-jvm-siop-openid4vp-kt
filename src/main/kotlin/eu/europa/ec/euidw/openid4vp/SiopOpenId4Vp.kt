@@ -3,10 +3,12 @@ package eu.europa.ec.euidw.openid4vp
 object SiopOpenId4Vp {
 
     suspend fun resolveRequestUri(walletOpenId4VPConfig: WalletOpenId4VPConfig, uri: String): Resolution =
-        ManagedAuthorizationRequestResolver.ktor(walletOpenId4VPConfig).use { resolver ->
-            resolver.resolveRequestUri(uri)
-        }
-
+        resolver(walletOpenId4VPConfig).use { resolver -> resolver.resolveRequestUri(uri) }
+    suspend fun resolveRequest(
+        walletOpenId4VPConfig: WalletOpenId4VPConfig,
+        authorizationRequest: AuthorizationRequest
+    ): Resolution =
+        resolver(walletOpenId4VPConfig).use { resolver -> resolver.resolveRequest(authorizationRequest) }
 
     suspend fun buildAuthorizationResponse(
         requestObject: ResolvedRequestObject,
@@ -32,4 +34,7 @@ object SiopOpenId4Vp {
                 dispatchAuthorizationResponse(authorizationResponse)
             }
         }
+
+    private fun resolver(walletOpenId4VPConfig: WalletOpenId4VPConfig): ManagedAuthorizationRequestResolver =
+        ManagedAuthorizationRequestResolver.ktor(walletOpenId4VPConfig)
 }

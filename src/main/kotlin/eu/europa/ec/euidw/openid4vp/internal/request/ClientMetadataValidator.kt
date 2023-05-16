@@ -6,9 +6,11 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.euidw.openid4vp.internal.success
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.MalformedURLException
 import java.net.URL
 import java.text.ParseException
 
@@ -33,54 +35,45 @@ internal object ClientMetadataValidator {
     }
 
     private suspend fun parseRequiredJwks(clientMetadata: ClientMetaData): Result<JWKSet> {
-        val bothJwksSourcesDefined = !clientMetadata.jwks.isNullOrEmpty() && !clientMetadata.jwksUri.isNullOrEmpty()
-        val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
 
+        val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
         if (!atLeastOneJwkSourceDefined) {
             return RequestValidationError.MissingClientMetadataJwksSource.asFailure()
         }
+
+        val bothJwksSourcesDefined = !clientMetadata.jwks.isNullOrEmpty() && !clientMetadata.jwksUri.isNullOrEmpty()
         if (bothJwksSourcesDefined) {
             return RequestValidationError.BothJwkUriAndInlineJwks.asFailure()
         }
-        when {
-            clientMetadata.jwksUri.isNullOrEmpty() -> {
-                return try {
-                    Result.success(JWKSet.parse(clientMetadata.jwks?.toString()))
-                } catch (ex: ParseException) {
-                    ResolutionError.ClientMetadataJwkUriUnparsable(ex).asFailure()
-                }
-            }
+        fun requiredJwks() = try {
+            Result.success(JWKSet.parse(clientMetadata.jwks?.toString()))
+        } catch (ex: ParseException) {
+            ResolutionError.ClientMetadataJwkUriUnparsable(ex).asFailure()
+        }
 
-            else -> {
-                // TODO this should be launched in coroutine, since it is blocking
-                return withContext(Dispatchers.IO) {
-                    try {
-                        Result.success(JWKSet.load(URL(clientMetadata.jwksUri)))
-                    } catch (ex: IOException) {
-                        ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
-                    } catch (ex: ParseException) {
-                        ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
-                    }
-                }
-            }
+        fun requiredJwksUri() = try {
+            Result.success(JWKSet.load(URL(clientMetadata.jwksUri)))
+        } catch (ex: IOException) {
+            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
+        } catch (ex: ParseException) {
+            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
+        }
+
+        return when {
+            clientMetadata.jwksUri.isNullOrEmpty() -> requiredJwks()
+            else -> withContext(Dispatchers.IO) { requiredJwksUri() }
         }
     }
 
     private fun parseRequiredSubjectSyntaxTypes(clientMetadata: ClientMetaData): Result<List<SubjectSyntaxType>> {
         val listNotEmpty = clientMetadata.subjectSyntaxTypesSupported.isNotEmpty()
         val allValidTypes = clientMetadata.subjectSyntaxTypesSupported.all(SubjectSyntaxType::isValid)
-        return when {
-            listNotEmpty && allValidTypes -> {
-                Result.success(clientMetadata.subjectSyntaxTypesSupported.map {
-                    when {
-                        SubjectSyntaxType.JWKThumbprint.isValid(it) -> SubjectSyntaxType.JWKThumbprint
-                        else -> SubjectSyntaxType.DecentralizedIdentifier.parse(it)
-                    }
-                })
-            }
-
-            else -> RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
+        fun String.asSubjectSyntaxType(): SubjectSyntaxType = when {
+            SubjectSyntaxType.JWKThumbprint.isValid(this) -> SubjectSyntaxType.JWKThumbprint
+            else -> SubjectSyntaxType.DecentralizedIdentifier.parse(this)
         }
+        return if (listNotEmpty && allValidTypes)
+            clientMetadata.subjectSyntaxTypesSupported.map { it.asSubjectSyntaxType() }.success()
+        else RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
     }
-
 }

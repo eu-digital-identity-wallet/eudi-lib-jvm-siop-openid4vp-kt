@@ -45,7 +45,7 @@ class AuthorizationResponseBuilderTest {
             clientMetaData = validated.getOrThrow(),
             clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
             nonce = "0S6_WzA2Mj",
-            responseMode = ResponseMode.DirectPost(HttpsUrl.make("https://respond.here").getOrThrow()),
+            responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
             state = genState(),
             scope = Scope.make("openid") ?: throw IllegalStateException()
         )

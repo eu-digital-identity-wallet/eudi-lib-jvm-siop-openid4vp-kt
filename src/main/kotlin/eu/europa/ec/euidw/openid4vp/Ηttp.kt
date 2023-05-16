@@ -1,23 +1,8 @@
 package eu.europa.ec.euidw.openid4vp
 
+import eu.europa.ec.euidw.openid4vp.internal.mapError
+import java.net.URI
 import java.net.URL
-
-/**
- * Represents an HTTPS URL
- */
-
-@JvmInline
-value class HttpsUrl private constructor(val value: URL) {
-//    init {
-//        require("https" == value.protocol) { "Only https is supported" }
-//    }
-
-    companion object {
-        fun make(s: String): Result<HttpsUrl> = runCatching { HttpsUrl(URL(s)) }
-        fun make(url: URL): Result<HttpsUrl> = runCatching { HttpsUrl(url) }
-    }
-}
-
 
 /**
  * An abstraction of an HTTP Get operation
@@ -30,3 +15,16 @@ fun interface HttpGet<out R> {
 fun interface HttpFormPost<out R> {
     suspend fun post(url: URL, formParameters: Map<String, String>): R
 }
+
+/**
+ * Convenient method for parsing a string into a [URL]
+ */
+internal fun String.asURL(onError: (Throwable) -> Throwable = { it }): Result<URL> =
+    runCatching { URL(this) }.mapError(onError)
+
+
+/**
+ * Convenient method for parsing a string into a [URI]
+ */
+internal fun String.asURI(onError: (Throwable) -> Throwable = { it }): Result<URI> =
+    runCatching { URI(this) }.mapError(onError)

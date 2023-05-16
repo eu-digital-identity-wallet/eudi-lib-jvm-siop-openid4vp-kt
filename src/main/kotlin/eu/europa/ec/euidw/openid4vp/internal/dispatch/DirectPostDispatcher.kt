@@ -21,7 +21,7 @@ internal class DirectPostDispatcher(
 
     override suspend fun dispatch(response: DirectPost) = withContext(Dispatchers.IO) {
         val formParameters = Form.from(response.data)
-        httpFormPost.post(response.responseUri.value, formParameters)
+        httpFormPost.post(response.responseUri, formParameters)
     }
 }
 

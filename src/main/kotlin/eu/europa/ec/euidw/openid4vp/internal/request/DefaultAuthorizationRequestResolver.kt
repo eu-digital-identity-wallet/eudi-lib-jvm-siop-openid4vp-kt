@@ -45,7 +45,7 @@ internal class DefaultAuthorizationRequestResolver(
 
         suspend fun fetchJwt(request: PassByReference): Jwt =
             withContext(Dispatchers.IO) {
-                getRequestObjectJwt.get(request.jwtURI.value).getOrThrow()
+                getRequestObjectJwt.get(request.jwtURI).getOrThrow()
             }
 
 

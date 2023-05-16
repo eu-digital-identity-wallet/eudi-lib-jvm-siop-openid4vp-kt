@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.Closeable
 import java.io.Serializable
+import java.net.URL
 
 /**
  * OAUTH2 authorization request
@@ -41,7 +42,7 @@ sealed interface AuthorizationRequest : Serializable {
         /**
          * A JAR passed by reference
          */
-        data class PassByReference(override val clientId: String, val jwtURI: HttpsUrl) : JwtSecured
+        data class PassByReference(override val clientId: String, val jwtURI: URL) : JwtSecured
     }
 
     companion object {
@@ -60,8 +61,7 @@ sealed interface AuthorizationRequest : Serializable {
 
             when {
                 !requestValue.isNullOrEmpty() -> PassByValue(clientId(), requestValue)
-                !requestUriValue.isNullOrEmpty() -> HttpsUrl.make(requestUriValue)
-                    .map { PassByReference(clientId(), it) }.getOrThrow()
+                !requestUriValue.isNullOrEmpty() ->requestUriValue.asURL().map { PassByReference(clientId(), it) }.getOrThrow()
 
                 else -> notSecured(uri)
             }

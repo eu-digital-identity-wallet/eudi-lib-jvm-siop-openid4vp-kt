@@ -8,6 +8,8 @@ import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.PresentationExchange
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
+import java.net.URI
+import java.net.URL
 
 
 internal sealed interface PresentationDefinitionSource {
@@ -24,13 +26,13 @@ internal sealed interface PresentationDefinitionSource {
      * The Wallet will send a GET request without additional parameters.
      * The resource MUST be exposed without further need to authenticate or authorize
      */
-    data class FetchByReference(val url: HttpsUrl) : PresentationDefinitionSource
+    data class FetchByReference(val url: URL) : PresentationDefinitionSource
     data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
 internal sealed interface ClientMetaDataSource {
     data class PassByValue(val metaData: ClientMetaData) : ClientMetaDataSource
-    data class FetchByReference(val url: HttpsUrl) : ClientMetaDataSource
+    data class FetchByReference(val url: URL) : ClientMetaDataSource
 }
 
 internal sealed interface ValidatedRequestObject {
@@ -171,18 +173,18 @@ internal object RequestObjectValidator {
 
     private fun requiredResponseMode(unvalidated: RequestObject): Result<ResponseMode> {
 
-        fun requiredRedirectUriAndNotProvidedResponseUri(): Result<HttpsUrl> =
+        fun requiredRedirectUriAndNotProvidedResponseUri(): Result<URI> =
             if (unvalidated.responseUri != null) RequestValidationError.ResponseUriMustNotBeProvided.asFailure()
             else when (val uri = unvalidated.redirectUri) {
                 null -> RequestValidationError.MissingRedirectUri.asFailure()
-                else -> HttpsUrl.make(uri).mapError { RequestValidationError.InvalidRedirectUri.asException() }
+                else -> uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }
             }
 
-        fun requiredResponseUriAndNotProvidedRedirectUri(): Result<HttpsUrl> =
+        fun requiredResponseUriAndNotProvidedRedirectUri(): Result<URL> =
             if (unvalidated.redirectUri != null) RequestValidationError.RedirectUriMustNotBeProvided.asFailure()
             else when (val uri = unvalidated.responseUri) {
                 null -> RequestValidationError.MissingResponseUri.asFailure()
-                else -> HttpsUrl.make(uri).mapError { RequestValidationError.InvalidResponseUri.asException() }
+                else -> uri.asURL { RequestValidationError.InvalidResponseUri.asException() }
             }
 
         return when (unvalidated.responseMode) {
@@ -237,7 +239,7 @@ internal object RequestObjectValidator {
 
 
         fun requiredPdUri() = runCatching {
-            val pdUri = HttpsUrl.make(unvalidated.presentationDefinitionUri!!).getOrThrow()
+            val pdUri = unvalidated.presentationDefinitionUri!!.asURL().getOrThrow()
             PresentationDefinitionSource.FetchByReference(pdUri)
         }.mapError { RequestValidationError.InvalidPresentationDefinitionUri.asException() }
 
@@ -269,9 +271,9 @@ internal object RequestObjectValidator {
         }
 
         fun requiredClientMetaDataUri() = runCatching {
-            val uri = HttpsUrl.make(unvalidated.clientMetadataUri!!)
-                .mapError { RequestValidationError.InvalidClientMetaDataUri.asException() }
-                .getOrThrow()
+            val uri =
+                unvalidated.clientMetadataUri!!.asURL { RequestValidationError.InvalidClientMetaDataUri.asException() }
+                    .getOrThrow()
             ClientMetaDataSource.FetchByReference(uri)
         }
 

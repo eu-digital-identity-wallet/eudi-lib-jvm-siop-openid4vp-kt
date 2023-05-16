@@ -5,6 +5,8 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import java.net.URI
+import java.net.URL
 
 
 @Serializable
@@ -114,17 +116,17 @@ sealed interface ResponseMode : java.io.Serializable {
      * In this mode, Authorization Response parameters are encoded
      * in the query string added to the redirect_uri when redirecting back to the Client.
      */
-    data class Query(val redirectUri: HttpsUrl) : ResponseMode
-    data class QueryJwt(val redirectUri: HttpsUrl) : ResponseMode
+    data class Query(val redirectUri: URI) : ResponseMode
+    data class QueryJwt(val redirectUri: URI) : ResponseMode
 
     /**
      * In this mode, Authorization Response parameters
      * are encoded in the fragment added to the redirect_uri when redirecting back to the Client.
      */
-    data class Fragment(val redirectUri: HttpsUrl) : ResponseMode
-    data class FragmentJwt(val redirectUri: HttpsUrl) : ResponseMode
-    data class DirectPost(val responseURI: HttpsUrl) : ResponseMode
-    data class DirectPostJwt(val responseURI: HttpsUrl) : ResponseMode
+    data class Fragment(val redirectUri: URI) : ResponseMode
+    data class FragmentJwt(val redirectUri: URI) : ResponseMode
+    data class DirectPost(val responseURI: URL) : ResponseMode
+    data class DirectPostJwt(val responseURI: URL) : ResponseMode
 }
 
 

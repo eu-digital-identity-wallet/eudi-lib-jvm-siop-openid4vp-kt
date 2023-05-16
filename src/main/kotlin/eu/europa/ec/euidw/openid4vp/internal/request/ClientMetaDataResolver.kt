@@ -3,6 +3,7 @@ package eu.europa.ec.euidw.openid4vp.internal.request
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.euidw.openid4vp.*
 import eu.europa.ec.euidw.openid4vp.internal.mapError
+import java.net.URL
 
 
 internal class ClientMetaDataResolver(
@@ -19,8 +20,8 @@ internal class ClientMetaDataResolver(
         return ClientMetadataValidator.validate(clientMetaData)
     }
 
-    private suspend fun fetch(url: HttpsUrl): Result<ClientMetaData> =
-        getClientMetaData.get(url.value)
+    private suspend fun fetch(url: URL): Result<ClientMetaData> =
+        getClientMetaData.get(url)
             .mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
 
 }

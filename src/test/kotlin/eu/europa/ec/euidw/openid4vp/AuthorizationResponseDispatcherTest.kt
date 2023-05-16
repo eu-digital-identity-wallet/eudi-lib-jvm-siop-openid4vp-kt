@@ -87,7 +87,7 @@ class AuthorizationResponseDispatcherTest {
                     routing {
                         post("/") {
                             val formParameters = call.receiveParameters()
-                            val idTokenTxt = formParameters["idToken"].toString()
+                            val idTokenTxt = formParameters["id_token"].toString()
                             val state = formParameters["state"].toString()
 
                             assertEquals(

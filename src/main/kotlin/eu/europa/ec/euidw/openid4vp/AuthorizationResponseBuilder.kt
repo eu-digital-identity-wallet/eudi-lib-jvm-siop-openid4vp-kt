@@ -68,45 +68,53 @@ sealed interface AuthorizationResponsePayload : Serializable {
     ) : Failed
 }
 
+/**
+ * Representation of holder's consensus to
+ * a [ResolvedRequestObject]
+ */
 sealed interface Consensus : Serializable {
 
+    /**
+     * No consensus. Holder decided to reject
+     * the request
+     */
     object NegativeConsensus : Consensus {
         override fun toString(): String = "NegativeConsensus"
     }
 
+    /**
+     * Positive consensus. Holder decided to
+     * respond the request
+     */
     sealed interface PositiveConsensus : Consensus {
+        /**
+         * In response to a [SiopAuthentication]
+         * Holder/Wallet provides a [idToken] JWT
+         */
         data class IdTokenConsensus(
-            val idToken: String
+            val idToken: Jwt
         ) : PositiveConsensus
 
+        /**
+         * In response to a [OpenId4VPAuthorization] where the
+         * wallet has claims that fulfill Verifier's presentation definition
+         * and holder has chosen the [claims to include][approvedClaims]
+         */
         data class VPTokenConsensus(
             val approvedClaims: List<Claim>
         ) : PositiveConsensus
 
+        /**
+         * In response to a [SiopOpenId4VPAuthentication]
+         */
         data class IdAndVPTokenConsensus(
-            val idToken: JWT,
+            val idToken: Jwt,
             val approvedClaims: List<Claim>
         ) : PositiveConsensus
     }
 }
 
-sealed interface RequestConsensus : Serializable {
-    data class ReleaseClaims(
-        val claims: List<ReleaseClaim>
-    ) : RequestConsensus {
-        data class ReleaseClaim(
-            val claim: Claim,
-            val attributes: List<String>
-        )
-    }
 
-    data class ReleaseIdentity(
-        val requester: String,
-        val reason: String
-    ) : RequestConsensus
-
-    object NoClaims : RequestConsensus
-}
 
 /**
  * An OAUTH2 authorization response

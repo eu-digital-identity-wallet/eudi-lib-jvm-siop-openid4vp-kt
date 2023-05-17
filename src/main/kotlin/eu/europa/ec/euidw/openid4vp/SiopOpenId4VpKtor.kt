@@ -13,8 +13,15 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import java.net.URL
 
+/**
+ * Alias of a  method that creates a [HttpClient]
+ */
 typealias KtorHttpClientFactory = () -> HttpClient
 
+/**
+ * An implementation of [SiopOpenId4Vp] that uses Ktor
+ *
+ */
 class SiopOpenId4VpKtor(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory = DefaultFactory
@@ -30,83 +37,110 @@ class SiopOpenId4VpKtor(
         dispatcher(httpClientFactory).dispatch(response)
 
     companion object {
-        val DefaultFactory: KtorHttpClientFactory = { createKtorClient() }
-        fun authorizationResolver(
-            walletOpenId4VPConfig: WalletOpenId4VPConfig,
-            httpClientFactory: KtorHttpClientFactory = DefaultFactory
-        ): AuthorizationRequestResolver = AuthorizationRequestResolver { request ->
-            httpClientFactory().use { client ->
-                createResolver(walletOpenId4VPConfig, client).resolveRequest(request)
+
+        /**
+         * Factory which produces a [Ktor Http client][HttpClient]
+         * The actual engine will be peeked up by whatever
+         * is available in classpath
+         *
+         * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
+         */
+        val DefaultFactory: KtorHttpClientFactory = {
+            HttpClient {
+                install(ContentNegotiation) { json() }
+                expectSuccess = true
             }
         }
 
-        fun dispatcher(httpClientFactory: KtorHttpClientFactory = DefaultFactory): Dispatcher =
-            Dispatcher { response ->
+        /**
+         * Factory method for creating an [AuthorizationRequestResolver] that
+         * uses the provided [KtorHttpClientFactory] to obtain a [HttpClient]
+         * which in turn is used, if needed, to contact the verifier's end-points
+         *
+         * The [AuthorizationRequestResolver] will obtain a new [HttpClient] with each call & then release it
+         *
+         * @param walletOpenId4VPConfig wallet configuration
+         * @param httpClientFactory factory to obtain [HttpClient]
+         * @return an [AuthorizationRequestResolver] as described above
+         *
+         * @see DefaultAuthorizationRequestResolver
+         */
+        fun authorizationResolver(
+            walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            httpClientFactory: KtorHttpClientFactory = DefaultFactory
+        ): AuthorizationRequestResolver {
+
+            fun createResolver(c: HttpClient) = DefaultAuthorizationRequestResolver.make(
+                getClientMetaData = httpGet(c),
+                getPresentationDefinition = httpGet(c),
+                getRequestObjectJwt = { url ->
+                    runCatching {
+                        c.get(url) {
+                            accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                        }.bodyAsText()
+                    }
+                },
+                walletOpenId4VPConfig = walletOpenId4VPConfig
+            )
+            return AuthorizationRequestResolver { request ->
                 httpClientFactory().use { client ->
-                    DefaultDispatcher(httpFormPost(client)).dispatch(response)
+                    createResolver(client).resolveRequest(request)
                 }
             }
+        }
+
+        /**
+         * A factory method for creating an instance of [HttpGet] that delegates HTTP
+         * calls to [httpClient]
+         *
+         * @param R the type of the body
+         * @return an [HttpGet] implemented via [ktor][HttpClient]
+         *
+         */
+        private inline fun <reified R> httpGet(httpClient: HttpClient): HttpGet<R> =
+            object : HttpGet<R> {
+                override suspend fun get(url: URL): Result<R> = runCatching {
+                    httpClient.get(url).body<R>()
+                }
+            }
+
+        /**
+         * Factory method for creating an [Dispatcher] that
+         * uses the provided [KtorHttpClientFactory] to obtain a [HttpClient]
+         * which in turn is used, if needed, to contact the verifier's end-points.
+         *
+         * The [Dispatcher] will obtain a new [HttpClient] with each call & then release it
+         *
+         * @param httpClientFactory factory to obtain [HttpClient]
+         * @return the [Dispatcher] as described above
+         * @see DefaultDispatcher
+         */
+        fun dispatcher(httpClientFactory: KtorHttpClientFactory = DefaultFactory): Dispatcher {
+
+            fun createDispatcher(c: HttpClient) = DefaultDispatcher { url, parameters ->
+                runCatching {
+                    val response = c.submitForm(
+                        url = url.toString(),
+                        formParameters = Parameters.build {
+                            parameters.entries.forEach { append(it.key, it.value) }
+                        }
+                    )
+                    if (response.status == HttpStatusCode.OK) DispatchOutcome.VerifierResponse.Accepted(null)
+                    else DispatchOutcome.VerifierResponse.Rejected
+                }.getOrElse { DispatchOutcome.VerifierResponse.Rejected }
+            }
+
+            return Dispatcher { response ->
+                httpClientFactory().use { client ->
+                    createDispatcher(client).dispatch(response)
+                }
+            }
+        }
     }
 
 }
 
-private fun createResolver(
-    walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    httpClient: HttpClient
-): AuthorizationRequestResolver =
-    DefaultAuthorizationRequestResolver.make(
-        getClientMetaData = httpGet(httpClient),
-        getPresentationDefinition = httpGet(httpClient),
-        getRequestObjectJwt = { url ->
-            runCatching {
-                httpClient.get(url) {
-                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                }.bodyAsText()
-            }
-        },
-        walletOpenId4VPConfig = walletOpenId4VPConfig
-    )
 
-/**
- * A factory method for creating an instance of [HttpFormPost] that delegates HTTP
- * calls to [httpClient]
- */
-private fun httpFormPost(httpClient: HttpClient): HttpFormPost<DispatchOutcome.VerifierResponse> =
-    HttpFormPost { url, parameters ->
-        try {
-            val response = httpClient.submitForm(
-                url = url.toString(),
-                formParameters = Parameters.build {
-                    parameters.entries.forEach { append(it.key, it.value) }
-                }
-            )
-            if (response.status == HttpStatusCode.OK) DispatchOutcome.VerifierResponse.Accepted(null)
-            else DispatchOutcome.VerifierResponse.Rejected
-        } catch (e: Throwable) {
-            DispatchOutcome.VerifierResponse.Rejected
-        }
-    }
 
-/**
- * A factory method for creating an instance of [HttpGet] that delegates HTTP
- * calls to [httpClient]
- */
-private inline fun <reified R> httpGet(httpClient: HttpClient): HttpGet<R> =
-    object : HttpGet<R> {
-        override suspend fun get(url: URL): Result<R> = runCatching {
-            httpClient.get(url).body<R>()
-        }
-    }
 
-/**
- * Factory method for creating a Ktor Http client
- * The actual engine will be peeked up by whatever
- * is available in classpath
- *
- * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
- */
-private fun createKtorClient(): HttpClient =
-    HttpClient {
-        install(ContentNegotiation) { json() }
-        expectSuccess = true
-    }
+

@@ -36,10 +36,10 @@ sealed interface SubjectSyntaxType : java.io.Serializable {
 
             fun parse(value: String): DecentralizedIdentifier =
                 when {
-                    value.isEmpty() -> throw IllegalArgumentException("Cannot create DID from $value: Empty value passed")
-                    value.count { it == ':' } != 1 -> throw IllegalArgumentException("Cannot create DID from $value: Wrong syntax")
+                    value.isEmpty() -> error("Cannot create DID from $value: Empty value passed")
+                    value.count { it == ':' } != 1 -> error("Cannot create DID from $value: Wrong syntax")
                     value.split(':')
-                        .any { it.isEmpty() } -> throw IllegalArgumentException("Cannot create DID from $value: DID components cannot be empty")
+                        .any { it.isEmpty() } -> error("Cannot create DID from $value: DID components cannot be empty")
 
                     else -> DecentralizedIdentifier(value.split(':')[1])
                 }

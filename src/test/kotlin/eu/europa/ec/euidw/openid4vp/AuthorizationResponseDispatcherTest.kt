@@ -108,13 +108,10 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val DISPATCHER = TestDirectPostResponseDispatcher(managedHttpClient) { DirectPostDispatcher(it) }
-
-            val response = DefaultAuthorizationResponseBuilder.buildResponse(siopAuthRequestObject, idTokenConsensus)
-
-            when (response) {
+            val dispatcher = TestDirectPostResponseDispatcher(managedHttpClient) { DirectPostDispatcher(it) }
+            when (val response = DefaultAuthorizationResponseBuilder.buildResponse(siopAuthRequestObject, idTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {
-                    DISPATCHER.dispatch(response)
+                    dispatcher.dispatch(response)
                 }
 
                 else -> fail("Not a direct post response")

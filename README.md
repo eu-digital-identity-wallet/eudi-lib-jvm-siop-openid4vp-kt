@@ -69,7 +69,7 @@ Out of scope: `did`, `entity_id`
 
 ## Authorization Request encoding
 
-OAUTH2 foresees that `AuthorizationRequest` is encoded as a HTTP GET
+OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET
 request which contains specific HTTP parameters.
 
 OpenID4VP on the other hand foresees in addition, support to

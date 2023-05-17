@@ -1,10 +1,10 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.jose.jwk.RSAKey
-import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -16,16 +16,24 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.net.URI
 import java.net.URLEncoder
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.security.interfaces.RSAPublicKey
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+
 
 fun main(): Unit = runBlocking {
 
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")
     val wallet = Wallet(walletKeyPair = walletKeyPair, holder = holder)
-    val verifier = VerifierApp.make(walletKeyPair.toRSAPublicKey())
 
-    wallet.handle(verifier.uri)
+    val verifier = Verifier.make(walletKeyPair.toRSAPublicKey())
+
+    wallet.handle(verifier.authorizationRequestUri)
 
     val idTokenClaims = verifier.getWalletResponse()
 
@@ -33,15 +41,25 @@ fun main(): Unit = runBlocking {
     println("Verifier got id_token with payload $idTokenClaims")
 }
 
-class VerifierApp private constructor(
+
+private const val VerifierApi = "https://10.240.178.250"
+//"http://localhost:8080"
+/**
+ * This class is a minimal Verifier / RP application
+ */
+class Verifier private constructor(
     private val walletPublicKey: RSAPublicKey,
-    val presentationId: String,
-    val uri: URI
+    private val presentationId: String,
+    val authorizationRequestUri: URI
 ) {
+
+
+    override fun toString(): String =
+        "Verifier presentationId=$presentationId, authorizationRequestUri=$authorizationRequestUri"
 
     suspend fun getWalletResponse(): IDTokenClaimsSet? {
         val walletResponse = createHttpClient().use {
-            it.get("http://localhost:8080/ui/presentations/${presentationId!!}") {
+            it.get("$VerifierApi/ui/presentations/${presentationId}") {
                 accept(ContentType.Application.Json)
             }
         }.body<JsonObject>()
@@ -58,48 +76,43 @@ class VerifierApp private constructor(
 
     companion object {
 
-
-        suspend fun make(walletPublicKey: RSAPublicKey): VerifierApp = coroutineScope {
-            val jobName = CoroutineName("wallet-initTransaction")
-            withContext(Dispatchers.IO + jobName) {
+        /**
+         * Creates a new verifier that knows (out of bound) the
+         * wallet's public key
+         */
+        suspend fun make(walletPublicKey: RSAPublicKey): Verifier = coroutineScope {
+            println("Initializing Verifier ...")
+            withContext(Dispatchers.IO + CoroutineName("wallet-initTransaction")) {
                 createHttpClient().use { client ->
-                    val initTransactionResponse = make(client).also { println(it) }
+                    val initTransactionResponse = initTransaction(client)
                     val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
-                    val uri = formatURI(initTransactionResponse)
-                    VerifierApp(walletPublicKey, presentationId, uri)
+                    val uri = formatAuthorizationRequest(initTransactionResponse)
+                    Verifier(walletPublicKey, presentationId, uri).also { println("Initialized $it") }
                 }
             }
         }
 
-        private suspend fun make(client: HttpClient): JsonObject =
-            client.post(" http://localhost:8080/ui/presentations") {
+
+        private suspend fun initTransaction(client: HttpClient): JsonObject {
+            println("Placing to verifier endpoint request for SiopAuthentication ...")
+            return client.post("$VerifierApi/ui/presentations") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     put("type", "id_token")
                     put("id_token_type", "subject_signed_id_token")
                 })
-
             }.body<JsonObject>()
-
-        private fun formatURI(iniTransactionResponse: JsonObject): URI {
-            val clientId = iniTransactionResponse["client_id"]!!.jsonPrimitive.content
-            val requestUri = iniTransactionResponse["request_uri"]!!.jsonPrimitive.content
-
-            return URI(
-                "eudi-wallet://authorize?client_id=${clientId}&request_uri=${
-                    URLEncoder.encode(
-                        requestUri,
-                        "UTF-8"
-                    )
-                }"
-            )
         }
 
-        private fun createHttpClient(): HttpClient = HttpClient {
-            install(ContentNegotiation) { json() }
-            expectSuccess = true
+        private fun formatAuthorizationRequest(iniTransactionResponse: JsonObject): URI {
+            fun String.encode() = URLEncoder.encode(this, "UTF-8")
+            val clientId = iniTransactionResponse["client_id"]?.jsonPrimitive?.content?.encode()!!
+            val requestUri = iniTransactionResponse["request_uri"]?.jsonPrimitive?.content?.encode()!!
+            return URI("eudi-wallet://authorize?client_id=$clientId&request_uri=$requestUri")
         }
+
+
     }
 }
 
@@ -109,19 +122,27 @@ private class Wallet(
     private val walletKeyPair: RSAKey
 ) {
 
+    private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
+        SiopOpenId4Vp.ktor(walletConfig) { createHttpClient() }
+    }
 
-    suspend fun handle(uri: URI): DispatchOutcome =
-        withContext(Dispatchers.IO) {
-            SiopOpenId4Vp.handle(walletConfig, uri.toString()) { holderConsent(it) }
+    suspend fun handle(uri: URI): DispatchOutcome {
+        println("Wallet handling $uri ...")
+        return withContext(Dispatchers.IO) {
+            siopOpenId4Vp.handle(uri.toString()) { holderConsent(it) }.also {
+                println("Wallet send to verifierApi response and got $it")
+            }
         }
+    }
 
     suspend fun holderConsent(request: ResolvedRequestObject): Consensus = withContext(Dispatchers.Default) {
         when (request) {
             is ResolvedRequestObject.SiopAuthentication -> {
 
+                println("Wallet received an SiopAuthentication request")
                 fun showScreen() = true
 
-                val userConsent: Boolean = showScreen();
+                val userConsent: Boolean = showScreen()
                 if (userConsent) {
                     val idToken = SiopIdTokenBuilder.build(request, holder, walletConfig, walletKeyPair)
                     Consensus.PositiveConsensus.IdTokenConsensus(idToken)
@@ -133,6 +154,41 @@ private class Wallet(
             else -> Consensus.NegativeConsensus
         }
     }
+}
+
+
+private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
+    engine {
+        config {
+            sslSocketFactory(SslSettings.sslContext().socketFactory, SslSettings.trustManager())
+            hostnameVerifier(SslSettings.hostNameVerifier())
+        }
+    }
+    install(ContentNegotiation) { json() }
+
+    expectSuccess = true
+}
+
+object SslSettings {
+
+    fun sslContext(): SSLContext {
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, arrayOf(trustManager()), SecureRandom())
+        return sslContext
+    }
+
+    fun hostNameVerifier(): HostnameVerifier = TrustAllHosts
+    fun trustManager(): X509TrustManager = TrustAllCerts as X509TrustManager
+
+
+    private var TrustAllCerts: TrustManager = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+        override fun getAcceptedIssuers(): Array<X509Certificate> {
+            return arrayOf()
+        }
+    }
+    private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
 private val DefaultConfig = WalletOpenId4VPConfig(

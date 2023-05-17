@@ -2,13 +2,14 @@ package eu.europa.ec.euidw.openid4vp.internal.ktor
 
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequestResolver
-import eu.europa.ec.euidw.openid4vp.ManagedAuthorizationRequestResolver
 import eu.europa.ec.euidw.openid4vp.WalletOpenId4VPConfig
 import eu.europa.ec.euidw.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import java.io.Closeable
+
 
 /**
  * An implementation of [AuthorizationRequestResolver] which uses Ktor client
@@ -23,13 +24,14 @@ import io.ktor.http.*
  * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
  */
 internal class KtorAuthorizationRequestResolver(
-    walletOpenId4VPConfig: WalletOpenId4VPConfig
-) : ManagedAuthorizationRequestResolver {
+    walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    httpClientFactory: () -> HttpClient
+) : AuthorizationRequestResolver, Closeable {
 
     /**
      * The ktor http client
      */
-    private val httpClient: HttpClient by lazy { HttpKtorAdapter.createKtorClient() }
+    private val httpClient: HttpClient by lazy(httpClientFactory)
 
     /**
      * The actual or proxied [AuthorizationRequestResolver]

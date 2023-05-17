@@ -10,7 +10,6 @@ import eu.europa.ec.euidw.openid4vp.internal.success
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import java.net.MalformedURLException
 import java.net.URL
 import java.text.ParseException
 

@@ -1,14 +1,10 @@
 package eu.europa.ec.euidw.openid4vp
 
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.RSAKey
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.euidw.prex.ClaimFormat
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.SupportedClaimFormat
 import kotlinx.serialization.SerialName
 import java.time.Duration
-import java.util.*
 
 
 sealed interface SupportedClientIdScheme {

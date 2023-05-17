@@ -12,7 +12,6 @@ import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import java.io.Closeable
 import java.io.Serializable
 import java.net.URL
 
@@ -61,7 +60,8 @@ sealed interface AuthorizationRequest : Serializable {
 
             when {
                 !requestValue.isNullOrEmpty() -> PassByValue(clientId(), requestValue)
-                !requestUriValue.isNullOrEmpty() ->requestUriValue.asURL().map { PassByReference(clientId(), it) }.getOrThrow()
+                !requestUriValue.isNullOrEmpty() -> requestUriValue.asURL().map { PassByReference(clientId(), it) }
+                    .getOrThrow()
 
                 else -> notSecured(uri)
             }
@@ -350,18 +350,6 @@ fun interface AuthorizationRequestResolver {
             getClientMetaData,
             walletOpenId4VPConfig
         )
-
     }
 }
 
-interface ManagedAuthorizationRequestResolver : AuthorizationRequestResolver, Closeable {
-    companion object {
-        /**
-         * A factory method for obtaining an instance of [AuthorizationRequestResolver] which
-         * uses the Ktor client for performing http calls
-         */
-        fun ktor(walletOpenId4VPConfig: WalletOpenId4VPConfig): ManagedAuthorizationRequestResolver {
-            return KtorAuthorizationRequestResolver(walletOpenId4VPConfig)
-        }
-    }
-}

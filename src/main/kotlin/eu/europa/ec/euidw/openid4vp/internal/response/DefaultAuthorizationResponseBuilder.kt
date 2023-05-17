@@ -34,15 +34,13 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
     private fun toAuthorizationResponse(
         responseMode: ResponseMode,
         responseData: AuthorizationResponsePayload
-    ): AuthorizationResponse {
-        return when (responseMode) {
-            is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
-            is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData)
-            is ResponseMode.Fragment -> AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
-            is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData)
-            is ResponseMode.Query -> AuthorizationResponse.Query(responseMode.redirectUri, responseData)
-            is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData)
-        }
+    ): AuthorizationResponse = when (responseMode) {
+        is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
+        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData)
+        is ResponseMode.Fragment -> AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
+        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData)
+        is ResponseMode.Query -> AuthorizationResponse.Query(responseMode.redirectUri, responseData)
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData)
     }
 
 

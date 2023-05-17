@@ -24,7 +24,7 @@ repositories {
     mavenLocal()
 }
 
-val ktor_version = "2.3.0"
+val ktorVersion = "2.3.0"
 val presentationExchangeVersion = "1.0-SNAPSHOT"
 val nimbusSdkVersion = "10.9"
 
@@ -32,14 +32,15 @@ dependencies {
     api("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")
     api("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
     implementation("com.eygraber:uri-kmp:0.0.11")
-    api("io.ktor:ktor-client-core:$ktor_version")
-    api("io.ktor:ktor-client-content-negotiation:$ktor_version")
-    api("io.ktor:ktor-client-serialization:$ktor_version")
-    api("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+    api("io.ktor:ktor-client-core:$ktorVersion")
+    api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    api("io.ktor:ktor-client-serialization:$ktorVersion")
+    api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-client-okhttp-jvm:2.3.0")
     testImplementation(kotlin("test"))
-    testImplementation("io.ktor:ktor-client-okhttp:$ktor_version")
-    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
-    testImplementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
+    testImplementation("io.ktor:ktor-client-okhttp:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
 
 }
 

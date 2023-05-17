@@ -1,7 +1,5 @@
 package eu.europa.ec.euidw.openid4vp
 
-import eu.europa.ec.euidw.openid4vp.Consensus.NegativeConsensus
-import eu.europa.ec.euidw.openid4vp.Consensus.PositiveConsensus
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.*
 import eu.europa.ec.euidw.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.euidw.prex.Claim
@@ -144,48 +142,10 @@ sealed interface AuthorizationResponse : Serializable {
     data class FragmentJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : FragmentResponse
 }
 
-interface AuthorizationResponseBuilder {
+fun interface AuthorizationResponseBuilder {
 
-    suspend fun build(
-        requestObject: ResolvedRequestObject,
-        consensus: Consensus
-    ): AuthorizationResponse =
+    suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse
 
-        if (consensus is NegativeConsensus) buildNoConsensusResponse(requestObject)
-        else when (requestObject) {
-            is SiopAuthentication -> when (consensus) {
-                is PositiveConsensus.IdTokenConsensus -> buildResponse(requestObject, consensus)
-                else -> error("Unexpected consensus")
-            }
-
-            is OpenId4VPAuthorization -> when (consensus) {
-                is PositiveConsensus.VPTokenConsensus -> buildResponse(requestObject, consensus)
-                else -> error("Unexpected consensus")
-            }
-
-            is SiopOpenId4VPAuthentication -> when (consensus) {
-                is PositiveConsensus.IdAndVPTokenConsensus -> buildResponse(requestObject, consensus)
-                else -> error("Unexpected consensus")
-            }
-        }
-
-
-    suspend fun buildResponse(
-        requestObject: SiopAuthentication,
-        consensus: PositiveConsensus.IdTokenConsensus
-    ): AuthorizationResponse
-
-    suspend fun buildResponse(
-        requestObject: OpenId4VPAuthorization,
-        consensus: PositiveConsensus.VPTokenConsensus
-    ): AuthorizationResponse
-
-    suspend fun buildResponse(
-        requestObject: SiopOpenId4VPAuthentication,
-        consensus: PositiveConsensus.IdAndVPTokenConsensus
-    ): AuthorizationResponse
-
-    suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse
     companion object {
         val Default: AuthorizationResponseBuilder = DefaultAuthorizationResponseBuilder
     }

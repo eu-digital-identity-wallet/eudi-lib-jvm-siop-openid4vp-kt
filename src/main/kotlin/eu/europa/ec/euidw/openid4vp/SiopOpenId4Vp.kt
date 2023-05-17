@@ -5,23 +5,20 @@ import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorAuthorizationRequestResolv
 import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorDispatcher
 import io.ktor.client.*
 
-interface SiopOpenId4Vp {
+interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBuilder, Dispatcher {
 
-    val resolver: AuthorizationRequestResolver
-    val responseBuilder: AuthorizationResponseBuilder
-    val dispatcher: Dispatcher
 
     suspend fun handle(
         uri: String,
         holderConsensus: suspend (ResolvedRequestObject) -> Consensus
     ): DispatchOutcome =
-        when (val authorizationRequestResolution = resolver.resolveRequestUri(uri)) {
+        when (val authorizationRequestResolution = resolveRequestUri(uri)) {
             is Resolution.Invalid -> throw authorizationRequestResolution.error.asException()
             is Resolution.Success -> {
                 val requestObject = authorizationRequestResolution.requestObject
                 val consensus = holderConsensus(requestObject)
-                val authorizationResponse = responseBuilder.build(requestObject, consensus)
-                dispatcher.dispatch(authorizationResponse)
+                val authorizationResponse = build(requestObject, consensus)
+                dispatch(authorizationResponse)
             }
         }
 
@@ -31,9 +28,26 @@ interface SiopOpenId4Vp {
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
             httpClientFactory: () -> HttpClient = { HttpKtorAdapter.createKtorClient() }
         ): SiopOpenId4Vp = object : SiopOpenId4Vp {
-            override val dispatcher: Dispatcher = ktorDispatcher(httpClientFactory)
-            override val resolver: AuthorizationRequestResolver = ktorResolver(walletOpenId4VPConfig, httpClientFactory)
-            override val responseBuilder: AuthorizationResponseBuilder = AuthorizationResponseBuilder.Default
+
+            private val dispatcher: Dispatcher by lazy { ktorDispatcher(httpClientFactory) }
+            private val resolver: AuthorizationRequestResolver by lazy {
+                ktorResolver(
+                    walletOpenId4VPConfig,
+                    httpClientFactory
+                )
+            }
+            private val responseBuilder: AuthorizationResponseBuilder by lazy { AuthorizationResponseBuilder.Default }
+
+            override suspend fun resolveRequest(request: AuthorizationRequest): Resolution =
+                resolver.resolveRequest(request)
+
+            override suspend fun build(
+                requestObject: ResolvedRequestObject,
+                consensus: Consensus
+            ): AuthorizationResponse = responseBuilder.build(requestObject, consensus)
+
+            override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
+                dispatcher.dispatch(response)
         }
 
 
@@ -41,7 +55,7 @@ interface SiopOpenId4Vp {
          * A factory method for obtaining an instance of [AuthorizationRequestResolver] which
          * uses the Ktor client for performing http calls
          */
-        fun ktorResolver(
+        private fun ktorResolver(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
             httpClientFactory: () -> HttpClient = { HttpKtorAdapter.createKtorClient() }
         ): AuthorizationRequestResolver = AuthorizationRequestResolver { request ->
@@ -51,7 +65,7 @@ interface SiopOpenId4Vp {
             ).use { it.resolveRequest(request) }
         }
 
-        fun ktorDispatcher(httpClientFactory: () -> HttpClient = { HttpKtorAdapter.createKtorClient() }): Dispatcher =
+        private fun ktorDispatcher(httpClientFactory: () -> HttpClient = { HttpKtorAdapter.createKtorClient() }): Dispatcher =
             KtorDispatcher(httpClientFactory)
     }
 }

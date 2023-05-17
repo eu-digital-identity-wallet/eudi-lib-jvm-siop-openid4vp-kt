@@ -61,7 +61,7 @@ class AuthorizationResponseBuilderTest {
             )
         )
 
-        val response = DefaultAuthorizationResponseBuilder.buildResponse(siopAuthRequestObject, idTokenConsensus)
+        val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
 
         when (response) {
             is AuthorizationResponse.DirectPost ->

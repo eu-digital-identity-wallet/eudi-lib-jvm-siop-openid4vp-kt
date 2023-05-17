@@ -4,7 +4,31 @@ import eu.europa.ec.euidw.openid4vp.*
 
 internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
 
-    override suspend fun buildResponse(
+
+    override suspend fun build(
+        requestObject: ResolvedRequestObject,
+        consensus: Consensus
+    ): AuthorizationResponse =
+
+        if (consensus is Consensus.NegativeConsensus) buildNoConsensusResponse(requestObject)
+        else when (requestObject) {
+            is ResolvedRequestObject.SiopAuthentication -> when (consensus) {
+                is Consensus.PositiveConsensus.IdTokenConsensus -> buildResponse(requestObject, consensus)
+                else -> error("Unexpected consensus")
+            }
+
+            is ResolvedRequestObject.OpenId4VPAuthorization -> when (consensus) {
+                is Consensus.PositiveConsensus.VPTokenConsensus -> buildResponse(requestObject, consensus)
+                else -> error("Unexpected consensus")
+            }
+
+            is ResolvedRequestObject.SiopOpenId4VPAuthentication -> when (consensus) {
+                is Consensus.PositiveConsensus.IdAndVPTokenConsensus -> buildResponse(requestObject, consensus)
+                else -> error("Unexpected consensus")
+            }
+        }
+
+    private suspend fun buildResponse(
         requestObject: ResolvedRequestObject.SiopAuthentication,
         consensus: Consensus.PositiveConsensus.IdTokenConsensus
     ): AuthorizationResponse {
@@ -12,21 +36,21 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
         return toAuthorizationResponse(requestObject.responseMode, payload)
     }
 
-    override suspend fun buildResponse(
+    private suspend fun buildResponse(
         requestObject: ResolvedRequestObject.OpenId4VPAuthorization,
         consensus: Consensus.PositiveConsensus.VPTokenConsensus
     ): AuthorizationResponse {
         TODO("Not yet implemented")
     }
 
-    override suspend fun buildResponse(
+    private suspend fun buildResponse(
         requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
         consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus
     ): AuthorizationResponse {
         TODO("Not yet implemented")
     }
 
-    override suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
+    suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
         val payload = AuthorizationResponsePayload.NoConsensusResponseData(requestObject.state)
         return toAuthorizationResponse(requestObject.responseMode, payload)
     }

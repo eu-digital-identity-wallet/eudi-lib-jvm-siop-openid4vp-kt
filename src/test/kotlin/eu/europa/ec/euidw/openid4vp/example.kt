@@ -42,8 +42,8 @@ fun main(): Unit = runBlocking {
 }
 
 
-private const val VerifierApi = "https://10.240.178.250"
-//"http://localhost:8080"
+private const val VerifierApi = "http://localhost:8080"
+
 /**
  * This class is a minimal Verifier / RP application
  */

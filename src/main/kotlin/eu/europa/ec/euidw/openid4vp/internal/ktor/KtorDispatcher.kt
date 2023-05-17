@@ -21,12 +21,10 @@ internal class KtorDispatcher(private val httpClientFactory: ()->HttpClient) : D
         return when (response) {
             is AuthorizationResponse.DirectPost -> directPost().use { dispatcher ->
                 dispatcher.dispatch(response)
-                DispatchOutcome.VerifierResponse
             }
 
             is AuthorizationResponse.DirectPostJwt -> directPostJwt().use { dispatcher ->
                 dispatcher.dispatch(response)
-                DispatchOutcome.VerifierResponse
             }
 
             is AuthorizationResponse.RedirectResponse -> {

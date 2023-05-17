@@ -1,14 +1,17 @@
 package eu.europa.ec.euidw.openid4vp.internal.ktor
 
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponse.DirectPostResponse
+import eu.europa.ec.euidw.openid4vp.DispatchOutcome
 import eu.europa.ec.euidw.openid4vp.HttpFormPost
+import eu.europa.ec.euidw.openid4vp.asURI
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.AuthorizationResponseDispatcher
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.ManagedAuthorizationResponseDispatcher
 import io.ktor.client.*
+import kotlinx.serialization.json.jsonPrimitive
 
 internal class KtorDirectPostResponseDispatcher<in A : DirectPostResponse>(
-    httpClientFactory: ()-> HttpClient,
-    proxyFactory: (HttpFormPost<Unit>) -> AuthorizationResponseDispatcher<A, Unit>
+    httpClientFactory: () -> HttpClient,
+    proxyFactory: (HttpFormPost<DispatchOutcome.VerifierResponse>) -> AuthorizationResponseDispatcher<A, DispatchOutcome.VerifierResponse>
 ) : ManagedAuthorizationResponseDispatcher<A> {
 
     /**
@@ -19,7 +22,7 @@ internal class KtorDirectPostResponseDispatcher<in A : DirectPostResponse>(
     /**
      * The actual or proxied [AuthorizationResponseDispatcher]
      */
-    private val proxy: AuthorizationResponseDispatcher<A, Unit> by lazy {
+    private val proxy: AuthorizationResponseDispatcher<A, DispatchOutcome.VerifierResponse> by lazy {
         proxyFactory(HttpKtorAdapter.httpFormPost(httpClient))
     }
 

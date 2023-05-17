@@ -5,6 +5,7 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationResponse.DirectPostJwt
 
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponsePayload
 import eu.europa.ec.euidw.openid4vp.AuthorizationResponsePayload.*
+import eu.europa.ec.euidw.openid4vp.DispatchOutcome
 import eu.europa.ec.euidw.openid4vp.HttpFormPost
 import eu.europa.ec.euidw.openid4vp.Jwt
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.AuthenticationResponseErrorCode.Companion.fromError
@@ -16,8 +17,8 @@ import kotlinx.serialization.json.Json
 
 
 internal class DirectPostDispatcher(
-    private val httpFormPost: HttpFormPost<Unit>
-) : AuthorizationResponseDispatcher<DirectPost, Unit> {
+    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>
+) : AuthorizationResponseDispatcher<DirectPost, DispatchOutcome.VerifierResponse> {
 
     override suspend fun dispatch(response: DirectPost) = withContext(Dispatchers.IO) {
         val formParameters = Form.from(response.data)
@@ -26,8 +27,8 @@ internal class DirectPostDispatcher(
 }
 
 internal class DirectPostJwtDispatcher(
-    private val httpFormPost: HttpFormPost<Unit>
-) : AuthorizationResponseDispatcher<DirectPostJwt, Unit> {
+    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>
+) : AuthorizationResponseDispatcher<DirectPostJwt, DispatchOutcome.VerifierResponse> {
 
     override suspend fun dispatch(response: DirectPostJwt) = withContext(Dispatchers.IO) {
         TODO("Not yet implemented")

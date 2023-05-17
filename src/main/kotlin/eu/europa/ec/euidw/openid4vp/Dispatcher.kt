@@ -7,8 +7,11 @@ import java.net.URI
 sealed interface DispatchOutcome : Serializable {
     data class RedirectURI(val value: URI) : DispatchOutcome
 
-    object VerifierResponse : DispatchOutcome {
-        override fun toString(): String = "VerifierResponse"
+    sealed interface VerifierResponse : DispatchOutcome {
+        data class Accepted(val redirectURI: URI?) : VerifierResponse
+        object Rejected : VerifierResponse {
+            override fun toString(): String = "Rejected"
+        }
     }
 
 }

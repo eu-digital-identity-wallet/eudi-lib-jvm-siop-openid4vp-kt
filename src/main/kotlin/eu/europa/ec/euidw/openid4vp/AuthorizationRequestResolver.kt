@@ -6,7 +6,6 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByRefere
 import eu.europa.ec.euidw.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.euidw.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
-import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorAuthorizationRequestResolver
 import eu.europa.ec.euidw.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import kotlinx.serialization.json.Json

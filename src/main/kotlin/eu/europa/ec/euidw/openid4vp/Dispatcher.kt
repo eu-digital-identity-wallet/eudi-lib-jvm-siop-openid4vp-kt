@@ -1,5 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
+import java.io.Closeable
 import java.io.Serializable
 import java.net.URI
 
@@ -16,8 +17,9 @@ sealed interface DispatchOutcome : Serializable {
 
 }
 
-interface Dispatcher {
+fun interface Dispatcher {
     suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome
+
 }
 
 

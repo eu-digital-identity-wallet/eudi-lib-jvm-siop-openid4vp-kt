@@ -1,13 +1,9 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.oauth2.sdk.id.State
-import eu.europa.ec.euidw.openid4vp.internal.dispatch.AuthorizationResponseDispatcher
-import eu.europa.ec.euidw.openid4vp.internal.dispatch.DirectPostDispatcher
-import eu.europa.ec.euidw.openid4vp.internal.ktor.HttpKtorAdapter
-import eu.europa.ec.euidw.openid4vp.internal.ktor.KtorDispatcher
+
 import eu.europa.ec.euidw.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.euidw.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
-import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -19,7 +15,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
-import java.io.Closeable
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
@@ -109,8 +104,9 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
+
             val dispatcher =// TestDirectPostResponseDispatcher(managedHttpClient) { DirectPostDispatcher(it) }
-                KtorDispatcher {managedHttpClient}
+                SiopOpenId4VpKtor.dispatcher { managedHttpClient }
             when (val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
@@ -121,23 +117,3 @@ class AuthorizationResponseDispatcherTest {
         }
     }
 }
-
-
-//internal class TestDirectPostResponseDispatcher<in A : AuthorizationResponse.DirectPostResponse>(
-//    val managedHttpClient: HttpClient,
-//    proxyFactory: (HttpFormPost<Unit>) -> AuthorizationResponseDispatcher<A, Unit>
-//) : AuthorizationResponseDispatcher<A, Unit>, Closeable {
-//
-//    /**
-//     * The actual or proxied [AuthorizationResponseDispatcher]
-//     */
-//    private val proxy: AuthorizationResponseDispatcher<A, Unit> by lazy {
-//        proxyFactory(HttpKtorAdapter.httpFormPost(managedHttpClient))
-//    }
-//
-//    override suspend fun dispatch(response: A) = proxy.dispatch(response)
-//
-//    override fun close() = managedHttpClient.close()
-//
-//
-//}

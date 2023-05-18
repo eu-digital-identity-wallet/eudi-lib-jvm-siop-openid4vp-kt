@@ -11,7 +11,7 @@ version = "1.0-SNAPSHOT"
 repositories {
     mavenCentral()
     maven {
-        name = "NiscyEudiwPackages"
+        name = "EUDIWalletSnapshots"
         url = uri("https://maven.pkg.github.com/niscy-eudiw/*")
         credentials {
             username = System.getenv("GH_PKG_USER")
@@ -36,7 +36,6 @@ dependencies {
     api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     api("io.ktor:ktor-client-serialization:$ktorVersion")
     api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-    implementation("io.ktor:ktor-client-okhttp-jvm:2.3.0")
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-okhttp:$ktorVersion")
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
@@ -64,7 +63,7 @@ publishing {
     repositories {
 
         maven {
-            name = "NiscyEudiwPackages"
+            name = "EUDIWalletSnapshots"
             url = uri("https://maven.pkg.github.com/niscy-eudiw/siop-openid4vp-kt")
             credentials {
                 username = System.getenv("GITHUB_ACTOR")

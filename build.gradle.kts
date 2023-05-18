@@ -12,12 +12,13 @@ repositories {
     mavenCentral()
     maven {
         name = "EUDIWalletSnapshots"
-        url = uri("https://maven.pkg.github.com/niscy-eudiw/*")
+        val dependenciesRepoUrl = System.getenv("DEP_MVN_REPO") ?: "https://maven.pkg.github.com/eu-digital-identity-wallet/*"
+        url = uri(dependenciesRepoUrl)
         credentials {
             username = System.getenv("GH_PKG_USER")
             password = System.getenv("GH_PKG_TOKEN")
         }
-        mavenContent{
+        mavenContent {
             snapshotsOnly()
         }
     }
@@ -48,7 +49,7 @@ tasks.test {
 }
 
 kotlin {
-    jvmToolchain{
+    jvmToolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
         vendor.set(JvmVendorSpec.ADOPTIUM)
     }
@@ -60,16 +61,19 @@ publishing {
             from(components["java"])
         }
     }
-    repositories {
+    val publishMvnRepo = System.getenv("PUBLISH_MVN_REPO")?.let { uri(it) }
+    if (null != publishMvnRepo)
+        repositories {
 
-        maven {
-            name = "EUDIWalletSnapshots"
-            url = uri("https://maven.pkg.github.com/niscy-eudiw/siop-openid4vp-kt")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+            maven {
+                name = "EUDIWalletSnapshots"
+                url = uri(publishMvnRepo)
+                credentials {
+                    username = System.getenv("GITHUB_ACTOR")
+                    password = System.getenv("GITHUB_TOKEN")
+                }
+
             }
-
         }
-    }
+    else println("Warning: PUBLISH_MVN_REPO undefined. Won't publish")
 }

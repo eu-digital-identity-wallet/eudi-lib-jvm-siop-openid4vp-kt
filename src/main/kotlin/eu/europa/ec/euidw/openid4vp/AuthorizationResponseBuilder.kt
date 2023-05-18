@@ -20,6 +20,9 @@ sealed interface AuthorizationResponsePayload : Serializable {
     /**
      * In response to a [ResolvedRequestObject.SiopAuthentication]
      * and holder's [Consensus.PositiveConsensus.IdTokenConsensus]
+     *
+     * @param idToken The id_token produced by the wallet
+     * @param state the state of the [request][ResolvedRequestObject.SiopAuthentication.state]
      */
     data class SiopAuthenticationResponse(
         val idToken: Jwt,
@@ -29,6 +32,12 @@ sealed interface AuthorizationResponsePayload : Serializable {
     /**
      * In response to a [ResolvedRequestObject.OpenId4VPAuthorization]
      * and holder's [Consensus.PositiveConsensus.VPTokenConsensus]
+     *
+     * @param verifiableCredential the list of verifiable credentials
+     * that fulfil the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
+     * @param presentationSubmission the presentation submission
+     * that fulfil the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
+     * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      */
     data class OpenId4VPAuthorizationResponse(
         val verifiableCredential: List<Jwt>,
@@ -39,6 +48,13 @@ sealed interface AuthorizationResponsePayload : Serializable {
     /**
      * In response to a [ResolvedRequestObject.SiopOpenId4VPAuthentication]
      * and holder's [Consensus.PositiveConsensus.IdAndVPTokenConsensus]
+     *
+     * @param idToken The id_token produced by the wallet
+     * @param verifiableCredential the list of verifiable credentials
+     * that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
+     * @param presentationSubmission the presentation submission
+     *  that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
+     * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      */
     data class SiopOpenId4VPAuthenticationResponse(
         val idToken: Jwt,
@@ -51,6 +67,8 @@ sealed interface AuthorizationResponsePayload : Serializable {
 
     /**
      * In response of an [Resolution.Invalid] [AuthorizationRequest]
+     * @param error the cause
+     * @param state the state of the request
      */
     data class InvalidRequest(
         val error: AuthorizationRequestError,
@@ -60,6 +78,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
     /**
      * In response of a [ResolvedRequestObject] and
      * holder's [negative consensus][Consensus.NegativeConsensus]
+     * @param state the state of the [request][ResolvedRequestObject.state]
      */
     data class NoConsensusResponseData(
         override val state: String
@@ -88,6 +107,8 @@ sealed interface Consensus : Serializable {
         /**
          * In response to a [SiopAuthentication]
          * Holder/Wallet provides a [idToken] JWT
+         *
+         * @param idToken The id_token produced by the wallet
          */
         data class IdTokenConsensus(
             val idToken: Jwt
@@ -104,6 +125,8 @@ sealed interface Consensus : Serializable {
 
         /**
          * In response to a [SiopOpenId4VPAuthentication]
+         *
+         * @param idToken The id_token produced by the wallet
          */
         data class IdAndVPTokenConsensus(
             val idToken: Jwt,
@@ -122,7 +145,21 @@ sealed interface AuthorizationResponse : Serializable {
      * direct_post or direct_pst.jwt
      */
     sealed interface DirectPostResponse : AuthorizationResponse
+
+    /**
+     * An authorization response to be communicated to verifier/RP via direct_post method
+     *
+     * @param responseUri the verifier/RP URI where the response will be posted
+     * @param data the contents of the authorization request
+     */
     data class DirectPost(val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
+
+    /**
+     * An authorization response to be communicated to verifier/RP via direct_post.jwt method
+     *
+     * @param responseUri the verifier/RP URI where the response will be posted
+     * @param data the contents of the authorization request
+     */
     data class DirectPostJwt(val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
 
     /**
@@ -142,11 +179,23 @@ sealed interface AuthorizationResponse : Serializable {
     data class FragmentJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : FragmentResponse
 }
 
+/**
+ * An interface for building the [AuthorizationResponse]
+ */
 fun interface AuthorizationResponseBuilder {
 
+    /**
+     * Creates an [AuthorizationResponse] given a request and a consensus
+     *
+     * @param requestObject the authorization request for which the response will be created
+     * @param consensus the consensus of the wallet
+     */
     suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse
 
     companion object {
+        /**
+         * Default implementation of [AuthorizationResponseBuilder]
+         */
         val Default: AuthorizationResponseBuilder = DefaultAuthorizationResponseBuilder
     }
 }

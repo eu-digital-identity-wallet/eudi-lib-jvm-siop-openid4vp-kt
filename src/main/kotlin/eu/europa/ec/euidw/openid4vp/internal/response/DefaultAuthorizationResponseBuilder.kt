@@ -2,6 +2,9 @@ package eu.europa.ec.euidw.openid4vp.internal.response
 
 import eu.europa.ec.euidw.openid4vp.*
 
+/**
+ * Default implementation of [AuthorizationResponseBuilder]
+ */
 internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
 
 

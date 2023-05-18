@@ -29,18 +29,7 @@ sealed interface SupportedClientIdScheme {
 
 }
 
-data class VPFormatsFormatsSupported(val formats: List<SupportedClaimFormat<*>>)
-data class WalletOpenId4VPMetaData(
-    /**
-     * OPTIONAL. Boolean value specifying whether the Wallet supports
-     * the transfer of presentation_definition by reference,
-     * with true indicating support. If omitted, the default value is true.
-     */
-    @SerialName("presentation_definition_uri_supported") val presentationDefinitionUriSupported: Boolean = true,
-    @SerialName("vp_formats_supported") val vpFormatsSupported: VPFormatsFormatsSupported,
-    @SerialName("client_id_schemes_supported") val clientIdSchemesSupported: List<ClientIdScheme>
 
-)
 
 data class WalletOpenId4VPConfig(
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,

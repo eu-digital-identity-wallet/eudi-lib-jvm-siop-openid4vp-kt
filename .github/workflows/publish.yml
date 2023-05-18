@@ -22,3 +22,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_PKG_USER: ${{ github.actor }}
           GH_PKG_TOKEN: ${{ secrets.GH_PKG_TOKEN }}
+          PUBLISH_MVN_REPO: https://maven.pkg.github.com/${{ github.repository }}

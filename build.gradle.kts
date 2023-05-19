@@ -27,7 +27,7 @@ repositories {
 
 val ktorVersion = "2.3.0"
 val presentationExchangeVersion = "1.0-SNAPSHOT"
-val nimbusSdkVersion = "10.9"
+val nimbusSdkVersion = "10.9.1"
 
 dependencies {
     api("eu.europa.ec.euidw:presentation-exchange-kt:$presentationExchangeVersion")

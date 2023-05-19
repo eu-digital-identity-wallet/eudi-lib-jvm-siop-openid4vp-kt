@@ -1,4 +1,4 @@
-name: Build Verifier project
+name: CI
 on:
   pull_request:
     branches: ['**']
@@ -25,7 +25,7 @@ jobs:
           java-version: '17'
       - name: Validate Gradle Wrapper
         uses: gradle/wrapper-validation-action@v1
-      - name: Setup Gradle
+      - name: Build with Gradle Wrapper
         uses: gradle/gradle-build-action@v2
         env:
           GH_PKG_USER: ${{ github.actor }}
@@ -52,7 +52,7 @@ jobs:
           java-version: '17'
       - name: Validate Gradle Wrapper
         uses: gradle/wrapper-validation-action@v1
-      - name: Setup Gradle
+      - name: Publish with Gradle Wrapper
         uses: gradle/gradle-build-action@v2
         with:
           arguments: publish

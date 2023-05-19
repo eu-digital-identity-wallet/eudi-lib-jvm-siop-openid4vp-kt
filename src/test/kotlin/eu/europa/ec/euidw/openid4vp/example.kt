@@ -36,10 +36,8 @@ fun main(): Unit = runBlocking {
 
     wallet.handle(verifier.authorizationRequestUri)
 
-    val idTokenClaims = verifier.getWalletResponse()
+    verifier.getWalletResponse()
 
-
-    println("Verifier got id_token with payload $idTokenClaims")
 }
 
 private fun randomNonce() : String = Nonce().value
@@ -74,7 +72,7 @@ class Verifier private constructor(
             )
             IDTokenClaimsSet(claims)
         }
-        return idTokenClaims
+        return idTokenClaims.also { verifierPrintln("Got id_token with payload $idTokenClaims") }
     }
 
     companion object {
@@ -84,20 +82,20 @@ class Verifier private constructor(
          * wallet's public key
          */
         suspend fun make(walletPublicKey: RSAPublicKey, nonce: String): Verifier = coroutineScope {
-            println("Initializing Verifier ...")
+            verifierPrintln("Initializing Verifier ...")
             withContext(Dispatchers.IO + CoroutineName("wallet-initTransaction")) {
                 createHttpClient().use { client ->
                     val initTransactionResponse = initTransaction(client, nonce)
                     val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
                     val uri = formatAuthorizationRequest(initTransactionResponse)
-                    Verifier(walletPublicKey, presentationId, nonce, uri ).also { println("Initialized $it") }
+                    Verifier(walletPublicKey, presentationId, nonce, uri ).also { verifierPrintln("Initialized $it") }
                 }
             }
         }
 
 
         private suspend fun initTransaction(client: HttpClient, nonce: String): JsonObject {
-            println("Placing to verifier endpoint request for SiopAuthentication ...")
+            verifierPrintln("Placing to verifier endpoint request for SiopAuthentication ...")
             return client.post("$VerifierApi/ui/presentations") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
@@ -116,6 +114,8 @@ class Verifier private constructor(
             return URI("eudi-wallet://authorize?client_id=$clientId&request_uri=$requestUri")
         }
 
+        private fun verifierPrintln(s: String) = println("Verifier : $s")
+
 
     }
 }
@@ -131,10 +131,10 @@ private class Wallet(
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {
-        println("Wallet handling $uri ...")
+        walletPrintln("Handling $uri ...")
         return withContext(Dispatchers.IO) {
             siopOpenId4Vp.handle(uri.toString()) { holderConsent(it) }.also {
-                println("Wallet send to verifierApi response and got $it")
+                walletPrintln("Response was sent to verifierApi which replied with $it")
             }
         }
     }
@@ -143,8 +143,10 @@ private class Wallet(
         when (request) {
             is ResolvedRequestObject.SiopAuthentication -> {
 
-                println("Wallet received an SiopAuthentication request")
-                fun showScreen() = true
+                walletPrintln("Received an SiopAuthentication request")
+                fun showScreen() = true.also {
+                    walletPrintln("User consensus was $it")
+                }
 
                 val userConsent: Boolean = showScreen()
                 if (userConsent) {
@@ -157,6 +159,10 @@ private class Wallet(
 
             else -> Consensus.NegativeConsensus
         }
+    }
+    companion object {
+        fun walletPrintln(s: String) = println("Wallet   : $s")
+
     }
 }
 

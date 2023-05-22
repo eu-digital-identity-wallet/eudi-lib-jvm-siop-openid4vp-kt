@@ -20,28 +20,26 @@ internal class DefaultAuthorizationRequestResolver(
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver
 ) : AuthorizationRequestResolver {
 
-
     override suspend fun resolveRequest(
         request: AuthorizationRequest
     ): Resolution = runCatching {
         val requestObject = requestObjectOf(request)
         val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
-        validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
+        val resolved =
+            validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
+        Resolution.Success(resolved)
+    }
+        .recoverCatching { recoverAuthorizationRequestException(it) ?: throw it }
+        .getOrThrow()
 
-    }.fold(
-        onSuccess = { Resolution.Success(it) },
-        onFailure = {
-            when (it) {
-                is AuthorizationRequestException -> Resolution.Invalid(it.error)
-                else -> throw it
-            }
-        })
-
+    private fun recoverAuthorizationRequestException(t: Throwable): Resolution.Invalid? =
+        if (t is AuthorizationRequestException) Resolution.Invalid(t.error)
+        else null
 
     /**
      * Extracts the [request object][RequestObject] of an [AuthorizationRequest]
      */
-    private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject  {
+    private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject {
 
         suspend fun fetchJwt(request: PassByReference): Jwt =
             withContext(Dispatchers.IO) {

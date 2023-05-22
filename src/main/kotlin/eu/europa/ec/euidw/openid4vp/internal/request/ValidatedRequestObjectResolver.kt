@@ -16,13 +16,13 @@ internal class ValidatedRequestObjectResolver(
         validated: ValidatedRequestObject,
         walletOpenId4VPConfig: WalletOpenId4VPConfig
     ): Result<ResolvedRequestObject> = when (validated) {
-        is IdTokenRequestObject -> resolveIdTokenRequest(validated)
-        is VpTokenRequestObject -> resolveVpTokenRequest(validated, walletOpenId4VPConfig)
-        is IdAndVPTokenRequestObject -> resolveIdAndVpTokenRequest(validated, walletOpenId4VPConfig)
+        is SiopAuthentication -> resolveIdTokenRequest(validated)
+        is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, walletOpenId4VPConfig)
+        is SiopOpenId4VPAuthentication -> resolveIdAndVpTokenRequest(validated, walletOpenId4VPConfig)
     }
 
     private suspend fun resolveIdAndVpTokenRequest(
-        validated: IdAndVPTokenRequestObject,
+        validated: SiopOpenId4VPAuthentication,
         walletOpenId4VPConfig: WalletOpenId4VPConfig
     ): Result<ResolvedRequestObject> {
         val presentationDefinition =
@@ -40,7 +40,7 @@ internal class ValidatedRequestObjectResolver(
     }
 
     private suspend fun resolveVpTokenRequest(
-        validated: VpTokenRequestObject,
+        validated: OpenId4VPAuthorization,
         walletOpenId4VPConfig: WalletOpenId4VPConfig
     ): Result<ResolvedRequestObject> {
         val presentationDefinition =
@@ -56,7 +56,7 @@ internal class ValidatedRequestObjectResolver(
         ).success()
     }
 
-    private suspend fun resolveIdTokenRequest(validated: IdTokenRequestObject): Result<ResolvedRequestObject> =
+    private suspend fun resolveIdTokenRequest(validated: SiopAuthentication): Result<ResolvedRequestObject> =
         ResolvedRequestObject.SiopAuthentication(
             idTokenType = validated.idTokenType,
             clientMetaData = resolveClientMetaData(validated).getOrThrow(),

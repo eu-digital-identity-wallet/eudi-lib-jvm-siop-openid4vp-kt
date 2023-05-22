@@ -249,6 +249,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
 
+    data class InvalidIdTokenType(val value: String): RequestValidationError
 }
 
 /**

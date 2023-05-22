@@ -19,7 +19,7 @@ internal class DefaultDispatcher(
 
     private suspend fun directPost(response: AuthorizationResponse.DirectPost): DispatchOutcome.VerifierResponse =
         withContext(Dispatchers.IO) {
-            val formParameters = Form.from(response.data)
+            val formParameters = DirectPostForm.of(response.data)
             httpFormPost.post(response.responseUri, formParameters)
         }
 
@@ -39,7 +39,7 @@ internal class DefaultDispatcher(
 }
 
 
-private object Form {
+private object DirectPostForm {
 
     private const val PRESENTATION_SUBMISSION_FORM_PARAM = "presentation_submission"
     private const val VP_TOKEN_FORM_PARAM = "vp_token"
@@ -48,47 +48,40 @@ private object Form {
     private const val ERROR_FORM_PARAM = "error"
     private const val ERROR_DESCRIPTION_FORM_PARAM = "error_description"
 
-    fun from(p: AuthorizationResponsePayload): Map<String, String> = when (p) {
-        is AuthorizationResponsePayload.SiopAuthenticationResponse -> mapOf(
-            ID_TOKEN_FORM_PARAM to p.idToken,
-            STATE_FORM_PARAM to p.state
-        )
+    fun of(p: AuthorizationResponsePayload): Map<String, String> {
+        fun ps(ps: PresentationSubmission) =  Json.encodeToString<PresentationSubmission>(ps)
+        fun vpToken(vcs: List<Jwt>) = Json.encodeToString<List<Jwt>>(vcs)
+        return when (p) {
+            is AuthorizationResponsePayload.SiopAuthenticationResponse -> mapOf(
+                ID_TOKEN_FORM_PARAM to p.idToken,
+                STATE_FORM_PARAM to p.state
+            )
 
-        is AuthorizationResponsePayload.OpenId4VPAuthorizationResponse -> mapOf(
-            VP_TOKEN_FORM_PARAM to Json.encodeToString<List<Jwt>>(p.verifiableCredential),
-            PRESENTATION_SUBMISSION_FORM_PARAM to Json.encodeToString<PresentationSubmission>(
-                p.presentationSubmission
-            ),
-            STATE_FORM_PARAM to p.state
-        )
+            is AuthorizationResponsePayload.OpenId4VPAuthorizationResponse -> mapOf(
+                VP_TOKEN_FORM_PARAM to vpToken(p.verifiableCredential),
+                PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
+                STATE_FORM_PARAM to p.state
+            )
 
-        is AuthorizationResponsePayload.SiopOpenId4VPAuthenticationResponse -> mapOf(
-            ID_TOKEN_FORM_PARAM to p.idToken,
-            VP_TOKEN_FORM_PARAM to Json.encodeToString<List<Jwt>>(p.verifiableCredential),
-            PRESENTATION_SUBMISSION_FORM_PARAM to Json.encodeToString<PresentationSubmission>(
-                p.presentationSubmission
-            ),
-            STATE_FORM_PARAM to p.state
-        )
+            is AuthorizationResponsePayload.SiopOpenId4VPAuthenticationResponse -> mapOf(
+                ID_TOKEN_FORM_PARAM to p.idToken,
+                VP_TOKEN_FORM_PARAM to vpToken(p.verifiableCredential),
+                PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
+                STATE_FORM_PARAM to p.state
+            )
 
-        is AuthorizationResponsePayload.InvalidRequest -> {
-            val (erroCode, description) = AuthenticationResponseErrorCode.fromError(p.error)
-            mapOf(
-                ERROR_FORM_PARAM to erroCode,
-                ERROR_DESCRIPTION_FORM_PARAM to "$description : ${p.error}",
+            is AuthorizationResponsePayload.InvalidRequest -> mapOf(
+                ERROR_FORM_PARAM to AuthorizationRequestErrorCode.fromError(p.error).code,
+                ERROR_DESCRIPTION_FORM_PARAM to "${p.error}",
+                STATE_FORM_PARAM to p.state
+            )
+
+
+            is AuthorizationResponsePayload.NoConsensusResponseData -> mapOf(
+                ERROR_FORM_PARAM to AuthorizationRequestErrorCode.USER_CANCELLED.code,
                 STATE_FORM_PARAM to p.state
             )
         }
-
-        is AuthorizationResponsePayload.NoConsensusResponseData -> {
-            val (erroCode, description) = AuthenticationResponseErrorCode.USER_CANCELLED
-            mapOf(
-                ERROR_FORM_PARAM to erroCode,
-                ERROR_DESCRIPTION_FORM_PARAM to description,
-                STATE_FORM_PARAM to p.state
-            )
-        }
-
     }
 }
 

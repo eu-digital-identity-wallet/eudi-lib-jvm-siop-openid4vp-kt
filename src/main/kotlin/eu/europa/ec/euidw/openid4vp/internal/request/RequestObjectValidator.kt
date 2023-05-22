@@ -2,10 +2,9 @@ package eu.europa.ec.euidw.openid4vp.internal.request
 
 import eu.europa.ec.euidw.openid4vp.*
 import eu.europa.ec.euidw.openid4vp.internal.mapError
+import eu.europa.ec.euidw.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.euidw.openid4vp.internal.success
-import eu.europa.ec.euidw.prex.JsonParser
 import eu.europa.ec.euidw.prex.PresentationDefinition
-import eu.europa.ec.euidw.prex.PresentationExchange
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URI
@@ -27,6 +26,13 @@ internal sealed interface PresentationDefinitionSource {
      * The resource MUST be exposed without further need to authenticate or authorize
      */
     data class FetchByReference(val url: URL) : PresentationDefinitionSource
+
+    /**
+     * When a presentation definition is pre-agreed between wallet and verifier, using
+     * a specific [scope]. In this case, verifier doesn't communicate the presentation definition
+     * neither [by value][PassByValue] nor by [FetchByReference]. Rather, the wallets
+     * has been configured (via a specific scope) with a well-known definition
+     */
     data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
@@ -35,6 +41,17 @@ internal sealed interface ClientMetaDataSource {
     data class FetchByReference(val url: URL) : ClientMetaDataSource
 }
 
+/**
+ * Represents a [RequestObject] that has been validated to
+ * represent one of the supported requests.
+ * Valid in this context, means that the [AuthorizationRequest] had the necessary
+ * information to represent either
+ * - a [SiopAuthentication], or
+ * - a [OpenId4VPAuthorization], or
+ * - a [SiopOpenId4VPAuthentication]
+ *
+ * @see RequestObjectValidator for the validation rules implemented
+ */
 internal sealed interface ValidatedRequestObject {
 
     val clientId: String
@@ -44,7 +61,10 @@ internal sealed interface ValidatedRequestObject {
     val responseMode: ResponseMode
     val state: String
 
-    data class IdTokenRequestObject(
+    /**
+     * A valid SIOP authentication
+     */
+    data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
         override val clientMetaDataSource: ClientMetaDataSource?,
         override val clientIdScheme: ClientIdScheme?,
@@ -55,7 +75,10 @@ internal sealed interface ValidatedRequestObject {
         override val state: String
     ) : ValidatedRequestObject
 
-    data class VpTokenRequestObject(
+    /**
+     * A valid OpenID4VP authorization
+     */
+    data class OpenId4VPAuthorization(
         val presentationDefinitionSource: PresentationDefinitionSource,
         override val clientMetaDataSource: ClientMetaDataSource?,
         override val clientIdScheme: ClientIdScheme?,
@@ -65,7 +88,10 @@ internal sealed interface ValidatedRequestObject {
         override val state: String
     ) : ValidatedRequestObject
 
-    data class IdAndVPTokenRequestObject(
+    /**
+     * A valid combined SIOP & OpenID4VP request
+     */
+    data class SiopOpenId4VPAuthentication(
         val idTokenType: List<IdTokenType>,
         val presentationDefinitionSource: PresentationDefinitionSource,
         override val clientMetaDataSource: ClientMetaDataSource?,
@@ -82,8 +108,14 @@ internal sealed interface ValidatedRequestObject {
 
 internal object RequestObjectValidator {
 
-    private val presentationExchangeParser: JsonParser = PresentationExchange.jsonParser
-
+    /**
+     * Validates that the given [authorizationRequest] represents a valid and supported [ValidatedRequestObject]
+     *
+     * @param authorizationRequest The request to validate
+     * @return if given [authorizationRequest] is valid returns an appropriate [ValidatedRequestObject]. Otherwise,
+     * returns a [failure][Result.Failure]. Validation rules violations are reported using [AuthorizationRequestError]
+     * wrapped inside a [specific exception][AuthorizationRequestException]
+     */
     fun validate(authorizationRequest: RequestObject): Result<ValidatedRequestObject> =
         runCatching {
             fun scope() = requiredScope(authorizationRequest)
@@ -98,7 +130,7 @@ internal object RequestObjectValidator {
             val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
             val idTokenType = optionalIdTokenType(authorizationRequest).getOrThrow()
 
-            fun idAndVpToken() = ValidatedRequestObject.IdAndVPTokenRequestObject(
+            fun idAndVpToken() = SiopOpenId4VPAuthentication(
                 idTokenType,
                 presentationDefinitionSource.getOrThrow()
                     ?: throw IllegalStateException("Presentation definition missing"),
@@ -111,7 +143,7 @@ internal object RequestObjectValidator {
                 state
             )
 
-            fun idToken() = ValidatedRequestObject.IdTokenRequestObject(
+            fun idToken() = SiopAuthentication(
                 idTokenType,
                 clientMetaDataSource,
                 clientIdScheme,
@@ -122,7 +154,7 @@ internal object RequestObjectValidator {
                 state
             )
 
-            fun vpToken() = ValidatedRequestObject.VpTokenRequestObject(
+            fun vpToken() = OpenId4VPAuthorization(
                 presentationDefinitionSource.getOrThrow()
                     ?: throw IllegalStateException("Presentation definition missing"),
                 clientMetaDataSource,
@@ -160,6 +192,7 @@ internal object RequestObjectValidator {
     private fun optionalIdTokenType(unvalidated: RequestObject): Result<List<IdTokenType>> = runCatching {
 
         unvalidated.idTokenType
+            ?.trim()
             ?.split(" ")
             ?.map {
                 when (it) {
@@ -191,36 +224,66 @@ internal object RequestObjectValidator {
             "direct_post" -> requiredResponseUriAndNotProvidedRedirectUri().map { ResponseMode.DirectPost(it) }
             "direct_post.jwt" -> requiredResponseUriAndNotProvidedRedirectUri().map { ResponseMode.DirectPostJwt(it) }
             "query" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Query(it) }
-            "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
-            null -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
+            "query.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.QueryJwt(it) }
+            null, "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
+            "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().map { ResponseMode.Fragment(it) }
             else -> RequestValidationError.UnsupportedResponseMode(unvalidated.responseMode).asFailure()
         }
     }
 
-
+    /**
+     * Makes sure that [unvalidated] contains a not-null/not-blank state value
+     *
+     * @param unvalidated the request to validate
+     * @return the state or [RequestValidationError.MissingState]
+     */
     private fun requiredState(unvalidated: RequestObject): Result<String> =
-        unvalidated.state?.success()
-            ?: RequestValidationError.MissingState.asFailure()
+        if (!unvalidated.state.isNullOrBlank()) unvalidated.state.success()
+        else RequestValidationError.MissingState.asFailure()
 
-    private fun requiredScope(unvalidated: RequestObject): Result<Scope> =
-        unvalidated.scope?.let { Scope.make(it) }?.success()
-            ?: RequestValidationError.MissingScope.asFailure()
+    /**
+     * Makes sure that [unvalidated] contains a not-null scope
+     *
+     * @param unvalidated the request to validate
+     * @return the scope or [RequestValidationError.MissingScope]
+     */
+    private fun requiredScope(unvalidated: RequestObject): Result<Scope> {
+        val scope = unvalidated.scope?.let { Scope.make(it) }
+        return scope?.success() ?: RequestValidationError.MissingScope.asFailure()
+    }
 
+
+    /**
+     * Makes sure that [unvalidated] contains a not-null nonce
+     *
+     * @param unvalidated the request to validate
+     * @return the nonce or [RequestValidationError.MissingNonce]
+     */
     private fun requiredNonce(unvalidated: RequestObject): Result<String> =
         unvalidated.nonce?.success() ?: RequestValidationError.MissingNonce.asFailure()
 
-
+    /**
+     * Makes sure that [unvalidated] contains a supported [ResponseType].
+     * Function check [RequestObject.responseType]
+     *
+     * @param unvalidated the request to validate
+     * @return the supported [ResponseType], or [RequestValidationError.MissingResponseType] if response type is not provided
+     * or [RequestValidationError.UnsupportedResponseType] if response type is not supported
+     */
     private fun requiredResponseType(unvalidated: RequestObject): Result<ResponseType> =
         when (val rt = unvalidated.responseType?.trim()) {
             "vp_token" -> ResponseType.VpToken.success()
-            "vp_token id_token" -> ResponseType.VpAndIdToken.success()
-            "id_token vp_token" -> ResponseType.VpAndIdToken.success()
+            "vp_token id_token", "id_token vp_token" -> ResponseType.VpAndIdToken.success()
             "id_token" -> ResponseType.IdToken.success()
             null -> RequestValidationError.MissingResponseType.asFailure()
             else -> RequestValidationError.UnsupportedResponseType(rt).asFailure()
         }
 
-
+    /**
+     * Makes sure that [unvalidated] contains a supported [PresentationDefinitionSource].
+     *
+     * @param unvalidated the request to validate
+     */
     private fun parsePresentationDefinitionSource(
         unvalidated: RequestObject,
         scope: Scope?

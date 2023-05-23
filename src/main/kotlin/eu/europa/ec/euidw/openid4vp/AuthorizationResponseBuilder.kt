@@ -144,7 +144,9 @@ sealed interface AuthorizationResponse : Serializable {
      * An authorization response to be communicated via either
      * direct_post or direct_pst.jwt
      */
-    sealed interface DirectPostResponse : AuthorizationResponse
+    sealed interface DirectPostResponse : AuthorizationResponse {
+        val responseUri: URL
+    }
 
     /**
      * An authorization response to be communicated to verifier/RP via direct_post method
@@ -152,7 +154,7 @@ sealed interface AuthorizationResponse : Serializable {
      * @param responseUri the verifier/RP URI where the response will be posted
      * @param data the contents of the authorization request
      */
-    data class DirectPost(val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
+    data class DirectPost(override val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
 
     /**
      * An authorization response to be communicated to verifier/RP via direct_post.jwt method
@@ -160,7 +162,7 @@ sealed interface AuthorizationResponse : Serializable {
      * @param responseUri the verifier/RP URI where the response will be posted
      * @param data the contents of the authorization request
      */
-    data class DirectPostJwt(val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
+    data class DirectPostJwt(override val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
 
     /**
      * An authorization response to be communicated via
@@ -170,13 +172,11 @@ sealed interface AuthorizationResponse : Serializable {
         val redirectUri: URI
     }
 
-    sealed interface QueryResponse : RedirectResponse
-    data class Query(override val redirectUri: URI, val data: AuthorizationResponsePayload) : QueryResponse
-    data class QueryJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : QueryResponse
+    data class Query(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
+    data class QueryJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
 
-    sealed interface FragmentResponse : RedirectResponse
-    data class Fragment(override val redirectUri: URI, val data: AuthorizationResponsePayload) : FragmentResponse
-    data class FragmentJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : FragmentResponse
+    data class Fragment(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
+    data class FragmentJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
 }
 
 /**

@@ -43,7 +43,7 @@ class SiopOpenId4VpKtor(
          * The actual engine will be peeked up by whatever
          * is available in classpath
          *
-         * @see <a href="https://ktor.io/docs/client-dependencies.html#engine-dependency">Ktor Client</a>
+         * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
          */
         val DefaultFactory: KtorHttpClientFactory = {
             HttpClient {

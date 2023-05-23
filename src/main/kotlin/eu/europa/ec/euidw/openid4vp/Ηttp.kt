@@ -12,6 +12,10 @@ fun interface HttpGet<out R> {
     suspend fun get(url: URL): Result<R>
 }
 
+/**
+ * An abstraction of an HTP Post operation
+ * to obtain [R]
+ */
 fun interface HttpFormPost<out R> {
     suspend fun post(url: URL, formParameters: Map<String, String>): R
 }

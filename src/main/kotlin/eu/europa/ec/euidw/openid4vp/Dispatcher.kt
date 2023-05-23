@@ -35,7 +35,27 @@ sealed interface DispatchOutcome : Serializable {
 
 }
 
+/**
+ * Depending on the kind of [AuthorizationResponse], the interface
+ * either dispatches the authorization response to the verifier/ RP
+ * in the case of [director post][AuthorizationResponse.DirectPostResponse],
+ * or produces an appropriate [redirect_uri][DispatchOutcome.RedirectURI],
+ * in the case of [redirect][AuthorizationResponse.RedirectResponse]
+ */
 fun interface Dispatcher {
+
+    /**
+     * Method dispatches the given [response] to the verifier / RP.
+     * In case of a [director post][AuthorizationResponse.DirectPostResponse] method performs the HTTP Post to
+     * the verifier end-point (response_uri).
+     * In case of a [redirect][AuthorizationResponse.RedirectResponse] method prepares an appropriate redirect_uri
+     *
+     * @param response the response to be dispatched to the verifier / RP
+     * @return in case of [director post][AuthorizationResponse.DirectPostResponse] method returns
+     * the [verifier's response][DispatchOutcome.VerifierResponse].
+     * In the case of a [redirect][AuthorizationResponse.RedirectResponse]
+     * method returns an appropriate [redirect_uri][DispatchOutcome.RedirectURI]
+     */
     suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome
 
 }

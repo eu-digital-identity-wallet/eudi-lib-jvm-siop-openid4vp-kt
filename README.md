@@ -5,9 +5,27 @@ In particular, the library focus on the wallet's role and in addition focuses on
 usage of those two protocols as they are constraint by ISO 23220-4 and ISO-18013-7
 
 
-
-
 ## Usage
+
+Entry point to the library is interface [SiopOpenId4Vp](src/main/kotlin/eu/europa/ec/euidw/openid4vp/SiopOpenId4Vp.kt)
+Currently, the library offers an implementation of this interface based on [Ktor](https://ktor.io/) Http Client.
+
+An instance of the interface can be obtained with the following code
+
+```kotlin
+// Include library in dependencies in build.gradle.kts
+dependencies {
+    api("eu.europa.ec.euidw:siop-openid4vp-kt:$version")
+}
+```
+
+```kotlin
+import eu.europa.ec.euidw.openid4vp.*
+
+val walletConfig: WalletOpenId4VPConfig =  ...
+val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)
+```
+
 
 ### Resolve an authorization request URI 
 
@@ -25,19 +43,35 @@ authorization request and ask the SDK to validate the URI (that is to make sure 
 requests mentioned aforementioned) and in addition gather from Verifier additional information that may be included by
 reference (such as `presentation_definition_uri`, `client_metadata_uri` etc)
 
+The interface that captures the aforementioned functionality is 
+[AuthorizationRequestResolver](src/main/kotlin/eu/europa/ec/euidw/openid4vp/AuthorizationRequestResolver.kt)
+
 ```kotlin
 import eu.europa.ec.euidw.openid4vp.*
 
-val walletConfig: WalletOpenId4VPConfig =  ...
 val authorizationRequestUri : String = ...
 
-
-val resolution = SiopOpenId4Vp.resolveRequestUri(walletConfig, authorizationRequestUri) 
+val resolution = siopOpenId4Vp.resolveRequestUri(walletConfig, authorizationRequestUri)
+val requestObject = when (resolution) {
+    is Resolution.Invalid -> throw resolution.error.asException()
+    is Resolution.Success -> resolution.requestObject
+}
 
 ```
+### Build an authorization response
+
+TBD
+
+The interface that captures the aforementioned functionality is
+[AuthorizationResponseBuilder](src/main/kotlin/eu/europa/ec/euidw/openid4vp/AuthorizationResponseBuilder.kt)
 
 
+### Dispatch authorization response to verifier / RP
 
+TBD
+
+The interface that captures the aforementioned functionality is
+[Dispatcher](src/main/kotlin/eu/europa/ec/euidw/openid4vp/Dispatcher.kt)
 
 
 

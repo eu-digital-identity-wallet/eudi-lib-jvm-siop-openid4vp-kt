@@ -157,6 +157,9 @@ by reference (using `request_uri`)
 
 
 ## Presentation Definition
+The Verifier articulates requirements of the Credential(s) that are requested using
+`presentation_definition` and `presentation_definition_uri` parameters that contain a 
+Presentation Definition JSON object. 
 
 According to OpenId4VP, verifier may pass the `presentation_definition` either
 

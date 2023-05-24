@@ -22,19 +22,17 @@ internal class DefaultAuthorizationRequestResolver(
 
     override suspend fun resolveRequest(
         request: AuthorizationRequest
-    ): Resolution = runCatching {
-        val requestObject = requestObjectOf(request)
-        val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
-        val resolved =
-            validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
-        Resolution.Success(resolved)
-    }
-        .recoverCatching { recoverAuthorizationRequestException(it) ?: throw it }
-        .getOrThrow()
+    ): Resolution =
+        try {
+            val requestObject = requestObjectOf(request)
+            val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
+            val resolved =
+                validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
+            Resolution.Success(resolved)
+        } catch (t: AuthorizationRequestException) {
+            Resolution.Invalid(t.error)
+        }
 
-    private fun recoverAuthorizationRequestException(t: Throwable): Resolution.Invalid? =
-        if (t is AuthorizationRequestException) Resolution.Invalid(t.error)
-        else null
 
     /**
      * Extracts the [request object][RequestObject] of an [AuthorizationRequest]

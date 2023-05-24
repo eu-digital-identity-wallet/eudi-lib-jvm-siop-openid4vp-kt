@@ -17,7 +17,7 @@ internal sealed interface PresentationDefinitionSource {
      * Presentation definition is passed by value (that is embedded to the authorization request)
      * by the verifier
      */
-    data class PassByValue(val presentationDefinition: PresentationDefinition) : PresentationDefinitionSource
+    data class ByValue(val presentationDefinition: PresentationDefinition) : PresentationDefinitionSource
 
     /**
      * Presentation Definition can be retrieved from the resource at the specified
@@ -25,20 +25,20 @@ internal sealed interface PresentationDefinitionSource {
      * The Wallet will send a GET request without additional parameters.
      * The resource MUST be exposed without further need to authenticate or authorize
      */
-    data class FetchByReference(val url: URL) : PresentationDefinitionSource
+    data class ByReference(val url: URL) : PresentationDefinitionSource
 
     /**
      * When a presentation definition is pre-agreed between wallet and verifier, using
      * a specific [scope]. In this case, verifier doesn't communicate the presentation definition
-     * neither [by value][PassByValue] nor by [FetchByReference]. Rather, the wallets
+     * neither [by value][ByValue] nor by [ByReference]. Rather, the wallets
      * has been configured (via a specific scope) with a well-known definition
      */
     data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
 internal sealed interface ClientMetaDataSource {
-    data class PassByValue(val metaData: ClientMetaData) : ClientMetaDataSource
-    data class FetchByReference(val url: URL) : ClientMetaDataSource
+    data class ByValue(val metaData: ClientMetaData) : ClientMetaDataSource
+    data class ByReference(val url: URL) : ClientMetaDataSource
 }
 
 /**
@@ -297,13 +297,13 @@ internal object RequestObjectValidator {
             val pd = runCatching {
                 json.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition!!)
             }.mapError { RequestValidationError.InvalidPresentationDefinition(it).asException() }.getOrThrow()
-            PresentationDefinitionSource.PassByValue(pd)
+            PresentationDefinitionSource.ByValue(pd)
         }
 
 
         fun requiredPdUri() = runCatching {
             val pdUri = unvalidated.presentationDefinitionUri!!.asURL().getOrThrow()
-            PresentationDefinitionSource.FetchByReference(pdUri)
+            PresentationDefinitionSource.ByReference(pdUri)
         }.mapError { RequestValidationError.InvalidPresentationDefinitionUri.asException() }
 
         fun requiredScope() = PresentationDefinitionSource.Implied(scope!!).success()
@@ -330,14 +330,14 @@ internal object RequestObjectValidator {
         val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
 
         fun requiredClientMetaData() = runCatching {
-            ClientMetaDataSource.PassByValue(Json.decodeFromJsonElement<ClientMetaData>(unvalidated.clientMetaData!!))
+            ClientMetaDataSource.ByValue(Json.decodeFromJsonElement<ClientMetaData>(unvalidated.clientMetaData!!))
         }
 
         fun requiredClientMetaDataUri() = runCatching {
             val uri =
                 unvalidated.clientMetadataUri!!.asURL { RequestValidationError.InvalidClientMetaDataUri.asException() }
                     .getOrThrow()
-            ClientMetaDataSource.FetchByReference(uri)
+            ClientMetaDataSource.ByReference(uri)
         }
 
         return when {

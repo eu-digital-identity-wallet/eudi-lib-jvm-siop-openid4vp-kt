@@ -88,8 +88,8 @@ After receiving a valid authorization wallet has to process it. Depending on the
 
 * For a SIOPv2 authentication request, wallet must get holder's consensus and provide an `id_token`
 * For a OpenID4VP authorization request,
-    * wallet should check whether holder has claims that can fulfill verifier's requirements
-    * let the holder choose which claims will be presented to the verifier and form a `vp_token`
+  * wallet should check whether holder has claims that can fulfill verifier's requirements
+  * let the holder choose which claims will be presented to the verifier and form a `vp_token`
 * For a combined SIOP & OpenID4VP request, wallet should perform both actions described above.
 
 This functionality is a wallet concern and it is not supported directly by the library
@@ -158,8 +158,8 @@ by reference (using `request_uri`)
 
 ## Presentation Definition
 The Verifier articulates requirements of the Credential(s) that are requested using
-`presentation_definition` and `presentation_definition_uri` parameters that contain a 
-Presentation Definition JSON object. 
+`presentation_definition` and `presentation_definition_uri` parameters that contain a
+Presentation Definition JSON object.
 
 According to OpenId4VP, verifier may pass the `presentation_definition` either
 

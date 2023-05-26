@@ -10,7 +10,6 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URI
 import java.net.URL
 
-
 internal sealed interface PresentationDefinitionSource {
 
     /**
@@ -72,7 +71,7 @@ internal sealed interface ValidatedRequestObject {
         override val nonce: String,
         val scope: Scope,
         override val responseMode: ResponseMode,
-        override val state: String
+        override val state: String,
     ) : ValidatedRequestObject
 
     /**
@@ -85,7 +84,7 @@ internal sealed interface ValidatedRequestObject {
         override val clientId: String,
         override val nonce: String,
         override val responseMode: ResponseMode,
-        override val state: String
+        override val state: String,
     ) : ValidatedRequestObject
 
     /**
@@ -100,11 +99,9 @@ internal sealed interface ValidatedRequestObject {
         override val nonce: String,
         val scope: Scope,
         override val responseMode: ResponseMode,
-        override val state: String
+        override val state: String,
     ) : ValidatedRequestObject
-
 }
-
 
 internal object RequestObjectValidator {
 
@@ -140,7 +137,7 @@ internal object RequestObjectValidator {
                 nonce,
                 scope().getOrThrow(),
                 responseMode,
-                state
+                state,
             )
 
             fun idToken() = SiopAuthentication(
@@ -151,7 +148,7 @@ internal object RequestObjectValidator {
                 nonce,
                 scope().getOrThrow(),
                 responseMode,
-                state
+                state,
             )
 
             fun vpToken() = OpenId4VPAuthorization(
@@ -162,7 +159,7 @@ internal object RequestObjectValidator {
                 clientId,
                 nonce,
                 responseMode,
-                state
+                state,
             )
 
             when (responseType) {
@@ -170,15 +167,18 @@ internal object RequestObjectValidator {
                 ResponseType.IdToken -> idToken()
                 ResponseType.VpToken ->
                     // If scope is defined and its value is "openid" then id token must also be returned
-                    if (scope().getOrNull()?.value == "openid") idAndVpToken()
-                    else vpToken()
+                    if (scope().getOrNull()?.value == "openid") {
+                        idAndVpToken()
+                    } else {
+                        vpToken()
+                    }
             }
         }
 
     private fun optionalPresentationDefinitionSource(
         authorizationRequest: RequestObject,
         responseType: ResponseType,
-        scopeProvider: () -> Scope?
+        scopeProvider: () -> Scope?,
     ): Result<PresentationDefinitionSource?> {
         return when (responseType) {
             ResponseType.VpToken, ResponseType.VpAndIdToken ->
@@ -188,9 +188,7 @@ internal object RequestObjectValidator {
         }
     }
 
-
     private fun optionalIdTokenType(unvalidated: RequestObject): Result<List<IdTokenType>> = runCatching {
-
         unvalidated.idTokenType
             ?.trim()
             ?.split(" ")
@@ -199,25 +197,29 @@ internal object RequestObjectValidator {
                     "subject_signed_id_token" -> IdTokenType.SubjectSigned
                     "attester_signed_id_token" -> IdTokenType.AttesterSigned
                     else -> throw IllegalArgumentException("Invalid id_token_type $it")
-
                 }
             } ?: emptyList()
     }
 
     private fun requiredResponseMode(unvalidated: RequestObject): Result<ResponseMode> {
-
         fun requiredRedirectUriAndNotProvidedResponseUri(): Result<URI> =
-            if (unvalidated.responseUri != null) RequestValidationError.ResponseUriMustNotBeProvided.asFailure()
-            else when (val uri = unvalidated.redirectUri) {
-                null -> RequestValidationError.MissingRedirectUri.asFailure()
-                else -> uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }
+            if (unvalidated.responseUri != null) {
+                RequestValidationError.ResponseUriMustNotBeProvided.asFailure()
+            } else {
+                when (val uri = unvalidated.redirectUri) {
+                    null -> RequestValidationError.MissingRedirectUri.asFailure()
+                    else -> uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }
+                }
             }
 
         fun requiredResponseUriAndNotProvidedRedirectUri(): Result<URL> =
-            if (unvalidated.redirectUri != null) RequestValidationError.RedirectUriMustNotBeProvided.asFailure()
-            else when (val uri = unvalidated.responseUri) {
-                null -> RequestValidationError.MissingResponseUri.asFailure()
-                else -> uri.asURL { RequestValidationError.InvalidResponseUri.asException() }
+            if (unvalidated.redirectUri != null) {
+                RequestValidationError.RedirectUriMustNotBeProvided.asFailure()
+            } else {
+                when (val uri = unvalidated.responseUri) {
+                    null -> RequestValidationError.MissingResponseUri.asFailure()
+                    else -> uri.asURL { RequestValidationError.InvalidResponseUri.asException() }
+                }
             }
 
         return when (unvalidated.responseMode) {
@@ -238,8 +240,9 @@ internal object RequestObjectValidator {
      * @return the state or [RequestValidationError.MissingState]
      */
     private fun requiredState(unvalidated: RequestObject): Result<String> =
-        if (!unvalidated.state.isNullOrBlank()) unvalidated.state.success()
-        else RequestValidationError.MissingState.asFailure()
+        if (!unvalidated.state.isNullOrBlank()) {
+            unvalidated.state.success()
+        } else RequestValidationError.MissingState.asFailure()
 
     /**
      * Makes sure that [unvalidated] contains a not-null scope
@@ -251,7 +254,6 @@ internal object RequestObjectValidator {
         val scope = unvalidated.scope?.let { Scope.make(it) }
         return scope?.success() ?: RequestValidationError.MissingScope.asFailure()
     }
-
 
     /**
      * Makes sure that [unvalidated] contains a not-null nonce
@@ -286,7 +288,7 @@ internal object RequestObjectValidator {
      */
     private fun parsePresentationDefinitionSource(
         unvalidated: RequestObject,
-        scope: Scope?
+        scope: Scope?,
     ): Result<PresentationDefinitionSource> {
         val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
         val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
@@ -299,7 +301,6 @@ internal object RequestObjectValidator {
             }.mapError { RequestValidationError.InvalidPresentationDefinition(it).asException() }.getOrThrow()
             PresentationDefinitionSource.ByValue(pd)
         }
-
 
         fun requiredPdUri() = runCatching {
             val pdUri = unvalidated.presentationDefinitionUri!!.asURL().getOrThrow()
@@ -317,15 +318,15 @@ internal object RequestObjectValidator {
     }
 
     private fun optionalClientIdScheme(unvalidated: RequestObject): Result<ClientIdScheme?> =
-        if (unvalidated.clientIdScheme.isNullOrEmpty()) Result.success(null)
-        else ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
+        if (unvalidated.clientIdScheme.isNullOrEmpty()) {
+            Result.success(null)
+        } else ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
             ?: RequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
 
     private fun requiredClientId(unvalidated: RequestObject): Result<String> =
         unvalidated.clientId?.success() ?: RequestValidationError.MissingClientId.asFailure()
 
     private fun optionalClientMetaDataSource(unvalidated: RequestObject): Result<ClientMetaDataSource?> {
-
         val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
         val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
 
@@ -346,7 +347,5 @@ internal object RequestObjectValidator {
             hasCMD && hasCMDUri -> RequestValidationError.OneOfClientMedataOrUri.asFailure()
             else -> Result.success(null)
         }
-
     }
-
 }

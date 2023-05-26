@@ -27,34 +27,30 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() = runBlocking {
-
             val state = State().value
             val data = AuthorizationResponsePayload.NoConsensusResponseData(state)
             testQueryResponse(data) {
                 assertEquals(
                     AuthorizationRequestErrorCode.USER_CANCELLED.code,
-                    getQueryParameter("error")
+                    getQueryParameter("error"),
                 )
             }
         }
 
         @Test
         fun `when invalid request, redirect_uri must contain an error query parameter`() = runBlocking {
-
             val state = State().value
             val error = RequestValidationError.MissingNonce
             val data = AuthorizationResponsePayload.InvalidRequest(error, state)
             val expectedErrorCode = AuthorizationRequestErrorCode.fromError(error)
             testQueryResponse(data) {
                 assertEquals(expectedErrorCode.code, getQueryParameter("error"))
-
             }
         }
 
         @Test
         fun `when response for SIOPAuthentication, redirect_uri must contain an id_token query parameter`() =
             runBlocking {
-
                 val state = State().value
                 val dummyJwt = "dummy"
                 val data = AuthorizationResponsePayload.SiopAuthenticationResponse(dummyJwt, state)
@@ -65,9 +61,8 @@ class DefaultDispatcherTest {
 
         private fun testQueryResponse(
             data: AuthorizationResponsePayload,
-            assertions: Uri.() -> Unit
+            assertions: Uri.() -> Unit,
         ) = runBlocking {
-
             val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
             val dispatchOutcome = dispatcher.dispatch(response)
             assertTrue(dispatchOutcome is DispatchOutcome.RedirectURI)
@@ -87,7 +82,6 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when no consensus, fragment must contain an error`() = runBlocking {
-
             val state = State().value
             val data = AuthorizationResponsePayload.NoConsensusResponseData(state)
             testFragmentResponse(data) { fragmentData ->
@@ -97,7 +91,6 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when invalid request, fragment must contain an error`() = runBlocking {
-
             val state = State().value
             val error = RequestValidationError.MissingNonce
             val data = AuthorizationResponsePayload.InvalidRequest(error, state)
@@ -109,7 +102,6 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when SIOPAuthentication, fragment must contain an id_token`() = runBlocking {
-
             val state = State().value
             val dummyJwt = "dummy"
             val data = AuthorizationResponsePayload.SiopAuthenticationResponse(dummyJwt, state)
@@ -120,9 +112,8 @@ class DefaultDispatcherTest {
 
         private fun testFragmentResponse(
             data: AuthorizationResponsePayload,
-            assertions: (Map<String, String>) -> Unit
+            assertions: (Map<String, String>) -> Unit,
         ) = runBlocking {
-
             val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
             val dispatchOutcome = dispatcher.dispatch(response)
             assertTrue(dispatchOutcome is DispatchOutcome.RedirectURI)
@@ -134,6 +125,5 @@ class DefaultDispatcherTest {
             map.also(assertions)
             assertEquals(data.state, map["state"])
         }
-
     }
 }

@@ -1,7 +1,6 @@
 package eu.europa.ec.euidw.openid4vp
 
 import com.nimbusds.oauth2.sdk.id.State
-
 import eu.europa.ec.euidw.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.euidw.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import io.ktor.client.plugins.contentnegotiation.*
@@ -29,12 +28,14 @@ class AuthorizationResponseDispatcherTest {
         subjectSyntaxTypesSupported = listOf(
             SubjectSyntaxType.JWKThumbprint,
             SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
-            SubjectSyntaxType.DecentralizedIdentifier.parse("did:key")
-        )
+            SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
+        ),
     )
 
     private val clientMetadataStr =
-        "{ \"jwks\": { \"keys\": [ { \"kty\": \"RSA\", \"e\": \"AQAB\", \"use\": \"sig\", \"kid\": \"a4e1bbe6-26e8-480b-a364-f43497894453\", \"iat\": 1683559586, \"n\": \"xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew\" } ] }, \"id_token_encrypted_response_alg\": \"RS256\", \"id_token_encrypted_response_enc\": \"A128CBC-HS256\", \"subject_syntax_types_supported\": [ \"urn:ietf:params:oauth:jwk-thumbprint\", \"did:example\", \"did:key\" ], \"id_token_signed_response_alg\": \"RS256\" }"
+        """
+            { "jwks": { "keys": [ { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256" }
+        """.trimIndent()
 
     private val clientMetaData = json.decodeFromString<ClientMetaData>(clientMetadataStr)
     private fun genState(): String {
@@ -54,7 +55,7 @@ class AuthorizationResponseDispatcherTest {
             nonce = "0S6_WzA2Mj",
             responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
             state = stateVal,
-            scope = Scope.make("openid") ?: throw IllegalStateException()
+            scope = Scope.make("openid") ?: throw IllegalStateException(),
         )
 
         val walletKeyPair = SiopIdTokenBuilder.randomKey()
@@ -62,17 +63,16 @@ class AuthorizationResponseDispatcherTest {
             siopAuthRequestObject,
             HolderInfo(
                 email = "foo@bar.com",
-                name = "Foo bar"
+                name = "Foo bar",
             ),
 
             walletConfig,
-            walletKeyPair
+            walletKeyPair,
         )
 
         val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
-            idToken = idToken
+            idToken = idToken,
         )
-
 
         testApplication {
             externalServices {
@@ -88,7 +88,7 @@ class AuthorizationResponseDispatcherTest {
 
                             assertEquals(
                                 "application/x-www-form-urlencoded; charset=UTF-8",
-                                call.request.headers["Content-Type"]
+                                call.request.headers["Content-Type"],
                             )
                             assertEquals(stateVal, state)
                             assertEquals(idToken, idTokenTxt)
@@ -104,8 +104,7 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-
-            val dispatcher =// TestDirectPostResponseDispatcher(managedHttpClient) { DirectPostDispatcher(it) }
+            val dispatcher = // TestDirectPostResponseDispatcher(managedHttpClient) { DirectPostDispatcher(it) }
                 SiopOpenId4VpKtor.dispatcher { managedHttpClient }
             when (val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {

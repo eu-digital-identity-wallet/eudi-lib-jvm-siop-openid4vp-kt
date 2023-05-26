@@ -70,7 +70,6 @@ sealed interface AuthorizationRequest : Serializable {
          * Populates a [NotSecured] from the query parameters of the given [uri]
          */
         private fun notSecured(uri: Uri): NotSecured {
-
             fun jsonObject(p: String): JsonObject? =
                 uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
 
@@ -87,12 +86,11 @@ sealed interface AuthorizationRequest : Serializable {
                     clientId = uri.getQueryParameter("client_id"),
                     responseUri = uri.getQueryParameter("response_uri"),
                     redirectUri = uri.getQueryParameter("redirect_uri"),
-                    state = uri.getQueryParameter("state")
-                )
+                    state = uri.getQueryParameter("state"),
+                ),
             )
         }
     }
-
 }
 
 /**
@@ -116,7 +114,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String,
-        val scope: Scope
+        val scope: Scope,
     ) : ResolvedRequestObject
 
     /**
@@ -142,7 +140,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String,
-        val scope: Scope
+        val scope: Scope,
     ) : ResolvedRequestObject
 }
 
@@ -249,7 +247,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
 
-    data class InvalidIdTokenType(val value: String): RequestValidationError
+    data class InvalidIdTokenType(val value: String) : RequestValidationError
 }
 
 /**
@@ -277,7 +275,6 @@ data class AuthorizationRequestException(val error: AuthorizationRequestError) :
  */
 fun AuthorizationRequestError.asException(): AuthorizationRequestException =
     AuthorizationRequestException(this)
-
 
 /**
  * Convenient method that lifts an [AuthorizationRequestError] into
@@ -319,10 +316,13 @@ fun interface AuthorizationRequestResolver {
     suspend fun resolveRequestUri(uri: String): Resolution = AuthorizationRequest.make(uri).fold(
         onSuccess = { request -> resolveRequest(request) },
         onFailure = { throwable ->
-            if (throwable is AuthorizationRequestException) Resolution.Invalid(throwable.error)
-            else throw throwable
-        })
-
+            if (throwable is AuthorizationRequestException) {
+                Resolution.Invalid(throwable.error)
+            } else {
+                throw throwable
+            }
+        },
+    )
 
     /**
      * Tries to validate and request the provided [request] into
@@ -343,13 +343,12 @@ fun interface AuthorizationRequestResolver {
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
             getClientMetaData: HttpGet<ClientMetaData>,
-            walletOpenId4VPConfig: WalletOpenId4VPConfig
+            walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
             getRequestObjectJwt,
             getPresentationDefinition,
             getClientMetaData,
-            walletOpenId4VPConfig
+            walletOpenId4VPConfig,
         )
     }
 }
-

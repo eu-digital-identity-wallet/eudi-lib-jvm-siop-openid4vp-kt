@@ -14,7 +14,7 @@ internal class ValidatedRequestObjectResolver(
 
     suspend fun resolve(
         validated: ValidatedRequestObject,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig
+        walletOpenId4VPConfig: WalletOpenId4VPConfig,
     ): Result<ResolvedRequestObject> = when (validated) {
         is SiopAuthentication -> resolveIdTokenRequest(validated)
         is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, walletOpenId4VPConfig)
@@ -23,7 +23,7 @@ internal class ValidatedRequestObjectResolver(
 
     private suspend fun resolveIdAndVpTokenRequest(
         validated: SiopOpenId4VPAuthentication,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig
+        walletOpenId4VPConfig: WalletOpenId4VPConfig,
     ): Result<ResolvedRequestObject> {
         val presentationDefinition =
             resolvePd(validated.presentationDefinitionSource, walletOpenId4VPConfig).getOrThrow()
@@ -35,13 +35,13 @@ internal class ValidatedRequestObjectResolver(
             state = validated.state,
             scope = validated.scope,
             nonce = validated.nonce,
-            responseMode = validated.responseMode
+            responseMode = validated.responseMode,
         ).success()
     }
 
     private suspend fun resolveVpTokenRequest(
         validated: OpenId4VPAuthorization,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig
+        walletOpenId4VPConfig: WalletOpenId4VPConfig,
     ): Result<ResolvedRequestObject> {
         val presentationDefinition =
             resolvePd(validated.presentationDefinitionSource, walletOpenId4VPConfig)
@@ -52,7 +52,7 @@ internal class ValidatedRequestObjectResolver(
             clientId = validated.clientId,
             state = validated.state,
             nonce = validated.nonce,
-            responseMode = validated.responseMode
+            responseMode = validated.responseMode,
         ).success()
     }
 
@@ -64,13 +64,12 @@ internal class ValidatedRequestObjectResolver(
             state = validated.state,
             scope = validated.scope,
             nonce = validated.nonce,
-            responseMode = validated.responseMode
+            responseMode = validated.responseMode,
         ).success()
-
 
     private suspend fun resolvePd(
         presentationDefinitionSource: PresentationDefinitionSource,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig
+        walletOpenId4VPConfig: WalletOpenId4VPConfig,
     ): Result<PresentationDefinition> {
         return presentationDefinitionResolver.resolve(presentationDefinitionSource, walletOpenId4VPConfig)
     }
@@ -79,7 +78,5 @@ internal class ValidatedRequestObjectResolver(
         return validated.clientMetaDataSource?.let {
             clientMetaDataResolver.resolve(it)
         } ?: throw IllegalArgumentException("Missing client metadata")
-
-
     }
 }

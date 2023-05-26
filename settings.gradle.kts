@@ -3,4 +3,3 @@ plugins {
 }
 
 rootProject.name = "siop-openid4vp-kt"
-

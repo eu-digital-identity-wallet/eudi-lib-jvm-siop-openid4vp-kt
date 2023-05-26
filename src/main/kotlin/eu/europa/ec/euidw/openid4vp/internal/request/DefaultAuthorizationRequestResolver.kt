@@ -17,11 +17,11 @@ import kotlinx.serialization.json.jsonObject
 internal class DefaultAuthorizationRequestResolver(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val getRequestObjectJwt: HttpGet<String>,
-    private val validatedRequestObjectResolver: ValidatedRequestObjectResolver
+    private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
     override suspend fun resolveRequest(
-        request: AuthorizationRequest
+        request: AuthorizationRequest,
     ): Resolution =
         try {
             val requestObject = requestObjectOf(request)
@@ -33,17 +33,14 @@ internal class DefaultAuthorizationRequestResolver(
             Resolution.Invalid(t.error)
         }
 
-
     /**
      * Extracts the [request object][RequestObject] of an [AuthorizationRequest]
      */
     private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject {
-
         suspend fun fetchJwt(request: PassByReference): Jwt =
             withContext(Dispatchers.IO) {
                 getRequestObjectJwt.get(request.jwtURI).getOrThrow()
             }
-
 
         return when (request) {
             is NotSecured -> request.requestObject
@@ -55,7 +52,9 @@ internal class DefaultAuthorizationRequestResolver(
                 val requestObject = requestObjectFromJwt(jwt)
                 // Make sure that clientId of the initial request is the same
                 // with the client id inside the request object
-                require(request.clientId == requestObject.clientId) { "Invalid client_id. Expected ${request.clientId} found ${requestObject.clientId}" }
+                require(request.clientId == requestObject.clientId) {
+                    "Invalid client_id. Expected ${request.clientId} found ${requestObject.clientId}"
+                }
 
                 // TODO remove warning as soon as signature validation is implemented
                 requestObject.also { println("Warning JWT signature not verified") }
@@ -72,30 +71,27 @@ internal class DefaultAuthorizationRequestResolver(
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
             getClientMetaData: HttpGet<ClientMetaData>,
-            walletOpenId4VPConfig: WalletOpenId4VPConfig
+            walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
             walletOpenId4VPConfig = walletOpenId4VPConfig,
             getRequestObjectJwt = getRequestObjectJwt,
             validatedRequestObjectResolver = ValidatedRequestObjectResolver(
                 presentationDefinitionResolver = PresentationDefinitionResolver(
-                    getPresentationDefinition = getPresentationDefinition
+                    getPresentationDefinition = getPresentationDefinition,
                 ),
                 clientMetaDataResolver = ClientMetaDataResolver(
-                    getClientMetaData = getClientMetaData
-                )
-            )
+                    getClientMetaData = getClientMetaData,
+                ),
+            ),
 
         )
     }
-
-
 }
 
 /**
  * Extracts the request object from a [jwt]
  */
 private fun requestObjectFromJwt(jwt: Jwt): RequestObject {
-
     // TODO Verify Signature
     // TODO Support Encryption
     val signedJwt = SignedJWT.parse(jwt)
@@ -120,8 +116,7 @@ private fun requestObjectFromJwt(jwt: Jwt): RequestObject {
             redirectUri = getStringClaim("redirect_uri"),
             state = getStringClaim("state"),
             supportedAlgorithm = getStringClaim("supported_algorithm"),
-            idTokenType = getStringClaim("id_token_type")
+            idTokenType = getStringClaim("id_token_type"),
         )
     }
-
 }

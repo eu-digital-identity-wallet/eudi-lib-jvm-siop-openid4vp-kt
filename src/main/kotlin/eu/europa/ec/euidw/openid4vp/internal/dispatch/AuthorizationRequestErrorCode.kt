@@ -4,7 +4,6 @@ import eu.europa.ec.euidw.openid4vp.AuthorizationRequestError
 import eu.europa.ec.euidw.openid4vp.RequestValidationError.*
 import eu.europa.ec.euidw.openid4vp.ResolutionError.*
 
-
 enum class AuthorizationRequestErrorCode(val code: String) {
 
     /**
@@ -26,7 +25,8 @@ enum class AuthorizationRequestErrorCode(val code: String) {
     INVALID_REGISTRATION_URI("invalid_registration_uri"),
     INVALID_REGISTRATION_OBJECT("invalid_registration_object"),
 
-    PROCESSING_FAILURE("processing_error");
+    PROCESSING_FAILURE("processing_error"),
+    ;
 
     companion object {
 
@@ -51,16 +51,20 @@ enum class AuthorizationRequestErrorCode(val code: String) {
                 ResponseUriMustNotBeProvided,
                 is UnsupportedResponseMode,
                 is UnsupportedResponseType,
-                is InvalidIdTokenType -> INVALID_REQUEST
+                is InvalidIdTokenType,
+                -> INVALID_REQUEST
 
                 BothJwkUriAndInlineJwks,
-                MissingClientMetadataJwksSource -> INVALID_REGISTRATION_OBJECT
+                MissingClientMetadataJwksSource,
+                -> INVALID_REGISTRATION_OBJECT
 
                 SubjectSyntaxTypesNoMatch,
-                SubjectSyntaxTypesWrongSyntax -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
+                SubjectSyntaxTypesWrongSyntax,
+                -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 
                 is ClientMetadataJwkUriUnparsable,
-                InvalidClientMetaDataUri -> INVALID_REGISTRATION_URI
+                InvalidClientMetaDataUri,
+                -> INVALID_REGISTRATION_URI
 
                 is InvalidPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_REFERENCE
                 InvalidPresentationDefinitionUri -> INVALID_PRESENTATION_DEFINITION_URI
@@ -69,9 +73,9 @@ enum class AuthorizationRequestErrorCode(val code: String) {
                 is PresentationDefinitionNotFoundForScope,
                 is UnableToFetchClientMetadata,
                 is UnableToFetchPresentationDefinition,
-                is UnableToFetchRequestObject -> PROCESSING_FAILURE
+                is UnableToFetchRequestObject,
+                -> PROCESSING_FAILURE
             }
-
         }
     }
 }

@@ -32,7 +32,6 @@ sealed interface DispatchOutcome : Serializable {
             override fun toString(): String = "Rejected"
         }
     }
-
 }
 
 /**
@@ -57,7 +56,4 @@ fun interface Dispatcher {
      * method returns an appropriate [redirect_uri][DispatchOutcome.RedirectURI]
      */
     suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome
-
 }
-
-

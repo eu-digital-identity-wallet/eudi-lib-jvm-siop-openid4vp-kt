@@ -25,9 +25,7 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
-
 fun main(): Unit = runBlocking {
-
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")
     val wallet = Wallet(walletKeyPair = walletKeyPair, holder = holder)
@@ -37,10 +35,9 @@ fun main(): Unit = runBlocking {
     wallet.handle(verifier.authorizationRequestUri)
 
     verifier.getWalletResponse()
-
 }
 
-private fun randomNonce() : String = Nonce().value
+private fun randomNonce(): String = Nonce().value
 
 private const val VerifierApi = "http://localhost:8080"
 
@@ -51,16 +48,15 @@ class Verifier private constructor(
     private val walletPublicKey: RSAPublicKey,
     private val presentationId: String,
     private val nonce: String,
-    val authorizationRequestUri: URI
+    val authorizationRequestUri: URI,
 ) {
-
 
     override fun toString(): String =
         "Verifier presentationId=$presentationId, authorizationRequestUri=$authorizationRequestUri"
 
     suspend fun getWalletResponse(): IDTokenClaimsSet? {
         val walletResponse = createHttpClient().use {
-            it.get("$VerifierApi/ui/presentations/${presentationId}?nonce=$nonce") {
+            it.get("$VerifierApi/ui/presentations/$presentationId?nonce=$nonce") {
                 accept(ContentType.Application.Json)
             }
         }.body<JsonObject>()
@@ -68,7 +64,7 @@ class Verifier private constructor(
         val idTokenClaims = walletResponse["id_token"]?.jsonPrimitive?.content?.let {
             val claims = SiopIdTokenBuilder.decodeAndVerify(
                 it,
-                walletPublicKey
+                walletPublicKey,
             )
             IDTokenClaimsSet(claims)
         }
@@ -88,22 +84,23 @@ class Verifier private constructor(
                     val initTransactionResponse = initTransaction(client, nonce)
                     val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
                     val uri = formatAuthorizationRequest(initTransactionResponse)
-                    Verifier(walletPublicKey, presentationId, nonce, uri ).also { verifierPrintln("Initialized $it") }
+                    Verifier(walletPublicKey, presentationId, nonce, uri).also { verifierPrintln("Initialized $it") }
                 }
             }
         }
-
 
         private suspend fun initTransaction(client: HttpClient, nonce: String): JsonObject {
             verifierPrintln("Placing to verifier endpoint request for SiopAuthentication ...")
             return client.post("$VerifierApi/ui/presentations") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
-                setBody(buildJsonObject {
-                    put("type", "id_token")
-                    put("id_token_type", "subject_signed_id_token")
-                    put("nonce", nonce)
-                })
+                setBody(
+                    buildJsonObject {
+                        put("type", "id_token")
+                        put("id_token_type", "subject_signed_id_token")
+                        put("nonce", nonce)
+                    },
+                )
             }.body<JsonObject>()
         }
 
@@ -115,15 +112,13 @@ class Verifier private constructor(
         }
 
         private fun verifierPrintln(s: String) = println("Verifier : $s")
-
-
     }
 }
 
 private class Wallet(
     private val holder: HolderInfo,
     private val walletConfig: WalletOpenId4VPConfig = DefaultConfig,
-    private val walletKeyPair: RSAKey
+    private val walletKeyPair: RSAKey,
 ) {
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
@@ -142,7 +137,6 @@ private class Wallet(
     suspend fun holderConsent(request: ResolvedRequestObject): Consensus = withContext(Dispatchers.Default) {
         when (request) {
             is ResolvedRequestObject.SiopAuthentication -> {
-
                 walletPrintln("Received an SiopAuthentication request")
                 fun showScreen() = true.also {
                     walletPrintln("User consensus was $it")
@@ -162,10 +156,8 @@ private class Wallet(
     }
     companion object {
         fun walletPrintln(s: String) = println("Wallet   : $s")
-
     }
 }
-
 
 private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
     engine {
@@ -190,7 +182,6 @@ object SslSettings {
     fun hostNameVerifier(): HostnameVerifier = TrustAllHosts
     fun trustManager(): X509TrustManager = TrustAllCerts as X509TrustManager
 
-
     private var TrustAllCerts: TrustManager = object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
@@ -205,12 +196,5 @@ private val DefaultConfig = WalletOpenId4VPConfig(
     presentationDefinitionUriSupported = true,
     supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
     vpFormatsSupported = emptyList(),
-    subjectSyntaxTypesSupported = emptyList()
+    subjectSyntaxTypesSupported = emptyList(),
 )
-
-
-
-
-
-
-

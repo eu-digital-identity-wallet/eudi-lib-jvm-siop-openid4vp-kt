@@ -1,6 +1,5 @@
 package eu.europa.ec.euidw.openid4vp
 
-
 import eu.europa.ec.euidw.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.euidw.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import io.ktor.client.*
@@ -24,7 +23,7 @@ typealias KtorHttpClientFactory = () -> HttpClient
  */
 class SiopOpenId4VpKtor(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory = DefaultFactory
+    private val httpClientFactory: KtorHttpClientFactory = DefaultFactory,
 ) : SiopOpenId4Vp {
 
     override suspend fun resolveRequest(request: AuthorizationRequest): Resolution =
@@ -67,9 +66,8 @@ class SiopOpenId4VpKtor(
          */
         fun authorizationResolver(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-            httpClientFactory: KtorHttpClientFactory = DefaultFactory
+            httpClientFactory: KtorHttpClientFactory = DefaultFactory,
         ): AuthorizationRequestResolver {
-
             fun createResolver(c: HttpClient) = DefaultAuthorizationRequestResolver.make(
                 getClientMetaData = httpGet(c),
                 getPresentationDefinition = httpGet(c),
@@ -80,7 +78,7 @@ class SiopOpenId4VpKtor(
                         }.bodyAsText()
                     }
                 },
-                walletOpenId4VPConfig = walletOpenId4VPConfig
+                walletOpenId4VPConfig = walletOpenId4VPConfig,
             )
             return AuthorizationRequestResolver { request ->
                 httpClientFactory().use { client ->
@@ -116,17 +114,17 @@ class SiopOpenId4VpKtor(
          * @see DefaultDispatcher
          */
         fun dispatcher(httpClientFactory: KtorHttpClientFactory = DefaultFactory): Dispatcher {
-
             fun createDispatcher(c: HttpClient) = DefaultDispatcher { url, parameters ->
                 runCatching {
                     val response = c.submitForm(
                         url = url.toString(),
                         formParameters = Parameters.build {
                             parameters.entries.forEach { append(it.key, it.value) }
-                        }
+                        },
                     )
-                    if (response.status == HttpStatusCode.OK) DispatchOutcome.VerifierResponse.Accepted(null)
-                    else DispatchOutcome.VerifierResponse.Rejected
+                    if (response.status == HttpStatusCode.OK) {
+                        DispatchOutcome.VerifierResponse.Accepted(null)
+                    } else DispatchOutcome.VerifierResponse.Rejected
                 }.getOrElse { DispatchOutcome.VerifierResponse.Rejected }
             }
 
@@ -137,10 +135,4 @@ class SiopOpenId4VpKtor(
             }
         }
     }
-
 }
-
-
-
-
-

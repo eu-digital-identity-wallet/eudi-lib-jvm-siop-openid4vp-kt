@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.net.URL
 
-
 @Serializable
 data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
     @SerialName("jwks_uri") val jwksUri: String? = null,
@@ -16,7 +15,7 @@ data class ClientMetaData( // By OpenID Connect Dynamic Client Registration spec
     @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String,
     @SerialName("id_token_encrypted_response_alg") val idTokenEncryptedResponseAlg: String,
     @SerialName("id_token_encrypted_response_enc") val idTokenEncryptedResponseEnc: String,
-    @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>
+    @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>,
 ) : java.io.Serializable
 
 sealed interface SubjectSyntaxType : java.io.Serializable {
@@ -26,13 +25,12 @@ sealed interface SubjectSyntaxType : java.io.Serializable {
     }
 
     data class DecentralizedIdentifier(
-        val method: String
+        val method: String,
     ) : SubjectSyntaxType {
         companion object {
 
             fun isValid(value: String): Boolean =
                 !(value.isEmpty() || value.count { it == ':' } != 1 || value.split(':').any { it.isEmpty() })
-
 
             fun parse(value: String): DecentralizedIdentifier =
                 when {
@@ -44,13 +42,11 @@ sealed interface SubjectSyntaxType : java.io.Serializable {
                     else -> DecentralizedIdentifier(value.split(':')[1])
                 }
         }
-
     }
 
     object JWKThumbprint : SubjectSyntaxType {
         fun isValid(value: String): Boolean = value != ThumbprintURI.PREFIX
     }
-
 }
 
 @JvmInline
@@ -61,8 +57,11 @@ value class Scope private constructor(val value: String) {
         fun make(s: String): Scope? {
             val trimmed = s.trim()
             val scopeItems: List<String> = itemsOf(trimmed)
-            return if (scopeItems.isEmpty()) null
-            else Scope(trimmed)
+            return if (scopeItems.isEmpty()) {
+                null
+            } else {
+                Scope(trimmed)
+            }
         }
 
         private fun itemsOf(s: String): List<String> = s.split(" ")
@@ -91,7 +90,9 @@ enum class ClientIdScheme {
 
     DID,
 
-    ISO_X509;
+    ISO_X509,
+
+    ;
 
     companion object {
 
@@ -104,7 +105,6 @@ enum class ClientIdScheme {
             else -> null
         }
     }
-
 }
 
 /**
@@ -129,11 +129,10 @@ sealed interface ResponseMode : java.io.Serializable {
     data class DirectPostJwt(val responseURI: URL) : ResponseMode
 }
 
-
 enum class ResponseType {
     VpToken,
     IdToken,
-    VpAndIdToken
+    VpAndIdToken,
 }
 
 /**
@@ -156,13 +155,12 @@ data class RequestObject(
     val scope: String? = null,
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
     val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
-    @SerialName("id_token_type") val idTokenType: String? = null
+    @SerialName("id_token_type") val idTokenType: String? = null,
 ) : java.io.Serializable
 
 typealias Jwt = String
 
 enum class IdTokenType {
     SubjectSigned,
-    AttesterSigned
+    AttesterSigned,
 }
-

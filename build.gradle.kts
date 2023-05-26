@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
+    id("com.diffplug.spotless") version "6.19.0"
     `java-library`
     `maven-publish`
 }
@@ -41,7 +42,6 @@ dependencies {
     testImplementation("io.ktor:ktor-client-okhttp:$ktorVersion")
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
     testImplementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-
 }
 
 tasks.test {
@@ -55,6 +55,16 @@ kotlin {
     }
 }
 
+val ktlintVersion = "0.49.1"
+spotless {
+    kotlin {
+        ktlint(ktlintVersion)
+    }
+    kotlinGradle {
+        ktlint(ktlintVersion)
+    }
+}
+
 publishing {
     publications {
         create<MavenPublication>("library") {
@@ -62,7 +72,7 @@ publishing {
         }
     }
     val publishMvnRepo = System.getenv("PUBLISH_MVN_REPO")?.let { uri(it) }
-    if (null != publishMvnRepo)
+    if (null != publishMvnRepo) {
         repositories {
 
             maven {
@@ -72,8 +82,9 @@ publishing {
                     username = System.getenv("GITHUB_ACTOR")
                     password = System.getenv("GITHUB_TOKEN")
                 }
-
             }
         }
-    else println("Warning: PUBLISH_MVN_REPO undefined. Won't publish")
+    } else {
+        println("Warning: PUBLISH_MVN_REPO undefined. Won't publish")
+    }
 }

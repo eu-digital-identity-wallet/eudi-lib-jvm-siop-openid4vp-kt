@@ -16,7 +16,7 @@ import kotlinx.serialization.json.Json
  * @param httpFormPost the abstraction to an HTTP post operation
  */
 internal class DefaultDispatcher(
-    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>
+    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>,
 ) : Dispatcher {
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
         when (response) {
@@ -36,7 +36,6 @@ internal class DefaultDispatcher(
             val formParameters = DirectPostForm.of(response.data)
             httpFormPost.post(response.responseUri, formParameters)
         }
-
 
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
         withContext(Dispatchers.IO) {
@@ -84,34 +83,32 @@ private object DirectPostForm {
         return when (p) {
             is AuthorizationResponsePayload.SiopAuthenticationResponse -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
-                STATE_FORM_PARAM to p.state
+                STATE_FORM_PARAM to p.state,
             )
 
             is AuthorizationResponsePayload.OpenId4VPAuthorizationResponse -> mapOf(
                 VP_TOKEN_FORM_PARAM to vpToken(p.verifiableCredential),
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
-                STATE_FORM_PARAM to p.state
+                STATE_FORM_PARAM to p.state,
             )
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthenticationResponse -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
                 VP_TOKEN_FORM_PARAM to vpToken(p.verifiableCredential),
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
-                STATE_FORM_PARAM to p.state
+                STATE_FORM_PARAM to p.state,
             )
 
             is AuthorizationResponsePayload.InvalidRequest -> mapOf(
                 ERROR_FORM_PARAM to AuthorizationRequestErrorCode.fromError(p.error).code,
                 ERROR_DESCRIPTION_FORM_PARAM to "${p.error}",
-                STATE_FORM_PARAM to p.state
+                STATE_FORM_PARAM to p.state,
             )
-
 
             is AuthorizationResponsePayload.NoConsensusResponseData -> mapOf(
                 ERROR_FORM_PARAM to AuthorizationRequestErrorCode.USER_CANCELLED.code,
-                STATE_FORM_PARAM to p.state
+                STATE_FORM_PARAM to p.state,
             )
         }
     }
 }
-

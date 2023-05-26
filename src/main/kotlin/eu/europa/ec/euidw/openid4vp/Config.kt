@@ -3,9 +3,7 @@ package eu.europa.ec.euidw.openid4vp
 import eu.europa.ec.euidw.prex.ClaimFormat
 import eu.europa.ec.euidw.prex.PresentationDefinition
 import eu.europa.ec.euidw.prex.SupportedClaimFormat
-import kotlinx.serialization.SerialName
 import java.time.Duration
-
 
 sealed interface SupportedClientIdScheme {
     val scheme: ClientIdScheme
@@ -26,10 +24,7 @@ sealed interface SupportedClientIdScheme {
     data class Preregistered(val clients: List<ClientMetaData>) : SupportedClientIdScheme
     object RedirectUri : SupportedClientIdScheme
     object IsoX509 : SupportedClientIdScheme
-
 }
-
-
 
 data class WalletOpenId4VPConfig(
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
@@ -39,11 +34,10 @@ data class WalletOpenId4VPConfig(
     val presentationDefinitionUriSupported: Boolean = false,
     val supportedClientIdScheme: SupportedClientIdScheme,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
-    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap()
+    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
 ) {
 
 //    init {
 //        require(vpFormatsSupported.isNotEmpty())
 //    }
-
 }

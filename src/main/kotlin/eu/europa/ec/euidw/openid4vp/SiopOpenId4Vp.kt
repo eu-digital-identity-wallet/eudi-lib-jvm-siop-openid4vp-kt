@@ -1,6 +1,5 @@
 package eu.europa.ec.euidw.openid4vp
 
-
 /**
  * An interface providing support for handling
  * an OAUTH2 authorization request that represents
@@ -18,13 +17,12 @@ package eu.europa.ec.euidw.openid4vp
  */
 interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBuilder, Dispatcher {
 
-
     /**
      *
      */
     suspend fun handle(
         uri: String,
-        holderConsensus: suspend (ResolvedRequestObject) -> Consensus
+        holderConsensus: suspend (ResolvedRequestObject) -> Consensus,
     ): DispatchOutcome =
         when (val resolution = resolveRequestUri(uri)) {
             is Resolution.Invalid -> throw resolution.error.asException()
@@ -35,7 +33,6 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
                 dispatch(authorizationResponse)
             }
         }
-
 
     companion object {
 
@@ -51,8 +48,7 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          */
         fun ktor(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-            httpClientFactory: KtorHttpClientFactory = SiopOpenId4VpKtor.DefaultFactory
+            httpClientFactory: KtorHttpClientFactory = SiopOpenId4VpKtor.DefaultFactory,
         ): SiopOpenId4Vp = SiopOpenId4VpKtor(walletOpenId4VPConfig, httpClientFactory)
-
     }
 }

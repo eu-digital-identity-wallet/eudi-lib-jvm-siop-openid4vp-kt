@@ -16,7 +16,6 @@ import java.text.ParseException
 internal object ClientMetadataValidator {
 
     suspend fun validate(clientMetadata: ClientMetaData): Result<OIDCClientMetadata> = runCatching {
-
         val jwkSets = parseRequiredJwks(clientMetadata).getOrThrow()
         val types = parseRequiredSubjectSyntaxTypes(clientMetadata).getOrThrow()
 
@@ -30,11 +29,9 @@ internal object ClientMetadataValidator {
 
         // Validate if RP's client metadata supported_subject_types and OP's supported_subject_types have at least one common type
         // val typesMatch = rpSupportedSyntaxTypes.any { walletOpenId4VPConfig.subjectSyntaxTypesSupported.contains(it) }
-
     }
 
     private suspend fun parseRequiredJwks(clientMetadata: ClientMetaData): Result<JWKSet> {
-
         val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
         if (!atLeastOneJwkSourceDefined) {
             return RequestValidationError.MissingClientMetadataJwksSource.asFailure()
@@ -71,8 +68,8 @@ internal object ClientMetadataValidator {
             SubjectSyntaxType.JWKThumbprint.isValid(this) -> SubjectSyntaxType.JWKThumbprint
             else -> SubjectSyntaxType.DecentralizedIdentifier.parse(this)
         }
-        return if (listNotEmpty && allValidTypes)
+        return if (listNotEmpty && allValidTypes) {
             clientMetadata.subjectSyntaxTypesSupported.map { it.asSubjectSyntaxType() }.success()
-        else RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
+        } else RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
     }
 }

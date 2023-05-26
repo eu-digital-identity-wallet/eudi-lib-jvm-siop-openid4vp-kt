@@ -16,7 +16,7 @@ import java.net.URL
  *  by [reference][PresentationDefinitionSource.ByReference]
  */
 internal class PresentationDefinitionResolver(
-    private val getPresentationDefinition: HttpGet<PresentationDefinition>
+    private val getPresentationDefinition: HttpGet<PresentationDefinition>,
 ) {
 
     /**
@@ -37,7 +37,7 @@ internal class PresentationDefinitionResolver(
      */
     suspend fun resolve(
         source: PresentationDefinitionSource,
-        config: WalletOpenId4VPConfig
+        config: WalletOpenId4VPConfig,
     ): Result<PresentationDefinition> = when (source) {
         is ByValue -> source.presentationDefinition.success()
         is ByReference -> fetch(source.url, config)
@@ -46,7 +46,7 @@ internal class PresentationDefinitionResolver(
 
     private fun lookupKnownPresentationDefinitions(
         scope: Scope,
-        config: WalletOpenId4VPConfig
+        config: WalletOpenId4VPConfig,
     ): Result<PresentationDefinition> =
         scope.items()
             .firstNotNullOfOrNull { config.knownPresentationDefinitionsPerScope[it] }
@@ -55,14 +55,12 @@ internal class PresentationDefinitionResolver(
 
     private suspend fun fetch(
         url: URL,
-        config: WalletOpenId4VPConfig
+        config: WalletOpenId4VPConfig,
     ): Result<PresentationDefinition> =
-        if (config.presentationDefinitionUriSupported)
+        if (config.presentationDefinitionUriSupported) {
             withContext(Dispatchers.IO) {
                 getPresentationDefinition.get(url)
                     .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
             }
-        else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
+        } else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
 }
-
-

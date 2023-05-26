@@ -25,7 +25,6 @@ data class HolderInfo(
     val name: String,
 ) : Serializable
 
-
 object SiopIdTokenBuilder {
 
     fun decode(jwt: String): HolderInfo? = runCatching {
@@ -36,9 +35,9 @@ object SiopIdTokenBuilder {
         }
     }.getOrNull()
 
-    fun decodeAndVerify(jwt: String, walletPublicKey : RSAPublicKey): JWTClaimsSet? = runCatching {
-        val verifier  = RSASSAVerifier(walletPublicKey)
-        val signedJwt  = SignedJWT.parse(jwt)
+    fun decodeAndVerify(jwt: String, walletPublicKey: RSAPublicKey): JWTClaimsSet? = runCatching {
+        val verifier = RSASSAVerifier(walletPublicKey)
+        val signedJwt = SignedJWT.parse(jwt)
 
         if (!signedJwt.verify(verifier)) {
             error("Oops signature doesn't match")
@@ -52,15 +51,13 @@ object SiopIdTokenBuilder {
         .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
         .generate()
 
-
     fun build(
         request: ResolvedRequestObject.SiopAuthentication,
         holderInfo: HolderInfo,
         walletConfig: WalletOpenId4VPConfig,
         rsaJWK: RSAKey,
-        clock: Clock = Clock.systemDefaultZone()
+        clock: Clock = Clock.systemDefaultZone(),
     ): String {
-
         fun sign(claimSet: IDTokenClaimsSet): Result<JWT> = runCatching {
             val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.keyID).build()
             val signedJWT = SignedJWT(header, claimSet.toJWTClaimsSet())
@@ -88,7 +85,6 @@ object SiopIdTokenBuilder {
 
         val (iat, exp) = computeTokenDates(clock)
 
-
         // TODO Consider using IDTokenClaimsSet instead of generic JWTClaimSet
         //  It is more type-safe and expresses by definition IdToken
 
@@ -106,5 +102,4 @@ object SiopIdTokenBuilder {
 
         return sign(IDTokenClaimsSet(claimSet)).getOrThrow().serialize()
     }
-
 }

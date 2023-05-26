@@ -26,7 +26,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
      */
     data class SiopAuthenticationResponse(
         val idToken: Jwt,
-        override val state: String
+        override val state: String,
     ) : Success
 
     /**
@@ -42,7 +42,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
     data class OpenId4VPAuthorizationResponse(
         val verifiableCredential: List<Jwt>,
         val presentationSubmission: PresentationSubmission,
-        override val state: String
+        override val state: String,
     ) : Success
 
     /**
@@ -60,7 +60,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
         val idToken: Jwt,
         val verifiableCredential: List<Jwt>,
         val presentationSubmission: PresentationSubmission,
-        override val state: String
+        override val state: String,
     ) : Success
 
     sealed interface Failed : AuthorizationResponsePayload
@@ -72,7 +72,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
      */
     data class InvalidRequest(
         val error: AuthorizationRequestError,
-        override val state: String
+        override val state: String,
     ) : Failed
 
     /**
@@ -81,7 +81,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * @param state the state of the [request][ResolvedRequestObject.state]
      */
     data class NoConsensusResponseData(
-        override val state: String
+        override val state: String,
     ) : Failed
 }
 
@@ -111,7 +111,7 @@ sealed interface Consensus : Serializable {
          * @param idToken The id_token produced by the wallet
          */
         data class IdTokenConsensus(
-            val idToken: Jwt
+            val idToken: Jwt,
         ) : PositiveConsensus
 
         /**
@@ -120,7 +120,7 @@ sealed interface Consensus : Serializable {
          * and holder has chosen the [claims to include][approvedClaims]
          */
         data class VPTokenConsensus(
-            val approvedClaims: List<Claim>
+            val approvedClaims: List<Claim>,
         ) : PositiveConsensus
 
         /**
@@ -130,11 +130,10 @@ sealed interface Consensus : Serializable {
          */
         data class IdAndVPTokenConsensus(
             val idToken: Jwt,
-            val approvedClaims: List<Claim>
+            val approvedClaims: List<Claim>,
         ) : PositiveConsensus
     }
 }
-
 
 /**
  * An OAUTH2 authorization response
@@ -199,4 +198,3 @@ fun interface AuthorizationResponseBuilder {
         val Default: AuthorizationResponseBuilder = DefaultAuthorizationResponseBuilder
     }
 }
-

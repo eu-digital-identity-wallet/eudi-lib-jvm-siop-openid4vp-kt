@@ -26,7 +26,6 @@ fun interface HttpFormPost<out R> {
 internal fun String.asURL(onError: (Throwable) -> Throwable = { it }): Result<URL> =
     runCatching { URL(this) }.mapError(onError)
 
-
 /**
  * Convenient method for parsing a string into a [URI]
  */

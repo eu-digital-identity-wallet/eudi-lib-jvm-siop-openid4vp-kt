@@ -11,6 +11,18 @@ extra["isReleaseVersion"] = !version.toString().endsWith("SNAPSHOT")
 
 repositories {
     mavenCentral()
+    maven {
+        name = "EUDIWalletSnapshots"
+        val dependenciesRepoUrl = System.getenv("DEP_MVN_REPO") ?: "https://maven.pkg.github.com/eu-digital-identity-wallet/*"
+        url = uri(dependenciesRepoUrl)
+        credentials {
+            username = System.getenv("GH_PKG_USER")
+            password = System.getenv("GH_PKG_TOKEN")
+        }
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
     mavenLocal()
 }
 
@@ -58,8 +70,8 @@ publishing {
         create<MavenPublication>("library") {
             from(components["java"])
             pom {
-                name.set("SIOP OpenId4VP")
-                description.set("SIOP OpenId4VP wallet role library")
+                name.set(project.name)
+                description.set("SIOP & OpenId4VP wallet role library")
                 licenses {
                     license {
                         name.set("The Apache License, Version 2.0")
@@ -78,10 +90,24 @@ publishing {
                 "https://s01.oss.sonatype.org/content/repositories/snapshots/"
             }
 
-        maven {
-            name = "sonatype"
-            url = uri(sonaUri)
-            credentials(PasswordCredentials::class)
+        if ((extra["isReleaseVersion"]) as Boolean) {
+            maven {
+                name = "sonatype"
+                url = uri(sonaUri)
+                credentials(PasswordCredentials::class)
+            }
+        } else {
+            val publishMvnRepo = System.getenv("PUBLISH_MVN_REPO")?.let { uri(it) }
+            if (publishMvnRepo != null) {
+                maven {
+                    name = "EudiwPackages"
+                    url = uri(publishMvnRepo)
+                    credentials {
+                        username = System.getenv("GITHUB_ACTOR")
+                        password = System.getenv("GITHUB_TOKEN")
+                    }
+                }
+            }
         }
     }
 }

@@ -16,12 +16,12 @@ An instance of the interface can be obtained with the following code
 ```kotlin
 // Include library in dependencies in build.gradle.kts
 dependencies {
-    api("eu.europa.ec.euidw:siop-openid4vp-kt:$version")
+    api("eu.europa.ec.euidw:eudi-lib-jvm-siop-openid4vp-kt:$version")
 }
 ```
 
 ```kotlin
-import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.*
 
 val walletConfig: WalletOpenId4VPConfig // Provided by wallet
 val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)
@@ -48,7 +48,7 @@ The interface that captures the aforementioned functionality is
 [AuthorizationRequestResolver](src/main/kotlin/eu/europa/ec/euidw/openid4vp/AuthorizationRequestResolver.kt)
 
 ```kotlin
-import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.*
 
 val authorizationRequestUri : String // obtained via deep link or scanning a QR code
 
@@ -79,7 +79,7 @@ The interface that captures the aforementioned functionality is
 [AuthorizationResponseBuilder](src/main/kotlin/eu/europa/ec/euidw/openid4vp/AuthorizationResponseBuilder.kt)
 
 ```kotlin
-import eu.europa.ec.euidw.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.*
 // Example assumes that requestObject is SiopAuthentication & holder's agreed to the issuance of id_token
 val requestObject // calculated in previous step
 val idToken : Jwt // provided by wallet
@@ -158,7 +158,7 @@ Library currently supports `response_type` equal to `id_token` or `vp_token id_t
 
 ## Dependencies (to other libs)
 
-* Presentation Exchange v2 [Presentation Exchange](https://github.com/eu-digital-identity-wallet/presentation-exchange-kt)
+* Presentation Exchange v2 [eudi-lib-jvm-presentation-exchange-kt](https://github.com/eu-digital-identity-wallet/eudi-lib-jvm-presentation-exchange-kt)
 * OAUTH2 & OIDC Support: [Nimbus OAuth 2.0 SDK with OpenID Connect extensions](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk)
 * URI parsing: [Uri KMP](https://github.com/eygraber/uri-kmp)
 * Http Client: [Ktor](https://ktor.io/)

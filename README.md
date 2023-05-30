@@ -1,15 +1,37 @@
-# SIOPv2 OpenID4VP 
+# eudi-lib-jvm-siop-openid4vp-kt 
 
-This is a Kotlin library, targeting JVM, that supports the 
-[SIOPv2 (draft 12)](https://openid.bitbucket.io/connect/openid-connect-self-issued-v2-1_0.html) and 
-[OpenId4VP (draft 18)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) protocols.
-In particular, the library focus on the wallet's role and in addition focuses on the 
-usage of those two protocols as they are constraint by ISO 23220-4 and ISO-18013-7
+This is a Kotlin library, targeting JVM, that supports the SIOPv2 (draft 12) and OpenId4VP (draft 18) protocols.
+In particular, the library focus on the wallet's role using those two protocols with  constraints 
+included in ISO 23220-4 and ISO-18013-7
+
+Additionally, it has supports for Verifiable Presentations using the Presentation Exchange  library version 2.
+You can use this library to simplify the integration of OpenId4VP into your web or mobile applications.
+
+## Introduction
+
+OpenID4VP is a protocol that enables the presentation of Verifiable Credentials. 
+It is built on top of OAuth 2.0 and supports multiple credential formats, 
+including W3C Verifiable Credentials Data Model, ISO mdoc, and AnonCreds. 
+This protocol allows for simple, secure, and developer-friendly credential presentation 
+and can be used to support credential presentation and the issuance of access tokens for 
+access to APIs based on Verifiable Credentials in the wallet
+
+OpenID for Verifiable Presentations (OpenId4VP) and Self-Issued OpenID Provider v2 (SIOP v2) 
+are two specifications that have been approved as OpenID Implementer’s Drafts by the OpenID Foundation membership 1.
+SIOP v2 is an OpenID specification that allows end-users to act as their own OpenID Providers (OPs). 
+Using Self-Issued OPs, end-users can authenticate themselves and present claims directly to a Relying Party (RP), 
+typically a webapp, without involving a third-party Identity Provider 2. OpenId4VP enables the presentation of 
+Verifiable Credentials using the OpenID Connect protocol.
+
+
+TODO add references to draft 18 & draft 12
+
 
 ## Usage
 
-Entry point to the library is interface [SiopOpenId4Vp](src/main/kotlin/eu/europa/ec/euidw/openid4vp/SiopOpenId4Vp.kt)
+Entry point to the library is the interface [SiopOpenId4Vp](src/main/kotlin/eu/europa/ec/eudi/openid4vp/SiopOpenId4Vp.kt)
 Currently, the library offers an implementation of this interface based on [Ktor](https://ktor.io/) Http Client.
+Ktor is built from the ground up using Kotlin and Coroutines.
 
 An instance of the interface can be obtained with the following code
 
@@ -45,7 +67,7 @@ requests mentioned aforementioned) and in addition gather from Verifier addition
 reference (such as `presentation_definition_uri`, `client_metadata_uri` etc)
 
 The interface that captures the aforementioned functionality is 
-[AuthorizationRequestResolver](src/main/kotlin/eu/europa/ec/euidw/openid4vp/AuthorizationRequestResolver.kt)
+[AuthorizationRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vp/AuthorizationRequestResolver.kt)
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vp.*
@@ -76,7 +98,7 @@ This functionality is a wallet concern and it is not supported directly by the l
 
 After collecting holder's consensus, wallet can use the library to form an appropriate response.
 The interface that captures the aforementioned functionality is
-[AuthorizationResponseBuilder](src/main/kotlin/eu/europa/ec/euidw/openid4vp/AuthorizationResponseBuilder.kt)
+[AuthorizationResponseBuilder](src/main/kotlin/eu/europa/ec/eudi/openid4vp/AuthorizationResponseBuilder.kt)
 
 ```kotlin
 import eu.europa.ec.eudi.openid4vp.*
@@ -94,7 +116,7 @@ Depending on the `response_mode` that the verifier included in his authorization
 * via a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`), or
 * by forming an appropriate `redirect_uri` (when response mode is `fragment` or `fragment.jwt`)
 
-Library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/euidw/openid4vp/Dispatcher.kt)
+Library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Dispatcher.kt)
 
 ```kotlin
 val authorizationResponse // from previous step

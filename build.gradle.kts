@@ -1,3 +1,14 @@
+import org.gradle.kotlin.dsl.invoke
+import org.gradle.kotlin.dsl.jar
+import org.gradle.kotlin.dsl.java
+
+object Meta {
+    const val projectDescription = "SIOP & OpenId4VP wallet role library"
+    const val projectBaseUrl = "https://github.com/eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt"
+    const val projectGitUrl = "scm:git:git@github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
+    const val projectSshUrl = "scm:git:ssh://github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
+}
+
 plugins {
     kotlin("jvm") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
@@ -44,6 +55,22 @@ dependencies {
     testImplementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
 }
 
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.jar {
+    manifest {
+        attributes(
+            mapOf(
+                "Implementation-Title" to project.name,
+                "Implementation-Version" to project.version,
+            ),
+        )
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
 }
@@ -71,12 +98,26 @@ publishing {
             from(components["java"])
             pom {
                 name.set(project.name)
-                description.set("SIOP & OpenId4VP wallet role library")
+                description.set(Meta.projectDescription)
+                url.set(Meta.projectBaseUrl)
                 licenses {
                     license {
                         name.set("The Apache License, Version 2.0")
-                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
                     }
+                }
+                scm {
+                    connection.set(Meta.projectGitUrl)
+                    developerConnection.set(Meta.projectSshUrl)
+                    url.set(Meta.projectBaseUrl)
+                }
+                issueManagement {
+                    system.set("github")
+                    url.set(Meta.projectBaseUrl + "/issues")
+                }
+                ciManagement {
+                    system.set("github")
+                    url.set(Meta.projectBaseUrl + "/actions")
                 }
             }
         }

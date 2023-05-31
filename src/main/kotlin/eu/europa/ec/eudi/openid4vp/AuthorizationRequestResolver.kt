@@ -8,6 +8,8 @@ import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -345,14 +347,16 @@ fun interface AuthorizationRequestResolver {
          * Caller should provide a http client in terms of implementing the [HttpGet]
          * interface.
          *
-         * For an example implementation that uses ktor client please check [KtorAuthorizationRequestResolver]
+         * For an example implementation that uses ktor client please check [SiopOpenId4VpKtor]
          */
         fun make(
+            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
             getClientMetaData: HttpGet<ClientMetaData>,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
+            ioCoroutineDispatcher,
             getRequestObjectJwt,
             getPresentationDefinition,
             getClientMetaData,

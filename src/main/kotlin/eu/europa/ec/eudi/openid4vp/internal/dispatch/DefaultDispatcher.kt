@@ -5,6 +5,7 @@ import com.eygraber.uri.toURI
 import com.eygraber.uri.toUri
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.prex.PresentationSubmission
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -13,9 +14,11 @@ import kotlinx.serialization.json.Json
 /**
  * Default implementation of [Dispatcher]
  *
+ * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
  * @param httpFormPost the abstraction to an HTTP post operation
  */
 internal class DefaultDispatcher(
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>,
 ) : Dispatcher {
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
@@ -32,14 +35,14 @@ internal class DefaultDispatcher(
      * @see DirectPostForm on how the given [response] is encoded into form data
      */
     private suspend fun directPost(response: AuthorizationResponse.DirectPost): DispatchOutcome.VerifierResponse =
-        withContext(Dispatchers.IO) {
+        withContext(ioCoroutineDispatcher) {
             val formParameters = DirectPostForm.of(response.data)
             httpFormPost.post(response.responseUri, formParameters)
         }
 
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
-        withContext(Dispatchers.IO) {
-            TODO("Implement directPostJwt")
+        withContext(ioCoroutineDispatcher) {
+            error("Not yet implemented directPostJwt")
         }
 
     private fun redirectURI(response: AuthorizationResponse.RedirectResponse): DispatchOutcome.RedirectURI =
@@ -57,8 +60,8 @@ internal class DefaultDispatcher(
                 is AuthorizationResponse.Query ->
                     DirectPostForm.of(response.data).forEach { (key, value) -> appendQueryParameter(key, value) }
 
-                is AuthorizationResponse.FragmentJwt -> TODO()
-                is AuthorizationResponse.QueryJwt -> TODO()
+                is AuthorizationResponse.FragmentJwt -> error("Not yet implemented")
+                is AuthorizationResponse.QueryJwt -> error("Not yet implemented")
             }
             return DispatchOutcome.RedirectURI(build().toURI())
         }

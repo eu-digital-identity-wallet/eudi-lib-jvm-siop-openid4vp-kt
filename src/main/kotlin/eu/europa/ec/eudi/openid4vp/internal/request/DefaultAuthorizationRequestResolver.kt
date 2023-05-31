@@ -8,6 +8,7 @@ import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByReferen
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.NotSecured
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -56,7 +57,6 @@ internal class DefaultAuthorizationRequestResolver(
                     "Invalid client_id. Expected ${request.clientId} found ${requestObject.clientId}"
                 }
 
-                // TODO remove warning as soon as signature validation is implemented
                 requestObject.also { println("Warning JWT signature not verified") }
             }
         }
@@ -68,6 +68,7 @@ internal class DefaultAuthorizationRequestResolver(
          * Factory method for creating a [DefaultAuthorizationRequestResolver]
          */
         internal fun make(
+            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
             getClientMetaData: HttpGet<ClientMetaData>,
@@ -77,6 +78,7 @@ internal class DefaultAuthorizationRequestResolver(
             getRequestObjectJwt = getRequestObjectJwt,
             validatedRequestObjectResolver = ValidatedRequestObjectResolver(
                 presentationDefinitionResolver = PresentationDefinitionResolver(
+                    ioCoroutineDispatcher = ioCoroutineDispatcher,
                     getPresentationDefinition = getPresentationDefinition,
                 ),
                 clientMetaDataResolver = ClientMetaDataResolver(
@@ -90,10 +92,11 @@ internal class DefaultAuthorizationRequestResolver(
 
 /**
  * Extracts the request object from a [jwt]
+ *
+ * Currently, method neither verify signature nor supports
+ * encrypted JARs
  */
 private fun requestObjectFromJwt(jwt: Jwt): RequestObject {
-    // TODO Verify Signature
-    // TODO Support Encryption
     val signedJwt = SignedJWT.parse(jwt)
     fun Map<String, Any?>.asJsonObject(): JsonObject {
         val jsonStr = Gson().toJson(this)

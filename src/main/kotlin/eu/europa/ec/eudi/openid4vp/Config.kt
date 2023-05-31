@@ -35,9 +35,4 @@ data class WalletOpenId4VPConfig(
     val supportedClientIdScheme: SupportedClientIdScheme,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
-) {
-
-//    init {
-//        require(vpFormatsSupported.isNotEmpty())
-//    }
-}
+)

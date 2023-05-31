@@ -26,9 +26,6 @@ internal object ClientMetadataValidator {
             jwkSet = jwkSets
             setCustomField("subject_syntax_types_supported", types)
         }
-
-        // Validate if RP's client metadata supported_subject_types and OP's supported_subject_types have at least one common type
-        // val typesMatch = rpSupportedSyntaxTypes.any { walletOpenId4VPConfig.subjectSyntaxTypesSupported.contains(it) }
     }
 
     private suspend fun parseRequiredJwks(clientMetadata: ClientMetaData): Result<JWKSet> {

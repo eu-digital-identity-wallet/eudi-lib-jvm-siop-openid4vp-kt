@@ -1,5 +1,8 @@
 package eu.europa.ec.eudi.openid4vp
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+
 /**
  * An interface providing support for handling
  * an OAUTH2 authorization request that represents
@@ -40,6 +43,7 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          * Factory method to create a [SiopOpenId4Vp] based
          * on ktor
          *
+         * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
          * @param walletOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain Ktor http client
          * @return a [SiopOpenId4Vp]
@@ -48,7 +52,8 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          */
         fun ktor(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = SiopOpenId4VpKtor.DefaultFactory,
-        ): SiopOpenId4Vp = SiopOpenId4VpKtor(walletOpenId4VPConfig, httpClientFactory)
+        ): SiopOpenId4Vp = SiopOpenId4VpKtor(ioCoroutineDispatcher, walletOpenId4VPConfig, httpClientFactory)
     }
 }

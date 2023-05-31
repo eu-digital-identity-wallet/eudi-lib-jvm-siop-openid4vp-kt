@@ -5,6 +5,7 @@ import eu.europa.ec.eudi.openid4vp.internal.mapError
 import eu.europa.ec.eudi.openid4vp.internal.request.PresentationDefinitionSource.*
 import eu.europa.ec.eudi.openid4vp.internal.success
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
@@ -16,6 +17,7 @@ import java.net.URL
  *  by [reference][PresentationDefinitionSource.ByReference]
  */
 internal class PresentationDefinitionResolver(
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val getPresentationDefinition: HttpGet<PresentationDefinition>,
 ) {
 
@@ -58,7 +60,7 @@ internal class PresentationDefinitionResolver(
         config: WalletOpenId4VPConfig,
     ): Result<PresentationDefinition> =
         if (config.presentationDefinitionUriSupported) {
-            withContext(Dispatchers.IO) {
+            withContext(ioCoroutineDispatcher) {
                 getPresentationDefinition.get(url)
                     .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
             }

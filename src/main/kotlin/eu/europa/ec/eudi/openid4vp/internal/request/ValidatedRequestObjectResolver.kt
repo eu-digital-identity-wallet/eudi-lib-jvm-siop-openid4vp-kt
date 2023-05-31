@@ -77,6 +77,6 @@ internal class ValidatedRequestObjectResolver(
     private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): Result<OIDCClientMetadata> {
         return validated.clientMetaDataSource?.let {
             clientMetaDataResolver.resolve(it)
-        } ?: throw IllegalArgumentException("Missing client metadata")
+        } ?: error("Missing client metadata")
     }
 }

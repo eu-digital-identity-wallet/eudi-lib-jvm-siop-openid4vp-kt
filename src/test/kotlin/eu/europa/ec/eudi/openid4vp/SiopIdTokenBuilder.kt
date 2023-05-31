@@ -85,9 +85,6 @@ object SiopIdTokenBuilder {
 
         val (iat, exp) = computeTokenDates(clock)
 
-        // TODO Consider using IDTokenClaimsSet instead of generic JWTClaimSet
-        //  It is more type-safe and expresses by definition IdToken
-
         val claimSet = with(JWTClaimsSet.Builder()) {
             issuer(buildIssuerClaim())
             subject(buildIssuerClaim()) // By SIOPv2 draft 12 issuer = subject

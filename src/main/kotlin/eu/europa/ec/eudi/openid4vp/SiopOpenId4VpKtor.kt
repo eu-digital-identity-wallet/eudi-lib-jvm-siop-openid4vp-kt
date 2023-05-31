@@ -10,6 +10,8 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import java.net.URL
 
 /**
@@ -22,18 +24,19 @@ typealias KtorHttpClientFactory = () -> HttpClient
  *
  */
 class SiopOpenId4VpKtor(
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory = DefaultFactory,
 ) : SiopOpenId4Vp {
 
     override suspend fun resolveRequest(request: AuthorizationRequest): Resolution =
-        authorizationResolver(walletOpenId4VPConfig, httpClientFactory).resolveRequest(request)
+        authorizationResolver(ioCoroutineDispatcher, walletOpenId4VPConfig, httpClientFactory).resolveRequest(request)
 
     override suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse =
         AuthorizationResponseBuilder.Default.build(requestObject, consensus)
 
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
-        dispatcher(httpClientFactory).dispatch(response)
+        dispatcher(ioCoroutineDispatcher, httpClientFactory).dispatch(response)
 
     companion object {
 
@@ -65,10 +68,12 @@ class SiopOpenId4VpKtor(
          * @see DefaultAuthorizationRequestResolver
          */
         fun authorizationResolver(
+            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
             httpClientFactory: KtorHttpClientFactory = DefaultFactory,
         ): AuthorizationRequestResolver {
             fun createResolver(c: HttpClient) = DefaultAuthorizationRequestResolver.make(
+                ioCoroutineDispatcher = ioCoroutineDispatcher,
                 getClientMetaData = httpGet(c),
                 getPresentationDefinition = httpGet(c),
                 getRequestObjectJwt = { url ->
@@ -110,11 +115,15 @@ class SiopOpenId4VpKtor(
          * The [Dispatcher] will obtain a new [HttpClient] with each call & then release it
          *
          * @param httpClientFactory factory to obtain [HttpClient]
+         * @param ioCoroutineDispatcher the coroutines dispatcher to handle IO
          * @return the [Dispatcher] as described above
          * @see DefaultDispatcher
          */
-        fun dispatcher(httpClientFactory: KtorHttpClientFactory = DefaultFactory): Dispatcher {
-            fun createDispatcher(c: HttpClient) = DefaultDispatcher { url, parameters ->
+        fun dispatcher(
+            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            httpClientFactory: KtorHttpClientFactory = DefaultFactory,
+        ): Dispatcher {
+            fun createDispatcher(c: HttpClient) = DefaultDispatcher(ioCoroutineDispatcher) { url, parameters ->
                 runCatching {
                     val response = c.submitForm(
                         url = url.toString(),

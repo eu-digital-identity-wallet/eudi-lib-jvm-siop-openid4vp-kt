@@ -45,17 +45,17 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
         requestObject: ResolvedRequestObject.OpenId4VPAuthorization,
         consensus: Consensus.PositiveConsensus.VPTokenConsensus,
     ): AuthorizationResponse {
-        TODO("Not yet implemented")
+        error("Not yet implemented")
     }
 
     private suspend fun buildResponse(
         requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
         consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus,
     ): AuthorizationResponse {
-        TODO("Not yet implemented")
+        error("Not yet implemented")
     }
 
-    suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
+    private suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
         val payload = AuthorizationResponsePayload.NoConsensusResponseData(requestObject.state)
         return toAuthorizationResponse(requestObject.responseMode, payload)
     }

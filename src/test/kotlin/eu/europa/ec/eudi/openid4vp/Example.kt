@@ -25,6 +25,10 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
+/**
+ * Examples assumes that you have cloned and running
+ * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
+ */
 fun main(): Unit = runBlocking {
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")

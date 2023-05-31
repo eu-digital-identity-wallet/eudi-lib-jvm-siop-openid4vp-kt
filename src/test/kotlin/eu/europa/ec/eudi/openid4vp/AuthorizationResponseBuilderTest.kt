@@ -5,6 +5,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -38,7 +39,7 @@ class AuthorizationResponseBuilderTest {
 
     @Test
     fun `id token request should produce a response with id token JWT`(): Unit = runBlocking {
-        val validated = ClientMetadataValidator.validate(clientMetaData)
+        val validated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaData)
 
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(

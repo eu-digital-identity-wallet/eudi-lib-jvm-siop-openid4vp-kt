@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 internal class DefaultAuthorizationRequestResolver(
+    private val ioCoroutineDispatcher: CoroutineDispatcher,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val getRequestObjectJwt: HttpGet<String>,
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
@@ -39,7 +40,7 @@ internal class DefaultAuthorizationRequestResolver(
      */
     private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject {
         suspend fun fetchJwt(request: PassByReference): Jwt =
-            withContext(Dispatchers.IO) {
+            withContext(ioCoroutineDispatcher) {
                 getRequestObjectJwt.get(request.jwtURI).getOrThrow()
             }
 
@@ -74,6 +75,7 @@ internal class DefaultAuthorizationRequestResolver(
             getClientMetaData: HttpGet<ClientMetaData>,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
+            ioCoroutineDispatcher = ioCoroutineDispatcher,
             walletOpenId4VPConfig = walletOpenId4VPConfig,
             getRequestObjectJwt = getRequestObjectJwt,
             validatedRequestObjectResolver = ValidatedRequestObjectResolver(
@@ -82,6 +84,7 @@ internal class DefaultAuthorizationRequestResolver(
                     getPresentationDefinition = getPresentationDefinition,
                 ),
                 clientMetaDataResolver = ClientMetaDataResolver(
+                    ioCoroutineDispatcher = ioCoroutineDispatcher,
                     getClientMetaData = getClientMetaData,
                 ),
             ),

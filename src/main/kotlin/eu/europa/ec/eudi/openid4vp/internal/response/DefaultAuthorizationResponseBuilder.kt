@@ -15,20 +15,21 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
         if (consensus is Consensus.NegativeConsensus) {
             buildNoConsensusResponse(requestObject)
         } else {
+            fun unexpected(): AuthorizationResponse = error("Unexpected consensus")
             when (requestObject) {
                 is ResolvedRequestObject.SiopAuthentication -> when (consensus) {
                     is Consensus.PositiveConsensus.IdTokenConsensus -> buildResponse(requestObject, consensus)
-                    else -> error("Unexpected consensus")
+                    else -> unexpected()
                 }
 
                 is ResolvedRequestObject.OpenId4VPAuthorization -> when (consensus) {
                     is Consensus.PositiveConsensus.VPTokenConsensus -> buildResponse(requestObject, consensus)
-                    else -> error("Unexpected consensus")
+                    else -> unexpected()
                 }
 
                 is ResolvedRequestObject.SiopOpenId4VPAuthentication -> when (consensus) {
                     is Consensus.PositiveConsensus.IdAndVPTokenConsensus -> buildResponse(requestObject, consensus)
-                    else -> error("Unexpected consensus")
+                    else -> unexpected()
                 }
             }
         }

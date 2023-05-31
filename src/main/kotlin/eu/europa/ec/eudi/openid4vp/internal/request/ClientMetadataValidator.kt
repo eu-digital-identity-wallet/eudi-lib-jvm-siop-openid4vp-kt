@@ -7,13 +7,13 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.success
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
-internal object ClientMetadataValidator {
+internal class ClientMetadataValidator(private val ioCoroutineDispatcher: CoroutineDispatcher) {
 
     suspend fun validate(clientMetadata: ClientMetaData): Result<OIDCClientMetadata> = runCatching {
         val jwkSets = parseRequiredJwks(clientMetadata).getOrThrow()
@@ -57,7 +57,7 @@ internal object ClientMetadataValidator {
 
         return when {
             clientMetadata.jwksUri.isNullOrEmpty() -> requiredJwks()
-            else -> withContext(Dispatchers.IO) { requiredJwksUri() }
+            else -> withContext(ioCoroutineDispatcher) { requiredJwksUri() }
         }
     }
 

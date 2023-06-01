@@ -20,7 +20,10 @@ extra["isReleaseVersion"] = !version.toString().endsWith("SNAPSHOT")
 repositories {
     mavenCentral()
     mavenLocal()
-    maven { url=uri("https://s01.oss.sonatype.org/content/repositories/snapshots/") }
+    maven {
+        url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+        mavenContent { snapshotsOnly() }
+    }
 }
 
 val ktorVersion = "2.3.0"
@@ -123,7 +126,6 @@ publishing {
             url = uri(sonaUri)
             credentials(PasswordCredentials::class)
         }
-
     }
 }
 

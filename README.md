@@ -9,6 +9,7 @@
   * [Holder's consensus, Handling of a valid authorization request](#holders-consensus-handling-of-a-valid-authorization-request)
   * [Build an authorization response](#build-an-authorization-response)
   * [Dispatch authorization response to verifier / RP](#dispatch-authorization-response-to-verifier--rp)
+  * [Example](#example)
 * [SIOPv2 & OpenId4VP features supported](#siopv2--openid4vp-features-supported)
 * [How to contribute](#how-to-contribute)
 * [License](#license)

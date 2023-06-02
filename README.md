@@ -26,7 +26,7 @@ In particular, the library focus on the wallet's role using those two protocols 
 included in ISO 23220-4 and ISO-18013-7
 
 
-# Disclaimer
+## Disclaimer
 
 The released software is a initial development release version: 
 -  The initial development release is an early endeavor reflecting the efforts of a short timeboxed period, and by no means can be considered as the final product.  

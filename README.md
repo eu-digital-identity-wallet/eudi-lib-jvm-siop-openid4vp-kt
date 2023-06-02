@@ -1,6 +1,6 @@
 # EUDI SIOPv2 OpenId4VP library
 
-[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.txt)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 ## Table of contents
 

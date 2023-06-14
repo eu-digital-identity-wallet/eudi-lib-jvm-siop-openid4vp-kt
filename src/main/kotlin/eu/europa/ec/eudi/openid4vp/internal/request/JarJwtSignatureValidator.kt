@@ -189,7 +189,7 @@ private fun String.toNimbusJWSAlgorithm() = JWSAlgorithm.parse(this)
 internal fun JwkSetSource.toNimbus(): JWKSource<SecurityContext> {
     val jwkSet = when (this) {
         is JwkSetSource.ByValue -> {
-            JWKSet.parse(jwks!!.toString())
+            JWKSet.parse(jwks.toString())
         }
 
         is JwkSetSource.ByReference -> {

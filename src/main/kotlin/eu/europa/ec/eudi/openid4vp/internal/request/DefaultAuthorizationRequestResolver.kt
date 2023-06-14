@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.shaded.gson.Gson
-import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
@@ -26,9 +24,6 @@ import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 
 internal class DefaultAuthorizationRequestResolver(
     private val ioCoroutineDispatcher: CoroutineDispatcher,
@@ -41,7 +36,7 @@ internal class DefaultAuthorizationRequestResolver(
         request: AuthorizationRequest,
     ): Resolution =
         try {
-            val requestObject = requestObjectOf(request)
+            val requestObject = requestObjectOf(request).getOrThrow()
             val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
             val resolved =
                 validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
@@ -53,28 +48,39 @@ internal class DefaultAuthorizationRequestResolver(
     /**
      * Extracts the [request object][RequestObject] of an [AuthorizationRequest]
      */
-    private suspend fun requestObjectOf(request: AuthorizationRequest): RequestObject {
+    private suspend fun requestObjectOf(request: AuthorizationRequest): Result<RequestObject> = runCatching {
         suspend fun fetchJwt(request: PassByReference): Jwt =
             withContext(ioCoroutineDispatcher) {
                 getRequestObjectJwt.get(request.jwtURI).getOrThrow()
             }
 
-        return when (request) {
+        when (request) {
             is NotSecured -> request.requestObject
             is JwtSecured -> {
-                val jwt = when (request) {
+                val jwt: Jwt = when (request) {
                     is PassByValue -> request.jwt
                     is PassByReference -> fetchJwt(request)
                 }
-                val requestObject = requestObjectFromJwt(jwt)
-                // Make sure that clientId of the initial request is the same
-                // with the client id inside the request object
-                require(request.clientId == requestObject.clientId) {
-                    "Invalid client_id. Expected ${request.clientId} found ${requestObject.clientId}"
-                }
-
-                requestObject.also { println("Warning JWT signature not verified") }
+                val clientId = request.clientId
+                requestObjectFromJwt(clientId, jwt).getOrThrow()
             }
+        }
+    }
+
+    /**
+     * Extracts the request object from a [jwt]
+     *
+     * Currently, method neither verify signature nor supports
+     * encrypted JARs
+     *
+     * @param jwt The JWT to be validated. It is assumed that represents in its payload
+     * a [RequestObject]
+     * @param clientId The client that placed request
+     */
+    private suspend fun requestObjectFromJwt(clientId: String, jwt: Jwt): Result<RequestObject> {
+        val validator = JarJwtSignatureValidator.forConfig(walletOpenId4VPConfig)
+        return withContext(ioCoroutineDispatcher) {
+            validator.validateOrError(clientId, jwt)
         }
     }
 
@@ -103,41 +109,6 @@ internal class DefaultAuthorizationRequestResolver(
                     getClientMetaData = getClientMetaData,
                 ),
             ),
-
-        )
-    }
-}
-
-/**
- * Extracts the request object from a [jwt]
- *
- * Currently, method neither verify signature nor supports
- * encrypted JARs
- */
-private fun requestObjectFromJwt(jwt: Jwt): RequestObject {
-    val signedJwt = SignedJWT.parse(jwt)
-    fun Map<String, Any?>.asJsonObject(): JsonObject {
-        val jsonStr = Gson().toJson(this)
-        return Json.parseToJsonElement(jsonStr).jsonObject
-    }
-
-    return with(signedJwt.jwtClaimsSet) {
-        RequestObject(
-            responseType = getStringClaim("response_type"),
-            presentationDefinition = getJSONObjectClaim("presentation_definition")?.asJsonObject(),
-            presentationDefinitionUri = getStringClaim("presentation_definition_uri"),
-            scope = getStringClaim("scope"),
-            nonce = getStringClaim("nonce"),
-            responseMode = getStringClaim("response_mode"),
-            clientIdScheme = getStringClaim("client_id_scheme"),
-            clientMetaData = getJSONObjectClaim("client_metadata")?.asJsonObject(),
-            clientMetadataUri = getStringClaim("client_metadata_uri"),
-            clientId = getStringClaim("client_id"),
-            responseUri = getStringClaim("response_uri"),
-            redirectUri = getStringClaim("redirect_uri"),
-            state = getStringClaim("state"),
-            supportedAlgorithm = getStringClaim("supported_algorithm"),
-            idTokenType = getStringClaim("id_token_type"),
         )
     }
 }

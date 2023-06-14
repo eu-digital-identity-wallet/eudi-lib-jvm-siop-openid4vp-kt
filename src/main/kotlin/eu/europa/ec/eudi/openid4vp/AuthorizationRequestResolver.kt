@@ -176,6 +176,8 @@ sealed interface AuthorizationRequestError : Serializable
  */
 sealed interface RequestValidationError : AuthorizationRequestError {
 
+    data class InvalidJarJwt(val cause: String) : AuthorizationRequestError
+
     //
     // Response Type errors
     //

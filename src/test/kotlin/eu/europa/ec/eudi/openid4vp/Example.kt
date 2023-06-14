@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
@@ -46,9 +47,14 @@ import javax.net.ssl.X509TrustManager
  */
 fun main(): Unit = runBlocking {
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
-    val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")
-    val wallet = Wallet(walletKeyPair = walletKeyPair, holder = holder)
 
+    val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")
+
+    val wallet = Wallet(
+        walletKeyPair = walletKeyPair,
+        holder = holder,
+        walletConfig = cfg(verifierPreregisteredMetaData),
+    )
     val verifier = Verifier.make(walletKeyPair.toRSAPublicKey(), randomNonce())
 
     wallet.handle(verifier.authorizationRequestUri)
@@ -59,6 +65,11 @@ fun main(): Unit = runBlocking {
 private fun randomNonce(): String = Nonce().value
 
 private const val VerifierApi = "http://localhost:8080"
+private val verifierPreregisteredMetaData = PreregisteredClient(
+    "Verifier",
+    JWSAlgorithm.RS256.name,
+    JwkSetSource.ByReference(URI("$VerifierApi/wallet/public-keys.json")),
+)
 
 /**
  * This class is a minimal Verifier / RP application
@@ -136,7 +147,7 @@ class Verifier private constructor(
 
 private class Wallet(
     private val holder: HolderInfo,
-    private val walletConfig: WalletOpenId4VPConfig = DefaultConfig,
+    private val walletConfig: WalletOpenId4VPConfig,
     private val walletKeyPair: RSAKey,
 ) {
 
@@ -211,9 +222,9 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private val DefaultConfig = WalletOpenId4VPConfig(
+private fun cfg(verifierMetaData: PreregisteredClient) = WalletOpenId4VPConfig(
     presentationDefinitionUriSupported = true,
-    supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
+    supportedClientIdScheme = SupportedClientIdScheme.Preregistered(mapOf(verifierMetaData.clientId to verifierMetaData)),
     vpFormatsSupported = emptyList(),
     subjectSyntaxTypesSupported = emptyList(),
 )

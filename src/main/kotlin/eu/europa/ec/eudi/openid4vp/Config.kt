@@ -18,27 +18,42 @@ package eu.europa.ec.eudi.openid4vp
 import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.SupportedClaimFormat
+import kotlinx.serialization.json.JsonObject
+import java.net.URI
 import java.time.Duration
+
+sealed interface JwkSetSource {
+    data class ByValue(val jwks: JsonObject) : JwkSetSource
+    data class ByReference(val jwksUri: URI) : JwkSetSource
+}
+
+data class PreregisteredClient(
+    val clientId: String,
+    val jarSigningAlg: String,
+    val jwkSetSource: JwkSetSource,
+)
 
 sealed interface SupportedClientIdScheme {
     val scheme: ClientIdScheme
         get() = when (this) {
             is Preregistered -> ClientIdScheme.PreRegistered
-            is RedirectUri -> ClientIdScheme.RedirectUri
             is IsoX509 -> ClientIdScheme.ISO_X509
         }
-    val preregisteredClients: List<ClientMetaData>
+    val preregisteredClients: Map<String, PreregisteredClient>
         get() = when (this) {
             is Preregistered -> clients
-            is RedirectUri -> emptyList()
-            is IsoX509 -> emptyList()
+            is IsoX509 -> emptyMap()
         }
 
     fun isClientIdSupported(clientIdScheme: ClientIdScheme): Boolean = clientIdScheme == scheme
 
-    data class Preregistered(val clients: List<ClientMetaData>) : SupportedClientIdScheme
-    object RedirectUri : SupportedClientIdScheme
-    object IsoX509 : SupportedClientIdScheme
+    data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
+
+    object IsoX509 : SupportedClientIdScheme {
+        override fun toString(): String {
+            return "IsoX509"
+        }
+    }
 }
 
 data class WalletOpenId4VPConfig(

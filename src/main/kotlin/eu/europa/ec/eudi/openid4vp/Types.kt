@@ -174,6 +174,7 @@ data class RequestObject(
 ) : java.io.Serializable
 
 typealias Jwt = String
+typealias VpToken = String
 
 enum class IdTokenType {
     SubjectSigned,

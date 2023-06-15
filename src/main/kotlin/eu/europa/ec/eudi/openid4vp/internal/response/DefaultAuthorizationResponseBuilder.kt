@@ -16,6 +16,9 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.AuthorizationResponsePayload.*
+import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
 
 /**
  * Default implementation of [AuthorizationResponseBuilder]
@@ -25,56 +28,49 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
     override suspend fun build(
         requestObject: ResolvedRequestObject,
         consensus: Consensus,
-    ): AuthorizationResponse =
+    ): AuthorizationResponse {
 
-        if (consensus is Consensus.NegativeConsensus) {
-            buildNoConsensusResponse(requestObject)
-        } else {
-            fun unexpected(): AuthorizationResponse = error("Unexpected consensus")
-            when (requestObject) {
-                is ResolvedRequestObject.SiopAuthentication -> when (consensus) {
-                    is Consensus.PositiveConsensus.IdTokenConsensus -> buildResponse(requestObject, consensus)
-                    else -> unexpected()
-                }
+        val payload = when (consensus) {
+            is Consensus.NegativeConsensus -> negativeConsensusPayload(requestObject)
+            is Consensus.PositiveConsensus -> positiveConsensusPayload(requestObject, consensus)
+        }
+        return toAuthorizationResponse(requestObject.responseMode, payload)
+    }
 
-                is ResolvedRequestObject.OpenId4VPAuthorization -> when (consensus) {
-                    is Consensus.PositiveConsensus.VPTokenConsensus -> buildResponse(requestObject, consensus)
-                    else -> unexpected()
-                }
 
-                is ResolvedRequestObject.SiopOpenId4VPAuthentication -> when (consensus) {
-                    is Consensus.PositiveConsensus.IdAndVPTokenConsensus -> buildResponse(requestObject, consensus)
-                    else -> unexpected()
-                }
-            }
+    private fun positiveConsensusPayload(
+        requestObject: ResolvedRequestObject,
+        consensus: Consensus.PositiveConsensus,
+    ): AuthorizationResponsePayload = when (requestObject) {
+
+        is SiopAuthentication -> when (consensus) {
+            is IdTokenConsensus -> SiopAuthenticationResponse(consensus.idToken, requestObject.state)
+            else -> null
         }
 
-    private suspend fun buildResponse(
-        requestObject: ResolvedRequestObject.SiopAuthentication,
-        consensus: Consensus.PositiveConsensus.IdTokenConsensus,
-    ): AuthorizationResponse {
-        val payload = AuthorizationResponsePayload.SiopAuthenticationResponse(consensus.idToken, requestObject.state)
-        return toAuthorizationResponse(requestObject.responseMode, payload)
-    }
+        is OpenId4VPAuthorization -> when (consensus) {
+            is VPTokenConsensus -> OpenId4VPAuthorizationResponse(
+                consensus.vpToken,
+                consensus.presentationSubmission,
+                requestObject.state,
+            )
+            else -> null
+        }
 
-    private suspend fun buildResponse(
-        requestObject: ResolvedRequestObject.OpenId4VPAuthorization,
-        consensus: Consensus.PositiveConsensus.VPTokenConsensus,
-    ): AuthorizationResponse {
-        error("Not yet implemented")
-    }
+        is SiopOpenId4VPAuthentication -> when (consensus) {
+            is IdAndVPTokenConsensus -> SiopOpenId4VPAuthenticationResponse(
+                consensus.idToken,
+                consensus.vpToken,
+                consensus.presentationSubmission,
+                requestObject.state,
+            )
+            else -> null
+        }
+    } ?: error("Unexpected consensus")
 
-    private suspend fun buildResponse(
-        requestObject: ResolvedRequestObject.SiopOpenId4VPAuthentication,
-        consensus: Consensus.PositiveConsensus.IdAndVPTokenConsensus,
-    ): AuthorizationResponse {
-        error("Not yet implemented")
-    }
 
-    private suspend fun buildNoConsensusResponse(requestObject: ResolvedRequestObject): AuthorizationResponse {
-        val payload = AuthorizationResponsePayload.NoConsensusResponseData(requestObject.state)
-        return toAuthorizationResponse(requestObject.responseMode, payload)
-    }
+    private fun negativeConsensusPayload(requestObject: ResolvedRequestObject): NoConsensusResponseData =
+        NoConsensusResponseData(requestObject.state)
 
     private fun toAuthorizationResponse(
         responseMode: ResponseMode,

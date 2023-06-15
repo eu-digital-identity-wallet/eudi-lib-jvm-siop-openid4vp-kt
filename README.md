@@ -85,7 +85,7 @@ import eu.europa.ec.eudi.openid4vp.*
 
 val authorizationRequestUri : String // obtained via deep link or scanning a QR code
 
-val resolution = siopOpenId4Vp.resolveRequestUri(walletConfig, authorizationRequestUri)
+val resolution = siopOpenId4Vp.resolveRequestUri(authorizationRequestUri)
 val requestObject = when (resolution) {
     is Resolution.Invalid -> throw resolution.error.asException()
     is Resolution.Success -> resolution.requestObject

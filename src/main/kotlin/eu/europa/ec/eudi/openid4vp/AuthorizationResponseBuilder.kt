@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
-import eu.europa.ec.eudi.prex.Claim
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import java.io.Serializable
 import java.net.URI
@@ -48,14 +47,14 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * In response to a [ResolvedRequestObject.OpenId4VPAuthorization]
      * and holder's [Consensus.PositiveConsensus.VPTokenConsensus]
      *
-     * @param verifiableCredential the list of verifiable credentials
-     * that fulfil the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
+     * @param vpToken the vp_token
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
      * @param presentationSubmission the presentation submission
-     * that fulfil the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      */
     data class OpenId4VPAuthorizationResponse(
-        val verifiableCredential: List<Jwt>,
+        val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
         override val state: String,
     ) : Success
@@ -65,15 +64,15 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * and holder's [Consensus.PositiveConsensus.IdAndVPTokenConsensus]
      *
      * @param idToken The id_token produced by the wallet
-     * @param verifiableCredential the list of verifiable credentials
-     * that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
+     * @param vpToken the vp_token
+     *       that fulfils the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
      * @param presentationSubmission the presentation submission
      *  that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      */
     data class SiopOpenId4VPAuthenticationResponse(
         val idToken: Jwt,
-        val verifiableCredential: List<Jwt>,
+        val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
         override val state: String,
     ) : Success
@@ -132,20 +131,26 @@ sealed interface Consensus : Serializable {
         /**
          * In response to a [OpenId4VPAuthorization] where the
          * wallet has claims that fulfill Verifier's presentation definition
-         * and holder has chosen the [claims to include][approvedClaims]
+         * and holder has chosen the claims to include
+         * @param vpToken the vp_token to be included in the authorization response
+         * @param presentationSubmission the presentation submission to be included in the authorization response
          */
         data class VPTokenConsensus(
-            val approvedClaims: List<Claim>,
+            val vpToken: VpToken,
+            val presentationSubmission: PresentationSubmission,
         ) : PositiveConsensus
 
         /**
          * In response to a [SiopOpenId4VPAuthentication]
          *
          * @param idToken The id_token produced by the wallet
+         * @param vpToken the vp_token to be included in the authorization response
+         * @param presentationSubmission the presentation submission to be included in the authorization response
          */
         data class IdAndVPTokenConsensus(
             val idToken: Jwt,
-            val approvedClaims: List<Claim>,
+            val vpToken: VpToken,
+            val presentationSubmission: PresentationSubmission,
         ) : PositiveConsensus
     }
 }

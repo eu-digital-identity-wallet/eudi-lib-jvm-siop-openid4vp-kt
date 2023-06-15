@@ -97,7 +97,7 @@ private object DirectPostForm {
 
     fun of(p: AuthorizationResponsePayload): Map<String, String> {
         fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
-        fun vpToken(vcs: List<Jwt>) = Json.encodeToString<List<Jwt>>(vcs)
+
         return when (p) {
             is AuthorizationResponsePayload.SiopAuthenticationResponse -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
@@ -105,14 +105,14 @@ private object DirectPostForm {
             )
 
             is AuthorizationResponsePayload.OpenId4VPAuthorizationResponse -> mapOf(
-                VP_TOKEN_FORM_PARAM to vpToken(p.verifiableCredential),
+                VP_TOKEN_FORM_PARAM to p.vpToken,
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
                 STATE_FORM_PARAM to p.state,
             )
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthenticationResponse -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
-                VP_TOKEN_FORM_PARAM to vpToken(p.verifiableCredential),
+                VP_TOKEN_FORM_PARAM to p.vpToken,
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
                 STATE_FORM_PARAM to p.state,
             )

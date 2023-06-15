@@ -29,7 +29,6 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
         requestObject: ResolvedRequestObject,
         consensus: Consensus,
     ): AuthorizationResponse {
-
         val payload = when (consensus) {
             is Consensus.NegativeConsensus -> negativeConsensusPayload(requestObject)
             is Consensus.PositiveConsensus -> positiveConsensusPayload(requestObject, consensus)
@@ -37,12 +36,10 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
         return toAuthorizationResponse(requestObject.responseMode, payload)
     }
 
-
     private fun positiveConsensusPayload(
         requestObject: ResolvedRequestObject,
         consensus: Consensus.PositiveConsensus,
     ): AuthorizationResponsePayload = when (requestObject) {
-
         is SiopAuthentication -> when (consensus) {
             is IdTokenConsensus -> SiopAuthenticationResponse(consensus.idToken, requestObject.state)
             else -> null
@@ -67,7 +64,6 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
             else -> null
         }
     } ?: error("Unexpected consensus")
-
 
     private fun negativeConsensusPayload(requestObject: ResolvedRequestObject): NoConsensusResponseData =
         NoConsensusResponseData(requestObject.state)

@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
@@ -27,9 +28,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import java.net.URI
 import java.net.URLEncoder
 import java.security.SecureRandom
@@ -46,9 +45,14 @@ import javax.net.ssl.X509TrustManager
  */
 fun main(): Unit = runBlocking {
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
-    val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")
-    val wallet = Wallet(walletKeyPair = walletKeyPair, holder = holder)
 
+    val holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder")
+
+    val wallet = Wallet(
+        walletKeyPair = walletKeyPair,
+        holder = holder,
+        walletConfig = cfg(verifierPreregisteredMetaData),
+    )
     val verifier = Verifier.make(walletKeyPair.toRSAPublicKey(), randomNonce())
 
     wallet.handle(verifier.authorizationRequestUri)
@@ -59,6 +63,11 @@ fun main(): Unit = runBlocking {
 private fun randomNonce(): String = Nonce().value
 
 private const val VerifierApi = "http://localhost:8080"
+private val verifierPreregisteredMetaData = PreregisteredClient(
+    "Verifier",
+    JWSAlgorithm.RS256.name,
+    JwkSetSource.ByReference(URI("$VerifierApi/wallet/public-keys.json")),
+)
 
 /**
  * This class is a minimal Verifier / RP application
@@ -100,7 +109,7 @@ class Verifier private constructor(
             verifierPrintln("Initializing Verifier ...")
             withContext(Dispatchers.IO + CoroutineName("wallet-initTransaction")) {
                 createHttpClient().use { client ->
-                    val initTransactionResponse = initTransaction(client, nonce)
+                    val initTransactionResponse = initSiopTransaction(client, nonce)
                     val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
                     val uri = formatAuthorizationRequest(initTransactionResponse)
                     Verifier(walletPublicKey, presentationId, nonce, uri).also { verifierPrintln("Initialized $it") }
@@ -108,20 +117,42 @@ class Verifier private constructor(
             }
         }
 
-        private suspend fun initTransaction(client: HttpClient, nonce: String): JsonObject {
-            verifierPrintln("Placing to verifier endpoint request for SiopAuthentication ...")
-            return client.post("$VerifierApi/ui/presentations") {
+        private suspend fun initSiopTransaction(client: HttpClient, nonce: String): JsonObject {
+            verifierPrintln("Placing to verifier endpoint  SIOP authentication request ...")
+            val request =
+                """
+                    {
+                        "type": "id_token",
+                        "nonce": "$nonce",
+                        "id_token_type": "subject_signed_id_token"    
+                    }
+                """.trimIndent()
+            return initTransaction(client, request)
+        }
+
+        private suspend fun initOpenId4VpTransaction(
+            client: HttpClient,
+            nonce: String,
+            presentationDefinition: String,
+        ): JsonObject {
+            verifierPrintln("Placing to verifier endpoint OpenId4Vp authorization request  ...")
+            val request =
+                """
+                    {
+                        "type": "vp_token",
+                        "nonce": "$nonce",
+                        "presentation_definition": $presentationDefinition    
+                    }
+                """.trimIndent()
+            return initTransaction(client, request)
+        }
+
+        private suspend inline fun <reified B> initTransaction(client: HttpClient, body: B): JsonObject =
+            client.post("$VerifierApi/ui/presentations") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
-                setBody(
-                    buildJsonObject {
-                        put("type", "id_token")
-                        put("id_token_type", "subject_signed_id_token")
-                        put("nonce", nonce)
-                    },
-                )
+                setBody(body)
             }.body<JsonObject>()
-        }
 
         private fun formatAuthorizationRequest(iniTransactionResponse: JsonObject): URI {
             fun String.encode() = URLEncoder.encode(this, "UTF-8")
@@ -136,7 +167,7 @@ class Verifier private constructor(
 
 private class Wallet(
     private val holder: HolderInfo,
-    private val walletConfig: WalletOpenId4VPConfig = DefaultConfig,
+    private val walletConfig: WalletOpenId4VPConfig,
     private val walletKeyPair: RSAKey,
 ) {
 
@@ -173,6 +204,7 @@ private class Wallet(
             else -> Consensus.NegativeConsensus
         }
     }
+
     companion object {
         fun walletPrintln(s: String) = println("Wallet   : $s")
     }
@@ -211,9 +243,9 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private val DefaultConfig = WalletOpenId4VPConfig(
+private fun cfg(verifierMetaData: PreregisteredClient) = WalletOpenId4VPConfig(
     presentationDefinitionUriSupported = true,
-    supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
+    supportedClientIdSchemes = listOf(SupportedClientIdScheme.Preregistered(mapOf(verifierMetaData.clientId to verifierMetaData))),
     vpFormatsSupported = emptyList(),
     subjectSyntaxTypesSupported = emptyList(),
 )

@@ -18,27 +18,35 @@ package eu.europa.ec.eudi.openid4vp
 import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.SupportedClaimFormat
+import kotlinx.serialization.json.JsonObject
+import java.net.URI
 import java.time.Duration
+
+sealed interface JwkSetSource {
+    data class ByValue(val jwks: JsonObject) : JwkSetSource
+    data class ByReference(val jwksUri: URI) : JwkSetSource
+}
+
+data class PreregisteredClient(
+    val clientId: String,
+    val jarSigningAlg: String,
+    val jwkSetSource: JwkSetSource,
+)
 
 sealed interface SupportedClientIdScheme {
     val scheme: ClientIdScheme
         get() = when (this) {
             is Preregistered -> ClientIdScheme.PreRegistered
-            is RedirectUri -> ClientIdScheme.RedirectUri
             is IsoX509 -> ClientIdScheme.ISO_X509
         }
-    val preregisteredClients: List<ClientMetaData>
-        get() = when (this) {
-            is Preregistered -> clients
-            is RedirectUri -> emptyList()
-            is IsoX509 -> emptyList()
+
+    data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
+
+    object IsoX509 : SupportedClientIdScheme {
+        override fun toString(): String {
+            return "IsoX509"
         }
-
-    fun isClientIdSupported(clientIdScheme: ClientIdScheme): Boolean = clientIdScheme == scheme
-
-    data class Preregistered(val clients: List<ClientMetaData>) : SupportedClientIdScheme
-    object RedirectUri : SupportedClientIdScheme
-    object IsoX509 : SupportedClientIdScheme
+    }
 }
 
 data class WalletOpenId4VPConfig(
@@ -47,7 +55,10 @@ data class WalletOpenId4VPConfig(
     val decentralizedIdentifier: String = "DID:example:12341512#$",
     val idTokenTTL: Duration = Duration.ofMinutes(10),
     val presentationDefinitionUriSupported: Boolean = false,
-    val supportedClientIdScheme: SupportedClientIdScheme,
+    val supportedClientIdSchemes: List<SupportedClientIdScheme>,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
 )
+
+fun WalletOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
+    supportedClientIdSchemes.firstOrNull { it.scheme == scheme }

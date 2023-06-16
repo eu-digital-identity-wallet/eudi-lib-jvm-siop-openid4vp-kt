@@ -50,6 +50,7 @@ enum class AuthorizationRequestErrorCode(val code: String) {
          */
         fun fromError(error: AuthorizationRequestError): AuthorizationRequestErrorCode {
             return when (error) {
+                is InvalidJarJwt,
                 is InvalidClientIdScheme,
                 InvalidRedirectUri,
                 InvalidResponseUri,

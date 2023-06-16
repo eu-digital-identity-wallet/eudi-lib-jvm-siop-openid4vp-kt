@@ -38,7 +38,7 @@ class AuthorizationResponseDispatcherTest {
 
     private val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
-        supportedClientIdScheme = SupportedClientIdScheme.IsoX509,
+        supportedClientIdSchemes = listOf(SupportedClientIdScheme.IsoX509),
         vpFormatsSupported = emptyList(),
         subjectSyntaxTypesSupported = listOf(
             SubjectSyntaxType.JWKThumbprint,

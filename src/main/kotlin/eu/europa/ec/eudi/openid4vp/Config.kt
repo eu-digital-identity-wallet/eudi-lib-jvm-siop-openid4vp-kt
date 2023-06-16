@@ -39,13 +39,6 @@ sealed interface SupportedClientIdScheme {
             is Preregistered -> ClientIdScheme.PreRegistered
             is IsoX509 -> ClientIdScheme.ISO_X509
         }
-    val preregisteredClients: Map<String, PreregisteredClient>
-        get() = when (this) {
-            is Preregistered -> clients
-            is IsoX509 -> emptyMap()
-        }
-
-    fun isClientIdSupported(clientIdScheme: ClientIdScheme): Boolean = clientIdScheme == scheme
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
 
@@ -62,7 +55,10 @@ data class WalletOpenId4VPConfig(
     val decentralizedIdentifier: String = "DID:example:12341512#$",
     val idTokenTTL: Duration = Duration.ofMinutes(10),
     val presentationDefinitionUriSupported: Boolean = false,
-    val supportedClientIdScheme: SupportedClientIdScheme,
+    val supportedClientIdSchemes: List<SupportedClientIdScheme>,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
 )
+
+fun WalletOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
+    supportedClientIdSchemes.firstOrNull { it.scheme == scheme }

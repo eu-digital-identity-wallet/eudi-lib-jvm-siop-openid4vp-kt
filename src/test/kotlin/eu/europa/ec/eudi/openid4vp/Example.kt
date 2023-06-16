@@ -245,7 +245,7 @@ object SslSettings {
 
 private fun cfg(verifierMetaData: PreregisteredClient) = WalletOpenId4VPConfig(
     presentationDefinitionUriSupported = true,
-    supportedClientIdScheme = SupportedClientIdScheme.Preregistered(mapOf(verifierMetaData.clientId to verifierMetaData)),
+    supportedClientIdSchemes = listOf(SupportedClientIdScheme.Preregistered(mapOf(verifierMetaData.clientId to verifierMetaData))),
     vpFormatsSupported = emptyList(),
     subjectSyntaxTypesSupported = emptyList(),
 )

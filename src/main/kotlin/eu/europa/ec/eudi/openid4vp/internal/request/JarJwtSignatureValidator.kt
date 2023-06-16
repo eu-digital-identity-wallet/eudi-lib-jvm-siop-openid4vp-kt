@@ -29,140 +29,94 @@ import com.nimbusds.jose.shaded.gson.Gson
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor
-import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.IsoX509
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.success
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.text.ParseException
 
 /**
- * The outcome of validating a [Jwt] that represents an
- * Authorization Request according to RFC9101
- *
- * @param CS the type that represents the set of claims of a valid JWT
- */
-internal sealed interface JarJwtValidation<out CS> {
-
-    /**
-     * Indicates a parsing exception
-     */
-    object NotJwt : JarJwtValidation<Nothing> {
-        override fun toString(): String {
-            return "NotJwt"
-        }
-    }
-
-    /**
-     * Indicates that JWT can be parsed but signature is invalid
-     */
-    object InvalidSignature : JarJwtValidation<Nothing> {
-        override fun toString(): String {
-            return "InvalidSignature"
-        }
-    }
-
-    data class ValidSignature<CS>(val jwtClaimSet: CS) : JarJwtValidation<CS>
-
-    /**
-     * Indicates that the client (verifier) that placed the authorization
-     * request is not trusted by the wallet
-     */
-    object UntrustedClient : JarJwtValidation<Nothing> {
-        override fun toString(): String {
-            return "UntrustedClient"
-        }
-    }
-
-    /**
-     * Maps to another way of representing the set of claims of a valid JWT
-     * @param f the mapping function
-     * @param CS2 the type of representing the set of claims of a valid JWT
-     * @return another sealed hierarchy of outcomes that uses the [CS2]
-     */
-    fun <CS2> map(f: (CS) -> CS2): JarJwtValidation<CS2> = when (this) {
-        is ValidSignature -> ValidSignature(f(this.jwtClaimSet))
-        is InvalidSignature -> InvalidSignature
-        NotJwt -> NotJwt
-        UntrustedClient -> UntrustedClient
-    }
-}
-
-/**
  * Validates a JWT that represents an Authorization Request according to RFC9101
  *
- * @param CS the type that represents the set of claims of a valid JWT
+ *
+ *
+ * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
+ * @param walletOpenId4VPConfig wallet's configuration
  */
-internal fun interface JarJwtSignatureValidator<CS> {
+internal class JarJwtSignatureValidator(
+    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+) {
 
-    suspend fun validate(clientId: String, jwt: Jwt): JarJwtValidation<CS>
-
-    suspend fun validateOrError(clientId: String, jwt: Jwt): Result<CS> =
-        when (val v = validate(clientId, jwt)) {
-            is JarJwtValidation.ValidSignature -> v.jwtClaimSet.success()
-            JarJwtValidation.InvalidSignature -> RequestValidationError.InvalidJarJwt(v.toString()).asFailure()
-            JarJwtValidation.NotJwt -> RequestValidationError.InvalidJarJwt(v.toString()).asFailure()
-            JarJwtValidation.UntrustedClient -> RequestValidationError.InvalidJarJwt(v.toString()).asFailure()
+    suspend fun validate(clientId: String, jwt: Jwt): Result<RequestObject> = runCatching {
+        val signedJwt = parse(jwt).getOrThrow()
+        val error = doValidate(clientId, signedJwt)
+        if (null == error) {
+            requestObject(signedJwt.jwtClaimsSet)
+        } else {
+            throw error.asException()
         }
-
-    fun <CS2> map(f: (CS) -> CS2): JarJwtSignatureValidator<CS2> = JarJwtSignatureValidator { clientId, jwt ->
-        this.validate(clientId, jwt).map(f)
     }
 
-    companion object {
-
-        /**
-         * Creates a [JarJwtValidation] using the [walletOpenId4VPConfig]
-         *
-         * @param walletOpenId4VPConfig the wallet configuration
-         *
-         */
-        fun forConfig(walletOpenId4VPConfig: WalletOpenId4VPConfig): JarJwtSignatureValidator<RequestObject> =
-            when (val supportedClientIdScheme = walletOpenId4VPConfig.supportedClientIdScheme) {
-                SupportedClientIdScheme.IsoX509 -> NonValidating
-                is SupportedClientIdScheme.Preregistered ->
-                    if (supportedClientIdScheme.preregisteredClients.isEmpty()) {
-                        NonValidating
-                    } else {
-                        PreregisteredClientJwtValidator(supportedClientIdScheme)
-                    }
-            }.map { requestObject(it) }
-
-        private object NonValidating : JarJwtSignatureValidator<JWTClaimsSet> {
-
-            override suspend fun validate(clientId: String, jwt: Jwt): JarJwtValidation<JWTClaimsSet> = try {
-                val signedJwt = SignedJWT.parse(jwt)
-                JarJwtValidation.ValidSignature(signedJwt.jwtClaimsSet)
-            } catch (pe: ParseException) {
-                JarJwtValidation.NotJwt
-            }
+    private fun parse(jwt: Jwt): Result<SignedJWT> =
+        try {
+            SignedJWT.parse(jwt).success()
+        } catch (pe: ParseException) {
+            RequestValidationError.InvalidJarJwt("JAR JWT parse error").asFailure()
         }
 
-        private class PreregisteredClientJwtValidator(
-            private val preregistered: SupportedClientIdScheme.Preregistered,
-        ) : JarJwtSignatureValidator<JWTClaimsSet> {
-
-            override suspend fun validate(clientId: String, jwt: Jwt): JarJwtValidation<JWTClaimsSet> {
-                val preregisteredClientMetaData = preregistered.clients[clientId]
-                return if (preregisteredClientMetaData == null) {
-                    return JarJwtValidation.UntrustedClient
-                } else {
-                    try {
-                        val signedJwt = SignedJWT.parse(jwt)
-                        val jwtProcessor = jwtProcessor(preregisteredClientMetaData)
-                        val jwtClaimsSet = jwtProcessor.process(signedJwt, null)
-                        JarJwtValidation.ValidSignature(jwtClaimsSet)
-                    } catch (e: ParseException) {
-                        JarJwtValidation.NotJwt
-                    } catch (e: JOSEException) {
-                        throw RuntimeException(e)
-                    } catch (e: BadJOSEException) {
-                        JarJwtValidation.InvalidSignature
-                    }
+    private suspend fun doValidate(clientId: String, signedJwt: SignedJWT): AuthorizationRequestError? =
+        withContext(ioCoroutineDispatcher) {
+            val untrustedClaimSet = signedJwt.jwtClaimsSet
+            val jwtClientId = untrustedClaimSet.getStringClaim("client_id")
+            if (null == jwtClientId) {
+                RequestValidationError.MissingClientId
+            } else if (clientId != jwtClientId) {
+                invalidJarJwt("ClientId mismatch. Found in JAR request $clientId, in JAR Jwt $jwtClientId")
+            } else {
+                val supportedClientIdScheme =
+                    untrustedClaimSet.getStringClaim("client_id_scheme")
+                        ?.let { ClientIdScheme.make(it) }
+                        ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
+                //
+                // Currently is not defined how to
+                // process client_id when scheme is IsoX509 or not provided
+                // Thus, we don't validate the signature
+                //
+                when (supportedClientIdScheme) {
+                    null -> null
+                    IsoX509 -> null
+                    is Preregistered -> validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
                 }
             }
+        }
+}
+
+private fun invalidJarJwt(cause: String): AuthorizationRequestError = RequestValidationError.InvalidJarJwt(cause)
+
+private fun validatePreregistered(
+    supportedClientIdScheme: Preregistered,
+    clientId: String,
+    signedJwt: SignedJWT,
+): AuthorizationRequestError? {
+    val preregisteredClientMetaData = supportedClientIdScheme.clients[clientId]
+    return if (preregisteredClientMetaData == null) {
+        invalidJarJwt("Client with client_id $clientId is not pre-registered")
+    } else {
+        try {
+            val jwtProcessor = jwtProcessor(preregisteredClientMetaData)
+            jwtProcessor.process(signedJwt, null)
+            null
+        } catch (e: JOSEException) {
+            throw RuntimeException(e)
+        } catch (e: BadJOSEException) {
+            invalidJarJwt("Invalid signature ${e.message}")
         }
     }
 }
@@ -175,12 +129,6 @@ private fun jwtProcessor(client: PreregisteredClient): ConfigurableJWTProcessor<
         it.jwsKeySelector = JWSVerificationKeySelector(
             client.jarSigningAlg.toNimbusJWSAlgorithm(),
             client.jwkSetSource.toNimbus(),
-        )
-        it.setJWTClaimsSetVerifier(
-            DefaultJWTClaimsVerifier(
-                JWTClaimsSet.Builder().claim("client_id", client.clientId).build(),
-                setOf("scope", "state", "nonce", "response_type", "response_mode"),
-            ),
         )
     }
 

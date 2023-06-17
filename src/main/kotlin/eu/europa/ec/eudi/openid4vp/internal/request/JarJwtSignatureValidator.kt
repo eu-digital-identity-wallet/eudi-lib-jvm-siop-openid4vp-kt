@@ -58,7 +58,7 @@ internal class JarJwtSignatureValidator(
         val signedJwt = parse(jwt).getOrThrow()
         val error = doValidate(clientId, signedJwt)
         if (null == error) {
-            requestObject(signedJwt.jwtClaimsSet)
+            signedJwt.jwtClaimsSet.toType { requestObject(it) }
         } else {
             throw error.asException()
         }
@@ -105,12 +105,9 @@ private fun validatePreregistered(
     clientId: String,
     signedJwt: SignedJWT,
 ): AuthorizationRequestError? {
-    val preregisteredClientMetaData = supportedClientIdScheme.clients[clientId]
-    return if (preregisteredClientMetaData == null) {
-        invalidJarJwt("Client with client_id $clientId is not pre-registered")
-    } else {
+    fun PreregisteredClient.verifySignature() =
         try {
-            val jwtProcessor = jwtProcessor(preregisteredClientMetaData)
+            val jwtProcessor = jwtProcessor(this)
             jwtProcessor.process(signedJwt, null)
             null
         } catch (e: JOSEException) {
@@ -118,6 +115,12 @@ private fun validatePreregistered(
         } catch (e: BadJOSEException) {
             invalidJarJwt("Invalid signature ${e.message}")
         }
+
+    val trustedClient = supportedClientIdScheme.clients[clientId]
+    return if (null == trustedClient) {
+        invalidJarJwt("Client with client_id $clientId is not pre-registered")
+    } else {
+        trustedClient.verifySignature()
     }
 }
 

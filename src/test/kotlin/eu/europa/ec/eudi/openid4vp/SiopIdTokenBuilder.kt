@@ -15,21 +15,28 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.RSASSASigner
-import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.ThumbprintUtils
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet
+import com.nimbusds.jose.jwk.source.JWKSource
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
+import com.nimbusds.jose.proc.JWSVerificationKeySelector
+import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWT
-import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.DefaultJWTProcessor
+import com.nimbusds.oauth2.sdk.id.Audience
+import com.nimbusds.oauth2.sdk.id.Issuer
+import com.nimbusds.oauth2.sdk.id.Subject
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import java.io.Serializable
-import java.security.interfaces.RSAPublicKey
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -42,23 +49,19 @@ data class HolderInfo(
 
 object SiopIdTokenBuilder {
 
-    fun decode(jwt: String): HolderInfo? = runCatching {
-        return with(SignedJWT.parse(jwt).jwtClaimsSet) {
-            val email = getStringClaim("email")!!
-            val name = getStringClaim("name")!!
-            HolderInfo(email = email, name = name)
+    fun decodeAndVerify(jwt: String, walletPubKey: RSAKey): Result<IDTokenClaimsSet> = runCatching {
+        val jwtProcessor = DefaultJWTProcessor<SecurityContext>().also {
+            it.jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType.JWT)
+            val jwsAlg = JWSAlgorithm.RS256
+            val jwkSet: JWKSource<SecurityContext> = ImmutableJWKSet(JWKSet(walletPubKey))
+            it.jwsKeySelector = JWSVerificationKeySelector(
+                jwsAlg,
+                jwkSet,
+            )
         }
-    }.getOrNull()
-
-    fun decodeAndVerify(jwt: String, walletPublicKey: RSAPublicKey): JWTClaimsSet? = runCatching {
-        val verifier = RSASSAVerifier(walletPublicKey)
-        val signedJwt = SignedJWT.parse(jwt)
-
-        if (!signedJwt.verify(verifier)) {
-            error("Oops signature doesn't match")
-        }
-        signedJwt.jwtClaimsSet
-    }.getOrNull()
+        val claimsSet = jwtProcessor.process(jwt, null)
+        IDTokenClaimsSet(claimsSet)
+    }
 
     fun randomKey(): RSAKey = RSAKeyGenerator(2048)
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
@@ -74,20 +77,21 @@ object SiopIdTokenBuilder {
         clock: Clock = Clock.systemDefaultZone(),
     ): String {
         fun sign(claimSet: IDTokenClaimsSet): Result<JWT> = runCatching {
-            val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.keyID).build()
+            val header = JWSHeader.Builder(JWSAlgorithm.RS256)
+                .keyID(rsaJWK.keyID)
+                .type(JOSEObjectType.JWT)
+                .build()
             val signedJWT = SignedJWT(header, claimSet.toJWTClaimsSet())
             signedJWT.sign(RSASSASigner(rsaJWK))
             signedJWT
         }
 
-        fun buildJWKThumbprint(): String =
-            ThumbprintUtils.compute("SHA-256", rsaJWK).toString()
+        fun buildJWKThumbprint(): String = ThumbprintUtils.compute("SHA-256", rsaJWK).toString()
 
-        fun buildIssuerClaim(): String =
-            when (walletConfig.preferredSubjectSyntaxType) {
-                is SubjectSyntaxType.JWKThumbprint -> buildJWKThumbprint()
-                is SubjectSyntaxType.DecentralizedIdentifier -> walletConfig.decentralizedIdentifier
-            }
+        fun buildIssuerClaim(): String = when (walletConfig.preferredSubjectSyntaxType) {
+            is SubjectSyntaxType.JWKThumbprint -> buildJWKThumbprint()
+            is SubjectSyntaxType.DecentralizedIdentifier -> walletConfig.decentralizedIdentifier
+        }
 
         fun computeTokenDates(clock: Clock): Pair<Date, Date> {
             val iat = clock.instant()
@@ -100,18 +104,20 @@ object SiopIdTokenBuilder {
 
         val (iat, exp) = computeTokenDates(clock)
 
-        val claimSet = with(JWTClaimsSet.Builder()) {
-            issuer(buildIssuerClaim())
-            subject(buildIssuerClaim()) // By SIOPv2 draft 12 issuer = subject
-            audience(request.clientId)
-            issueTime(iat)
-            expirationTime(exp)
-            claim("sub_jwk", subjectJwk.toJSONObject())
-            claim("email", holderInfo.email)
-            claim("name", holderInfo.name)
-            build()
-        }
+        return with(
+            IDTokenClaimsSet(
+                Issuer(buildIssuerClaim()),
+                Subject(buildIssuerClaim()),
+                listOf(request.clientId).map { Audience(it) },
+                exp,
+                iat,
+            ),
+        ) {
+            subjectJWK = rsaJWK.toPublicJWK()
+            setClaim("email", holderInfo.email)
+            setClaim("name", holderInfo.name)
 
-        return sign(IDTokenClaimsSet(claimSet)).getOrThrow().serialize()
+            sign(this).getOrThrow().serialize()
+        }
     }
 }

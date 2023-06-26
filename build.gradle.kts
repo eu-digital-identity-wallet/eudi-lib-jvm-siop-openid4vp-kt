@@ -29,7 +29,7 @@ repositories {
 
 val ktorVersion = "2.3.0"
 val presentationExchangeVersion = "0.1.0-SNAPSHOT"
-val nimbusSdkVersion = "10.9.1"
+val nimbusSdkVersion = "10.9.2"
 
 dependencies {
     api("eu.europa.ec.eudi:eudi-lib-jvm-presentation-exchange-kt:$presentationExchangeVersion")

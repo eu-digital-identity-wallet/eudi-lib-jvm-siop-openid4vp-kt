@@ -26,7 +26,7 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/wrapper-validation-action@v1
       - name: Build with Gradle Wrapper
-        uses: gradle/gradle-build-action@v2.4.2
+        uses: gradle/gradle-build-action@v2.5.1
         env:
           CI: true
           GH_PKG_USER: ${{ github.actor }}
@@ -53,7 +53,7 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/wrapper-validation-action@v1
       - name: Publish with Gradle Wrapper
-        uses: gradle/gradle-build-action@v2.4.2
+        uses: gradle/gradle-build-action@v2.5.1
         with:
           arguments: publish --full-stacktrace
         env:
@@ -81,7 +81,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Publish with Gradle Wrapper
-        uses: gradle/gradle-build-action@v2.4.2
+        uses: gradle/gradle-build-action@v2.5.1
         with:
           arguments: publish --full-stacktrace
         env:

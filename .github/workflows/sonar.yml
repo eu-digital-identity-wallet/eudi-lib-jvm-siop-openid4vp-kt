@@ -1,15 +1,13 @@
 name: SonarCloud
 on:
   push:
-    branches: [ 'main', 'feature/*' ]
+    branches: [ 'main', 'release/*' ]
     tags: [ v* ]
   workflow_dispatch:
 
 jobs:
   run-sast:
     name: Build and run SonarQube analysis
-    # Run on external PRs, but not on internal PRs since those will be run by push to branch
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository 
     runs-on:  ubuntu-latest
     steps:
       - name: Checkout project sources
@@ -42,7 +40,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN}}
       - name: Build with Gradle Wrapper & Run Sonar
         if: (steps.checksecrets.outputs.secretspresent == 'YES')
-        uses: gradle/gradle-build-action@v2.4.2
+        uses: gradle/gradle-build-action@v2.6.0
         with:
           gradle-version: wrapper
           arguments: build sonar --info --full-stacktrace -Dsonar.organization=${{ github.repository_owner }} -Dsonar.projectKey=${{ env.PROJECTKEY }}

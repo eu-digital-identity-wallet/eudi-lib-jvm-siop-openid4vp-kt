@@ -151,7 +151,8 @@ enum class ResponseType {
 }
 
 /**
- * The data of an OpenID4VP authorization request
+ * The data of an OpenID4VP authorization request or SIOP Authentication request
+ * or a combined OpenId4VP & SIOP request
  * without any validation and regardless of the way they sent to the wallet
  */
 @Serializable
@@ -174,6 +175,7 @@ data class RequestObject(
 ) : java.io.Serializable
 
 typealias Jwt = String
+typealias VpToken = String
 
 enum class IdTokenType {
     SubjectSigned,

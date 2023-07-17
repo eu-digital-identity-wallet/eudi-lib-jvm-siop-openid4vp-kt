@@ -83,7 +83,7 @@ class AuthorizationResponseBuilderTest {
         when (response) {
             is AuthorizationResponse.DirectPost ->
                 when (val data = response.data) {
-                    is AuthorizationResponsePayload.SiopAuthenticationResponse -> {
+                    is AuthorizationResponsePayload.SiopAuthentication -> {
                         val idToken = data.idToken
                         assertTrue("Id Token signature could not be verified") {
                             SignedJWT.parse(idToken).verify(RSASSAVerifier(rsaJWK))

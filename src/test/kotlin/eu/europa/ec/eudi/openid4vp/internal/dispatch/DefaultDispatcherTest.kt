@@ -68,7 +68,7 @@ class DefaultDispatcherTest {
             runBlocking {
                 val state = State().value
                 val dummyJwt = "dummy"
-                val data = AuthorizationResponsePayload.SiopAuthenticationResponse(dummyJwt, state)
+                val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state)
                 testQueryResponse(data) {
                     assertEquals(dummyJwt, getQueryParameter("id_token"))
                 }
@@ -119,7 +119,7 @@ class DefaultDispatcherTest {
         fun `when SIOPAuthentication, fragment must contain an id_token`() = runBlocking {
             val state = State().value
             val dummyJwt = "dummy"
-            val data = AuthorizationResponsePayload.SiopAuthenticationResponse(dummyJwt, state)
+            val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state)
             testFragmentResponse(data) { fragmentData ->
                 assertEquals(dummyJwt, fragmentData["id_token"])
             }

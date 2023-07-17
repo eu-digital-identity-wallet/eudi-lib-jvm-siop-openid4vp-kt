@@ -33,6 +33,14 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
     suspend fun validate(clientMetadata: ClientMetaData): Result<OIDCClientMetadata> = runCatching {
         val jwkSets = parseRequiredJwks(clientMetadata).getOrThrow()
         val types = parseRequiredSubjectSyntaxTypes(clientMetadata).getOrThrow()
+        if (clientMetadata.authorizationEncryptedResponseAlg != null &&
+            clientMetadata.authorizationEncryptedResponseEnc == null) {
+            throw RuntimeException("Cannot construct ResponseSigningEncryptionSpec from client metadata:" +
+                    " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found")
+        }
+        val authSgnRespAlg : JWSAlgorithm? = clientMetadata.authorizationSignedResponseAlg.let { JWSAlgorithm.parse(it) }
+        val authEncRespAlg : JWEAlgorithm? = clientMetadata.authorizationEncryptedResponseAlg.let { JWEAlgorithm.parse(it) }
+        val authEncRespEnc : EncryptionMethod? = clientMetadata.authorizationEncryptedResponseEnc.let { EncryptionMethod.parse(it) }
 
         OIDCClientMetadata().apply {
             idTokenJWSAlg = JWSAlgorithm.parse(clientMetadata.idTokenSignedResponseAlg)
@@ -40,6 +48,9 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
             idTokenJWEEnc = EncryptionMethod.parse(clientMetadata.idTokenEncryptedResponseEnc)
             jwkSet = jwkSets
             setCustomField("subject_syntax_types_supported", types)
+            authSgnRespAlg.let { setCustomField("authorization_signed_response_alg", it) }
+            authEncRespAlg.let { setCustomField("authorization_encrypted_response_alg", it) }
+            authEncRespEnc.let { setCustomField("authorization_encrypted_response_enc", it) }
         }
     }
 

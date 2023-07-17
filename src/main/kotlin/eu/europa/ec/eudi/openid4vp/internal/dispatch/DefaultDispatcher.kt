@@ -34,7 +34,7 @@ import kotlinx.serialization.json.Json
  */
 internal class DefaultDispatcher(
     private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>,
+    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>
 ) : Dispatcher {
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
         when (response) {
@@ -57,7 +57,8 @@ internal class DefaultDispatcher(
 
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
         withContext(ioCoroutineDispatcher) {
-            error("Not yet implemented directPostJwt")
+            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
+            httpFormPost.post(response.responseUri, mapOf("response" to joseResponse))
         }
 
     private fun redirectURI(response: AuthorizationResponse.RedirectResponse): DispatchOutcome.RedirectURI =
@@ -99,18 +100,18 @@ private object DirectPostForm {
         fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
 
         return when (p) {
-            is AuthorizationResponsePayload.SiopAuthenticationResponse -> mapOf(
+            is AuthorizationResponsePayload.SiopAuthentication -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
                 STATE_FORM_PARAM to p.state,
             )
 
-            is AuthorizationResponsePayload.OpenId4VPAuthorizationResponse -> mapOf(
+            is AuthorizationResponsePayload.OpenId4VPAuthorization -> mapOf(
                 VP_TOKEN_FORM_PARAM to p.vpToken,
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
                 STATE_FORM_PARAM to p.state,
             )
 
-            is AuthorizationResponsePayload.SiopOpenId4VPAuthenticationResponse -> mapOf(
+            is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
                 VP_TOKEN_FORM_PARAM to p.vpToken,
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
@@ -130,3 +131,4 @@ private object DirectPostForm {
         }
     }
 }
+

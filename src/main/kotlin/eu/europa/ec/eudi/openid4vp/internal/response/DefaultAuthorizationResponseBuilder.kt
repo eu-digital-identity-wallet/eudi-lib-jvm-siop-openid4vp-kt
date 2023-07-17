@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp.internal.response
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.AuthorizationResponsePayload.*
 import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
 
 /**
  * Default implementation of [AuthorizationResponseBuilder]
@@ -33,20 +32,21 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
             is Consensus.NegativeConsensus -> negativeConsensusPayload(requestObject)
             is Consensus.PositiveConsensus -> positiveConsensusPayload(requestObject, consensus)
         }
-        return toAuthorizationResponse(requestObject.responseMode, payload)
+        val jarmSpec = JarmSpec.fromClientMetadata(requestObject.clientMetaData)
+        return toAuthorizationResponse(requestObject.responseMode, payload, jarmSpec)
     }
 
     private fun positiveConsensusPayload(
         requestObject: ResolvedRequestObject,
         consensus: Consensus.PositiveConsensus,
     ): AuthorizationResponsePayload = when (requestObject) {
-        is SiopAuthentication -> when (consensus) {
-            is IdTokenConsensus -> SiopAuthenticationResponse(consensus.idToken, requestObject.state)
+        is ResolvedRequestObject.SiopAuthentication -> when (consensus) {
+            is IdTokenConsensus -> SiopAuthentication(consensus.idToken, requestObject.state)
             else -> null
         }
 
-        is OpenId4VPAuthorization -> when (consensus) {
-            is VPTokenConsensus -> OpenId4VPAuthorizationResponse(
+        is ResolvedRequestObject.OpenId4VPAuthorization -> when (consensus) {
+            is VPTokenConsensus -> OpenId4VPAuthorization(
                 consensus.vpToken,
                 consensus.presentationSubmission,
                 requestObject.state,
@@ -54,8 +54,8 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
             else -> null
         }
 
-        is SiopOpenId4VPAuthentication -> when (consensus) {
-            is IdAndVPTokenConsensus -> SiopOpenId4VPAuthenticationResponse(
+        is ResolvedRequestObject.SiopOpenId4VPAuthentication -> when (consensus) {
+            is IdAndVPTokenConsensus -> SiopOpenId4VPAuthentication(
                 consensus.idToken,
                 consensus.vpToken,
                 consensus.presentationSubmission,
@@ -71,12 +71,13 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
     private fun toAuthorizationResponse(
         responseMode: ResponseMode,
         responseData: AuthorizationResponsePayload,
+        jarmSpec: JarmSpec,
     ): AuthorizationResponse = when (responseMode) {
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
-        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData)
+        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmSpec)
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData)
+        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmSpec)
         is ResponseMode.Query -> AuthorizationResponse.Query(responseMode.redirectUri, responseData)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData)
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec)
     }
 }

@@ -15,6 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -38,7 +43,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * @param idToken The id_token produced by the wallet
      * @param state the state of the [request][ResolvedRequestObject.SiopAuthentication.state]
      */
-    data class SiopAuthenticationResponse(
+    data class SiopAuthentication(
         val idToken: Jwt,
         override val state: String,
     ) : Success
@@ -53,7 +58,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      */
-    data class OpenId4VPAuthorizationResponse(
+    data class OpenId4VPAuthorization(
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
         override val state: String,
@@ -70,7 +75,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
      *  that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      */
-    data class SiopOpenId4VPAuthenticationResponse(
+    data class SiopOpenId4VPAuthentication(
         val idToken: Jwt,
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
@@ -163,7 +168,7 @@ sealed interface AuthorizationResponse : Serializable {
      * An authorization response to be communicated via either
      * direct_post or direct_pst.jwt
      */
-    sealed interface DirectPostResponse : AuthorizationResponse {
+    sealed interface DirectPostResponse :  AuthorizationResponse {
         val responseUri: URL
     }
 
@@ -180,8 +185,9 @@ sealed interface AuthorizationResponse : Serializable {
      *
      * @param responseUri the verifier/RP URI where the response will be posted
      * @param data the contents of the authorization request
+     * @param jarmSpec
      */
-    data class DirectPostJwt(override val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
+    data class DirectPostJwt(override val responseUri: URL, val data: AuthorizationResponsePayload, val jarmSpec: JarmSpec) : DirectPostResponse
 
     /**
      * An authorization response to be communicated via
@@ -192,10 +198,10 @@ sealed interface AuthorizationResponse : Serializable {
     }
 
     data class Query(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
-    data class QueryJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
+    data class QueryJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload, val jarmSpec: JarmSpec) : RedirectResponse
 
     data class Fragment(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
-    data class FragmentJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
+    data class FragmentJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload, val jarmSpec: JarmSpec) : RedirectResponse
 }
 
 /**
@@ -217,4 +223,42 @@ fun interface AuthorizationResponseBuilder {
          */
         val Default: AuthorizationResponseBuilder = DefaultAuthorizationResponseBuilder
     }
+}
+
+
+sealed interface JarmSpec {
+
+
+    class SignedResponseJarmSpec(val responseSigningAlg: JWSAlgorithm) : JarmSpec
+    class EncryptedResponseJarmSpec(val responseEncryptionAlg: JWEAlgorithm,
+                                    val responseEncryptionEnc: EncryptionMethod,
+                                    val keySet: JWKSet) : JarmSpec
+    class SignedAndEncryptedResponseJarmSpec(val responseSigningAlg: JWSAlgorithm,
+                                             val responseEncryptionAlg: JWEAlgorithm,
+                                             val responseEncryptionEnc: EncryptionMethod,
+                                             val keySet: JWKSet) : JarmSpec
+
+    companion object {
+        fun fromClientMetadata(clientMetaData: OIDCClientMetadata) : JarmSpec {
+
+            fun signedResponse() : Boolean = clientMetaData.getCustomField("authorization_signed_response_alg") != null
+            fun encryptedResponse() : Boolean = clientMetaData.getCustomField("authorization_encrypted_response_alg") != null
+
+            return when {
+                signedResponse() && !encryptedResponse() -> SignedResponseJarmSpec(clientMetaData.getCustomField("authorization_signed_response_alg") as JWSAlgorithm)
+                !signedResponse() && encryptedResponse() -> EncryptedResponseJarmSpec(
+                                                                    clientMetaData.getCustomField("authorization_authorization_encrypted_response_alg_response_alg") as JWEAlgorithm,
+                                                                    clientMetaData.getCustomField("authorization_authorization_encrypted_response_alg_response_enc") as EncryptionMethod,
+                                                                    clientMetaData.jwkSet)
+                signedResponse() && encryptedResponse() -> SignedAndEncryptedResponseJarmSpec(
+                                                                    clientMetaData.getCustomField("authorization_signed_response_alg") as JWSAlgorithm,
+                                                                    clientMetaData.getCustomField("authorization_authorization_encrypted_response_alg_response_alg") as JWEAlgorithm,
+                                                                    clientMetaData.getCustomField("authorization_authorization_encrypted_response_alg_response_enc") as EncryptionMethod,
+                                                                    clientMetaData.jwkSet)
+
+                else -> throw RuntimeException("Cannot resolve JarmSpec from passed Client Metadata")
+            }
+        }
+    }
+
 }

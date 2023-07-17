@@ -122,6 +122,7 @@ sealed interface AuthorizationRequest : Serializable {
 sealed interface ResolvedRequestObject : Serializable {
 
     val responseMode: ResponseMode
+    val clientMetaData: OIDCClientMetadata
     val state: String
 
     /**
@@ -129,7 +130,7 @@ sealed interface ResolvedRequestObject : Serializable {
      */
     data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
-        val clientMetaData: OIDCClientMetadata,
+        override val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
@@ -142,7 +143,7 @@ sealed interface ResolvedRequestObject : Serializable {
      */
     data class OpenId4VPAuthorization(
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: OIDCClientMetadata,
+        override val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
@@ -155,7 +156,7 @@ sealed interface ResolvedRequestObject : Serializable {
     data class SiopOpenId4VPAuthentication(
         val idTokenType: List<IdTokenType>,
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: OIDCClientMetadata,
+        override val clientMetaData: OIDCClientMetadata,
         val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,

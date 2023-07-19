@@ -48,7 +48,7 @@ class SiopOpenId4VpKtor(
         authorizationResolver(ioCoroutineDispatcher, walletOpenId4VPConfig, httpClientFactory).resolveRequest(request)
 
     override suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse =
-        AuthorizationResponseBuilder.Default.build(requestObject, consensus)
+        AuthorizationResponseBuilder.make(walletOpenId4VPConfig).build(requestObject, consensus)
 
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
         dispatcher(ioCoroutineDispatcher, httpClientFactory).dispatch(response)
@@ -138,7 +138,7 @@ class SiopOpenId4VpKtor(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = DefaultFactory,
         ): Dispatcher {
-            fun createDispatcher(c: HttpClient) = DefaultDispatcher(ioCoroutineDispatcher) { url, parameters ->
+            fun createDispatcher(c: HttpClient): DefaultDispatcher = DefaultDispatcher(ioCoroutineDispatcher) { url, parameters ->
                 runCatching {
                     val response = c.submitForm(
                         url = url.toString(),

@@ -22,7 +22,9 @@ import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
 /**
  * Default implementation of [AuthorizationResponseBuilder]
  */
-internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
+internal class DefaultAuthorizationResponseBuilder(
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+) : AuthorizationResponseBuilder {
 
     override suspend fun build(
         requestObject: ResolvedRequestObject,
@@ -32,7 +34,7 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
             is Consensus.NegativeConsensus -> negativeConsensusPayload(requestObject)
             is Consensus.PositiveConsensus -> positiveConsensusPayload(requestObject, consensus)
         }
-        val jarmSpec = JarmSpec.fromClientMetadata(requestObject.clientMetaData)
+        val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
         return toAuthorizationResponse(requestObject.responseMode, payload, jarmSpec)
     }
 
@@ -41,7 +43,11 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
         consensus: Consensus.PositiveConsensus,
     ): AuthorizationResponsePayload = when (requestObject) {
         is ResolvedRequestObject.SiopAuthentication -> when (consensus) {
-            is IdTokenConsensus -> SiopAuthentication(consensus.idToken, requestObject.state)
+            is IdTokenConsensus -> SiopAuthentication(
+                consensus.idToken,
+                requestObject.state,
+                requestObject.clientId,
+            )
             else -> null
         }
 
@@ -50,6 +56,7 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
                 consensus.vpToken,
                 consensus.presentationSubmission,
                 requestObject.state,
+                requestObject.clientId,
             )
             else -> null
         }
@@ -60,13 +67,14 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
                 consensus.vpToken,
                 consensus.presentationSubmission,
                 requestObject.state,
+                requestObject.clientId,
             )
             else -> null
         }
     } ?: error("Unexpected consensus")
 
     private fun negativeConsensusPayload(requestObject: ResolvedRequestObject): NoConsensusResponseData =
-        NoConsensusResponseData(requestObject.state)
+        NoConsensusResponseData(requestObject.state, requestObject.clientId)
 
     private fun toAuthorizationResponse(
         responseMode: ResponseMode,

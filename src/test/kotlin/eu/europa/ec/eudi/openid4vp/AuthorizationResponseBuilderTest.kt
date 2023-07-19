@@ -19,11 +19,14 @@ import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
+import eu.europa.ec.eudi.prex.Id
+import eu.europa.ec.eudi.prex.PresentationDefinition
+import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -78,7 +81,7 @@ class AuthorizationResponseBuilderTest {
             ),
         )
 
-        val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
+        val response = AuthorizationResponseBuilder.make(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
 
         when (response) {
             is AuthorizationResponse.DirectPost ->
@@ -95,5 +98,37 @@ class AuthorizationResponseBuilderTest {
 
             else -> fail("Authorization response not of expected type: AuthorizationResponse.DirectPost")
         }
+    }
+
+    @Test
+    fun `when direct_post jwt, builder should return DirectPostJwt with JarmSpec of correct type`(): Unit = runBlocking {
+        val clientMetadataStr =
+            """
+                { "jwks": { "keys": [{"kty":"EC","use":"enc","crv":"P-256","kid":"123","x":"h9vfgIOK_KS40MNbX6Rpnc5-IkM8Tqvoc_6bG4nD610","y":"Yvo8GGg6axZhyikq8YqeqFk8apbp0PmjKo0cNZwkSDw","alg":"ECDH-ES"}, { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256","authorization_encrypted_response_alg":"ECDH_ES", "authorization_encrypted_response_enc":"A256GCM" }
+            """.trimIndent()
+        val clientMetaDataDecoded = json.decodeFromString<ClientMetaData>(clientMetadataStr)
+        val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
+        val resolvedRequest =
+            ResolvedRequestObject.OpenId4VPAuthorization(
+                presentationDefinition = PresentationDefinition(
+                    id = Id("pdId"),
+                    inputDescriptors = emptyList(),
+                ),
+                clientMetaData = clientMetadataValidated.getOrThrow(),
+                clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
+                nonce = "0S6_WzA2Mj",
+                responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
+                state = genState(),
+            )
+
+        val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+            "dummy_vp_token",
+            PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+        )
+        val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+
+        assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
+        assertNotNull((response as AuthorizationResponse.DirectPostJwt).jarmSpec)
+        assertTrue(response.jarmSpec is JarmSpec.EncryptedResponseJarmSpec)
     }
 }

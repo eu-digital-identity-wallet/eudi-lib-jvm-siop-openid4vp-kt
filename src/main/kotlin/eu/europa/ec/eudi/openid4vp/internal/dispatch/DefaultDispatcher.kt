@@ -34,7 +34,7 @@ import kotlinx.serialization.json.Json
  */
 internal class DefaultDispatcher(
     private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>
+    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>,
 ) : Dispatcher {
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
         when (response) {
@@ -131,4 +131,3 @@ private object DirectPostForm {
         }
     }
 }
-

@@ -15,12 +15,17 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.SupportedClaimFormat
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.time.Duration
+import java.util.*
 
 sealed interface JwkSetSource {
     data class ByValue(val jwks: JsonObject) : JwkSetSource
@@ -55,6 +60,12 @@ data class WalletOpenId4VPConfig(
     val decentralizedIdentifier: String = "DID:example:12341512#$",
     val idTokenTTL: Duration = Duration.ofMinutes(10),
     val presentationDefinitionUriSupported: Boolean = false,
+    val signingKey: RSAKey = RSAKeyGenerator(2048)
+        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
+        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
+        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
+        .generate(),
+    val signingKeySet: JWKSet = JWKSet(signingKey),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),

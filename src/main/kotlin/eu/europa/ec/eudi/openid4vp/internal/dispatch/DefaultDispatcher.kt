@@ -58,7 +58,7 @@ internal class DefaultDispatcher(
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
         withContext(ioCoroutineDispatcher) {
             val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
-            httpFormPost.post(response.responseUri, mapOf("response" to joseResponse))
+            httpFormPost.post(response.responseUri, mapOf("response" to joseResponse, "state" to response.data.state))
         }
 
     private fun redirectURI(response: AuthorizationResponse.RedirectResponse): DispatchOutcome.RedirectURI =

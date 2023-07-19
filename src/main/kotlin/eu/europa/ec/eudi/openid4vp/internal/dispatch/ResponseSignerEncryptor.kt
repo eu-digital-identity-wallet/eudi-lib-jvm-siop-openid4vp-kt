@@ -106,7 +106,7 @@ internal object ResponseSignerEncryptor {
         JWEAlgorithm.Family.RSA.any { it.name.equals(responseEncryptionAlg.name) } -> createRSAEncrypter(encryptionKeySet)
         else -> throw RuntimeException(
             "Unsupported encryption algorithm $responseEncryptionAlg." +
-                " Currently supported algorithms are [ECDH_ES, RSA_OAEP_256]",
+                " Currently supported encryption algorithm families are [ECDH_ES, RSA]",
         )
     }
 

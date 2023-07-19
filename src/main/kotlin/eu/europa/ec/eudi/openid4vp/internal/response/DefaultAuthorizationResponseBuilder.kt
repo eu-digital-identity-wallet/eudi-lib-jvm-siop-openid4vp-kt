@@ -34,8 +34,7 @@ internal class DefaultAuthorizationResponseBuilder(
             is Consensus.NegativeConsensus -> negativeConsensusPayload(requestObject)
             is Consensus.PositiveConsensus -> positiveConsensusPayload(requestObject, consensus)
         }
-        val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
-        return toAuthorizationResponse(requestObject.responseMode, payload, jarmSpec)
+        return toAuthorizationResponse(requestObject, payload)
     }
 
     private fun positiveConsensusPayload(
@@ -77,15 +76,23 @@ internal class DefaultAuthorizationResponseBuilder(
         NoConsensusResponseData(requestObject.state, requestObject.clientId)
 
     private fun toAuthorizationResponse(
-        responseMode: ResponseMode,
+        requestObject: ResolvedRequestObject,
         responseData: AuthorizationResponsePayload,
-        jarmSpec: JarmSpec,
-    ): AuthorizationResponse = when (responseMode) {
+    ): AuthorizationResponse = when (val responseMode = requestObject.responseMode) {
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
-        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmSpec)
+        is ResponseMode.DirectPostJwt -> {
+            val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+            AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmSpec)
+        }
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmSpec)
+        is ResponseMode.FragmentJwt -> {
+            val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+            AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmSpec)
+        }
         is ResponseMode.Query -> AuthorizationResponse.Query(responseMode.redirectUri, responseData)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec)
+        is ResponseMode.QueryJwt -> {
+            val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+            AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec)
+        }
     }
 }

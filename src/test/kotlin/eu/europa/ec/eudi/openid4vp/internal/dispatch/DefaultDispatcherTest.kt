@@ -19,13 +19,15 @@ import com.eygraber.uri.Uri
 import com.eygraber.uri.toUri
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWEObject
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
-import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
@@ -47,6 +49,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.security.interfaces.ECPrivateKey
+import java.util.*
 import kotlin.test.assertTrue
 
 class DefaultDispatcherTest {
@@ -217,7 +220,6 @@ class DefaultDispatcherTest {
             }.dispatch(response)
         }
 
-
         private fun ecdhDecrypt(ecPrivateKey: ECPrivateKey, jwtString: String): JWTClaimsSet {
             val jwt = EncryptedJWT.parse(jwtString)
             val rsaDecrypter = ECDHDecrypter(ecPrivateKey)
@@ -232,12 +234,19 @@ class DefaultDispatcherTest {
 
         private val dispatcher = DefaultDispatcher { _, _ -> error("Not used") }
         private val redirectUriBase = URI("https://foo.bar")
+        private val signingKey = RSAKeyGenerator(2048)
+            .keyUse(KeyUse.SIGNATURE)
+            .keyID(UUID.randomUUID().toString())
+            .issueTime(Date(System.currentTimeMillis()))
+            .generate()
+        private val signingKeySet: JWKSet = JWKSet(signingKey)
 
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() = runBlocking {
             val state = State().value
             val data = AuthorizationResponsePayload.NoConsensusResponseData(state, "client_id")
-            testQueryResponse(data) {
+            val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
+            testQueryResponse(data, response) {
                 assertEquals(
                     AuthorizationRequestErrorCode.USER_CANCELLED.code,
                     getQueryParameter("error"),
@@ -251,7 +260,8 @@ class DefaultDispatcherTest {
             val error = RequestValidationError.MissingNonce
             val data = AuthorizationResponsePayload.InvalidRequest(error, state, "client_id")
             val expectedErrorCode = AuthorizationRequestErrorCode.fromError(error)
-            testQueryResponse(data) {
+            val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
+            testQueryResponse(data, response) {
                 assertEquals(expectedErrorCode.code, getQueryParameter("error"))
             }
         }
@@ -262,19 +272,44 @@ class DefaultDispatcherTest {
                 val state = State().value
                 val dummyJwt = "dummy"
                 val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-                testQueryResponse(data) {
+                val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
+                testQueryResponse(data, response) {
                     assertEquals(dummyJwt, getQueryParameter("id_token"))
+                }
+            }
+
+        @Test
+        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() =
+            runBlocking {
+                val state = State().value
+                val dummyJwt = "dummy"
+                val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
+                val jarmSpec = JarmSpec.SignedResponseJarmSpec(
+                    holderId = "DID:example:123",
+                    responseSigningAlg = JWSAlgorithm.RS256,
+                    signingKeySet = signingKeySet,
+                )
+                val response = AuthorizationResponse.QueryJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
+                testQueryResponse(data, response) {
+                    assertNotNull(getQueryParameter("response"))
+                    assertNotNull(getQueryParameter("state"))
+                    val signedJWT = SignedJWT.parse(getQueryParameter("response"))
+                    signedJWT.verify(RSASSAVerifier(signingKey))
+                    assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
+                    assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
+                    assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
+                    assertEquals(dummyJwt, signedJWT.jwtClaimsSet.getClaim("id_token"))
                 }
             }
 
         private fun testQueryResponse(
             data: AuthorizationResponsePayload,
+            response: AuthorizationResponse.RedirectResponse,
             assertions: Uri.() -> Unit,
         ) = runBlocking {
-            val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
             val dispatchOutcome = dispatcher.dispatch(response)
             assertTrue(dispatchOutcome is DispatchOutcome.RedirectURI)
-            val redirectUri = (dispatchOutcome as DispatchOutcome.RedirectURI).value.toUri()
+            val redirectUri = (dispatchOutcome).value.toUri()
                 .also { println(it) }
                 .also(assertions)
             assertEquals(data.state, redirectUri.getQueryParameter("state"))
@@ -287,12 +322,19 @@ class DefaultDispatcherTest {
 
         private val dispatcher = DefaultDispatcher { _, _ -> error("Not used") }
         private val redirectUriBase = URI("https://foo.bar")
+        private val signingKey = RSAKeyGenerator(2048)
+            .keyUse(KeyUse.SIGNATURE)
+            .keyID(UUID.randomUUID().toString())
+            .issueTime(Date(System.currentTimeMillis()))
+            .generate()
+        private val signingKeySet: JWKSet = JWKSet(signingKey)
 
         @Test
         fun `when no consensus, fragment must contain an error`() = runBlocking {
             val state = State().value
             val data = AuthorizationResponsePayload.NoConsensusResponseData(state, "client_id")
-            testFragmentResponse(data) { fragmentData ->
+            val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
+            testFragmentResponse(data, response) { fragmentData ->
                 assertEquals(AuthorizationRequestErrorCode.USER_CANCELLED.code, fragmentData["error"])
             }
         }
@@ -303,7 +345,8 @@ class DefaultDispatcherTest {
             val error = RequestValidationError.MissingNonce
             val data = AuthorizationResponsePayload.InvalidRequest(error, state, "client_id")
             val expectedErrorCode = AuthorizationRequestErrorCode.fromError(error)
-            testFragmentResponse(data) { fragmentData ->
+            val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
+            testFragmentResponse(data, response) { fragmentData ->
                 assertEquals(expectedErrorCode.code, fragmentData["error"])
             }
         }
@@ -313,16 +356,40 @@ class DefaultDispatcherTest {
             val state = State().value
             val dummyJwt = "dummy"
             val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-            testFragmentResponse(data) { fragmentData ->
+            val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
+            testFragmentResponse(data, response) { fragmentData ->
                 assertEquals(dummyJwt, fragmentData["id_token"])
+            }
+        }
+
+        @Test
+        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() = runBlocking {
+            val state = State().value
+            val dummyJwt = "dummy"
+            val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
+            val jarmSpec = JarmSpec.SignedResponseJarmSpec(
+                holderId = "DID:example:123",
+                responseSigningAlg = JWSAlgorithm.RS256,
+                signingKeySet = signingKeySet,
+            )
+            val response = AuthorizationResponse.FragmentJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
+            testFragmentResponse(data, response) { fragmentData ->
+                assertNotNull(fragmentData["state"])
+                assertNotNull(fragmentData["response"])
+                val signedJWT = SignedJWT.parse(fragmentData["response"])
+                signedJWT.verify(RSASSAVerifier(signingKey))
+                assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
+                assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
+                assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
+                assertEquals(dummyJwt, signedJWT.jwtClaimsSet.getClaim("id_token"))
             }
         }
 
         private fun testFragmentResponse(
             data: AuthorizationResponsePayload,
+            response: AuthorizationResponse.RedirectResponse,
             assertions: (Map<String, String>) -> Unit,
         ) = runBlocking {
-            val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
             val dispatchOutcome = dispatcher.dispatch(response)
             assertTrue(dispatchOutcome is DispatchOutcome.RedirectURI)
             val redirectUri = (dispatchOutcome as DispatchOutcome.RedirectURI).value.toUri()

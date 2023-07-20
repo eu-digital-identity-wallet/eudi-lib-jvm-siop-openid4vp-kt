@@ -35,17 +35,17 @@ internal object ResponseSignerEncryptor {
 
     fun signEncryptResponse(spec: JarmSpec, data: AuthorizationResponsePayload): String {
         return when (spec) {
-            is JarmSpec.SignedResponseJarmSpec -> sign(spec, data)
-            is JarmSpec.EncryptedResponseJarmSpec -> encrypt(spec, data)
-            is JarmSpec.SignedAndEncryptedResponseJarmSpec -> signAndEncrypt(spec, data)
+            is JarmSpec.SignedResponse -> sign(spec, data)
+            is JarmSpec.EncryptedResponse -> encrypt(spec, data)
+            is JarmSpec.SignedAndEncryptedResponse -> signAndEncrypt(spec, data)
         }
     }
 
-    private fun sign(spec: JarmSpec.SignedResponseJarmSpec, data: AuthorizationResponsePayload): String {
+    private fun sign(spec: JarmSpec.SignedResponse, data: AuthorizationResponsePayload): String {
         return dataAsSignedJWT(data, spec.responseSigningAlg, spec.signingKeySet, spec.holderId).serialize()
     }
 
-    private fun encrypt(spec: JarmSpec.EncryptedResponseJarmSpec, data: AuthorizationResponsePayload): String {
+    private fun encrypt(spec: JarmSpec.EncryptedResponse, data: AuthorizationResponsePayload): String {
         val jweEncrypter = deductEncryptor(spec.responseEncryptionAlg, spec.encryptionKeySet)
         val jweHeader = JWEHeader(spec.responseEncryptionAlg, spec.responseEncryptionEnc)
         val encryptedJWT = EncryptedJWT(jweHeader, dataAsJwt(data, spec.holderId))
@@ -56,7 +56,7 @@ internal object ResponseSignerEncryptor {
     }
 
     private fun signAndEncrypt(
-        spec: JarmSpec.SignedAndEncryptedResponseJarmSpec,
+        spec: JarmSpec.SignedAndEncryptedResponse,
         data: AuthorizationResponsePayload,
     ): String {
         val signedJwt = dataAsSignedJWT(data, spec.responseSigningAlg, spec.signingKeySet, spec.holderId)
@@ -92,7 +92,7 @@ internal object ResponseSignerEncryptor {
     ): JWSSigner = when {
         JWSAlgorithm.Family.EC.contains(signingAlg) -> createECSigner(signingKeySet)
         JWSAlgorithm.Family.RSA.contains(signingAlg) -> createRSASigner(signingKeySet)
-        else -> throw RuntimeException(
+        else -> throw UnsupportedOperationException(
             "Unsupported signing algorithm $signingKeySet. Currently supported signing " +
                 "algorithm families are [EC, RSA]",
         )
@@ -104,7 +104,7 @@ internal object ResponseSignerEncryptor {
     ): JWEEncrypter = when {
         JWEAlgorithm.Family.ECDH_ES.any { it.name.equals(responseEncryptionAlg.name) } -> createECDHEncrypter(encryptionKeySet)
         JWEAlgorithm.Family.RSA.any { it.name.equals(responseEncryptionAlg.name) } -> createRSAEncrypter(encryptionKeySet)
-        else -> throw RuntimeException(
+        else -> throw UnsupportedOperationException(
             "Unsupported encryption algorithm $responseEncryptionAlg." +
                 " Currently supported encryption algorithm families are [ECDH_ES, RSA]",
         )

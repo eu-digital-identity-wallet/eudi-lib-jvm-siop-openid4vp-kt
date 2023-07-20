@@ -16,6 +16,9 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.crypto.RSASSAVerifier
+import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
@@ -25,6 +28,8 @@ import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import java.time.Duration
+import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -33,6 +38,12 @@ import kotlin.test.fail
 class AuthorizationResponseBuilderTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
+
+    private val signingKey = RSAKeyGenerator(2048)
+        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
+        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
+        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
+        .generate()
 
     private val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
@@ -43,6 +54,14 @@ class AuthorizationResponseBuilderTest {
             SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
             SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
         ),
+        signingKey = signingKey,
+        signingKeySet = JWKSet(signingKey),
+        idTokenTTL = Duration.ofMinutes(10),
+        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+        decentralizedIdentifier = "DID:example:12341512#$",
+        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationEncryptionAlgValuesSupported = emptyList(),
+        authorizationEncryptionEncValuesSupported = emptyList(),
     )
 
     private val clientMetadataStr =
@@ -129,6 +148,6 @@ class AuthorizationResponseBuilderTest {
 
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
         assertNotNull((response as AuthorizationResponse.DirectPostJwt).jarmSpec)
-        assertTrue(response.jarmSpec is JarmSpec.EncryptedResponseJarmSpec)
+        assertTrue(response.jarmSpec is JarmSpec.EncryptedResponse)
     }
 }

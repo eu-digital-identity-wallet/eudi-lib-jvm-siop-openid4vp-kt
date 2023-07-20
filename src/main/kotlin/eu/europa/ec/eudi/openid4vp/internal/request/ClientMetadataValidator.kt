@@ -41,6 +41,7 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
                     " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
             )
         }
+        // TODO: Find if signing/encryption algs match the supported ones
         val authSgnRespAlg: JWSAlgorithm? = clientMetadata.authorizationSignedResponseAlg?.let { JWSAlgorithm.parse(it) }
         val authEncRespAlg: JWEAlgorithm? = clientMetadata.authorizationEncryptedResponseAlg?.let { JWEAlgorithm.parse(it) }
         val authEncRespEnc: EncryptionMethod? = clientMetadata.authorizationEncryptedResponseEnc?.let { EncryptionMethod.parse(it) }

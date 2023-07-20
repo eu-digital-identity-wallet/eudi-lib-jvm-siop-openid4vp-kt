@@ -194,20 +194,20 @@ sealed interface JarmSpec {
 
     val holderId: String
 
-    class SignedResponseJarmSpec(
+    class SignedResponse(
         override val holderId: String,
         val responseSigningAlg: JWSAlgorithm,
         val signingKeySet: JWKSet,
     ) : JarmSpec
 
-    class EncryptedResponseJarmSpec(
+    class EncryptedResponse(
         override val holderId: String,
         val responseEncryptionAlg: JWEAlgorithm,
         val responseEncryptionEnc: EncryptionMethod,
         val encryptionKeySet: JWKSet,
     ) : JarmSpec
 
-    class SignedAndEncryptedResponseJarmSpec(
+    class SignedAndEncryptedResponse(
         override val holderId: String,
         val responseSigningAlg: JWSAlgorithm,
         val responseEncryptionAlg: JWEAlgorithm,
@@ -217,26 +217,26 @@ sealed interface JarmSpec {
     ) : JarmSpec
 
     companion object {
-        fun make(clientMetaData: OIDCClientMetadata, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec {
+        fun make(clientMetaData: OIDCClientMetadata, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? {
             fun signedResponse(): Boolean = clientMetaData.getCustomField("authorization_signed_response_alg") != null
             fun encryptedResponse(): Boolean =
                 clientMetaData.getCustomField("authorization_encrypted_response_alg") != null
 
             return when {
-                signedResponse() && !encryptedResponse() -> SignedResponseJarmSpec(
+                signedResponse() && !encryptedResponse() -> SignedResponse(
                     walletOpenId4VPConfig.decentralizedIdentifier,
                     clientMetaData.getCustomField("authorization_signed_response_alg") as JWSAlgorithm,
                     walletOpenId4VPConfig.signingKeySet,
                 )
 
-                !signedResponse() && encryptedResponse() -> EncryptedResponseJarmSpec(
+                !signedResponse() && encryptedResponse() -> EncryptedResponse(
                     walletOpenId4VPConfig.decentralizedIdentifier,
                     clientMetaData.getCustomField("authorization_encrypted_response_alg") as JWEAlgorithm,
                     clientMetaData.getCustomField("authorization_encrypted_response_enc") as EncryptionMethod,
                     clientMetaData.jwkSet,
                 )
 
-                signedResponse() && encryptedResponse() -> SignedAndEncryptedResponseJarmSpec(
+                signedResponse() && encryptedResponse() -> SignedAndEncryptedResponse(
                     walletOpenId4VPConfig.decentralizedIdentifier,
                     clientMetaData.getCustomField("authorization_signed_response_alg") as JWSAlgorithm,
                     clientMetaData.getCustomField("authorization_encrypted_response_alg") as JWEAlgorithm,
@@ -245,7 +245,7 @@ sealed interface JarmSpec {
                     clientMetaData.jwkSet,
                 )
 
-                else -> throw RuntimeException("Cannot resolve JarmSpec from passed Client Metadata")
+                else -> null
             }
         }
     }

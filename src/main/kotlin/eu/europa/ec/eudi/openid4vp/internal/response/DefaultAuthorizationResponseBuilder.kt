@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp.internal.response
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.AuthorizationResponsePayload.*
 import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
+import java.lang.IllegalArgumentException
 
 /**
  * Default implementation of [AuthorizationResponseBuilder]
@@ -82,16 +83,19 @@ internal class DefaultAuthorizationResponseBuilder(
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
         is ResponseMode.DirectPostJwt -> {
             val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+                ?: throw IllegalArgumentException("Cannot deduct JarmSpec from passed Client Metadata")
             AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmSpec)
         }
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
         is ResponseMode.FragmentJwt -> {
             val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+                ?: throw IllegalArgumentException("Cannot deduct JarmSpec from passed Client Metadata")
             AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmSpec)
         }
         is ResponseMode.Query -> AuthorizationResponse.Query(responseMode.redirectUri, responseData)
         is ResponseMode.QueryJwt -> {
             val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+                ?: throw IllegalArgumentException("Cannot deduct JarmSpec from passed Client Metadata")
             AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec)
         }
     }

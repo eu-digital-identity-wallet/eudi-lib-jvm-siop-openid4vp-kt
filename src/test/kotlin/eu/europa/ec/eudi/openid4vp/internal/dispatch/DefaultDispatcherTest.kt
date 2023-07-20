@@ -26,6 +26,7 @@ import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.EncryptedJWT
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.security.interfaces.ECPrivateKey
+import java.time.Duration
 import java.util.*
 import kotlin.test.assertTrue
 
@@ -59,6 +61,13 @@ class DefaultDispatcherTest {
     inner class DirectPostJwtResponse {
 
         private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
+
+        private val signingKey = RSAKeyGenerator(2048)
+            .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
+            .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
+            .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
+            .generate()
+
         private val walletConfig = WalletOpenId4VPConfig(
             presentationDefinitionUriSupported = true,
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.IsoX509),
@@ -68,7 +77,16 @@ class DefaultDispatcherTest {
                 SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
                 SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
             ),
+            signingKey = signingKey,
+            signingKeySet = JWKSet(signingKey),
+            idTokenTTL = Duration.ofMinutes(10),
+            preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+            decentralizedIdentifier = "DID:example:12341512#$",
+            authorizationSigningAlgValuesSupported = emptyList(),
+            authorizationEncryptionAlgValuesSupported = emptyList(),
+            authorizationEncryptionEncValuesSupported = emptyList(),
         )
+
         private val ecKey = ECKeyGenerator(Curve.P_256)
             .keyUse(KeyUse.ENCRYPTION)
             .algorithm(JWEAlgorithm.ECDH_ES)
@@ -165,7 +183,7 @@ class DefaultDispatcherTest {
                     assertTrue(encrypted.state == JWEObject.State.DECRYPTED)
 
                     val signedJWT = encrypted.payload.toSignedJWT()
-                    signedJWT.verify(RSASSAVerifier(walletConfig.signingKey))
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
                     assertTrue(signedJWT.state == JWSObject.State.VERIFIED)
 
                     assertNotNull(signedJWT.jwtClaimsSet.issuer)
@@ -208,7 +226,7 @@ class DefaultDispatcherTest {
                 runCatching {
                     val joseResponse = parameters.get("response") as String
                     val signedJWT = SignedJWT.parse(joseResponse)
-                    signedJWT.verify(RSASSAVerifier(walletConfig.signingKey))
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
 
                     assertNotNull(signedJWT)
                     assertNotNull(signedJWT.jwtClaimsSet.issuer)
@@ -284,7 +302,7 @@ class DefaultDispatcherTest {
                 val state = State().value
                 val dummyJwt = "dummy"
                 val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-                val jarmSpec = JarmSpec.SignedResponseJarmSpec(
+                val jarmSpec = JarmSpec.SignedResponse(
                     holderId = "DID:example:123",
                     responseSigningAlg = JWSAlgorithm.RS256,
                     signingKeySet = signingKeySet,
@@ -367,7 +385,7 @@ class DefaultDispatcherTest {
             val state = State().value
             val dummyJwt = "dummy"
             val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-            val jarmSpec = JarmSpec.SignedResponseJarmSpec(
+            val jarmSpec = JarmSpec.SignedResponse(
                 holderId = "DID:example:123",
                 responseSigningAlg = JWSAlgorithm.RS256,
                 signingKeySet = signingKeySet,

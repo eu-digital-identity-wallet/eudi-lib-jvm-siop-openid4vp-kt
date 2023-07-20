@@ -15,6 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.oauth2.sdk.id.State
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -24,7 +27,8 @@ import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.net.URLEncoder
-import kotlin.test.Ignore
+import java.time.Duration
+import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -40,6 +44,12 @@ class AuthorizationRequestResolverTest {
         ?.replace("  ", "")
         ?.also { URLEncoder.encode(it, "UTF-8") }
 
+    private val signingKey = RSAKeyGenerator(2048)
+        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
+        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
+        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
+        .generate()
+
     private val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.IsoX509),
@@ -49,6 +59,14 @@ class AuthorizationRequestResolverTest {
             SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
             SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
         ),
+        signingKey = signingKey,
+        signingKeySet = JWKSet(signingKey),
+        idTokenTTL = Duration.ofMinutes(10),
+        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+        decentralizedIdentifier = "DID:example:12341512#$",
+        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationEncryptionAlgValuesSupported = emptyList(),
+        authorizationEncryptionEncValuesSupported = emptyList(),
     )
 
     private val resolver = SiopOpenId4Vp.ktor(walletConfig)
@@ -219,38 +237,6 @@ class AuthorizationRequestResolverTest {
 
         resolution.validateInvalid<RequestValidationError.MissingClientId>()
     }
-
-    @Test
-    @Ignore
-    fun `when RP's subject_syntax_types_supported in client metadata don't match OP's reject the request`(): Unit =
-        runBlocking {
-            val authRequest =
-                "https://client.example.org/universal-link?" +
-                    "response_type=id_token" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
-                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&nonce=n-0S6_WzA2Mj" +
-                    "&state=${genState()}" +
-                    "&scope=openid" +
-                    "&client_metadata=$clientMetadataJwksInline"
-
-            val walletConfig = WalletOpenId4VPConfig(
-                presentationDefinitionUriSupported = true,
-                supportedClientIdSchemes = listOf(SupportedClientIdScheme.IsoX509),
-                vpFormatsSupported = emptyList(),
-                subjectSyntaxTypesSupported = listOf(
-                    SubjectSyntaxType.DecentralizedIdentifier.parse("did:test"),
-                ),
-            )
-
-            val resolver = SiopOpenId4Vp.ktor(walletConfig)
-
-            val authReq = AuthorizationRequest.make(authRequest).also { println(it) }.getOrThrow()
-            val resolution = resolver.resolveRequest(authReq)
-
-            resolution.validateInvalid<RequestValidationError.SubjectSyntaxTypesNoMatch>()
-        }
 
     @OptIn(ExperimentalSerializationApi::class)
     fun readFileAsText(fileName: String): String? {

@@ -52,9 +52,9 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
             idTokenJWEEnc = EncryptionMethod.parse(clientMetadata.idTokenEncryptedResponseEnc)
             jwkSet = jwkSets
             setCustomField("subject_syntax_types_supported", types)
-            authSgnRespAlg.let { setCustomField("authorization_signed_response_alg", it) }
-            authEncRespAlg.let { setCustomField("authorization_encrypted_response_alg", it) }
-            authEncRespEnc.let { setCustomField("authorization_encrypted_response_enc", it) }
+            authSgnRespAlg?.let { setCustomField("authorization_signed_response_alg", it) }
+            authEncRespAlg?.let { setCustomField("authorization_encrypted_response_alg", it) }
+            authEncRespEnc?.let { setCustomField("authorization_encrypted_response_enc", it) }
         }
     }
 

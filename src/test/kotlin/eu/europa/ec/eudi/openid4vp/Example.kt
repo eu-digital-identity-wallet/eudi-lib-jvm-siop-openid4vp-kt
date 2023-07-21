@@ -31,8 +31,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URLEncoder
 import java.security.SecureRandom
@@ -181,8 +180,11 @@ class Verifier private constructor(
         private fun formatAuthorizationRequest(iniTransactionResponse: JsonObject): URI {
             fun String.encode() = URLEncoder.encode(this, "UTF-8")
             val clientId = iniTransactionResponse["client_id"]?.jsonPrimitive?.content?.encode()!!
-            val requestUri = iniTransactionResponse["request_uri"]?.jsonPrimitive?.content?.encode()!!
-            return URI("eudi-wallet://authorize?client_id=$clientId&request_uri=$requestUri")
+            val requestUri = iniTransactionResponse["request_uri"]?.jsonPrimitive?.contentOrNull?.encode()?.let { "request_uri=$it" }
+            val request = iniTransactionResponse["request"]?.jsonPrimitive?.contentOrNull?.let { "request=$it" }
+            require(request != null || requestUri != null)
+            val requestPart = requestUri ?: request
+            return URI("eudi-wallet://authorize?client_id=$clientId&$requestPart")
         }
 
         private fun randomNonce(): String = Nonce().value

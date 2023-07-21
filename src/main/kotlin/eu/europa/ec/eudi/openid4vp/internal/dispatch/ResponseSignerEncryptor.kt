@@ -48,7 +48,8 @@ internal object ResponseSignerEncryptor {
     private fun encrypt(spec: JarmSpec.EncryptedResponse, data: AuthorizationResponsePayload): String {
         val jweEncrypter = deductEncryptor(spec.responseEncryptionAlg, spec.encryptionKeySet)
         val jweHeader = JWEHeader(spec.responseEncryptionAlg, spec.responseEncryptionEnc)
-        val encryptedJWT = EncryptedJWT(jweHeader, dataAsJwt(data, spec.holderId))
+        val dataAsJWT = DirectPostForm.of(data).asJWT(spec.holderId)
+        val encryptedJWT = EncryptedJWT(jweHeader, dataAsJWT)
         return with(encryptedJWT) {
             encrypt(jweEncrypter)
             serialize()
@@ -81,7 +82,8 @@ internal object ResponseSignerEncryptor {
         val header = JWSHeader.Builder(signingAlg)
             .keyID("") // TODO: keyId
             .build()
-        val signedJWT = SignedJWT(header, dataAsJwt(data, holderId))
+        val dataAsJWT = DirectPostForm.of(data).asJWT(holderId)
+        val signedJWT = SignedJWT(header, dataAsJWT)
         signedJWT.sign(jwsSigner)
         return signedJWT
     }
@@ -135,13 +137,13 @@ internal object ResponseSignerEncryptor {
         return RSASSASigner(RSAKey.parse(rsaJWK.toJSONObject()))
     }
 
-    private fun dataAsJwt(data: AuthorizationResponsePayload, holderId: String): JWTClaimsSet? {
+    private fun Map<String, String>.asJWT(holderId: String): JWTClaimsSet {
         return with(JWTClaimsSet.Builder()) {
             issuer(holderId)
-            audience(data.clientId)
             issueTime(Date())
-            DirectPostForm.of(data).map { claim(it.key, it.value) }
+            this@asJWT.entries.map { claim(it.key, it.value) }
             build()
         }
     }
+
 }

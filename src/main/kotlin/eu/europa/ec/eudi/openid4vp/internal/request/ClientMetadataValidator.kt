@@ -33,8 +33,10 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
         val jwkSets = parseRequiredJwks(unvalidatedClientMetadata).getOrThrow()
         val types = parseRequiredSubjectSyntaxTypes(unvalidatedClientMetadata).getOrThrow()
         if (unvalidatedClientMetadata.authorizationEncryptedResponseAlg != null &&
-            unvalidatedClientMetadata.authorizationEncryptedResponseEnc == null) {
-            throw RuntimeException("Cannot construct ResponseSigningEncryptionSpec from client metadata:" +
+            unvalidatedClientMetadata.authorizationEncryptedResponseEnc == null
+        ) {
+            throw RuntimeException(
+                "Cannot construct ResponseSigningEncryptionSpec from client metadata:" +
                     " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
             )
         }

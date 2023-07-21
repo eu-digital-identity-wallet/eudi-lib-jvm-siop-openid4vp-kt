@@ -40,7 +40,7 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
         ) {
             throw RuntimeException(
                 "Cannot construct ResponseSigningEncryptionSpec from client metadata:" +
-                        " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
+                    " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
             )
         }
         val authSgnRespAlg: JWSAlgorithm? =
@@ -65,18 +65,21 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
     }
 
     private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {
-        return if (signingAlg.isNullOrEmpty()) null
-        else JWSAlgorithm.parse(signingAlg)
+        return if (signingAlg.isNullOrEmpty()) {
+            null
+        } else JWSAlgorithm.parse(signingAlg)
     }
 
     private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? {
-        return if (encryptionAlg.isNullOrEmpty()) null
-        else JWEAlgorithm.parse(encryptionAlg)
+        return if (encryptionAlg.isNullOrEmpty()) {
+            null
+        } else JWEAlgorithm.parse(encryptionAlg)
     }
 
     private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
-        return if (encryptionMethod.isNullOrEmpty()) null
-        else EncryptionMethod.parse(encryptionMethod)
+        return if (encryptionMethod.isNullOrEmpty()) {
+            null
+        } else EncryptionMethod.parse(encryptionMethod)
     }
 
     private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> {

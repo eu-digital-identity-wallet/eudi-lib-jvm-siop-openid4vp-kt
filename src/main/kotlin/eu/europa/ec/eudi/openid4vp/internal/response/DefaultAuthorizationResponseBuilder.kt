@@ -18,12 +18,14 @@ package eu.europa.ec.eudi.openid4vp.internal.response
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.AuthorizationResponsePayload.*
 import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
+import java.lang.IllegalArgumentException
 
 /**
  * Default implementation of [AuthorizationResponseBuilder]
  */
-internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
+internal class DefaultAuthorizationResponseBuilder(
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+) : AuthorizationResponseBuilder {
 
     override suspend fun build(
         requestObject: ResolvedRequestObject,
@@ -33,50 +35,68 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
             is Consensus.NegativeConsensus -> negativeConsensusPayload(requestObject)
             is Consensus.PositiveConsensus -> positiveConsensusPayload(requestObject, consensus)
         }
-        return toAuthorizationResponse(requestObject.responseMode, payload)
+        return toAuthorizationResponse(requestObject, payload)
     }
 
     private fun positiveConsensusPayload(
         requestObject: ResolvedRequestObject,
         consensus: Consensus.PositiveConsensus,
     ): AuthorizationResponsePayload = when (requestObject) {
-        is SiopAuthentication -> when (consensus) {
-            is IdTokenConsensus -> SiopAuthenticationResponse(consensus.idToken, requestObject.state)
-            else -> null
-        }
-
-        is OpenId4VPAuthorization -> when (consensus) {
-            is VPTokenConsensus -> OpenId4VPAuthorizationResponse(
-                consensus.vpToken,
-                consensus.presentationSubmission,
+        is ResolvedRequestObject.SiopAuthentication -> when (consensus) {
+            is IdTokenConsensus -> SiopAuthentication(
+                consensus.idToken,
                 requestObject.state,
+                requestObject.clientId,
             )
             else -> null
         }
 
-        is SiopOpenId4VPAuthentication -> when (consensus) {
-            is IdAndVPTokenConsensus -> SiopOpenId4VPAuthenticationResponse(
+        is ResolvedRequestObject.OpenId4VPAuthorization -> when (consensus) {
+            is VPTokenConsensus -> OpenId4VPAuthorization(
+                consensus.vpToken,
+                consensus.presentationSubmission,
+                requestObject.state,
+                requestObject.clientId,
+            )
+            else -> null
+        }
+
+        is ResolvedRequestObject.SiopOpenId4VPAuthentication -> when (consensus) {
+            is IdAndVPTokenConsensus -> SiopOpenId4VPAuthentication(
                 consensus.idToken,
                 consensus.vpToken,
                 consensus.presentationSubmission,
                 requestObject.state,
+                requestObject.clientId,
             )
             else -> null
         }
     } ?: error("Unexpected consensus")
 
     private fun negativeConsensusPayload(requestObject: ResolvedRequestObject): NoConsensusResponseData =
-        NoConsensusResponseData(requestObject.state)
+        NoConsensusResponseData(requestObject.state, requestObject.clientId)
 
     private fun toAuthorizationResponse(
-        responseMode: ResponseMode,
+        requestObject: ResolvedRequestObject,
         responseData: AuthorizationResponsePayload,
-    ): AuthorizationResponse = when (responseMode) {
+    ): AuthorizationResponse = when (val responseMode = requestObject.responseMode) {
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
-        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData)
+        is ResponseMode.DirectPostJwt -> {
+            val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+                ?: throw IllegalArgumentException("Cannot deduct JarmSpec from passed Client Metadata")
+            AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmSpec)
+        }
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData)
+        is ResponseMode.FragmentJwt -> {
+            val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+                ?: throw IllegalArgumentException("Cannot deduct JarmSpec from passed Client Metadata")
+            AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmSpec)
+        }
         is ResponseMode.Query -> AuthorizationResponse.Query(responseMode.redirectUri, responseData)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData)
+        is ResponseMode.QueryJwt -> {
+            val jarmSpec = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+                ?: throw IllegalArgumentException("Cannot deduct JarmSpec from passed Client Metadata")
+            AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec)
+        }
     }
 }

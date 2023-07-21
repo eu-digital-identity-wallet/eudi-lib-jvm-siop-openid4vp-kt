@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
@@ -30,12 +31,13 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URLEncoder
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import java.time.Duration
+import java.util.*
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
@@ -46,10 +48,11 @@ import javax.net.ssl.X509TrustManager
  * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
  */
 fun main(): Unit = runBlocking {
+    val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
-        walletKeyPair = SiopIdTokenBuilder.randomKey(),
+        walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
-        walletConfig = cfg(Verifier.OutBandMeta),
+        walletConfig = cfg(Verifier.OutBandMeta, walletKeyPair),
     )
 
     suspend fun runUseCase(transaction: Transaction) {
@@ -177,8 +180,11 @@ class Verifier private constructor(
         private fun formatAuthorizationRequest(iniTransactionResponse: JsonObject): URI {
             fun String.encode() = URLEncoder.encode(this, "UTF-8")
             val clientId = iniTransactionResponse["client_id"]?.jsonPrimitive?.content?.encode()!!
-            val requestUri = iniTransactionResponse["request_uri"]?.jsonPrimitive?.content?.encode()!!
-            return URI("eudi-wallet://authorize?client_id=$clientId&request_uri=$requestUri")
+            val requestUri = iniTransactionResponse["request_uri"]?.jsonPrimitive?.contentOrNull?.encode()?.let { "request_uri=$it" }
+            val request = iniTransactionResponse["request"]?.jsonPrimitive?.contentOrNull?.let { "request=$it" }
+            require(request != null || requestUri != null)
+            val requestPart = requestUri ?: request
+            return URI("eudi-wallet://authorize?client_id=$clientId&$requestPart")
         }
 
         private fun randomNonce(): String = Nonce().value
@@ -305,11 +311,19 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun cfg(verifierMetaData: PreregisteredClient) = WalletOpenId4VPConfig(
+private fun cfg(verifierMetaData: PreregisteredClient, walletKeyPair: RSAKey) = WalletOpenId4VPConfig(
     presentationDefinitionUriSupported = true,
     supportedClientIdSchemes = listOf(SupportedClientIdScheme.Preregistered(mapOf(verifierMetaData.clientId to verifierMetaData))),
     vpFormatsSupported = emptyList(),
     subjectSyntaxTypesSupported = emptyList(),
+    signingKey = walletKeyPair,
+    signingKeySet = JWKSet(walletKeyPair),
+    idTokenTTL = Duration.ofMinutes(10),
+    preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+    decentralizedIdentifier = "DID:example:12341512#$",
+    authorizationSigningAlgValuesSupported = emptyList(),
+    authorizationEncryptionAlgValuesSupported = emptyList(),
+    authorizationEncryptionEncValuesSupported = emptyList(),
 )
 
 val PidPresentationDefinition = """

@@ -15,6 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
@@ -24,13 +28,27 @@ import java.net.URI
 import java.net.URL
 
 @Serializable
-data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
+data class UnvalidatedClientMetaData(
     @SerialName("jwks_uri") val jwksUri: String? = null,
     @SerialName("jwks") val jwks: JsonObject? = null,
     @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String,
     @SerialName("id_token_encrypted_response_alg") val idTokenEncryptedResponseAlg: String,
     @SerialName("id_token_encrypted_response_enc") val idTokenEncryptedResponseEnc: String,
     @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>,
+    @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
+    @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
+    @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
+) : java.io.Serializable
+
+data class ClientMetaData(
+    val jwkSet: JWKSet? = null,
+    val idTokenJWSAlg: JWSAlgorithm,
+    val idTokenJWEAlg: JWEAlgorithm,
+    val idTokenJWEEnc: EncryptionMethod,
+    val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
+    val authorizationSignedResponseAlg: JWSAlgorithm? = null,
+    val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
+    val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
 ) : java.io.Serializable
 
 sealed interface SubjectSyntaxType : java.io.Serializable {
@@ -180,4 +198,64 @@ typealias VpToken = String
 enum class IdTokenType {
     SubjectSigned,
     AttesterSigned,
+}
+
+sealed interface JarmSpec {
+
+    val holderId: String
+
+    class SignedResponse(
+        override val holderId: String,
+        val responseSigningAlg: JWSAlgorithm,
+        val signingKeySet: JWKSet,
+    ) : JarmSpec
+
+    class EncryptedResponse(
+        override val holderId: String,
+        val responseEncryptionAlg: JWEAlgorithm,
+        val responseEncryptionEnc: EncryptionMethod,
+        val encryptionKeySet: JWKSet,
+    ) : JarmSpec
+
+    class SignedAndEncryptedResponse(
+        override val holderId: String,
+        val responseSigningAlg: JWSAlgorithm,
+        val responseEncryptionAlg: JWEAlgorithm,
+        val responseEncryptionEnc: EncryptionMethod,
+        val signingKeySet: JWKSet,
+        val encryptionKeySet: JWKSet,
+    ) : JarmSpec
+
+    companion object {
+        fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? {
+            fun signedResponse(): Boolean = clientMetaData.authorizationSignedResponseAlg != null
+            fun encryptedResponse(): Boolean = clientMetaData.authorizationEncryptedResponseAlg != null
+
+            return when {
+                signedResponse() && !encryptedResponse() -> SignedResponse(
+                    walletOpenId4VPConfig.decentralizedIdentifier,
+                    clientMetaData.authorizationSignedResponseAlg ?: throw RuntimeException(),
+                    walletOpenId4VPConfig.signingKeySet,
+                )
+
+                !signedResponse() && encryptedResponse() -> EncryptedResponse(
+                    walletOpenId4VPConfig.decentralizedIdentifier,
+                    clientMetaData.authorizationEncryptedResponseAlg ?: throw RuntimeException(),
+                    clientMetaData.authorizationEncryptedResponseEnc ?: throw RuntimeException(),
+                    clientMetaData.jwkSet ?: throw RuntimeException(),
+                )
+
+                signedResponse() && encryptedResponse() -> SignedAndEncryptedResponse(
+                    walletOpenId4VPConfig.decentralizedIdentifier,
+                    clientMetaData.authorizationSignedResponseAlg ?: throw RuntimeException(),
+                    clientMetaData.authorizationEncryptedResponseAlg ?: throw RuntimeException(),
+                    clientMetaData.authorizationEncryptedResponseEnc ?: throw RuntimeException(),
+                    walletOpenId4VPConfig.signingKeySet,
+                    clientMetaData.jwkSet ?: throw RuntimeException(),
+                )
+
+                else -> null
+            }
+        }
+    }
 }

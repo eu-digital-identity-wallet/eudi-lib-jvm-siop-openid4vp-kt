@@ -15,6 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.SupportedClaimFormat
@@ -51,13 +56,18 @@ sealed interface SupportedClientIdScheme {
 
 data class WalletOpenId4VPConfig(
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
-    val preferredSubjectSyntaxType: SubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-    val decentralizedIdentifier: String = "DID:example:12341512#$",
-    val idTokenTTL: Duration = Duration.ofMinutes(10),
-    val presentationDefinitionUriSupported: Boolean = false,
+    val preferredSubjectSyntaxType: SubjectSyntaxType,
+    val decentralizedIdentifier: String,
+    val idTokenTTL: Duration,
+    val presentationDefinitionUriSupported: Boolean,
+    val signingKey: JWK,
+    val signingKeySet: JWKSet,
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+    val authorizationSigningAlgValuesSupported: List<JWSAlgorithm>,
+    val authorizationEncryptionAlgValuesSupported: List<JWEAlgorithm>,
+    val authorizationEncryptionEncValuesSupported: List<EncryptionMethod>,
 )
 
 fun WalletOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =

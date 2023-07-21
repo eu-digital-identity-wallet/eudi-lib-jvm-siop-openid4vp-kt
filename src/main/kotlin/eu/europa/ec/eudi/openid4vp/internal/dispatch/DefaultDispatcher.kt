@@ -40,13 +40,16 @@ internal class DefaultDispatcher(
         when (response) {
             is AuthorizationResponse.DirectPost -> directPost(response)
             is AuthorizationResponse.DirectPostJwt -> directPostJwt(response)
-            is AuthorizationResponse.RedirectResponse -> redirectURI(response)
+            is AuthorizationResponse.Fragment -> fragment(response)
+            is AuthorizationResponse.FragmentJwt -> fragmentJwt(response)
+            is AuthorizationResponse.Query -> query(response)
+            is AuthorizationResponse.QueryJwt -> queryJwt(response)
         }
 
     /**
      * Implements the direct_post method by performing a form-encoded HTTP post
      * @param response the response to be communicated via direct_post
-     * @return the [response][DispatchOutcome.VerifierResponse] fo the verifier
+     * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
      * @see DirectPostForm on how the given [response] is encoded into form data
      */
     private suspend fun directPost(response: AuthorizationResponse.DirectPost): DispatchOutcome.VerifierResponse =
@@ -55,30 +58,65 @@ internal class DefaultDispatcher(
             httpFormPost.post(response.responseUri, formParameters)
         }
 
+    /**
+     * Implements the direct_post.jwt method by performing a form-encoded HTTP post.
+     * The posted form's payload is:
+     * <ul>
+     *     <li>'response' form param: Response data signed and/or encrypted as per [JARM][https://openid.net/specs/openid-financial-api-jarm.html] spec.</li>
+     *     <li>'sate' form param: The state attribute as specified in authorization request</li>
+     * </ul>
+     * @param response the response to be communicated via direct_post.jwt
+     * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
+     * @see [JARM][https://openid.net/specs/openid-financial-api-jarm.html] specification for details regarding
+     * response signing/encryption
+     * @see [OpenId4VP][https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-signed-and-encrypted-respon]
+     * for details about direct_post.jwt response type
+     */
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
         withContext(ioCoroutineDispatcher) {
-            error("Not yet implemented directPostJwt")
+            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
+            httpFormPost.post(response.responseUri, mapOf("response" to joseResponse, "state" to response.data.state))
         }
 
-    private fun redirectURI(response: AuthorizationResponse.RedirectResponse): DispatchOutcome.RedirectURI =
+    private fun fragment(response: AuthorizationResponse.Fragment): DispatchOutcome.RedirectURI =
         with(response.redirectUri.toUri().buildUpon()) {
-            when (response) {
-                is AuthorizationResponse.Fragment -> {
-                    val encodedFragment = DirectPostForm.of(response.data).map { (key, value) ->
-                        val encodedKey = UriCodec.encode(key, null)
-                        val encodedValue = UriCodec.encodeOrNull(value, null)
-                        "$encodedKey=$encodedValue"
-                    }.joinToString(separator = "&")
-                    encodedFragment(encodedFragment)
-                }
+            val encodedFragment = DirectPostForm.of(response.data).map { (key, value) ->
+                val encodedKey = UriCodec.encode(key, null)
+                val encodedValue = UriCodec.encodeOrNull(value, null)
+                "$encodedKey=$encodedValue"
+            }.joinToString(separator = "&")
+            encodedFragment(encodedFragment)
+            DispatchOutcome.RedirectURI(build().toURI())
+        }
 
-                is AuthorizationResponse.Query ->
-                    DirectPostForm.of(response.data).forEach { (key, value) -> appendQueryParameter(key, value) }
+    private fun fragmentJwt(response: AuthorizationResponse.FragmentJwt): DispatchOutcome.RedirectURI =
+        with(response.redirectUri.toUri().buildUpon()) {
+            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
+            val encodedFragment =
+                mapOf(
+                    "response" to joseResponse,
+                    "state" to response.data.state,
+                ).map { (key, value) ->
+                    val encodedKey = UriCodec.encode(key, null)
+                    val encodedValue = UriCodec.encodeOrNull(value, null)
+                    "$encodedKey=$encodedValue"
+                }.joinToString(separator = "&")
+            encodedFragment(encodedFragment)
+            DispatchOutcome.RedirectURI(build().toURI())
+        }
 
-                is AuthorizationResponse.FragmentJwt -> error("Not yet implemented")
-                is AuthorizationResponse.QueryJwt -> error("Not yet implemented")
-            }
-            return DispatchOutcome.RedirectURI(build().toURI())
+    private fun query(response: AuthorizationResponse.Query): DispatchOutcome.RedirectURI =
+        with(response.redirectUri.toUri().buildUpon()) {
+            DirectPostForm.of(response.data).forEach { (key, value) -> appendQueryParameter(key, value) }
+            DispatchOutcome.RedirectURI(build().toURI())
+        }
+
+    private fun queryJwt(response: AuthorizationResponse.QueryJwt): DispatchOutcome.RedirectURI =
+        with(response.redirectUri.toUri().buildUpon()) {
+            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
+            appendQueryParameter("response", joseResponse)
+            appendQueryParameter("state", response.data.state)
+            DispatchOutcome.RedirectURI(build().toURI())
         }
 }
 
@@ -86,7 +124,7 @@ internal class DefaultDispatcher(
  * An object responsible for encoding a [AuthorizationResponsePayload] into
  * HTTP form
  */
-private object DirectPostForm {
+internal object DirectPostForm {
 
     private const val PRESENTATION_SUBMISSION_FORM_PARAM = "presentation_submission"
     private const val VP_TOKEN_FORM_PARAM = "vp_token"
@@ -99,18 +137,18 @@ private object DirectPostForm {
         fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
 
         return when (p) {
-            is AuthorizationResponsePayload.SiopAuthenticationResponse -> mapOf(
+            is AuthorizationResponsePayload.SiopAuthentication -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
                 STATE_FORM_PARAM to p.state,
             )
 
-            is AuthorizationResponsePayload.OpenId4VPAuthorizationResponse -> mapOf(
+            is AuthorizationResponsePayload.OpenId4VPAuthorization -> mapOf(
                 VP_TOKEN_FORM_PARAM to p.vpToken,
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
                 STATE_FORM_PARAM to p.state,
             )
 
-            is AuthorizationResponsePayload.SiopOpenId4VPAuthenticationResponse -> mapOf(
+            is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> mapOf(
                 ID_TOKEN_FORM_PARAM to p.idToken,
                 VP_TOKEN_FORM_PARAM to p.vpToken,
                 PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),

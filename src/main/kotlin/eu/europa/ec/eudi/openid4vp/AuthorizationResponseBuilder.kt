@@ -28,6 +28,7 @@ import java.net.URL
 sealed interface AuthorizationResponsePayload : Serializable {
 
     val state: String
+    val clientId: String
 
     sealed interface Success : AuthorizationResponsePayload
 
@@ -38,9 +39,10 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * @param idToken The id_token produced by the wallet
      * @param state the state of the [request][ResolvedRequestObject.SiopAuthentication.state]
      */
-    data class SiopAuthenticationResponse(
+    data class SiopAuthentication(
         val idToken: Jwt,
         override val state: String,
+        override val clientId: String,
     ) : Success
 
     /**
@@ -53,10 +55,11 @@ sealed interface AuthorizationResponsePayload : Serializable {
      * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      */
-    data class OpenId4VPAuthorizationResponse(
+    data class OpenId4VPAuthorization(
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
         override val state: String,
+        override val clientId: String,
     ) : Success
 
     /**
@@ -70,11 +73,12 @@ sealed interface AuthorizationResponsePayload : Serializable {
      *  that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      */
-    data class SiopOpenId4VPAuthenticationResponse(
+    data class SiopOpenId4VPAuthentication(
         val idToken: Jwt,
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
         override val state: String,
+        override val clientId: String,
     ) : Success
 
     sealed interface Failed : AuthorizationResponsePayload
@@ -87,6 +91,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
     data class InvalidRequest(
         val error: AuthorizationRequestError,
         override val state: String,
+        override val clientId: String,
     ) : Failed
 
     /**
@@ -96,6 +101,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
      */
     data class NoConsensusResponseData(
         override val state: String,
+        override val clientId: String,
     ) : Failed
 }
 
@@ -180,8 +186,13 @@ sealed interface AuthorizationResponse : Serializable {
      *
      * @param responseUri the verifier/RP URI where the response will be posted
      * @param data the contents of the authorization request
+     * @param jarmSpec
      */
-    data class DirectPostJwt(override val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
+    data class DirectPostJwt(
+        override val responseUri: URL,
+        val data: AuthorizationResponsePayload,
+        val jarmSpec: JarmSpec,
+    ) : DirectPostResponse
 
     /**
      * An authorization response to be communicated via
@@ -192,10 +203,15 @@ sealed interface AuthorizationResponse : Serializable {
     }
 
     data class Query(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
-    data class QueryJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
+    data class QueryJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload, val jarmSpec: JarmSpec) :
+        RedirectResponse
 
     data class Fragment(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
-    data class FragmentJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
+    data class FragmentJwt(
+        override val redirectUri: URI,
+        val data: AuthorizationResponsePayload,
+        val jarmSpec: JarmSpec,
+    ) : RedirectResponse
 }
 
 /**
@@ -212,9 +228,7 @@ fun interface AuthorizationResponseBuilder {
     suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse
 
     companion object {
-        /**
-         * Default implementation of [AuthorizationResponseBuilder]
-         */
-        val Default: AuthorizationResponseBuilder = DefaultAuthorizationResponseBuilder
+        fun make(walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationResponseBuilder =
+            DefaultAuthorizationResponseBuilder(walletOpenId4VPConfig)
     }
 }

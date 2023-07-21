@@ -124,7 +124,7 @@ val authorizationResponse = siopOpenId4Vp.build(requestObject, consensus)
 The final step, of processing an authorization request, is to dispatch to the verifier the authorization response.
 Depending on the `response_mode` that the verifier included in his authorization request, this is done either
 * via a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`), or
-* by forming an appropriate `redirect_uri` (when response mode is `fragment` or `fragment.jwt`)
+* by forming an appropriate `redirect_uri` (when response mode is `fragment`, `fragment.jwt`, `query` or `query.jwt`)
 
 Library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Dispatcher.kt)
 
@@ -153,11 +153,15 @@ and then run the Example.
 
 A Wallet can take the form a web or mobile application.
 OpenId4VP describes flows for both cases. Given that we are focusing on a mobile wallet we could
-assume that `AuthorizationRequest` contains always a `response_mode` equal to `direct_post`
+assume that `AuthorizationRequest` contains always a `response_mode`
 
 Library currently supports `response_mode`
 * `direct_post`
-* `redirect` (fragment or query)
+* `direct_post.jwt`
+* `fragment`
+* `fragment.jwt`
+* `query`
+* `query.jwt`
 
 
 ### Supported Client ID Scheme
@@ -202,7 +206,7 @@ Library supports both options
 
 ### Supported response types
 
-Library currently supports `response_type` equal to `id_token` or `vp_token id_token`
+Library currently supports `response_type` equal to `id_token`, `vp_token` or `vp_token id_token`
 
 
 ## How to contribute

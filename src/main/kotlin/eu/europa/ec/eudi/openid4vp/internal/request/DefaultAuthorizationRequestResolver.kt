@@ -91,7 +91,7 @@ internal class DefaultAuthorizationRequestResolver(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
-            getClientMetaData: HttpGet<ClientMetaData>,
+            getClientMetaData: HttpGet<UnvalidatedClientMetaData>,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
             ioCoroutineDispatcher = ioCoroutineDispatcher,

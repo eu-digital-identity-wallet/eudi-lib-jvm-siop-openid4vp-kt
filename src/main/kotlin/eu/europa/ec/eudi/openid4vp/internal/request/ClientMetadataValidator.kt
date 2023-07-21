@@ -19,7 +19,6 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.success
 import kotlinx.coroutines.CoroutineDispatcher
@@ -30,20 +29,37 @@ import java.text.ParseException
 
 internal class ClientMetadataValidator(private val ioCoroutineDispatcher: CoroutineDispatcher) {
 
-    suspend fun validate(clientMetadata: ClientMetaData): Result<OIDCClientMetadata> = runCatching {
-        val jwkSets = parseRequiredJwks(clientMetadata).getOrThrow()
-        val types = parseRequiredSubjectSyntaxTypes(clientMetadata).getOrThrow()
-
-        OIDCClientMetadata().apply {
-            idTokenJWSAlg = JWSAlgorithm.parse(clientMetadata.idTokenSignedResponseAlg)
-            idTokenJWEAlg = JWEAlgorithm.parse(clientMetadata.idTokenEncryptedResponseAlg)
-            idTokenJWEEnc = EncryptionMethod.parse(clientMetadata.idTokenEncryptedResponseEnc)
-            jwkSet = jwkSets
-            setCustomField("subject_syntax_types_supported", types)
+    suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
+        val jwkSets = parseRequiredJwks(unvalidatedClientMetadata).getOrThrow()
+        val types = parseRequiredSubjectSyntaxTypes(unvalidatedClientMetadata).getOrThrow()
+        if (unvalidatedClientMetadata.authorizationEncryptedResponseAlg != null &&
+            unvalidatedClientMetadata.authorizationEncryptedResponseEnc == null
+        ) {
+            throw RuntimeException(
+                "Cannot construct ResponseSigningEncryptionSpec from client metadata:" +
+                    " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
+            )
         }
+        // TODO: Find if signing/encryption algs match the supported ones
+        val authSgnRespAlg: JWSAlgorithm? = unvalidatedClientMetadata.authorizationSignedResponseAlg?.let { JWSAlgorithm.parse(it) }
+        val authEncRespAlg: JWEAlgorithm? = unvalidatedClientMetadata.authorizationEncryptedResponseAlg?.let { JWEAlgorithm.parse(it) }
+        val authEncRespEnc: EncryptionMethod? = unvalidatedClientMetadata.authorizationEncryptedResponseEnc?.let {
+            EncryptionMethod.parse(it)
+        }
+
+        ClientMetaData(
+            idTokenJWSAlg = JWSAlgorithm.parse(unvalidatedClientMetadata.idTokenSignedResponseAlg),
+            idTokenJWEAlg = JWEAlgorithm.parse(unvalidatedClientMetadata.idTokenEncryptedResponseAlg),
+            idTokenJWEEnc = EncryptionMethod.parse(unvalidatedClientMetadata.idTokenEncryptedResponseEnc),
+            jwkSet = jwkSets,
+            subjectSyntaxTypesSupported = types,
+            authorizationSignedResponseAlg = authSgnRespAlg,
+            authorizationEncryptedResponseAlg = authEncRespAlg,
+            authorizationEncryptedResponseEnc = authEncRespEnc,
+        )
     }
 
-    private suspend fun parseRequiredJwks(clientMetadata: ClientMetaData): Result<JWKSet> {
+    private suspend fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {
         val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
         if (!atLeastOneJwkSourceDefined) {
             return RequestValidationError.MissingClientMetadataJwksSource.asFailure()
@@ -76,7 +92,7 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
         }
     }
 
-    private fun parseRequiredSubjectSyntaxTypes(clientMetadata: ClientMetaData): Result<List<SubjectSyntaxType>> {
+    private fun parseRequiredSubjectSyntaxTypes(clientMetadata: UnvalidatedClientMetaData): Result<List<SubjectSyntaxType>> {
         val listNotEmpty = clientMetadata.subjectSyntaxTypesSupported.isNotEmpty()
         val allValidTypes = clientMetadata.subjectSyntaxTypesSupported.all(SubjectSyntaxType::isValid)
         fun String.asSubjectSyntaxType(): SubjectSyntaxType = when {

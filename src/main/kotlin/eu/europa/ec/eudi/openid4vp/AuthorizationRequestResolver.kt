@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.eygraber.uri.Uri
-import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
@@ -122,15 +121,17 @@ sealed interface AuthorizationRequest : Serializable {
 sealed interface ResolvedRequestObject : Serializable {
 
     val responseMode: ResponseMode
+    val clientMetaData: ClientMetaData
     val state: String
+    val clientId: String
 
     /**
      * SIOPv2 Authentication request for issuing an id_token
      */
     data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
-        val clientMetaData: OIDCClientMetadata,
-        val clientId: String,
+        override val clientMetaData: ClientMetaData,
+        override val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String,
@@ -142,8 +143,8 @@ sealed interface ResolvedRequestObject : Serializable {
      */
     data class OpenId4VPAuthorization(
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: OIDCClientMetadata,
-        val clientId: String,
+        override val clientMetaData: ClientMetaData,
+        override val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String,
@@ -155,8 +156,8 @@ sealed interface ResolvedRequestObject : Serializable {
     data class SiopOpenId4VPAuthentication(
         val idTokenType: List<IdTokenType>,
         val presentationDefinition: PresentationDefinition,
-        val clientMetaData: OIDCClientMetadata,
-        val clientId: String,
+        override val clientMetaData: ClientMetaData,
+        override val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String,
@@ -370,7 +371,7 @@ fun interface AuthorizationRequestResolver {
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             getRequestObjectJwt: HttpGet<String>,
             getPresentationDefinition: HttpGet<PresentationDefinition>,
-            getClientMetaData: HttpGet<ClientMetaData>,
+            getClientMetaData: HttpGet<UnvalidatedClientMetaData>,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
             ioCoroutineDispatcher,

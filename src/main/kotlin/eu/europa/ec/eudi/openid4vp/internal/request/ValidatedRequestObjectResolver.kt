@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
+import eu.europa.ec.eudi.openid4vp.ClientMetaData
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
 import eu.europa.ec.eudi.openid4vp.WalletOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
@@ -89,7 +89,7 @@ internal class ValidatedRequestObjectResolver(
         return presentationDefinitionResolver.resolve(presentationDefinitionSource, walletOpenId4VPConfig)
     }
 
-    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): Result<OIDCClientMetadata> {
+    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): Result<ClientMetaData> {
         return validated.clientMetaDataSource?.let {
             clientMetaDataResolver.resolve(it)
         } ?: error("Missing client metadata")

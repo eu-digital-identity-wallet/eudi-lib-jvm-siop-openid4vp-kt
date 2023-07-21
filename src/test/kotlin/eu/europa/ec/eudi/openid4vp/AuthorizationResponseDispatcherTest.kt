@@ -15,9 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -29,12 +31,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
+import java.time.Duration
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
 class AuthorizationResponseDispatcherTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
+
+    private val signingKey = RSAKeyGenerator(2048)
+        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
+        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
+        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
+        .generate()
 
     private val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
@@ -45,6 +55,14 @@ class AuthorizationResponseDispatcherTest {
             SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
             SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
         ),
+        signingKey = signingKey,
+        signingKeySet = JWKSet(signingKey),
+        idTokenTTL = Duration.ofMinutes(10),
+        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+        decentralizedIdentifier = "DID:example:12341512#$",
+        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationEncryptionAlgValuesSupported = emptyList(),
+        authorizationEncryptionEncValuesSupported = emptyList(),
     )
 
     private val clientMetadataStr =
@@ -52,7 +70,7 @@ class AuthorizationResponseDispatcherTest {
             { "jwks": { "keys": [ { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256" }
         """.trimIndent()
 
-    private val clientMetaData = json.decodeFromString<ClientMetaData>(clientMetadataStr)
+    private val clientMetaData = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
     private fun genState(): String {
         return State().value
     }
@@ -120,9 +138,8 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = // TestDirectPostResponseDispatcher(managedHttpClient) { DirectPostDispatcher(it) }
-                SiopOpenId4VpKtor.dispatcher { managedHttpClient }
-            when (val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)) {
+            val dispatcher = SiopOpenId4VpKtor.dispatcher { managedHttpClient }
+            when (val response = AuthorizationResponseBuilder.make(walletConfig).build(siopAuthRequestObject, idTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
                 }

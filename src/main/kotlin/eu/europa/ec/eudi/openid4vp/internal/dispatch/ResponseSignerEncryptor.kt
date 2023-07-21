@@ -139,39 +139,8 @@ internal object ResponseSignerEncryptor {
         return with(JWTClaimsSet.Builder()) {
             issuer(holderId)
             audience(data.clientId)
-//            expirationTime()
             issueTime(Date())
-
-            when (data) {
-                is AuthorizationResponsePayload.SiopAuthentication -> {
-                    claim("id_token", data.idToken)
-                    claim("state", data.state)
-                }
-
-                is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                    claim("vp_token", data.vpToken)
-                    claim("presentation_submission", data.presentationSubmission)
-                    claim("state", data.state)
-                }
-
-                is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
-                    claim("id_token", data.idToken)
-                    claim("vp_token", data.vpToken)
-                    claim("presentation_submission", data.presentationSubmission)
-                    claim("state", data.state)
-                }
-
-                is AuthorizationResponsePayload.NoConsensusResponseData -> {
-                    claim("error", AuthorizationRequestErrorCode.USER_CANCELLED.code)
-                    claim("state", data.state)
-                }
-
-                is AuthorizationResponsePayload.InvalidRequest -> {
-                    claim("error", AuthorizationRequestErrorCode.fromError(data.error).code)
-                    claim("error_description", "${data.error}")
-                    claim("state", data.state)
-                }
-            }
+            DirectPostForm.of(data).map { claim(it.key, it.value) }
             build()
         }
     }

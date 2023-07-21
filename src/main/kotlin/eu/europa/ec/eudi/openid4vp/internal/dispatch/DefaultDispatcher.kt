@@ -124,7 +124,7 @@ internal class DefaultDispatcher(
  * An object responsible for encoding a [AuthorizationResponsePayload] into
  * HTTP form
  */
-private object DirectPostForm {
+internal object DirectPostForm {
 
     private const val PRESENTATION_SUBMISSION_FORM_PARAM = "presentation_submission"
     private const val VP_TOKEN_FORM_PARAM = "vp_token"

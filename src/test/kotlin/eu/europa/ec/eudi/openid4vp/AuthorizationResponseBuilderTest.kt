@@ -69,7 +69,7 @@ class AuthorizationResponseBuilderTest {
             { "jwks": { "keys": [ { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256" }
         """.trimIndent()
 
-    private val clientMetaData = json.decodeFromString<ClientMetaData>(clientMetadataStr)
+    private val clientMetaData = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
     private fun genState(): String {
         return State().value
     }
@@ -125,7 +125,7 @@ class AuthorizationResponseBuilderTest {
             """
                 { "jwks": { "keys": [{"kty":"EC","use":"enc","crv":"P-256","kid":"123","x":"h9vfgIOK_KS40MNbX6Rpnc5-IkM8Tqvoc_6bG4nD610","y":"Yvo8GGg6axZhyikq8YqeqFk8apbp0PmjKo0cNZwkSDw","alg":"ECDH-ES"}, { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256","authorization_encrypted_response_alg":"ECDH_ES", "authorization_encrypted_response_enc":"A256GCM" }
             """.trimIndent()
-        val clientMetaDataDecoded = json.decodeFromString<ClientMetaData>(clientMetadataStr)
+        val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
         val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
         val resolvedRequest =
             ResolvedRequestObject.OpenId4VPAuthorization(

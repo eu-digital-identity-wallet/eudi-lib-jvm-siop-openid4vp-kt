@@ -51,7 +51,7 @@ internal sealed interface PresentationDefinitionSource {
 }
 
 internal sealed interface ClientMetaDataSource {
-    data class ByValue(val metaData: ClientMetaData) : ClientMetaDataSource
+    data class ByValue(val metaData: UnvalidatedClientMetaData) : ClientMetaDataSource
     data class ByReference(val url: URL) : ClientMetaDataSource
 }
 
@@ -346,7 +346,7 @@ internal object RequestObjectValidator {
         val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
 
         fun requiredClientMetaData() = runCatching {
-            ClientMetaDataSource.ByValue(Json.decodeFromJsonElement<ClientMetaData>(unvalidated.clientMetaData!!))
+            ClientMetaDataSource.ByValue(Json.decodeFromJsonElement<UnvalidatedClientMetaData>(unvalidated.clientMetaData!!))
         }
 
         fun requiredClientMetaDataUri() = runCatching {

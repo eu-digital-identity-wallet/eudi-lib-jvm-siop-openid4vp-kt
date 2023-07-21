@@ -20,7 +20,6 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
-import com.nimbusds.openid.connect.sdk.rp.OIDCClientMetadata
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,7 +28,7 @@ import java.net.URI
 import java.net.URL
 
 @Serializable
-data class ClientMetaData( // By OpenID Connect Dynamic Client Registration specification
+data class UnvalidatedClientMetaData(
     @SerialName("jwks_uri") val jwksUri: String? = null,
     @SerialName("jwks") val jwks: JsonObject? = null,
     @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String,
@@ -39,6 +38,17 @@ data class ClientMetaData( // By OpenID Connect Dynamic Client Registration spec
     @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
+) : java.io.Serializable
+
+data class ClientMetaData(
+    val jwkSet: JWKSet? = null,
+    val idTokenJWSAlg: JWSAlgorithm,
+    val idTokenJWEAlg: JWEAlgorithm,
+    val idTokenJWEEnc: EncryptionMethod,
+    val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
+    val authorizationSignedResponseAlg: JWSAlgorithm? = null,
+    val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
+    val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
 ) : java.io.Serializable
 
 sealed interface SubjectSyntaxType : java.io.Serializable {
@@ -217,32 +227,31 @@ sealed interface JarmSpec {
     ) : JarmSpec
 
     companion object {
-        fun make(clientMetaData: OIDCClientMetadata, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? {
-            fun signedResponse(): Boolean = clientMetaData.getCustomField("authorization_signed_response_alg") != null
-            fun encryptedResponse(): Boolean =
-                clientMetaData.getCustomField("authorization_encrypted_response_alg") != null
+        fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? {
+            fun signedResponse(): Boolean = clientMetaData.authorizationSignedResponseAlg != null
+            fun encryptedResponse(): Boolean = clientMetaData.authorizationEncryptedResponseAlg != null
 
             return when {
                 signedResponse() && !encryptedResponse() -> SignedResponse(
                     walletOpenId4VPConfig.decentralizedIdentifier,
-                    clientMetaData.getCustomField("authorization_signed_response_alg") as JWSAlgorithm,
+                    clientMetaData.authorizationSignedResponseAlg ?: throw RuntimeException(),
                     walletOpenId4VPConfig.signingKeySet,
                 )
 
                 !signedResponse() && encryptedResponse() -> EncryptedResponse(
                     walletOpenId4VPConfig.decentralizedIdentifier,
-                    clientMetaData.getCustomField("authorization_encrypted_response_alg") as JWEAlgorithm,
-                    clientMetaData.getCustomField("authorization_encrypted_response_enc") as EncryptionMethod,
-                    clientMetaData.jwkSet,
+                    clientMetaData.authorizationEncryptedResponseAlg ?: throw RuntimeException(),
+                    clientMetaData.authorizationEncryptedResponseEnc ?: throw RuntimeException(),
+                    clientMetaData.jwkSet ?: throw RuntimeException(),
                 )
 
                 signedResponse() && encryptedResponse() -> SignedAndEncryptedResponse(
                     walletOpenId4VPConfig.decentralizedIdentifier,
-                    clientMetaData.getCustomField("authorization_signed_response_alg") as JWSAlgorithm,
-                    clientMetaData.getCustomField("authorization_encrypted_response_alg") as JWEAlgorithm,
-                    clientMetaData.getCustomField("authorization_encrypted_response_enc") as EncryptionMethod,
+                    clientMetaData.authorizationSignedResponseAlg ?: throw RuntimeException(),
+                    clientMetaData.authorizationEncryptedResponseAlg ?: throw RuntimeException(),
+                    clientMetaData.authorizationEncryptedResponseEnc ?: throw RuntimeException(),
                     walletOpenId4VPConfig.signingKeySet,
-                    clientMetaData.jwkSet,
+                    clientMetaData.jwkSet ?: throw RuntimeException(),
                 )
 
                 else -> null

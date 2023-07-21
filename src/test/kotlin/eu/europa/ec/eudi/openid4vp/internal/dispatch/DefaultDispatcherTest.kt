@@ -108,7 +108,7 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_alg":"ECDH-ES", 
                     "authorization_encrypted_response_enc":"A256GCM" }
             """.trimIndent()
-            val clientMetaDataDecoded = json.decodeFromString<ClientMetaData>(clientMetadataStr)
+            val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
@@ -152,7 +152,7 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_alg":"ECDH-ES", 
                     "authorization_encrypted_response_enc":"A256GCM"}
             """.trimIndent().trimMargin()
-            val clientMetaDataDecoded = json.decodeFromString<ClientMetaData>(clientMetadataStr)
+            val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
@@ -201,7 +201,7 @@ class DefaultDispatcherTest {
                     { "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
                     "authorization_signed_response_alg":"RS256" }
             """.trimIndent().trimMargin()
-            val clientMetaDataDecoded = json.decodeFromString<ClientMetaData>(clientMetadataStr)
+            val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(

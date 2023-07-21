@@ -32,31 +32,75 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
     suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
         val jwkSets = parseRequiredJwks(unvalidatedClientMetadata).getOrThrow()
         val types = parseRequiredSubjectSyntaxTypes(unvalidatedClientMetadata).getOrThrow()
-        if (unvalidatedClientMetadata.authorizationEncryptedResponseAlg != null &&
-            unvalidatedClientMetadata.authorizationEncryptedResponseEnc == null
+        val idTokenJWSAlg = parseRequiredSigningAlgorithm(unvalidatedClientMetadata.idTokenSignedResponseAlg).getOrThrow()
+        val idTokenJWEAlg = parseRequiredEncryptionAlgorithm(unvalidatedClientMetadata.idTokenEncryptedResponseAlg).getOrThrow()
+        val idTokenJWEEnc = parseRequiredEncryptionMethod(unvalidatedClientMetadata.idTokenEncryptedResponseEnc).getOrThrow()
+        if (!unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
+            unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
         ) {
             throw RuntimeException(
                 "Cannot construct ResponseSigningEncryptionSpec from client metadata:" +
-                    " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
+                        " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
             )
         }
+        val authSgnRespAlg: JWSAlgorithm? =
+            parseOptionalSigningAlgorithm(unvalidatedClientMetadata.authorizationSignedResponseAlg)
+        val authEncRespAlg: JWEAlgorithm? =
+            parseOptionalEncryptionAlgorithm(unvalidatedClientMetadata.authorizationEncryptedResponseAlg)
+        val authEncRespEnc: EncryptionMethod? =
+            parseOptionalEncryptionMethod(unvalidatedClientMetadata.authorizationEncryptedResponseEnc)
+
         // TODO: Find if signing/encryption algs match the supported ones
-        val authSgnRespAlg: JWSAlgorithm? = unvalidatedClientMetadata.authorizationSignedResponseAlg?.let { JWSAlgorithm.parse(it) }
-        val authEncRespAlg: JWEAlgorithm? = unvalidatedClientMetadata.authorizationEncryptedResponseAlg?.let { JWEAlgorithm.parse(it) }
-        val authEncRespEnc: EncryptionMethod? = unvalidatedClientMetadata.authorizationEncryptedResponseEnc?.let {
-            EncryptionMethod.parse(it)
-        }
 
         ClientMetaData(
-            idTokenJWSAlg = JWSAlgorithm.parse(unvalidatedClientMetadata.idTokenSignedResponseAlg),
-            idTokenJWEAlg = JWEAlgorithm.parse(unvalidatedClientMetadata.idTokenEncryptedResponseAlg),
-            idTokenJWEEnc = EncryptionMethod.parse(unvalidatedClientMetadata.idTokenEncryptedResponseEnc),
+            idTokenJWSAlg = idTokenJWSAlg,
+            idTokenJWEAlg = idTokenJWEAlg,
+            idTokenJWEEnc = idTokenJWEEnc,
             jwkSet = jwkSets,
             subjectSyntaxTypesSupported = types,
             authorizationSignedResponseAlg = authSgnRespAlg,
             authorizationEncryptedResponseAlg = authEncRespAlg,
             authorizationEncryptedResponseEnc = authEncRespEnc,
         )
+    }
+
+    private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {
+        return if (signingAlg.isNullOrEmpty()) null
+        else JWSAlgorithm.parse(signingAlg)
+    }
+
+    private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? {
+        return if (encryptionAlg.isNullOrEmpty()) null
+        else JWEAlgorithm.parse(encryptionAlg)
+    }
+
+    private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
+        return if (encryptionMethod.isNullOrEmpty()) null
+        else EncryptionMethod.parse(encryptionMethod)
+    }
+
+    private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> {
+        return if (signingAlg.isNullOrEmpty()) {
+            RequestValidationError.IdTokenSigningAlgMissing.asFailure()
+        } else {
+            Result.success(JWSAlgorithm.parse(signingAlg))
+        }
+    }
+
+    private fun parseRequiredEncryptionAlgorithm(encryptionAlg: String?): Result<JWEAlgorithm> {
+        return if (encryptionAlg.isNullOrEmpty()) {
+            RequestValidationError.IdTokenEncryptionAlgMissing.asFailure()
+        } else {
+            Result.success(JWEAlgorithm.parse(encryptionAlg))
+        }
+    }
+
+    private fun parseRequiredEncryptionMethod(encryptionMethod: String?): Result<EncryptionMethod> {
+        return if (encryptionMethod.isNullOrEmpty()) {
+            RequestValidationError.IdTokenEncryptionMethodMissing.asFailure()
+        } else {
+            Result.success(EncryptionMethod.parse(encryptionMethod))
+        }
     }
 
     private suspend fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {

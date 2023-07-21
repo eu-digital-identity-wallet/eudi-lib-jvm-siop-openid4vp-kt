@@ -268,6 +268,18 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         override fun toString(): String = "SubjectSyntaxTypesWrongSyntax"
     }
 
+    object IdTokenSigningAlgMissing : RequestValidationError {
+        override fun toString(): String = "IdTokenSigningAlgMissing"
+    }
+
+    object IdTokenEncryptionAlgMissing : RequestValidationError {
+        override fun toString(): String = "IdTokenEncryptionAlgMissing"
+    }
+
+    object IdTokenEncryptionMethodMissing : RequestValidationError {
+        override fun toString(): String = "IdTokenEncryptionMethodMissing"
+    }
+
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
 
     data class InvalidIdTokenType(val value: String) : RequestValidationError

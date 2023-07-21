@@ -145,5 +145,4 @@ internal object ResponseSignerEncryptor {
             build()
         }
     }
-
 }

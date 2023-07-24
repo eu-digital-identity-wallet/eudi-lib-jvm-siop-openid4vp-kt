@@ -10,7 +10,7 @@ plugins {
     id("org.sonarqube") version "4.0.0.2929"
     kotlin("jvm") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
-    id("com.diffplug.spotless") version "6.19.0"
+    id("com.diffplug.spotless") version "6.20.0"
     `java-library`
     `maven-publish`
     signing

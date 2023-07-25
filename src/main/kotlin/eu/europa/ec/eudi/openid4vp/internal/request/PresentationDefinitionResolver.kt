@@ -70,6 +70,7 @@ internal class PresentationDefinitionResolver(
             ?.success()
             ?: ResolutionError.PresentationDefinitionNotFoundForScope(scope).asFailure()
 
+    @Suppress("ktlint")
     private suspend fun fetch(
         url: URL,
         config: WalletOpenId4VPConfig,
@@ -79,5 +80,7 @@ internal class PresentationDefinitionResolver(
                 getPresentationDefinition.get(url)
                     .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
             }
-        } else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
+        } else {
+            ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
+        }
 }

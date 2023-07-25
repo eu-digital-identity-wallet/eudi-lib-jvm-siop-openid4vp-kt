@@ -177,16 +177,16 @@ internal object RequestObjectValidator {
                 state,
             )
 
+            @Suppress("ktlint")
             when (responseType) {
                 ResponseType.VpAndIdToken -> idAndVpToken()
                 ResponseType.IdToken -> idToken()
                 ResponseType.VpToken ->
                     // If scope is defined and its value is "openid" then id token must also be returned
-                    if (scope().getOrNull()?.value == "openid") {
-                        idAndVpToken()
-                    } else {
-                        vpToken()
-                    }
+
+                    if (scope().getOrNull()?.value == "openid") idAndVpToken()
+                    else vpToken()
+
             }
         }
 
@@ -254,10 +254,10 @@ internal object RequestObjectValidator {
      * @param unvalidated the request to validate
      * @return the state or [RequestValidationError.MissingState]
      */
+    @Suppress("ktlint")
     private fun requiredState(unvalidated: RequestObject): Result<String> =
-        if (!unvalidated.state.isNullOrBlank()) {
-            unvalidated.state.success()
-        } else RequestValidationError.MissingState.asFailure()
+        if (!unvalidated.state.isNullOrBlank()) unvalidated.state.success()
+        else RequestValidationError.MissingState.asFailure()
 
     /**
      * Makes sure that [unvalidated] contains a not-null scope
@@ -335,8 +335,10 @@ internal object RequestObjectValidator {
     private fun optionalClientIdScheme(unvalidated: RequestObject): Result<ClientIdScheme?> =
         if (unvalidated.clientIdScheme.isNullOrEmpty()) {
             Result.success(null)
-        } else ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
-            ?: RequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
+        } else {
+            ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
+                ?: RequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
+        }
 
     private fun requiredClientId(unvalidated: RequestObject): Result<String> =
         unvalidated.clientId?.success() ?: RequestValidationError.MissingClientId.asFailure()

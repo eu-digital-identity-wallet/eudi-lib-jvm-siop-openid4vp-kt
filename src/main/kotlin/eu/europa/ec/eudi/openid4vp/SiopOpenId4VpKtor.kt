@@ -152,7 +152,6 @@ class SiopOpenId4VpKtor(
                         @Suppress("ktlint")
                         if (response.status == HttpStatusCode.OK) VerifierResponse.Accepted(null)
                         else VerifierResponse.Rejected
-
                     }.getOrElse { VerifierResponse.Rejected }
                 }
 

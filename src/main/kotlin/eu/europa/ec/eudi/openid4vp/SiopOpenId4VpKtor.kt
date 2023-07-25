@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import eu.europa.ec.eudi.openid4vp.DispatchOutcome.VerifierResponse
 import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import io.ktor.client.*
@@ -138,19 +139,22 @@ class SiopOpenId4VpKtor(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = DefaultFactory,
         ): Dispatcher {
-            fun createDispatcher(c: HttpClient): DefaultDispatcher = DefaultDispatcher(ioCoroutineDispatcher) { url, parameters ->
-                runCatching {
-                    val response = c.submitForm(
-                        url = url.toString(),
-                        formParameters = Parameters.build {
-                            parameters.entries.forEach { append(it.key, it.value) }
-                        },
-                    )
-                    if (response.status == HttpStatusCode.OK) {
-                        DispatchOutcome.VerifierResponse.Accepted(null)
-                    } else DispatchOutcome.VerifierResponse.Rejected
-                }.getOrElse { DispatchOutcome.VerifierResponse.Rejected }
-            }
+            fun createDispatcher(c: HttpClient): DefaultDispatcher =
+                DefaultDispatcher(ioCoroutineDispatcher) { url, parameters ->
+                    runCatching {
+                        val response = c.submitForm(
+                            url = url.toString(),
+                            formParameters = Parameters.build {
+                                parameters.entries.forEach { append(it.key, it.value) }
+                            },
+                        )
+
+                        @Suppress("ktlint")
+                        if (response.status == HttpStatusCode.OK) VerifierResponse.Accepted(null)
+                        else VerifierResponse.Rejected
+
+                    }.getOrElse { VerifierResponse.Rejected }
+                }
 
             return Dispatcher { response ->
                 httpClientFactory().use { client ->

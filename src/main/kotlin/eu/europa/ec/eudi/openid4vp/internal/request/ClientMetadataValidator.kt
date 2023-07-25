@@ -32,16 +32,20 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
     suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
         val jwkSets = parseRequiredJwks(unvalidatedClientMetadata).getOrThrow()
         val types = parseRequiredSubjectSyntaxTypes(unvalidatedClientMetadata).getOrThrow()
-        val idTokenJWSAlg = parseRequiredSigningAlgorithm(unvalidatedClientMetadata.idTokenSignedResponseAlg).getOrThrow()
-        val idTokenJWEAlg = parseRequiredEncryptionAlgorithm(unvalidatedClientMetadata.idTokenEncryptedResponseAlg).getOrThrow()
-        val idTokenJWEEnc = parseRequiredEncryptionMethod(unvalidatedClientMetadata.idTokenEncryptedResponseEnc).getOrThrow()
+        val idTokenJWSAlg =
+            parseRequiredSigningAlgorithm(unvalidatedClientMetadata.idTokenSignedResponseAlg).getOrThrow()
+        val idTokenJWEAlg =
+            parseRequiredEncryptionAlgorithm(unvalidatedClientMetadata.idTokenEncryptedResponseAlg).getOrThrow()
+        val idTokenJWEEnc =
+            parseRequiredEncryptionMethod(unvalidatedClientMetadata.idTokenEncryptedResponseEnc).getOrThrow()
         if (!unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
             unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
         ) {
-            throw RuntimeException(
-                "Cannot construct ResponseSigningEncryptionSpec from client metadata:" +
-                    " property authorization_encrypted_response_alg exists but no property authorization_encrypted_response_enc found",
-            )
+            val msg = """Cannot construct ResponseSigningEncryptionSpec from client metadata:
+                    property authorization_encrypted_response_alg exists 
+                    but no property authorization_encrypted_response_enc found
+            """.trimIndent()
+            throw RuntimeException(msg)
         }
         val authSgnRespAlg: JWSAlgorithm? =
             parseOptionalSigningAlgorithm(unvalidatedClientMetadata.authorizationSignedResponseAlg)
@@ -64,47 +68,35 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
         )
     }
 
-    private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {
-        return if (signingAlg.isNullOrEmpty()) {
-            null
-        } else JWSAlgorithm.parse(signingAlg)
-    }
+    @Suppress("ktlint")
+    private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? =
+        if (signingAlg.isNullOrEmpty()) null
+        else JWSAlgorithm.parse(signingAlg)
 
-    private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? {
-        return if (encryptionAlg.isNullOrEmpty()) {
-            null
-        } else JWEAlgorithm.parse(encryptionAlg)
-    }
+    @Suppress("ktlint")
+    private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? =
+        if (encryptionAlg.isNullOrEmpty()) null
+        else JWEAlgorithm.parse(encryptionAlg)
 
-    private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
-        return if (encryptionMethod.isNullOrEmpty()) {
-            null
-        } else EncryptionMethod.parse(encryptionMethod)
-    }
+    @Suppress("ktlint")
+    private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? =
+        if (encryptionMethod.isNullOrEmpty()) null
+        else EncryptionMethod.parse(encryptionMethod)
 
-    private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> {
-        return if (signingAlg.isNullOrEmpty()) {
-            RequestValidationError.IdTokenSigningAlgMissing.asFailure()
-        } else {
-            Result.success(JWSAlgorithm.parse(signingAlg))
-        }
-    }
+    @Suppress("ktlint")
+    private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> =
+        if (signingAlg.isNullOrEmpty()) RequestValidationError.IdTokenSigningAlgMissing.asFailure()
+        else Result.success(JWSAlgorithm.parse(signingAlg))
 
-    private fun parseRequiredEncryptionAlgorithm(encryptionAlg: String?): Result<JWEAlgorithm> {
-        return if (encryptionAlg.isNullOrEmpty()) {
-            RequestValidationError.IdTokenEncryptionAlgMissing.asFailure()
-        } else {
-            Result.success(JWEAlgorithm.parse(encryptionAlg))
-        }
-    }
+    @Suppress("ktlint")
+    private fun parseRequiredEncryptionAlgorithm(encryptionAlg: String?): Result<JWEAlgorithm> =
+        if (encryptionAlg.isNullOrEmpty()) RequestValidationError.IdTokenEncryptionAlgMissing.asFailure()
+        else Result.success(JWEAlgorithm.parse(encryptionAlg))
 
-    private fun parseRequiredEncryptionMethod(encryptionMethod: String?): Result<EncryptionMethod> {
-        return if (encryptionMethod.isNullOrEmpty()) {
-            RequestValidationError.IdTokenEncryptionMethodMissing.asFailure()
-        } else {
-            Result.success(EncryptionMethod.parse(encryptionMethod))
-        }
-    }
+    @Suppress("ktlint")
+    private fun parseRequiredEncryptionMethod(encryptionMethod: String?): Result<EncryptionMethod> =
+        if (encryptionMethod.isNullOrEmpty()) RequestValidationError.IdTokenEncryptionMethodMissing.asFailure()
+        else Result.success(EncryptionMethod.parse(encryptionMethod))
 
     private suspend fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {
         val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
@@ -148,6 +140,8 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
         }
         return if (listNotEmpty && allValidTypes) {
             clientMetadata.subjectSyntaxTypesSupported.map { it.asSubjectSyntaxType() }.success()
-        } else RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
+        } else {
+            RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
+        }
     }
 }

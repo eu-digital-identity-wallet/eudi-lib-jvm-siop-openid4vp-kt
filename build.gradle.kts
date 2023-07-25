@@ -7,7 +7,7 @@ object Meta {
 }
 
 plugins {
-    id("org.sonarqube") version "4.0.0.2929"
+    id("org.sonarqube") version "4.3.0.3225"
     kotlin("jvm") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
     id("com.diffplug.spotless") version "6.20.0"

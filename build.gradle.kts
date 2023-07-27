@@ -30,11 +30,12 @@ repositories {
 val ktorVersion = "2.3.0"
 val presentationExchangeVersion = "0.1.0-SNAPSHOT"
 val nimbusSdkVersion = "10.11"
+val uriKmpVersion = "0.0.13"
 
 dependencies {
     api("eu.europa.ec.eudi:eudi-lib-jvm-presentation-exchange-kt:$presentationExchangeVersion")
     api("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
-    implementation("com.eygraber:uri-kmp:0.0.11")
+    implementation("com.eygraber:uri-kmp:$uriKmpVersion")
     api("io.ktor:ktor-client-core:$ktorVersion")
     api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     api("io.ktor:ktor-client-serialization:$ktorVersion")

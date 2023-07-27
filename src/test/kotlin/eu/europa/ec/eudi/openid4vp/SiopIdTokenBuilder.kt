@@ -100,8 +100,6 @@ object SiopIdTokenBuilder {
             return iat.toDate() to exp.toDate()
         }
 
-        val subjectJwk = JWKSet(rsaJWK).toPublicJWKSet()
-
         val (iat, exp) = computeTokenDates(clock)
 
         return with(

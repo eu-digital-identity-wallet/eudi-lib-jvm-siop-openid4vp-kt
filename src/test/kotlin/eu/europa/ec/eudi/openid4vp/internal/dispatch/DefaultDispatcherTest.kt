@@ -129,7 +129,7 @@ class DefaultDispatcherTest {
             )
             val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
-            DefaultDispatcher { url, parameters ->
+            DefaultDispatcher { _, parameters ->
                 runCatching {
                     val joseResponse = parameters.get("response") as String
                     val decryptedJWT = ecdhDecrypt(ecKey.toECPrivateKey(), joseResponse)
@@ -173,7 +173,7 @@ class DefaultDispatcherTest {
             )
             val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
-            DefaultDispatcher { url, parameters ->
+            DefaultDispatcher { _, parameters ->
                 runCatching {
                     val joseResponse = parameters.get("response") as String
                     val encrypted = EncryptedJWT.parse(joseResponse)
@@ -222,7 +222,7 @@ class DefaultDispatcherTest {
             )
             val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
-            DefaultDispatcher { url, parameters ->
+            DefaultDispatcher { _, parameters ->
                 runCatching {
                     val joseResponse = parameters.get("response") as String
                     val signedJWT = SignedJWT.parse(joseResponse)
@@ -410,7 +410,7 @@ class DefaultDispatcherTest {
         ) = runBlocking {
             val dispatchOutcome = dispatcher.dispatch(response)
             assertTrue(dispatchOutcome is DispatchOutcome.RedirectURI)
-            val redirectUri = (dispatchOutcome as DispatchOutcome.RedirectURI).value.toUri()
+            val redirectUri = dispatchOutcome.value.toUri()
                 .also { println(it) }
 
             assertNotNull(redirectUri.fragment)

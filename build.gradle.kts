@@ -1,9 +1,9 @@
 object Meta {
-    const val orgUrl = "https://github.com/eu-digital-identity-wallet"
-    const val projectDescription = "SIOP & OpenId4VP wallet role library"
-    const val projectBaseUrl = "https://github.com/eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt"
-    const val projectGitUrl = "scm:git:git@github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
-    const val projectSshUrl = "scm:git:ssh://github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
+    const val ORG_URL = "https://github.com/eu-digital-identity-wallet"
+    const val PROJ_DESCR = "SIOP & OpenId4VP wallet role library"
+    const val PROJ_BASE_DIR = "https://github.com/eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt"
+    const val PROJ_GIT_URL = "scm:git:git@github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
+    const val PROJ_SSH_URL = "scm:git:ssh://github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
 }
 
 plugins {
@@ -61,8 +61,12 @@ tasks.jar {
     }
 }
 
-tasks.test {
-    useJUnitPlatform()
+testing {
+    suites {
+        val test by getting(JvmTestSuite::class) {
+            useJUnitJupiter()
+        }
+    }
 }
 
 kotlin {
@@ -89,8 +93,8 @@ publishing {
             from(components["java"])
             pom {
                 name.set(project.name)
-                description.set(Meta.projectDescription)
-                url.set(Meta.projectBaseUrl)
+                description.set(Meta.PROJ_DESCR)
+                url.set(Meta.PROJ_BASE_DIR)
                 licenses {
                     license {
                         name.set("The Apache License, Version 2.0")
@@ -98,21 +102,21 @@ publishing {
                     }
                 }
                 scm {
-                    connection.set(Meta.projectGitUrl)
-                    developerConnection.set(Meta.projectSshUrl)
-                    url.set(Meta.projectBaseUrl)
+                    connection.set(Meta.PROJ_GIT_URL)
+                    developerConnection.set(Meta.PROJ_SSH_URL)
+                    url.set(Meta.PROJ_BASE_DIR)
                 }
                 issueManagement {
                     system.set("github")
-                    url.set(Meta.projectBaseUrl + "/issues")
+                    url.set(Meta.PROJ_BASE_DIR + "/issues")
                 }
                 ciManagement {
                     system.set("github")
-                    url.set(Meta.projectBaseUrl + "/actions")
+                    url.set(Meta.PROJ_BASE_DIR + "/actions")
                 }
                 developers {
                     organization {
-                        url.set(Meta.orgUrl)
+                        url.set(Meta.ORG_URL)
                     }
                 }
             }

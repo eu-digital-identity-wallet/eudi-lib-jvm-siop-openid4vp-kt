@@ -148,6 +148,6 @@ class AuthorizationResponseBuilderTest {
 
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
         assertNotNull((response as AuthorizationResponse.DirectPostJwt).jarmSpec)
-        assertTrue(response.jarmSpec is JarmSpec.EncryptedResponse)
+        assertTrue(response.jarmSpec.jarmOption is JarmOption.EncryptedResponse)
     }
 }

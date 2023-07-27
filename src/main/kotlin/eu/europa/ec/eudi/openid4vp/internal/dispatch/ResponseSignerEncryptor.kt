@@ -28,24 +28,25 @@ import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.AuthorizationResponsePayload
+import eu.europa.ec.eudi.openid4vp.JarmOption
 import eu.europa.ec.eudi.openid4vp.JarmSpec
 import java.util.*
 
 internal object ResponseSignerEncryptor {
 
-    fun signEncryptResponse(spec: JarmSpec, data: AuthorizationResponsePayload): String {
-        return when (spec) {
-            is JarmSpec.SignedResponse -> sign(spec, data).serialize()
-            is JarmSpec.EncryptedResponse -> encrypt(spec, data).serialize()
-            is JarmSpec.SignedAndEncryptedResponse -> signAndEncrypt(spec, data).serialize()
+    fun signEncryptResponse(spec: JarmSpec, data: AuthorizationResponsePayload): String =
+        when (val jarmOption = spec.jarmOption) {
+            is JarmOption.SignedResponse -> sign(spec.holderId, jarmOption, data).serialize()
+            is JarmOption.EncryptedResponse -> encrypt(spec.holderId, jarmOption, data).serialize()
+            is JarmOption.SignedAndEncryptedResponse -> signAndEncrypt(spec.holderId, jarmOption, data).serialize()
         }
-    }
 
     private fun sign(
-        spec: JarmSpec.SignedResponse,
+        holderId: String,
+        option: JarmOption.SignedResponse,
         data: AuthorizationResponsePayload,
     ): SignedJWT {
-        val (holderId, signingAlg, signingKeySet) = spec
+        val (signingAlg, signingKeySet) = option
         val (signingKey, jwsSigner) = keyAndSigner(signingAlg, signingKeySet)
         val header = JWSHeader.Builder(signingAlg)
             .keyID(signingKey.keyID)
@@ -55,29 +56,30 @@ internal object ResponseSignerEncryptor {
     }
 
     private fun encrypt(
-        spec: JarmSpec.EncryptedResponse,
+        holderId: String,
+        option: JarmOption.EncryptedResponse,
         data: AuthorizationResponsePayload,
     ): EncryptedJWT {
-        val (_, jweEncrypter) = keyAndEncryptor(spec.responseEncryptionAlg, spec.encryptionKeySet)
-        val jweHeader = JWEHeader(spec.responseEncryptionAlg, spec.responseEncryptionEnc)
-        val dataAsJWT = DirectPostForm.of(data).asJWT(spec.holderId)
+        val (jweAlgorithm, encryptionMethod, encryptionKeySet) = option
+        val (_, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
+        val jweHeader = JWEHeader(jweAlgorithm, encryptionMethod)
+        val dataAsJWT = DirectPostForm.of(data).asJWT(holderId)
         return EncryptedJWT(jweHeader, dataAsJWT).apply { encrypt(jweEncrypter) }
     }
 
     private fun signAndEncrypt(
-        spec: JarmSpec.SignedAndEncryptedResponse,
+        holderId: String,
+        option: JarmOption.SignedAndEncryptedResponse,
         data: AuthorizationResponsePayload,
     ): JWEObject {
-        val signedJwt = sign(spec.signedResponse(), data)
-        val (_, jweEncrypter) = keyAndEncryptor(spec.responseEncryptionAlg, spec.encryptionKeySet)
+        val signedJwt = sign(holderId, option.signedResponse, data)
+        val (jweAlgorithm, encryptionMethod, encryptionKeySet) = option.encryptResponse
+        val (_, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
         return JWEObject(
-            JWEHeader(spec.responseEncryptionAlg, spec.responseEncryptionEnc),
+            JWEHeader(jweAlgorithm, encryptionMethod),
             Payload(signedJwt),
         ).apply { encrypt(jweEncrypter) }
     }
-
-    private fun JarmSpec.SignedAndEncryptedResponse.signedResponse(): JarmSpec.SignedResponse =
-        JarmSpec.SignedResponse(holderId, responseSigningAlg, signingKeySet)
 
     private fun keyAndSigner(
         jwsAlgorithm: JWSAlgorithm,

@@ -204,20 +204,20 @@ sealed interface JarmSpec {
 
     val holderId: String
 
-    class SignedResponse(
+    data class SignedResponse(
         override val holderId: String,
         val responseSigningAlg: JWSAlgorithm,
         val signingKeySet: JWKSet,
     ) : JarmSpec
 
-    class EncryptedResponse(
+    data class EncryptedResponse(
         override val holderId: String,
         val responseEncryptionAlg: JWEAlgorithm,
         val responseEncryptionEnc: EncryptionMethod,
         val encryptionKeySet: JWKSet,
     ) : JarmSpec
 
-    class SignedAndEncryptedResponse(
+    data class SignedAndEncryptedResponse(
         override val holderId: String,
         val responseSigningAlg: JWSAlgorithm,
         val responseEncryptionAlg: JWEAlgorithm,

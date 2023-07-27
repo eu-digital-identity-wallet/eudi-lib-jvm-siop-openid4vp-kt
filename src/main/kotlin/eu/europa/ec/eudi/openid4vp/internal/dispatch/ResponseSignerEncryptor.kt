@@ -104,8 +104,8 @@ internal object ResponseSignerEncryptor {
         responseEncryptionAlg: JWEAlgorithm,
         encryptionKeySet: JWKSet,
     ): JWEEncrypter = when {
-        JWEAlgorithm.Family.ECDH_ES.any { it.name.equals(responseEncryptionAlg.name) } -> createECDHEncrypter(encryptionKeySet)
-        JWEAlgorithm.Family.RSA.any { it.name.equals(responseEncryptionAlg.name) } -> createRSAEncrypter(encryptionKeySet)
+        JWEAlgorithm.Family.ECDH_ES.any { it.name == responseEncryptionAlg.name } -> createECDHEncrypter(encryptionKeySet)
+        JWEAlgorithm.Family.RSA.any { it.name == responseEncryptionAlg.name } -> createRSAEncrypter(encryptionKeySet)
         else -> throw UnsupportedOperationException(
             "Unsupported encryption algorithm $responseEncryptionAlg." +
                 " Currently supported encryption algorithm families are [ECDH_ES, RSA]",
@@ -114,25 +114,25 @@ internal object ResponseSignerEncryptor {
 
     private fun createECDHEncrypter(keySet: JWKSet): ECDHEncrypter {
         // Look for a EC key in JWKSet
-        val ecJWK = keySet.keys.first { it.keyType.value.equals(KeyType.EC.value) }
+        val ecJWK = keySet.keys.first { it.keyType.value == KeyType.EC.value }
             ?: throw RuntimeException("No EC encryption key found in the provided key set")
         return ECDHEncrypter(ECKey.parse(ecJWK.toJSONObject()))
     }
 
     private fun createECSigner(keySet: JWKSet): JWSSigner {
-        val ecJWK = keySet.keys.first { it.keyType.value.equals(KeyType.EC.value) }
+        val ecJWK = keySet.keys.first { it.keyType.value == KeyType.EC.value }
             ?: throw RuntimeException("No EC signing key found in the provided key set")
         return ECDSASigner(ECKey.parse(ecJWK.toJSONObject()))
     }
 
     private fun createRSAEncrypter(keySet: JWKSet): RSAEncrypter {
-        val rsaJWK = keySet.keys.first { it.keyType.value.equals(KeyType.RSA.value) }
+        val rsaJWK = keySet.keys.first { it.keyType.value == KeyType.RSA.value }
             ?: throw RuntimeException("No RSA encryption key found in the provided key set")
         return RSAEncrypter(RSAKey.parse(rsaJWK.toJSONObject()))
     }
 
     private fun createRSASigner(keySet: JWKSet): JWSSigner {
-        val rsaJWK = keySet.keys.first { it.keyType.value.equals(KeyType.RSA.value) }
+        val rsaJWK = keySet.keys.first { it.keyType.value == KeyType.RSA.value }
             ?: throw RuntimeException("No RSA signing key found in the provided key set")
         return RSASSASigner(RSAKey.parse(rsaJWK.toJSONObject()))
     }

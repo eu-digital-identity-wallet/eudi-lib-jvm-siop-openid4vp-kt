@@ -200,62 +200,55 @@ enum class IdTokenType {
     AttesterSigned,
 }
 
-sealed interface JarmSpec {
-
-    val holderId: String
-
-    class SignedResponse(
-        override val holderId: String,
+sealed interface JarmOption {
+    data class SignedResponse(
         val responseSigningAlg: JWSAlgorithm,
         val signingKeySet: JWKSet,
-    ) : JarmSpec
+    ) : JarmOption
 
-    class EncryptedResponse(
-        override val holderId: String,
+    data class EncryptedResponse(
         val responseEncryptionAlg: JWEAlgorithm,
         val responseEncryptionEnc: EncryptionMethod,
         val encryptionKeySet: JWKSet,
-    ) : JarmSpec
+    ) : JarmOption
 
-    class SignedAndEncryptedResponse(
-        override val holderId: String,
-        val responseSigningAlg: JWSAlgorithm,
-        val responseEncryptionAlg: JWEAlgorithm,
-        val responseEncryptionEnc: EncryptionMethod,
-        val signingKeySet: JWKSet,
-        val encryptionKeySet: JWKSet,
-    ) : JarmSpec
+    data class SignedAndEncryptedResponse(
+        val signedResponse: SignedResponse,
+        val encryptResponse: EncryptedResponse,
+    ) : JarmOption
 
     companion object {
-        fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? {
-            fun signedResponse(): Boolean = clientMetaData.authorizationSignedResponseAlg != null
-            fun encryptedResponse(): Boolean = clientMetaData.authorizationEncryptedResponseAlg != null
+        fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmOption? {
+            val signed: SignedResponse? = clientMetaData.authorizationSignedResponseAlg?.let {
+                SignedResponse(it, walletOpenId4VPConfig.signingKeySet)
+            }
+
+            val encrypted: EncryptedResponse? =
+                clientMetaData.authorizationEncryptedResponseAlg?.let { jweAlg ->
+                    clientMetaData.authorizationEncryptedResponseEnc?.let { encMethod ->
+                        clientMetaData.jwkSet?.let { jwkSet ->
+                            EncryptedResponse(jweAlg, encMethod, jwkSet)
+                        }
+                    }
+                }
 
             return when {
-                signedResponse() && !encryptedResponse() -> SignedResponse(
-                    walletOpenId4VPConfig.decentralizedIdentifier,
-                    clientMetaData.authorizationSignedResponseAlg ?: throw RuntimeException(),
-                    walletOpenId4VPConfig.signingKeySet,
-                )
-
-                !signedResponse() && encryptedResponse() -> EncryptedResponse(
-                    walletOpenId4VPConfig.decentralizedIdentifier,
-                    clientMetaData.authorizationEncryptedResponseAlg ?: throw RuntimeException(),
-                    clientMetaData.authorizationEncryptedResponseEnc ?: throw RuntimeException(),
-                    clientMetaData.jwkSet ?: throw RuntimeException(),
-                )
-
-                signedResponse() && encryptedResponse() -> SignedAndEncryptedResponse(
-                    walletOpenId4VPConfig.decentralizedIdentifier,
-                    clientMetaData.authorizationSignedResponseAlg ?: throw RuntimeException(),
-                    clientMetaData.authorizationEncryptedResponseAlg ?: throw RuntimeException(),
-                    clientMetaData.authorizationEncryptedResponseEnc ?: throw RuntimeException(),
-                    walletOpenId4VPConfig.signingKeySet,
-                    clientMetaData.jwkSet ?: throw RuntimeException(),
-                )
-
+                signed != null && encrypted != null -> SignedAndEncryptedResponse(signed, encrypted)
+                signed != null && encrypted == null -> signed
+                signed == null && encrypted != null -> encrypted
                 else -> null
             }
         }
+    }
+}
+
+data class JarmSpec(val holderId: String, val jarmOption: JarmOption) {
+
+    companion object {
+        fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? =
+            JarmOption.make(clientMetaData, walletOpenId4VPConfig)?.let { jarmOption ->
+                val holderId = walletOpenId4VPConfig.decentralizedIdentifier
+                JarmSpec(holderId, jarmOption)
+            }
     }
 }

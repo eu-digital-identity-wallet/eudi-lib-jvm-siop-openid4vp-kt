@@ -15,6 +15,7 @@ plugins {
     `java-library`
     `maven-publish`
     signing
+    jacoco
 }
 
 extra["isReleaseVersion"] = !version.toString().endsWith("SNAPSHOT")
@@ -75,6 +76,12 @@ kotlin {
     jvmToolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
         vendor.set(JvmVendorSpec.ADOPTIUM)
+    }
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
     }
 }
 

@@ -112,7 +112,7 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM" }
                 """.trimIndent()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
+                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(
@@ -159,7 +159,7 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM"}
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
+                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(
@@ -211,7 +211,7 @@ class DefaultDispatcherTest {
                     "authorization_signed_response_alg":"RS256" }
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaDataDecoded)
+                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(

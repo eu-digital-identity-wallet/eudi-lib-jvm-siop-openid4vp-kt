@@ -1,30 +1,30 @@
-name: Software Composition Analysis with Dependency-Check
+name: SCA - Dependency Check
 on:
   push:
     branches: [ 'main', 'release/*', 'feature/*' ]
     tags: [ v* ]
   workflow_dispatch:
-
+  
 jobs:
-  Dependency_check:
-    runs-on: ubuntu-latest
+ sca-dependency-check-gradle:
+    name: Build
+    runs-on:  ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout project sources
         uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
         with:
-          fetch-depth: 0
-      - name: Depcheck Action - SCA
-        uses: dependency-check/Dependency-Check_Action@main
-        id: Depcheck
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v1
+      - name: Build with Gradle Wrapper & Run Dependency-Check
+        uses: gradle/gradle-build-action@v2.6.1
         with:
-          project: '${{ github.repository }}'
-          path: '.'
-          format: 'HTML'
-          out: 'reports' # this is the default, no need to specify unless you wish to override it
-          args: >
-            --enableRetired
+          gradle-version: wrapper
+          arguments: dependencyCheckAnalyze 
       - name: Upload results - SCA
         uses: actions/upload-artifact@master
         with:
-           name: Depcheck report
-           path: ${{github.workspace}}/reports
+           name: Dependency Check Report
+           path: ${{github.workspace}}/build/reports/dependency-check-report.html

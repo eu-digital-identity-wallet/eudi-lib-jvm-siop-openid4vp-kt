@@ -79,10 +79,10 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
 
     @Suppress("ktlint")
     private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {
-        val parsedSigningAlg = JWSAlgorithm.parse(signingAlg) ?: return null
+        val parsedSigningAlg = JWSAlgorithm.parse(signingAlg)
         if (!walletOpenId4VPConfig.authorizationSigningAlgValuesSupported.contains(parsedSigningAlg)) {
             throw RuntimeException(
-                "The Signing algorithm specified in received client metadata, does not match the Wallet's signing algorithm",
+                "The Signing algorithm specified in received client metadata, is not supported",
             )
         }
         return parsedSigningAlg
@@ -90,10 +90,10 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
 
     @Suppress("ktlint")
     private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? {
-        val parsedEncryptionAlgorithm = JWEAlgorithm.parse(encryptionAlg) ?: return null
+        val parsedEncryptionAlgorithm = JWEAlgorithm.parse(encryptionAlg)
         if (!walletOpenId4VPConfig.authorizationEncryptionAlgValuesSupported.contains(parsedEncryptionAlgorithm)) {
             throw RuntimeException(
-                "The Encryption algorithm specified in received client metadata, does not match the Wallet's Encryption algorithm",
+                "The Encryption algorithm specified in received client metadata, is not supported",
             )
         }
         return parsedEncryptionAlgorithm
@@ -101,10 +101,10 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
 
     @Suppress("ktlint")
     private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
-        val parsedEncryptionMethodAlgorithm = EncryptionMethod.parse(encryptionMethod) ?: return null
+        val parsedEncryptionMethodAlgorithm = EncryptionMethod.parse(encryptionMethod)
         if (!walletOpenId4VPConfig.authorizationEncryptionEncValuesSupported.contains(parsedEncryptionMethodAlgorithm)) {
             throw RuntimeException(
-                "The Encryption algorithm specified in received client metadata, does not match the Wallet's Encryption algorithm",
+                "The Encryption Encoding method specified in received client metadata, is not supported",
             )
         }
         return parsedEncryptionMethodAlgorithm

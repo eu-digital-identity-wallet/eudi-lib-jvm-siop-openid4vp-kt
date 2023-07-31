@@ -27,8 +27,10 @@ import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
-internal class ClientMetadataValidator(private val ioCoroutineDispatcher: CoroutineDispatcher,
-                                       private val walletOpenId4VPConfig: WalletOpenId4VPConfig) {
+internal class ClientMetadataValidator(
+    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+) {
 
     suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
         val jwkSets = parseRequiredJwks(unvalidatedClientMetadata).getOrThrow()
@@ -39,10 +41,14 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
             parseRequiredEncryptionAlgorithm(unvalidatedClientMetadata.idTokenEncryptedResponseAlg).getOrThrow()
         val idTokenJWEEnc =
             parseRequiredEncryptionMethod(unvalidatedClientMetadata.idTokenEncryptedResponseEnc).getOrThrow()
-        if ((!unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
-                    unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()) ||
-            (unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
-                    !unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty())
+        if ((
+                !unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
+                    unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
+                ) ||
+            (
+                unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
+                    !unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
+                )
         ) {
             val msg = """Cannot construct ResponseSigningEncryptionSpec from client metadata:
                     property authorization_encrypted_response_alg exists 
@@ -53,15 +59,15 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
 
         val authSgnRespAlg: JWSAlgorithm? =
             parseOptionalSigningAlgorithm(
-                unvalidatedClientMetadata.authorizationSignedResponseAlg
+                unvalidatedClientMetadata.authorizationSignedResponseAlg,
             )
         val authEncRespAlg: JWEAlgorithm? =
             parseOptionalEncryptionAlgorithm(
-                unvalidatedClientMetadata.authorizationEncryptedResponseAlg
+                unvalidatedClientMetadata.authorizationEncryptedResponseAlg,
             )
         val authEncRespEnc: EncryptionMethod? =
             parseOptionalEncryptionMethod(
-                unvalidatedClientMetadata.authorizationEncryptedResponseEnc
+                unvalidatedClientMetadata.authorizationEncryptedResponseEnc,
             )
 
         ClientMetaData(
@@ -75,7 +81,6 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
             authorizationEncryptedResponseEnc = authEncRespEnc,
         )
     }
-
 
     @Suppress("ktlint")
     private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {

@@ -98,14 +98,10 @@ class DefaultDispatcherTest {
             idTokenTTL = Duration.ofMinutes(10),
             preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
             decentralizedIdentifier = "DID:example:12341512#$",
-            authorizationSigningAlgValuesSupported = listOf( JWSAlgorithm.parse("RS256")),
-            authorizationEncryptionAlgValuesSupported = listOf( JWEAlgorithm.parse("ECDH-ES")),
-            authorizationEncryptionEncValuesSupported = listOf( EncryptionMethod.parse("A256GCM"))
+            authorizationSigningAlgValuesSupported = listOf(JWSAlgorithm.parse("RS256")),
+            authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
         )
-
-
-
-
 
         private val ecKey = ECKeyGenerator(Curve.P_256)
             .keyUse(KeyUse.ENCRYPTION)
@@ -222,6 +218,7 @@ class DefaultDispatcherTest {
             }
 
         @Test
+        @Suppress("ktlint")
         fun `if response type direct_post jwt, JWT should be returned if only signing alg, encryption alg and encryption method are specified and supported by wallet`(): Unit =
             runBlocking {
                 val clientMetadataStr = """

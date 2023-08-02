@@ -24,6 +24,7 @@ import eu.europa.ec.eudi.openid4vp.internal.success
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.lang.NullPointerException
 import java.net.URL
 import java.text.ParseException
 
@@ -84,36 +85,41 @@ internal class ClientMetadataValidator(
 
     @Suppress("ktlint")
     private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {
+        if (signingAlg.isNullOrEmpty()) {
+            return null
+        }
         val parsedSigningAlg = JWSAlgorithm.parse(signingAlg)
         if (!walletOpenId4VPConfig.authorizationSigningAlgValuesSupported.contains(parsedSigningAlg)) {
-            throw RuntimeException(
-                "The Signing algorithm specified in received client metadata, is not supported",
-            )
+            throw IllegalArgumentException("The Signing algorithm specified in received client metadata is not supported")
         }
         return parsedSigningAlg
     }
 
     @Suppress("ktlint")
     private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? {
+        if (encryptionAlg.isNullOrEmpty()) {
+            return null
+        }
         val parsedEncryptionAlgorithm = JWEAlgorithm.parse(encryptionAlg)
         if (!walletOpenId4VPConfig.authorizationEncryptionAlgValuesSupported.contains(parsedEncryptionAlgorithm)) {
-            throw RuntimeException(
-                "The Encryption algorithm specified in received client metadata, is not supported",
-            )
+            throw IllegalArgumentException("The Encryption algorithm specified in received client metadata is not supported")
         }
         return parsedEncryptionAlgorithm
     }
 
+
     @Suppress("ktlint")
     private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
+        if (encryptionMethod.isNullOrEmpty()) {
+            return null
+        }
         val parsedEncryptionMethodAlgorithm = EncryptionMethod.parse(encryptionMethod)
         if (!walletOpenId4VPConfig.authorizationEncryptionEncValuesSupported.contains(parsedEncryptionMethodAlgorithm)) {
-            throw RuntimeException(
-                "The Encryption Encoding method specified in received client metadata, is not supported",
-            )
+            throw UnsupportedOperationException("The Encryption Encoding method specified in received client metadata is not supported")
         }
         return parsedEncryptionMethodAlgorithm
     }
+
 
     @Suppress("ktlint")
     private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> =

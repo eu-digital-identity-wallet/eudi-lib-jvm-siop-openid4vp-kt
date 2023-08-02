@@ -38,10 +38,10 @@ import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -129,6 +129,12 @@ class DefaultDispatcherTest {
                 """.trimIndent()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+
+
+                assert(clientMetadataValidated.isSuccess) {
+                    return@runBlocking
+                }
+
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(
@@ -176,6 +182,12 @@ class DefaultDispatcherTest {
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+
+                assertFalse(clientMetadataValidated.isSuccess)
+                if (!clientMetadataValidated.isSuccess){
+                    return@runBlocking
+                }
+
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(
@@ -211,7 +223,6 @@ class DefaultDispatcherTest {
                         assertNotNull(signedJWT.jwtClaimsSet.issuer)
                         assertNotNull(signedJWT.jwtClaimsSet.audience)
                         assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
-
                         DispatchOutcome.VerifierResponse.Accepted(null)
                     }.getOrThrow()
                 }.dispatch(response)
@@ -248,7 +259,7 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder.make(walletConfigWithSignAndEncryptionAlgorithms).build(resolvedRequest, vpTokenConsensus)
 
                 DefaultDispatcher { _, parameters ->
                     runCatching {
@@ -283,6 +294,9 @@ class DefaultDispatcherTest {
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+                assert(clientMetadataValidated.isSuccess) {
+                    return@runBlocking
+                }
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(

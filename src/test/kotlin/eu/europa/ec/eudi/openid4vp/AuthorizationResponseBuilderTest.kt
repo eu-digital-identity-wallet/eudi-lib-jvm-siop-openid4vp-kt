@@ -25,9 +25,11 @@ import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
+import junit.framework.TestCase.assertFalse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Assertions
 import java.time.Duration
 import java.util.*
 import kotlin.test.Test
@@ -127,6 +129,12 @@ class AuthorizationResponseBuilderTest {
             """.trimIndent()
         val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
         val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+
+        assertFalse(clientMetadataValidated.isSuccess)
+        if (!clientMetadataValidated.isSuccess){
+            return@runBlocking
+        }
+
         val resolvedRequest =
             ResolvedRequestObject.OpenId4VPAuthorization(
                 presentationDefinition = PresentationDefinition(
@@ -149,5 +157,7 @@ class AuthorizationResponseBuilderTest {
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
         assertNotNull((response as AuthorizationResponse.DirectPostJwt).jarmSpec)
         assertTrue(response.jarmSpec.jarmOption is JarmOption.EncryptedResponse)
+
+
     }
 }

@@ -117,6 +117,23 @@ class DefaultDispatcherTest {
                 "Bl62k90RaMZpXCxNO4Ew\"}"
             ).trimIndent()
 
+
+        @Test
+        fun `client metadata does not match with wallet's supported algorithms`(): Unit = runBlocking {
+            val clientMetadataStr = """
+                    { "jwks": { "keys": [${
+                ecKey.toPublicJWK().toJSONString()
+            }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
+                    "authorization_signed_response_alg":"RS256",
+                    "authorization_encryptd_response_alg":"ECDH-ES", 
+                    "authorization_encrypted_response_enc":"A256GCM"}
+                """.trimIndent().trimMargin()
+            val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
+            val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+            assertFalse(clientMetadataValidated.isSuccess)
+        }
+
+
         @Test
         fun `if response type direct_post jwt, JWE should be returned if encryption alg specified`(): Unit =
             runBlocking {
@@ -128,12 +145,9 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM" }
                 """.trimIndent()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfigWithSignAndEncryptionAlgorithms).validate(clientMetaDataDecoded)
 
-
-                assert(clientMetadataValidated.isSuccess) {
-                    return@runBlocking
-                }
+                assertTrue(clientMetadataValidated.isSuccess)
 
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
@@ -181,12 +195,9 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM"}
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfigWithSignAndEncryptionAlgorithms).validate(clientMetaDataDecoded)
 
-                assertFalse(clientMetadataValidated.isSuccess)
-                if (!clientMetadataValidated.isSuccess){
-                    return@runBlocking
-                }
+                assertTrue(clientMetadataValidated.isSuccess)
 
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
@@ -242,6 +253,7 @@ class DefaultDispatcherTest {
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfigWithSignAndEncryptionAlgorithms).validate(clientMetaDataDecoded)
+                assertTrue(clientMetadataValidated.isSuccess)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(
@@ -293,10 +305,8 @@ class DefaultDispatcherTest {
                     "authorization_signed_response_alg":"RS256" }
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
-                assert(clientMetadataValidated.isSuccess) {
-                    return@runBlocking
-                }
+                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfigWithSignAndEncryptionAlgorithms).validate(clientMetaDataDecoded)
+                assertTrue(clientMetadataValidated.isSuccess)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(

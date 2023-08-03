@@ -24,7 +24,6 @@ import eu.europa.ec.eudi.openid4vp.internal.success
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import java.lang.NullPointerException
 import java.net.URL
 import java.text.ParseException
 
@@ -107,7 +106,6 @@ internal class ClientMetadataValidator(
         return parsedEncryptionAlgorithm
     }
 
-
     @Suppress("ktlint")
     private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
         if (encryptionMethod.isNullOrEmpty()) {
@@ -119,7 +117,6 @@ internal class ClientMetadataValidator(
         }
         return parsedEncryptionMethodAlgorithm
     }
-
 
     @Suppress("ktlint")
     private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> =

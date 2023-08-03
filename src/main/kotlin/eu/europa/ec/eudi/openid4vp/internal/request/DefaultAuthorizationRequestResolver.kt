@@ -105,6 +105,7 @@ internal class DefaultAuthorizationRequestResolver(
                 clientMetaDataResolver = ClientMetaDataResolver(
                     ioCoroutineDispatcher = ioCoroutineDispatcher,
                     getClientMetaData = getClientMetaData,
+                    walletOpenId4VPConfig,
                 ),
             ),
         )

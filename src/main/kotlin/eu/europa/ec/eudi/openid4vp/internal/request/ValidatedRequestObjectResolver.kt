@@ -92,6 +92,6 @@ internal class ValidatedRequestObjectResolver(
     private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): Result<ClientMetaData> {
         return validated.clientMetaDataSource?.let {
             clientMetaDataResolver.resolve(it)
-        } ?: error("Missing client metadata")
+        } ?: error("Missing or invalid client metadata")
     }
 }

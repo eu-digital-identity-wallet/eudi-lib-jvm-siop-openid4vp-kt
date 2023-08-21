@@ -77,7 +77,7 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`(): Unit = runBlocking {
-        val validated = ClientMetadataValidator(Dispatchers.IO).validate(clientMetaData)
+        val validated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaData)
 
         val stateVal = genState()
 

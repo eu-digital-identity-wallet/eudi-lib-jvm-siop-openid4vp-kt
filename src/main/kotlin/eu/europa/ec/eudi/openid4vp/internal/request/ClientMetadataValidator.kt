@@ -27,7 +27,10 @@ import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
-internal class ClientMetadataValidator(private val ioCoroutineDispatcher: CoroutineDispatcher) {
+internal class ClientMetadataValidator(
+    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+) {
 
     suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
         val jwkSets = parseRequiredJwks(unvalidatedClientMetadata).getOrThrow()
@@ -38,8 +41,14 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
             parseRequiredEncryptionAlgorithm(unvalidatedClientMetadata.idTokenEncryptedResponseAlg).getOrThrow()
         val idTokenJWEEnc =
             parseRequiredEncryptionMethod(unvalidatedClientMetadata.idTokenEncryptedResponseEnc).getOrThrow()
-        if (!unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
-            unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
+        if ((
+                !unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
+                    unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
+                ) ||
+            (
+                unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
+                    !unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
+                )
         ) {
             val msg = """Cannot construct ResponseSigningEncryptionSpec from client metadata:
                     property authorization_encrypted_response_alg exists 
@@ -47,14 +56,19 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
             """.trimIndent()
             throw RuntimeException(msg)
         }
-        val authSgnRespAlg: JWSAlgorithm? =
-            parseOptionalSigningAlgorithm(unvalidatedClientMetadata.authorizationSignedResponseAlg)
-        val authEncRespAlg: JWEAlgorithm? =
-            parseOptionalEncryptionAlgorithm(unvalidatedClientMetadata.authorizationEncryptedResponseAlg)
-        val authEncRespEnc: EncryptionMethod? =
-            parseOptionalEncryptionMethod(unvalidatedClientMetadata.authorizationEncryptedResponseEnc)
 
-        // TODO: Find if signing/encryption algs match the supported ones
+        val authSgnRespAlg: JWSAlgorithm? =
+            parseOptionalSigningAlgorithm(
+                unvalidatedClientMetadata.authorizationSignedResponseAlg,
+            )
+        val authEncRespAlg: JWEAlgorithm? =
+            parseOptionalEncryptionAlgorithm(
+                unvalidatedClientMetadata.authorizationEncryptedResponseAlg,
+            )
+        val authEncRespEnc: EncryptionMethod? =
+            parseOptionalEncryptionMethod(
+                unvalidatedClientMetadata.authorizationEncryptedResponseEnc,
+            )
 
         ClientMetaData(
             idTokenJWSAlg = idTokenJWSAlg,
@@ -69,19 +83,40 @@ internal class ClientMetadataValidator(private val ioCoroutineDispatcher: Corout
     }
 
     @Suppress("ktlint")
-    private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? =
-        if (signingAlg.isNullOrEmpty()) null
-        else JWSAlgorithm.parse(signingAlg)
+    private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {
+        if (signingAlg.isNullOrEmpty()) {
+            return null
+        }
+        val parsedSigningAlg = JWSAlgorithm.parse(signingAlg)
+        if (!walletOpenId4VPConfig.authorizationSigningAlgValuesSupported.contains(parsedSigningAlg)) {
+            throw IllegalArgumentException("The Signing algorithm specified in received client metadata is not supported")
+        }
+        return parsedSigningAlg
+    }
 
     @Suppress("ktlint")
-    private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? =
-        if (encryptionAlg.isNullOrEmpty()) null
-        else JWEAlgorithm.parse(encryptionAlg)
+    private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? {
+        if (encryptionAlg.isNullOrEmpty()) {
+            return null
+        }
+        val parsedEncryptionAlgorithm = JWEAlgorithm.parse(encryptionAlg)
+        if (!walletOpenId4VPConfig.authorizationEncryptionAlgValuesSupported.contains(parsedEncryptionAlgorithm)) {
+            throw IllegalArgumentException("The Encryption algorithm specified in received client metadata is not supported")
+        }
+        return parsedEncryptionAlgorithm
+    }
 
     @Suppress("ktlint")
-    private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? =
-        if (encryptionMethod.isNullOrEmpty()) null
-        else EncryptionMethod.parse(encryptionMethod)
+    private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
+        if (encryptionMethod.isNullOrEmpty()) {
+            return null
+        }
+        val parsedEncryptionMethodAlgorithm = EncryptionMethod.parse(encryptionMethod)
+        if (!walletOpenId4VPConfig.authorizationEncryptionEncValuesSupported.contains(parsedEncryptionMethodAlgorithm)) {
+            throw UnsupportedOperationException("The Encryption Encoding method specified in received client metadata is not supported")
+        }
+        return parsedEncryptionMethodAlgorithm
+    }
 
     @Suppress("ktlint")
     private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> =

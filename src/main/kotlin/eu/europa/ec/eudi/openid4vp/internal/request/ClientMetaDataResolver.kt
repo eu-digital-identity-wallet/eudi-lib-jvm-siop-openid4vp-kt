@@ -23,8 +23,9 @@ import java.net.URL
 internal class ClientMetaDataResolver(
     ioCoroutineDispatcher: CoroutineDispatcher,
     private val getClientMetaData: HttpGet<UnvalidatedClientMetaData>,
+    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
-    private val clientMetadataValidator = ClientMetadataValidator(ioCoroutineDispatcher)
+    private val clientMetadataValidator = ClientMetadataValidator(ioCoroutineDispatcher, walletOpenId4VPConfig)
     suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): Result<ClientMetaData> {
         val unvalidatedClientMetaData = when (clientMetaDataSource) {
             is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData

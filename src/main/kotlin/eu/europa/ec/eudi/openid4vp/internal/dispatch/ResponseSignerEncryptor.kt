@@ -30,7 +30,9 @@ import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.AuthorizationResponsePayload
 import eu.europa.ec.eudi.openid4vp.JarmOption
 import eu.europa.ec.eudi.openid4vp.JarmSpec
-import java.util.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
+import java.time.Instant
 
 internal object ResponseSignerEncryptor {
 
@@ -51,7 +53,7 @@ internal object ResponseSignerEncryptor {
         val header = JWSHeader.Builder(signingAlg)
             .keyID(signingKey.keyID)
             .build()
-        val dataAsJWT = DirectPostForm.of(data).asJWT(holderId)
+        val dataAsJWT = JwtPayloadFactory.create(data, holderId, Instant.now())
         return SignedJWT(header, dataAsJWT).apply { sign(jwsSigner) }
     }
 
@@ -63,7 +65,7 @@ internal object ResponseSignerEncryptor {
         val (jweAlgorithm, encryptionMethod, encryptionKeySet) = option
         val (_, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
         val jweHeader = JWEHeader(jweAlgorithm, encryptionMethod)
-        val dataAsJWT = DirectPostForm.of(data).asJWT(holderId)
+        val dataAsJWT = JwtPayloadFactory.create(data, holderId, Instant.now())
         return EncryptedJWT(jweHeader, dataAsJWT).apply { encrypt(jweEncrypter) }
     }
 
@@ -102,14 +104,51 @@ internal object ResponseSignerEncryptor {
             .firstOrNull()
             ?.toPair()
             ?: error("Cannot find appropriate encryption key for ${jweAlgorithm.name}")
+}
 
-    private fun Map<String, String>.asJWT(holderId: String): JWTClaimsSet {
-        return with(JWTClaimsSet.Builder()) {
-            issuer(holderId)
-            issueTime(Date())
-            this@asJWT.entries.map { claim(it.key, it.value) }
-            build()
-        }
+private object JwtPayloadFactory {
+
+    private const val PRESENTATION_SUBMISSION_CLAIM = "presentation_submission"
+    private const val VP_TOKEN_CLAIM = "vp_token"
+    private const val STATE_CLAIM = "state"
+    private const val ID_TOKEN_CLAIM = "id_token"
+    private const val ERROR_CLAIM = "error"
+    private const val ERROR_DESCRIPTION_CLAIM = "error_description"
+    fun create(data: AuthorizationResponsePayload, holderId: String, issuedAt: Instant): JWTClaimsSet =
+        buildJsonObject {
+            put("iss", holderId)
+            put("iat", issuedAt.epochSecond)
+            put(STATE_CLAIM, data.state)
+
+            when (data) {
+                is AuthorizationResponsePayload.SiopAuthentication -> {
+                    put(ID_TOKEN_CLAIM, data.idToken)
+                }
+
+                is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
+                    put(VP_TOKEN_CLAIM, data.vpToken)
+                    put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
+                }
+
+                is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
+                    put(ID_TOKEN_CLAIM, data.idToken)
+                    put(VP_TOKEN_CLAIM, data.vpToken)
+                    put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
+                }
+
+                is AuthorizationResponsePayload.InvalidRequest -> {
+                    put(ERROR_CLAIM, AuthorizationRequestErrorCode.fromError(data.error).code)
+                    put(ERROR_DESCRIPTION_CLAIM, "${data.error}")
+                }
+
+                is AuthorizationResponsePayload.NoConsensusResponseData -> {
+                    put(ERROR_CLAIM, AuthorizationRequestErrorCode.USER_CANCELLED.code)
+                }
+            }
+        }.asJWTClaimSet()
+    private fun JsonObject.asJWTClaimSet(): JWTClaimsSet {
+        val jsonStr = Json.encodeToString(this)
+        return JWTClaimsSet.parse(jsonStr)
     }
 }
 

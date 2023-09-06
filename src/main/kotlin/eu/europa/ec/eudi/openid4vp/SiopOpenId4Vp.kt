@@ -21,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 /**
  * An interface providing support for handling
  * an OAUTH2 authorization request that represents
- * either an SIOP authentication request, or a OpenId4VP authorization request or
+ * either an SIOP authentication request, or an OpenId4VP authorization request or
  * a combined SIOP & OpenId4VP request
  *
  * The support is grouped into three groups:
@@ -35,23 +35,6 @@ import kotlinx.coroutines.Dispatchers
  */
 interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBuilder, Dispatcher {
 
-    /**
-     *
-     */
-    suspend fun handle(
-        uri: String,
-        holderConsensus: suspend (ResolvedRequestObject) -> Consensus,
-    ): DispatchOutcome =
-        when (val resolution = resolveRequestUri(uri)) {
-            is Resolution.Invalid -> throw resolution.error.asException()
-            is Resolution.Success -> {
-                val requestObject = resolution.requestObject
-                val consensus = holderConsensus(requestObject)
-                val authorizationResponse = build(requestObject, consensus)
-                dispatch(authorizationResponse)
-            }
-        }
-
     companion object {
 
         /**
@@ -60,7 +43,7 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          *
          * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
          * @param walletOpenId4VPConfig wallet's configuration
-         * @param httpClientFactory a factory to obtain Ktor http client
+         * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
          *
          * @see SiopOpenId4VpKtor

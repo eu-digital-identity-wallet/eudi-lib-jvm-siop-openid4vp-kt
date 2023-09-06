@@ -86,7 +86,7 @@ internal class JarJwtSignatureValidator(
                         ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
                 //
                 // Currently is not defined how to
-                // process client_id when scheme is IsoX509 or not provided
+                // process client_id when the scheme is IsoX509 or not provided
                 // Thus, we don't validate the signature
                 //
                 when (supportedClientIdScheme) {

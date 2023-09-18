@@ -32,7 +32,7 @@ repositories {
 val ktorVersion = "2.3.3"
 val presentationExchangeVersion = "0.1.0-SNAPSHOT"
 
-val nimbusSdkVersion = "10.14.2"
+val nimbusSdkVersion = "10.15"
 val uriKmpVersion = "0.0.14"
 
 dependencies {

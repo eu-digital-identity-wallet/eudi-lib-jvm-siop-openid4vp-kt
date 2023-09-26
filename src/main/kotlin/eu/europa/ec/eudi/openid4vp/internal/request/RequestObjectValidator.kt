@@ -28,7 +28,7 @@ import java.net.URL
 internal sealed interface PresentationDefinitionSource {
 
     /**
-     * Presentation definition is passed by value (that is embedded to the authorization request)
+     * Presentation definition is given by value (that is embedded to the authorization request)
      * by the verifier
      */
     data class ByValue(val presentationDefinition: PresentationDefinition) : PresentationDefinitionSource
@@ -37,14 +37,14 @@ internal sealed interface PresentationDefinitionSource {
      * Presentation Definition can be retrieved from the resource at the specified
      * URL, rather than being passed by value.
      * The Wallet will send a GET request without additional parameters.
-     * The resource MUST be exposed without further need to authenticate or authorize
+     * The resource MUST be exposed without a further need to authenticate or authorize
      */
     data class ByReference(val url: URL) : PresentationDefinitionSource
 
     /**
      * When a presentation definition is pre-agreed between wallet and verifier, using
      * a specific [scope]. In this case, verifier doesn't communicate the presentation definition
-     * neither [by value][ByValue] nor by [ByReference]. Rather, the wallets
+     * neither [by value][ByValue] nor by [ByReference]. Rather, the wallet
      * has been configured (via a specific scope) with a well-known definition
      */
     data class Implied(val scope: Scope) : PresentationDefinitionSource
@@ -284,8 +284,8 @@ internal object RequestObjectValidator {
      * Function check [RequestObject.responseType]
      *
      * @param unvalidated the request to validate
-     * @return the supported [ResponseType], or [RequestValidationError.MissingResponseType] if response type is not provided
-     * or [RequestValidationError.UnsupportedResponseType] if response type is not supported
+     * @return the supported [ResponseType], or [RequestValidationError.MissingResponseType] if the response type is not provided
+     * or [RequestValidationError.UnsupportedResponseType] if the response type is not supported
      */
     private fun requiredResponseType(unvalidated: RequestObject): Result<ResponseType> =
         when (val rt = unvalidated.responseType?.trim()) {

@@ -32,7 +32,7 @@ sealed interface DispatchOutcome : Serializable {
     data class RedirectURI(val value: URI) : DispatchOutcome
 
     /**
-     * The verifier/RP 's response to a [direct post][AuthorizationResponse.RedirectResponse]
+     * The verifier/RP's response to a [direct post][AuthorizationResponse.RedirectResponse]
      */
     sealed interface VerifierResponse : DispatchOutcome {
         /**
@@ -44,6 +44,7 @@ sealed interface DispatchOutcome : Serializable {
          * When verifier/RP reject the direct post
          */
         object Rejected : VerifierResponse {
+            private fun readResolve(): Any = Rejected
             override fun toString(): String = "Rejected"
         }
     }

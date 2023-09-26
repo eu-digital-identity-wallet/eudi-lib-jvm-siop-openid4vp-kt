@@ -248,6 +248,20 @@ private class Wallet(
         }
     }
 
+    suspend fun SiopOpenId4Vp.handle(
+        uri: String,
+        holderConsensus: suspend (ResolvedRequestObject) -> Consensus,
+    ): DispatchOutcome =
+        when (val resolution = resolveRequestUri(uri)) {
+            is Resolution.Invalid -> throw resolution.error.asException()
+            is Resolution.Success -> {
+                val requestObject = resolution.requestObject
+                val consensus = holderConsensus(requestObject)
+                val authorizationResponse = build(requestObject, consensus)
+                dispatch(authorizationResponse)
+            }
+        }
+
     suspend fun holderConsent(request: ResolvedRequestObject): Consensus = withContext(Dispatchers.Default) {
         when (request) {
             is ResolvedRequestObject.SiopAuthentication -> handleSiop(request)
@@ -256,6 +270,7 @@ private class Wallet(
         }
     }
 
+    @Suppress("KotlinConstantConditions")
     private fun handleSiop(request: ResolvedRequestObject.SiopAuthentication): Consensus {
         walletPrintln("Received an SiopAuthentication request")
         fun showScreen() = true.also {

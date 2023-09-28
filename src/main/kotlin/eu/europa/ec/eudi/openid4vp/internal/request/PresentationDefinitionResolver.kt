@@ -28,7 +28,7 @@ import java.net.URL
 /**
  * Resolves a [PresentationDefinitionSource] into a [PresentationDefinition]
  *
- * @param getPresentationDefinition a way of performing a HTTP GET to obtain a [PresentationDefinition] provided
+ * @param getPresentationDefinition a way of performing an HTTP GET to obtain a [PresentationDefinition] provided
  *  by [reference][PresentationDefinitionSource.ByReference]
  */
 internal class PresentationDefinitionResolver(

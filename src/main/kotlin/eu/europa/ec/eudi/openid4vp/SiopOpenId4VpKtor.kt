@@ -31,7 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import java.net.URL
 
 /**
- * Alias of a  method that creates a [HttpClient]
+ * Alias of a method that creates a [HttpClient]
  */
 typealias KtorHttpClientFactory = () -> HttpClient
 
@@ -59,7 +59,7 @@ class SiopOpenId4VpKtor(
         /**
          * Factory which produces a [Ktor Http client][HttpClient]
          * The actual engine will be peeked up by whatever
-         * is available in classpath
+         * it is available in classpath
          *
          * @see [Ktor Client]("https://ktor.io/docs/client-dependencies.html#engine-dependency)
          */
@@ -131,7 +131,7 @@ class SiopOpenId4VpKtor(
          * The [Dispatcher] will obtain a new [HttpClient] with each call & then release it
          *
          * @param httpClientFactory factory to obtain [HttpClient]
-         * @param ioCoroutineDispatcher the coroutines dispatcher to handle IO
+         * @param ioCoroutineDispatcher the co-routines dispatcher to handle IO
          * @return the [Dispatcher] as described above
          * @see DefaultDispatcher
          */

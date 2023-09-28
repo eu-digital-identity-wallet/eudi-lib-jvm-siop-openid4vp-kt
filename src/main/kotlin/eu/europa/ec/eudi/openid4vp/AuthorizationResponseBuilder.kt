@@ -116,12 +116,13 @@ sealed interface Consensus : Serializable {
      * the request
      */
     object NegativeConsensus : Consensus {
+        private fun readResolve(): Any = NegativeConsensus
         override fun toString(): String = "NegativeConsensus"
     }
 
     /**
      * Positive consensus. Holder decided to
-     * respond the request
+     *  respond to the request
      */
     sealed interface PositiveConsensus : Consensus {
         /**

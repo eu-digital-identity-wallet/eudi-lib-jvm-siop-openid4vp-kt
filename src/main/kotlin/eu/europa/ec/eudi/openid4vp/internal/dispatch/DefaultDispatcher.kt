@@ -67,9 +67,9 @@ internal class DefaultDispatcher(
      * </ul>
      * @param response the response to be communicated via direct_post.jwt
      * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
-     * @see [JARM][https://openid.net/specs/openid-financial-api-jarm.html] specification for details regarding
+     * **See Also:** [JARM](https://openid.net/specs/openid-financial-api-jarm.html) specification for details regarding
      * response signing/encryption
-     * @see [OpenId4VP][https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-signed-and-encrypted-respon]
+     * **See Also:** [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-signed-and-encrypted-respon)
      * for details about direct_post.jwt response type
      */
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =

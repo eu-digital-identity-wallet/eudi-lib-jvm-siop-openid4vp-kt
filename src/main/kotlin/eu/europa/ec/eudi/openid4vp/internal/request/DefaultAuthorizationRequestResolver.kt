@@ -70,10 +70,8 @@ internal class DefaultAuthorizationRequestResolver(
     /**
      * Extracts the request object from a [jwt]
      *
-     * Currently, method neither verify signature nor supports
-     * encrypted JARs
-     *
-     * @param jwt The JWT to be validated. It is assumed that represents in its payload
+     * @param jwt The JWT to be validated.
+     * It is assumed that represents, in its payload,
      * a [RequestObject]
      * @param clientId The client that placed request
      */

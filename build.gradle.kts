@@ -1,3 +1,7 @@
+import org.jetbrains.dokka.DokkaConfiguration
+import org.jetbrains.dokka.gradle.DokkaTask
+import java.net.URL
+
 object Meta {
     const val ORG_URL = "https://github.com/eu-digital-identity-wallet"
     const val PROJ_DESCR = "SIOP & OpenId4VP wallet role library"
@@ -16,6 +20,7 @@ plugins {
     `maven-publish`
     signing
     jacoco
+    alias(libs.plugins.dokka)
 }
 
 extra["isReleaseVersion"] = !version.toString().endsWith("SNAPSHOT")
@@ -45,9 +50,7 @@ dependencies {
 
 java {
     sourceCompatibility = JavaVersion.toVersion(libs.versions.java.get())
-
     withSourcesJar()
-    withJavadocJar()
 }
 
 kotlin {
@@ -92,10 +95,41 @@ tasks.jar {
     }
 }
 
+tasks.withType<DokkaTask>().configureEach {
+    dokkaSourceSets {
+        named("main") {
+            // used as project name in the header
+            moduleName.set("SIOPv2 OpenId4VP")
+
+            // contains descriptions for the module and the packages
+            includes.from("Module.md")
+
+            documentedVisibilities.set(setOf(DokkaConfiguration.Visibility.PUBLIC, DokkaConfiguration.Visibility.PROTECTED))
+
+            val remoteSourceUrl = System.getenv()["GIT_REF_NAME"]?.let { URL("${Meta.PROJ_BASE_DIR}/tree/$it/src") }
+            remoteSourceUrl
+                ?.let {
+                    sourceLink {
+                        localDirectory.set(projectDir.resolve("src"))
+                        remoteUrl.set(it)
+                        remoteLineSuffix.set("#L")
+                    }
+                }
+        }
+    }
+}
+
+val javadocJar = tasks.register<Jar>("javadocJar") {
+    dependsOn(tasks.dokkaHtml)
+    from(tasks.dokkaHtml.flatMap { it.outputDirectory })
+    archiveClassifier.set("javadoc")
+}
+
 publishing {
     publications {
         create<MavenPublication>("library") {
             from(components["java"])
+            artifacts + artifact(javadocJar)
             pom {
                 name.set(project.name)
                 description.set(Meta.PROJ_DESCR)

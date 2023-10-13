@@ -9,6 +9,7 @@ nimbus-sdk = "11.0"
 uri-kmp = "0.0.14"
 java = "17"
 ktlint = "0.50.0"
+dokka = "1.9.0"
 
 [libraries]
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -28,3 +29,4 @@ sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

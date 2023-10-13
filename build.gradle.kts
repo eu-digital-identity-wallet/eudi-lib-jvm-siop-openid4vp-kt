@@ -1,24 +1,23 @@
+import org.jetbrains.dokka.DokkaConfiguration
+import org.jetbrains.dokka.gradle.DokkaTask
+import java.net.URL
+
 object Meta {
-    const val ORG_URL = "https://github.com/eu-digital-identity-wallet"
-    const val PROJ_DESCR = "SIOP & OpenId4VP wallet role library"
-    const val PROJ_BASE_DIR = "https://github.com/eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt"
-    const val PROJ_GIT_URL = "scm:git:git@github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
-    const val PROJ_SSH_URL = "scm:git:ssh://github.com:eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt.git"
+    const val BASE_URL = "https://github.com/eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt"
 }
 
 plugins {
-    id("org.owasp.dependencycheck") version "8.4.0"
-    id("org.sonarqube") version "4.3.0.3225"
-    kotlin("jvm") version "1.8.21"
-    kotlin("plugin.serialization") version "1.8.21"
-    id("com.diffplug.spotless") version "6.21.0"
+    base
     `java-library`
-    `maven-publish`
-    signing
     jacoco
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.sonarqube)
+    alias(libs.plugins.dependency.check)
+    alias(libs.plugins.maven.publish)
 }
-
-extra["isReleaseVersion"] = !version.toString().endsWith("SNAPSHOT")
 
 repositories {
     mavenCentral()
@@ -29,29 +28,53 @@ repositories {
     }
 }
 
-val ktorVersion = "2.3.3"
-val presentationExchangeVersion = "0.1.0-SNAPSHOT"
-
-val nimbusSdkVersion = "11.0"
-val uriKmpVersion = "0.0.14"
-
 dependencies {
-    api("eu.europa.ec.eudi:eudi-lib-jvm-presentation-exchange-kt:$presentationExchangeVersion")
-    api("com.nimbusds:oauth2-oidc-sdk:$nimbusSdkVersion")
-    implementation("com.eygraber:uri-kmp:$uriKmpVersion")
-    api("io.ktor:ktor-client-core:$ktorVersion")
-    api("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-    api("io.ktor:ktor-client-serialization:$ktorVersion")
-    api("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    api(libs.presentation.exchange)
+    api(libs.nimbus.oauth2.oidc.sdk)
+    implementation(libs.uri.kmp)
+    api(libs.ktor.client.core)
+    api(libs.ktor.client.content.negotiation)
+    api(libs.ktor.client.serialization)
+    api(libs.ktor.serialization.kotlinx.json)
     testImplementation(kotlin("test"))
-    testImplementation("io.ktor:ktor-client-okhttp:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
+    testImplementation(libs.ktor.client.okhttp)
+    testImplementation(libs.ktor.server.test.host)
+    testImplementation(libs.ktor.server.content.negotiation)
 }
 
 java {
-    withSourcesJar()
-    withJavadocJar()
+    sourceCompatibility = JavaVersion.toVersion(libs.versions.java.get())
+}
+
+kotlin {
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.java.get()))
+        vendor.set(JvmVendorSpec.ADOPTIUM)
+    }
+}
+
+spotless {
+    kotlin {
+        ktlint(libs.versions.ktlint.get())
+        licenseHeaderFile("FileHeader.txt")
+    }
+    kotlinGradle {
+        ktlint(libs.versions.ktlint.get())
+    }
+}
+
+testing {
+    suites {
+        val test by getting(JvmTestSuite::class) {
+            useJUnitJupiter()
+        }
+    }
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+    }
 }
 
 tasks.jar {
@@ -65,97 +88,35 @@ tasks.jar {
     }
 }
 
-testing {
-    suites {
-        val test by getting(JvmTestSuite::class) {
-            useJUnitJupiter()
-        }
-    }
-}
+tasks.withType<DokkaTask>().configureEach {
+    dokkaSourceSets {
+        named("main") {
+            // used as project name in the header
+            moduleName.set("SIOPv2 OpenId4VP")
 
-kotlin {
-    jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
-        vendor.set(JvmVendorSpec.ADOPTIUM)
-    }
-}
+            // contains descriptions for the module and the packages
+            includes.from("Module.md")
 
-tasks.jacocoTestReport {
-    reports {
-        xml.required.set(true)
-    }
-}
+            documentedVisibilities.set(setOf(DokkaConfiguration.Visibility.PUBLIC, DokkaConfiguration.Visibility.PROTECTED))
 
-val ktlintVersion = "0.50.0"
-spotless {
-    kotlin {
-        ktlint(ktlintVersion)
-        licenseHeaderFile("FileHeader.txt")
-    }
-    kotlinGradle {
-        ktlint(ktlintVersion)
-    }
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("library") {
-            from(components["java"])
-            pom {
-                name.set(project.name)
-                description.set(Meta.PROJ_DESCR)
-                url.set(Meta.PROJ_BASE_DIR)
-                licenses {
-                    license {
-                        name.set("The Apache License, Version 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+            val remoteSourceUrl = System.getenv()["GIT_REF_NAME"]?.let { URL("${Meta.BASE_URL}/tree/$it/src") }
+            remoteSourceUrl
+                ?.let {
+                    sourceLink {
+                        localDirectory.set(projectDir.resolve("src"))
+                        remoteUrl.set(it)
+                        remoteLineSuffix.set("#L")
                     }
                 }
-                scm {
-                    connection.set(Meta.PROJ_GIT_URL)
-                    developerConnection.set(Meta.PROJ_SSH_URL)
-                    url.set(Meta.PROJ_BASE_DIR)
-                }
-                issueManagement {
-                    system.set("github")
-                    url.set(Meta.PROJ_BASE_DIR + "/issues")
-                }
-                ciManagement {
-                    system.set("github")
-                    url.set(Meta.PROJ_BASE_DIR + "/actions")
-                }
-                developers {
-                    organization {
-                        url.set(Meta.ORG_URL)
-                    }
-                }
-            }
-        }
-    }
-    repositories {
-
-        val sonaUri =
-            if ((extra["isReleaseVersion"]) as Boolean) {
-                "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
-            } else {
-                "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-            }
-
-        maven {
-            name = "sonatype"
-            url = uri(sonaUri)
-            credentials(PasswordCredentials::class)
         }
     }
 }
 
-signing {
-    setRequired({
-        (project.extra["isReleaseVersion"] as Boolean) && gradle.taskGraph.hasTask("publish")
-    })
-    val signingKeyId: String? by project
-    val signingKey: String? by project
-    val signingPassword: String? by project
-    useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
-    sign(publishing.publications["library"])
+mavenPublishing {
+    pom {
+        ciManagement {
+            system = "github"
+            url = "${Meta.BASE_URL}/actions"
+        }
+    }
 }

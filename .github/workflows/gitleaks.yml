@@ -1,8 +1,6 @@
 name: Secret Scanning - Gitleaks
 on:
   push:
-    branches: [ 'main', 'release/*', 'feature/*' ]
-    tags: [ v* ]
   workflow_dispatch:
 
 jobs:

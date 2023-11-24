@@ -69,7 +69,7 @@ class AuthorizationRequestResolverTest {
         authorizationEncryptionEncValuesSupported = emptyList(),
     )
 
-    private val resolver = SiopOpenId4Vp.ktor(walletConfig)
+    private val resolver = SiopOpenId4Vp.make(walletConfig)
 
     private val clientMetadataJwksInline =
         """ {

@@ -39,7 +39,7 @@ import java.net.URL
  */
 internal class DefaultDispatcher(
     private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) : Dispatcher {
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
         when (response) {

@@ -28,9 +28,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal class DefaultAuthorizationRequestResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
 ) : AuthorizationRequestResolver {
 

@@ -22,13 +22,14 @@ import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.success
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
 internal class ClientMetadataValidator(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
 

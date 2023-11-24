@@ -32,7 +32,7 @@ import java.net.URL
  */
 internal class PresentationDefinitionResolver(
     private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) {
 
     /**

@@ -19,6 +19,7 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -138,8 +139,11 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = SiopOpenId4VpKtor.dispatcher { managedHttpClient }
-            when (val response = AuthorizationResponseBuilder.make(walletConfig).build(siopAuthRequestObject, idTokenConsensus)) {
+            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
+            when (
+                val response =
+                    AuthorizationResponseBuilder.make(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
+            ) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
                 }

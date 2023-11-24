@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import eu.europa.ec.eudi.openid4vp.internal.DefaultSiopOpenId4Vp
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -38,20 +39,41 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
     companion object {
 
         /**
-         * Factory method to create a [SiopOpenId4Vp] based
-         * on ktor
+         * Factory method to create a [SiopOpenId4Vp].
          *
          * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
          * @param walletOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
          *
-         * @see SiopOpenId4VpKtor
+         * @see DefaultSiopOpenId4Vp
          */
-        fun ktor(
+        fun make(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpClientFactory: KtorHttpClientFactory = SiopOpenId4VpKtor.DefaultFactory,
-        ): SiopOpenId4Vp = SiopOpenId4VpKtor(ioCoroutineDispatcher, walletOpenId4VPConfig, httpClientFactory)
+            httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+        ): SiopOpenId4Vp =
+            make(
+                AuthorizationRequestResolver.make(ioCoroutineDispatcher, httpClientFactory, walletOpenId4VPConfig),
+                Dispatcher.make(ioCoroutineDispatcher, httpClientFactory),
+                AuthorizationResponseBuilder.make(walletOpenId4VPConfig),
+            )
+
+        /**
+         * Factory method to create a [SiopOpenId4Vp].
+         *
+         * @param authorizationResolver the [AuthorizationRequestResolver] instance to use
+         * @param dispatcher the [Dispatcher] instance to use
+         * @param authorizationResponseBuilder the [AuthorizationResponseBuilder] instance to use
+         * @return a [SiopOpenId4Vp]
+         *
+         * @see DefaultSiopOpenId4Vp
+         */
+        fun make(
+            authorizationResolver: AuthorizationRequestResolver,
+            dispatcher: Dispatcher,
+            authorizationResponseBuilder: AuthorizationResponseBuilder,
+        ): SiopOpenId4Vp =
+            DefaultSiopOpenId4Vp(authorizationResolver, dispatcher, authorizationResponseBuilder)
     }
 }

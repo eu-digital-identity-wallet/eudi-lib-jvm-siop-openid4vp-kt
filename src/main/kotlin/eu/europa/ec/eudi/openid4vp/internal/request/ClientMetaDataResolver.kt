@@ -26,7 +26,7 @@ import java.net.URL
 
 internal class ClientMetaDataResolver(
     private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
     walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
     private val clientMetadataValidator = ClientMetadataValidator(ioCoroutineDispatcher, walletOpenId4VPConfig)

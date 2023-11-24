@@ -35,6 +35,7 @@ import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.IsoX509
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.success
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -50,7 +51,7 @@ import java.text.ParseException
  * @param walletOpenId4VPConfig wallet's configuration
  */
 internal class JarJwtSignatureValidator(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
 

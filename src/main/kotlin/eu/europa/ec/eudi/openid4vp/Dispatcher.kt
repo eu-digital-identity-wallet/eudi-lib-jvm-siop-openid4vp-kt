@@ -46,9 +46,8 @@ sealed interface DispatchOutcome : Serializable {
         /**
          * When verifier/RP reject the direct post
          */
-        object Rejected : VerifierResponse {
+        data object Rejected : VerifierResponse {
             private fun readResolve(): Any = Rejected
-            override fun toString(): String = "Rejected"
         }
     }
 }

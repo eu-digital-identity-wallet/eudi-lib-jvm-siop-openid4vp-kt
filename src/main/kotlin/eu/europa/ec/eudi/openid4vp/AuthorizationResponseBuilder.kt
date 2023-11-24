@@ -115,9 +115,8 @@ sealed interface Consensus : Serializable {
      * No consensus. Holder decided to reject
      * the request
      */
-    object NegativeConsensus : Consensus {
+    data object NegativeConsensus : Consensus {
         private fun readResolve(): Any = NegativeConsensus
-        override fun toString(): String = "NegativeConsensus"
     }
 
     /**

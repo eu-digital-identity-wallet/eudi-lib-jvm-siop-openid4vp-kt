@@ -77,7 +77,7 @@ sealed interface SubjectSyntaxType : java.io.Serializable {
         }
     }
 
-    object JWKThumbprint : SubjectSyntaxType {
+    data object JWKThumbprint : SubjectSyntaxType {
         private fun readResolve(): Any = JWKThumbprint
         fun isValid(value: String): Boolean = value != ThumbprintURI.PREFIX
     }

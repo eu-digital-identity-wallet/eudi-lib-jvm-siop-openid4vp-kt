@@ -183,9 +183,9 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     // Response Type errors
     //
     data class UnsupportedResponseType(val value: String) : RequestValidationError
-    object MissingResponseType : RequestValidationError {
+
+    data object MissingResponseType : RequestValidationError {
         private fun readResolve(): Any = MissingResponseType
-        override fun toString(): String = "MissingResponseType"
     }
 
     //
@@ -196,110 +196,90 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     //
     // Presentation Definition errors
     //
-    object MissingPresentationDefinition : RequestValidationError {
+    data object MissingPresentationDefinition : RequestValidationError {
         private fun readResolve(): Any = MissingPresentationDefinition
-        override fun toString(): String = "MissingPresentationDefinition"
     }
 
     data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
-    object InvalidPresentationDefinitionUri : RequestValidationError {
+
+    data object InvalidPresentationDefinitionUri : RequestValidationError {
         private fun readResolve(): Any = InvalidPresentationDefinitionUri
-        override fun toString(): String = "InvalidPresentationDefinitionUri"
     }
 
-    object InvalidRedirectUri : RequestValidationError {
+    data object InvalidRedirectUri : RequestValidationError {
         private fun readResolve(): Any = InvalidRedirectUri
-        override fun toString(): String = "InvalidRedirectUri"
     }
 
-    object MissingRedirectUri : RequestValidationError {
+    data object MissingRedirectUri : RequestValidationError {
         private fun readResolve(): Any = MissingRedirectUri
-        override fun toString(): String = "MissingRedirectUri"
     }
 
-    object MissingResponseUri : RequestValidationError {
+    data object MissingResponseUri : RequestValidationError {
         private fun readResolve(): Any = MissingResponseUri
-        override fun toString(): String = "MissingResponseUri"
     }
 
-    object InvalidResponseUri : RequestValidationError {
+    data object InvalidResponseUri : RequestValidationError {
         private fun readResolve(): Any = InvalidResponseUri
-        override fun toString(): String = "InvalidResponseUri"
     }
 
-    object ResponseUriMustNotBeProvided : RequestValidationError {
+    data object ResponseUriMustNotBeProvided : RequestValidationError {
         private fun readResolve(): Any = ResponseUriMustNotBeProvided
-        override fun toString(): String = "ResponseUriMustNotBeProvided"
     }
 
-    object RedirectUriMustNotBeProvided : RequestValidationError {
+    data object RedirectUriMustNotBeProvided : RequestValidationError {
         private fun readResolve(): Any = RedirectUriMustNotBeProvided
-        override fun toString(): String = "RedirectUriMustNotBeProvided"
     }
 
-    object MissingState : RequestValidationError {
+    data object MissingState : RequestValidationError {
         private fun readResolve(): Any = MissingState
-        override fun toString(): String = "MissingState"
     }
 
-    object MissingNonce : RequestValidationError {
+    data object MissingNonce : RequestValidationError {
         private fun readResolve(): Any = MissingNonce
-        override fun toString(): String = "MissingNonce"
     }
 
-    object MissingScope : RequestValidationError {
+    data object MissingScope : RequestValidationError {
         private fun readResolve(): Any = MissingScope
-        override fun toString(): String = "MissingScope"
     }
 
-    object MissingClientId : RequestValidationError {
+    data object MissingClientId : RequestValidationError {
         private fun readResolve(): Any = MissingClientId
-        override fun toString(): String = "MissingClientId"
     }
 
-    object InvalidClientMetaDataUri : RequestValidationError {
+    data object InvalidClientMetaDataUri : RequestValidationError {
         private fun readResolve(): Any = InvalidClientMetaDataUri
-        override fun toString(): String = "InvalidClientMetaDataUri"
     }
 
-    object OneOfClientMedataOrUri : RequestValidationError {
+    data object OneOfClientMedataOrUri : RequestValidationError {
         private fun readResolve(): Any = OneOfClientMedataOrUri
-        override fun toString(): String = "OneOfClientMedataOrUri"
     }
 
-    object SubjectSyntaxTypesNoMatch : RequestValidationError {
+    data object SubjectSyntaxTypesNoMatch : RequestValidationError {
         private fun readResolve(): Any = SubjectSyntaxTypesNoMatch
-        override fun toString(): String = "SubjectSyntaxTypesNoMatch"
     }
 
-    object MissingClientMetadataJwksSource : RequestValidationError {
+    data object MissingClientMetadataJwksSource : RequestValidationError {
         private fun readResolve(): Any = MissingClientMetadataJwksSource
-        override fun toString(): String = "MissingClientMetadataJwksSource"
     }
 
-    object BothJwkUriAndInlineJwks : RequestValidationError {
+    data object BothJwkUriAndInlineJwks : RequestValidationError {
         private fun readResolve(): Any = BothJwkUriAndInlineJwks
-        override fun toString(): String = "BothJwkUriAndInlineJwks"
     }
 
-    object SubjectSyntaxTypesWrongSyntax : RequestValidationError {
+    data object SubjectSyntaxTypesWrongSyntax : RequestValidationError {
         private fun readResolve(): Any = SubjectSyntaxTypesWrongSyntax
-        override fun toString(): String = "SubjectSyntaxTypesWrongSyntax"
     }
 
-    object IdTokenSigningAlgMissing : RequestValidationError {
+    data object IdTokenSigningAlgMissing : RequestValidationError {
         private fun readResolve(): Any = IdTokenSigningAlgMissing
-        override fun toString(): String = "IdTokenSigningAlgMissing"
     }
 
-    object IdTokenEncryptionAlgMissing : RequestValidationError {
+    data object IdTokenEncryptionAlgMissing : RequestValidationError {
         private fun readResolve(): Any = IdTokenEncryptionAlgMissing
-        override fun toString(): String = "IdTokenEncryptionAlgMissing"
     }
 
-    object IdTokenEncryptionMethodMissing : RequestValidationError {
+    data object IdTokenEncryptionMethodMissing : RequestValidationError {
         private fun readResolve(): Any = IdTokenEncryptionMethodMissing
-        override fun toString(): String = "IdTokenEncryptionMethodMissing"
     }
 
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
@@ -314,9 +294,8 @@ sealed interface ResolutionError : AuthorizationRequestError {
     data class PresentationDefinitionNotFoundForScope(val scope: Scope) :
         ResolutionError
 
-    object FetchingPresentationDefinitionNotSupported : ResolutionError {
+    data object FetchingPresentationDefinitionNotSupported : ResolutionError {
         private fun readResolve(): Any = FetchingPresentationDefinitionNotSupported
-        override fun toString(): String = "FetchingPresentationDefinitionNotSupported"
     }
 
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError

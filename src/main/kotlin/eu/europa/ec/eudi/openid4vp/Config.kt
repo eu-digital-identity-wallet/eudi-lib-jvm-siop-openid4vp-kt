@@ -47,11 +47,7 @@ sealed interface SupportedClientIdScheme {
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
 
-    object IsoX509 : SupportedClientIdScheme {
-        override fun toString(): String {
-            return "IsoX509"
-        }
-    }
+    data object IsoX509 : SupportedClientIdScheme
 }
 
 data class WalletOpenId4VPConfig(

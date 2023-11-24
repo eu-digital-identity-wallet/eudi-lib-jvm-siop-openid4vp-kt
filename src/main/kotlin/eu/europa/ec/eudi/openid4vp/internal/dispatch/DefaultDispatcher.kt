@@ -20,21 +20,26 @@ import com.eygraber.uri.toURI
 import com.eygraber.uri.toUri
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.prex.PresentationSubmission
+import io.ktor.client.*
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.URL
 
 /**
  * Default implementation of [Dispatcher]
  *
  * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
- * @param httpFormPost the abstraction to an HTTP post operation
+ * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
     private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val httpFormPost: HttpFormPost<DispatchOutcome.VerifierResponse>,
+    private val httpClientFactory: KtorHttpClientFactory,
 ) : Dispatcher {
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
         when (response) {
@@ -54,8 +59,31 @@ internal class DefaultDispatcher(
      */
     private suspend fun directPost(response: AuthorizationResponse.DirectPost): DispatchOutcome.VerifierResponse =
         withContext(ioCoroutineDispatcher) {
-            val formParameters = DirectPostForm.of(response.data)
-            httpFormPost.post(response.responseUri, formParameters)
+            val parameters = DirectPostForm.of(response.data)
+                .let {
+                    Parameters.build {
+                        it.entries.forEach { append(it.key, it.value) }
+                    }
+                }
+
+            submitForm(response.responseUri, parameters)
+                .map {
+                    when (it.status) {
+                        HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
+                        else -> DispatchOutcome.VerifierResponse.Rejected
+                    }
+                }
+                .getOrElse { DispatchOutcome.VerifierResponse.Rejected }
+        }
+
+    /**
+     * Submits an HTTP Form to [url] with the provided [parameters].
+     */
+    private suspend fun submitForm(url: URL, parameters: Parameters): Result<HttpResponse> =
+        runCatching {
+            httpClientFactory().use {
+                it.submitForm(url.toExternalForm(), parameters)
+            }
         }
 
     /**
@@ -75,7 +103,19 @@ internal class DefaultDispatcher(
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
         withContext(ioCoroutineDispatcher) {
             val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
-            httpFormPost.post(response.responseUri, mapOf("response" to joseResponse, "state" to response.data.state))
+            val parameters = Parameters.build {
+                append("response", joseResponse)
+                append("state", response.data.state)
+            }
+
+            submitForm(response.responseUri, parameters)
+                .map {
+                    when (it.status) {
+                        HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
+                        else -> DispatchOutcome.VerifierResponse.Rejected
+                    }
+                }
+                .getOrElse { DispatchOutcome.VerifierResponse.Rejected }
         }
 
     private fun fragment(response: AuthorizationResponse.Fragment): DispatchOutcome.RedirectURI =

@@ -17,12 +17,16 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.mapError
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.net.URL
 
 internal class ClientMetaDataResolver(
-    ioCoroutineDispatcher: CoroutineDispatcher,
-    private val getClientMetaData: HttpGet<UnvalidatedClientMetaData>,
+    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val httpClientFactory: KtorHttpClientFactory,
     walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
     private val clientMetadataValidator = ClientMetadataValidator(ioCoroutineDispatcher, walletOpenId4VPConfig)
@@ -35,6 +39,12 @@ internal class ClientMetaDataResolver(
     }
 
     private suspend fun fetch(url: URL): Result<UnvalidatedClientMetaData> =
-        getClientMetaData.get(url)
-            .mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
+        withContext(ioCoroutineDispatcher) {
+            httpClientFactory()
+                .use {
+                    runCatching {
+                        it.get(url).body<UnvalidatedClientMetaData>()
+                    }.mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
+                }
+        }
 }

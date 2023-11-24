@@ -20,22 +20,6 @@ import java.net.URI
 import java.net.URL
 
 /**
- * An abstraction of an HTTP Get operation
- * to obtain [R]
- */
-fun interface HttpGet<out R> {
-    suspend fun get(url: URL): Result<R>
-}
-
-/**
- * An abstraction of an HTP Post operation
- * to obtain [R]
- */
-fun interface HttpFormPost<out R> {
-    suspend fun post(url: URL, formParameters: Map<String, String>): R
-}
-
-/**
  * Convenient method for parsing a string into a [URL]
  */
 internal fun String.asURL(onError: (Throwable) -> Throwable = { it }): Result<URL> =

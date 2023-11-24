@@ -15,20 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import eu.europa.ec.eudi.openid4vp.DispatchOutcome.VerifierResponse
 import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import java.net.URL
 
 /**
  * Alias of a method that creates a [HttpClient]
@@ -87,41 +80,12 @@ class SiopOpenId4VpKtor(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
             httpClientFactory: KtorHttpClientFactory = DefaultFactory,
-        ): AuthorizationRequestResolver {
-            fun createResolver(c: HttpClient) = DefaultAuthorizationRequestResolver.make(
-                ioCoroutineDispatcher = ioCoroutineDispatcher,
-                getClientMetaData = httpGet(c),
-                getPresentationDefinition = httpGet(c),
-                getRequestObjectJwt = { url ->
-                    runCatching {
-                        c.get(url) {
-                            accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                        }.bodyAsText()
-                    }
-                },
-                walletOpenId4VPConfig = walletOpenId4VPConfig,
+        ): AuthorizationRequestResolver =
+            DefaultAuthorizationRequestResolver.make(
+                ioCoroutineDispatcher,
+                httpClientFactory,
+                walletOpenId4VPConfig,
             )
-            return AuthorizationRequestResolver { request ->
-                httpClientFactory().use { client ->
-                    createResolver(client).resolveRequest(request)
-                }
-            }
-        }
-
-        /**
-         * A factory method for creating an instance of [HttpGet] that delegates HTTP
-         * calls to [httpClient]
-         *
-         * @param R the type of the body
-         * @return an [HttpGet] implemented via [ktor][HttpClient]
-         *
-         */
-        private inline fun <reified R> httpGet(httpClient: HttpClient): HttpGet<R> =
-            object : HttpGet<R> {
-                override suspend fun get(url: URL): Result<R> = runCatching {
-                    httpClient.get(url).body<R>()
-                }
-            }
 
         /**
          * Factory method for creating an [Dispatcher] that
@@ -138,28 +102,6 @@ class SiopOpenId4VpKtor(
         fun dispatcher(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = DefaultFactory,
-        ): Dispatcher {
-            fun createDispatcher(c: HttpClient): DefaultDispatcher =
-                DefaultDispatcher(ioCoroutineDispatcher) { url, parameters ->
-                    runCatching {
-                        val response = c.submitForm(
-                            url = url.toString(),
-                            formParameters = Parameters.build {
-                                parameters.entries.forEach { append(it.key, it.value) }
-                            },
-                        )
-
-                        @Suppress("ktlint")
-                        if (response.status == HttpStatusCode.OK) VerifierResponse.Accepted(null)
-                        else VerifierResponse.Rejected
-                    }.getOrElse { VerifierResponse.Rejected }
-                }
-
-            return Dispatcher { response ->
-                httpClientFactory().use { client ->
-                    createDispatcher(client).dispatch(response)
-                }
-            }
-        }
+        ): Dispatcher = DefaultDispatcher(ioCoroutineDispatcher, httpClientFactory)
     }
 }

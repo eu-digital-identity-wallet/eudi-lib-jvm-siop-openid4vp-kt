@@ -40,6 +40,7 @@ dependencies {
     testImplementation(libs.ktor.client.okhttp)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.ktor.server.content.negotiation)
+    testImplementation(libs.ktor.client.mock)
 }
 
 java {

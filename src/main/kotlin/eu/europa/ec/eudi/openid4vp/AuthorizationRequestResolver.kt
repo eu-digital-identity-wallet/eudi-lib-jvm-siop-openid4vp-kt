@@ -313,10 +313,12 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 sealed interface ResolutionError : AuthorizationRequestError {
     data class PresentationDefinitionNotFoundForScope(val scope: Scope) :
         ResolutionError
+
     object FetchingPresentationDefinitionNotSupported : ResolutionError {
         private fun readResolve(): Any = FetchingPresentationDefinitionNotSupported
         override fun toString(): String = "FetchingPresentationDefinitionNotSupported"
     }
+
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
     data class UnableToFetchClientMetadata(val cause: Throwable) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
@@ -399,22 +401,15 @@ fun interface AuthorizationRequestResolver {
 
         /**
          * A factory method for obtaining an instance of [AuthorizationRequestResolver]
-         * Caller should provide a http client in terms of implementing the [HttpGet]
-         * interface.
-         *
-         * For an example implementation that uses ktor client please check [SiopOpenId4VpKtor]
+         * Caller should provide a [KtorHttpClientFactory] instance.
          */
         fun make(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            getRequestObjectJwt: HttpGet<String>,
-            getPresentationDefinition: HttpGet<PresentationDefinition>,
-            getClientMetaData: HttpGet<UnvalidatedClientMetaData>,
+            httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
             ioCoroutineDispatcher,
-            getRequestObjectJwt,
-            getPresentationDefinition,
-            getClientMetaData,
+            httpClientFactory,
             walletOpenId4VPConfig,
         )
     }

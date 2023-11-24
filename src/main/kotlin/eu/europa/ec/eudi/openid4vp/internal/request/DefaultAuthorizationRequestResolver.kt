@@ -20,7 +20,9 @@ import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.NotSecured
-import eu.europa.ec.eudi.prex.PresentationDefinition
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,7 +30,7 @@ import kotlinx.coroutines.withContext
 internal class DefaultAuthorizationRequestResolver(
     private val ioCoroutineDispatcher: CoroutineDispatcher,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val getRequestObjectJwt: HttpGet<String>,
+    private val httpClientFactory: KtorHttpClientFactory,
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
@@ -38,8 +40,7 @@ internal class DefaultAuthorizationRequestResolver(
         try {
             val requestObject = requestObjectOf(request).getOrThrow()
             val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
-            val resolved =
-                validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
+            val resolved = validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
             Resolution.Success(resolved)
         } catch (t: AuthorizationRequestException) {
             Resolution.Invalid(t.error)
@@ -51,7 +52,11 @@ internal class DefaultAuthorizationRequestResolver(
     private suspend fun requestObjectOf(request: AuthorizationRequest): Result<RequestObject> = runCatching {
         suspend fun fetchJwt(request: PassByReference): Jwt =
             withContext(ioCoroutineDispatcher) {
-                getRequestObjectJwt.get(request.jwtURI).getOrThrow()
+                httpClientFactory().use {
+                    it.get(request.jwtURI) {
+                        accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                    }.body<String>()
+                }
             }
 
         when (request) {
@@ -87,22 +92,20 @@ internal class DefaultAuthorizationRequestResolver(
          */
         internal fun make(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            getRequestObjectJwt: HttpGet<String>,
-            getPresentationDefinition: HttpGet<PresentationDefinition>,
-            getClientMetaData: HttpGet<UnvalidatedClientMetaData>,
+            httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
-            ioCoroutineDispatcher = ioCoroutineDispatcher,
-            walletOpenId4VPConfig = walletOpenId4VPConfig,
-            getRequestObjectJwt = getRequestObjectJwt,
-            validatedRequestObjectResolver = ValidatedRequestObjectResolver(
+            ioCoroutineDispatcher,
+            walletOpenId4VPConfig,
+            httpClientFactory,
+            ValidatedRequestObjectResolver(
                 presentationDefinitionResolver = PresentationDefinitionResolver(
-                    ioCoroutineDispatcher = ioCoroutineDispatcher,
-                    getPresentationDefinition = getPresentationDefinition,
+                    ioCoroutineDispatcher,
+                    httpClientFactory,
                 ),
                 clientMetaDataResolver = ClientMetaDataResolver(
-                    ioCoroutineDispatcher = ioCoroutineDispatcher,
-                    getClientMetaData = getClientMetaData,
+                    ioCoroutineDispatcher,
+                    httpClientFactory,
                     walletOpenId4VPConfig,
                 ),
             ),

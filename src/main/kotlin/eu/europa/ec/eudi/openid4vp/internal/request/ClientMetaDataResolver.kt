@@ -22,6 +22,9 @@ import io.ktor.client.request.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import java.net.URL
 
 internal class ClientMetaDataResolver(
@@ -48,3 +51,16 @@ internal class ClientMetaDataResolver(
                 }
         }
 }
+
+@Serializable
+internal data class UnvalidatedClientMetaData(
+    @SerialName("jwks_uri") val jwksUri: String? = null,
+    @SerialName("jwks") val jwks: JsonObject? = null,
+    @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String,
+    @SerialName("id_token_encrypted_response_alg") val idTokenEncryptedResponseAlg: String,
+    @SerialName("id_token_encrypted_response_enc") val idTokenEncryptedResponseEnc: String,
+    @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>,
+    @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
+    @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
+    @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
+) : java.io.Serializable

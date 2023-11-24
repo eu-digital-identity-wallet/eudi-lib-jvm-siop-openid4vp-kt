@@ -20,6 +20,7 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
+import eu.europa.ec.eudi.openid4vp.internal.mapError
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -253,3 +254,15 @@ data class JarmSpec(val holderId: String, val jarmOption: JarmOption) {
             }
     }
 }
+
+/**
+ * Convenient method for parsing a string into a [URL]
+ */
+internal fun String.asURL(onError: (Throwable) -> Throwable = { it }): Result<URL> =
+    runCatching { URL(this) }.mapError(onError)
+
+/**
+ * Convenient method for parsing a string into a [URI]
+ */
+internal fun String.asURI(onError: (Throwable) -> Throwable = { it }): Result<URI> =
+    runCatching { URI(this) }.mapError(onError)

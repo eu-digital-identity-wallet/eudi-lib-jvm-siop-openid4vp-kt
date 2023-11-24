@@ -83,7 +83,7 @@ internal class DefaultAuthorizationResponseBuilder(
         responseData: AuthorizationResponsePayload,
     ): AuthorizationResponse {
         fun jarmSpec() = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
-            ?: throw IllegalArgumentException("Cannot deduct JarmSpec from passed Client Metadata")
+            ?: error("Cannot deduct JarmSpec from passed Client Metadata")
 
         return when (val responseMode = requestObject.responseMode) {
             is ResponseMode.DirectPost ->

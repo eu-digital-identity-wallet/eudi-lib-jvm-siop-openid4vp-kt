@@ -130,7 +130,7 @@ internal class ClientMetadataValidator(
         if (encryptionMethod.isNullOrEmpty()) RequestValidationError.IdTokenEncryptionMethodMissing.asFailure()
         else Result.success(EncryptionMethod.parse(encryptionMethod))
 
-    private suspend fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {
+    private fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {
         val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
         if (!atLeastOneJwkSourceDefined) {
             return RequestValidationError.MissingClientMetadataJwksSource.asFailure()

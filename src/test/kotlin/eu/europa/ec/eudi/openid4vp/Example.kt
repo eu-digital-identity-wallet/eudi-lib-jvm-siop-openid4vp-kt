@@ -210,7 +210,7 @@ sealed interface Transaction {
             is OpenId4VP -> "OpenId4Vp"
         }
 
-    object SIOP : Transaction
+    data object SIOP : Transaction
     data class OpenId4VP(val presentationDefinition: String) : Transaction
 
     companion object {

@@ -128,79 +128,74 @@ internal object RequestObjectValidator {
      * returns a [failure][Result.Failure]. Validation rules violations are reported using [AuthorizationRequestError]
      * wrapped inside a [specific exception][AuthorizationRequestException]
      */
-    fun validate(authorizationRequest: RequestObject): Result<ValidatedRequestObject> =
-        runCatching {
-            fun scope() = requiredScope(authorizationRequest)
-            val state = requiredState(authorizationRequest).getOrThrow()
-            val nonce = requiredNonce(authorizationRequest).getOrThrow()
-            val responseType = requiredResponseType(authorizationRequest).getOrThrow()
-            val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
-            val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow()
-            val clientId = requiredClientId(authorizationRequest).getOrThrow()
-            val presentationDefinitionSource =
-                optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
-            val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
-            val idTokenType = optionalIdTokenType(authorizationRequest).getOrThrow()
+    fun validate(authorizationRequest: RequestObject): Result<ValidatedRequestObject> = runCatching {
+        fun scope() = requiredScope(authorizationRequest)
+        val state = requiredState(authorizationRequest).getOrThrow()
+        val nonce = requiredNonce(authorizationRequest).getOrThrow()
+        val responseType = requiredResponseType(authorizationRequest).getOrThrow()
+        val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
+        val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow()
+        val clientId = requiredClientId(authorizationRequest).getOrThrow()
+        val presentationDefinitionSource =
+            optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
+        val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
+        val idTokenType = optionalIdTokenType(authorizationRequest).getOrThrow()
 
-            fun idAndVpToken() = SiopOpenId4VPAuthentication(
-                idTokenType,
-                presentationDefinitionSource.getOrThrow()
-                    ?: throw IllegalStateException("Presentation definition missing"),
-                clientMetaDataSource,
-                clientIdScheme,
-                clientId,
-                nonce,
-                scope().getOrThrow(),
-                responseMode,
-                state,
-            )
+        fun idAndVpToken() = SiopOpenId4VPAuthentication(
+            idTokenType,
+            presentationDefinitionSource.getOrThrow()
+                ?: throw IllegalStateException("Presentation definition missing"),
+            clientMetaDataSource,
+            clientIdScheme,
+            clientId,
+            nonce,
+            scope().getOrThrow(),
+            responseMode,
+            state,
+        )
 
-            fun idToken() = SiopAuthentication(
-                idTokenType,
-                clientMetaDataSource,
-                clientIdScheme,
-                clientId,
-                nonce,
-                scope().getOrThrow(),
-                responseMode,
-                state,
-            )
+        fun idToken() = SiopAuthentication(
+            idTokenType,
+            clientMetaDataSource,
+            clientIdScheme,
+            clientId,
+            nonce,
+            scope().getOrThrow(),
+            responseMode,
+            state,
+        )
 
-            fun vpToken() = OpenId4VPAuthorization(
-                presentationDefinitionSource.getOrThrow()
-                    ?: throw IllegalStateException("Presentation definition missing"),
-                clientMetaDataSource,
-                clientIdScheme,
-                clientId,
-                nonce,
-                responseMode,
-                state,
-            )
+        fun vpToken() = OpenId4VPAuthorization(
+            presentationDefinitionSource.getOrThrow()
+                ?: throw IllegalStateException("Presentation definition missing"),
+            clientMetaDataSource,
+            clientIdScheme,
+            clientId,
+            nonce,
+            responseMode,
+            state,
+        )
 
-            @Suppress("ktlint")
-            when (responseType) {
-                ResponseType.VpAndIdToken -> idAndVpToken()
-                ResponseType.IdToken -> idToken()
-                ResponseType.VpToken ->
-                    // If scope is defined and its value is "openid" then id token must also be returned
-
-                    if (scope().getOrNull()?.value == "openid") idAndVpToken()
-                    else vpToken()
-
-            }
+        @Suppress("ktlint")
+        when (responseType) {
+            ResponseType.VpAndIdToken -> idAndVpToken()
+            ResponseType.IdToken -> idToken()
+            ResponseType.VpToken ->
+                // If scope is defined and its value is "openid" then id token must also be returned
+                if (scope().getOrNull()?.value == "openid") idAndVpToken()
+                else vpToken()
         }
+    }
 
     private fun optionalPresentationDefinitionSource(
         authorizationRequest: RequestObject,
         responseType: ResponseType,
         scopeProvider: () -> Scope?,
-    ): Result<PresentationDefinitionSource?> {
-        return when (responseType) {
-            ResponseType.VpToken, ResponseType.VpAndIdToken ->
-                parsePresentationDefinitionSource(authorizationRequest, scopeProvider())
+    ): Result<PresentationDefinitionSource?> = when (responseType) {
+        ResponseType.VpToken, ResponseType.VpAndIdToken ->
+            parsePresentationDefinitionSource(authorizationRequest, scopeProvider())
 
-            ResponseType.IdToken -> Result.success(null)
-        }
+        ResponseType.IdToken -> Result.success(null)
     }
 
     private fun optionalIdTokenType(unvalidated: RequestObject): Result<List<IdTokenType>> = runCatching {
@@ -211,9 +206,10 @@ internal object RequestObjectValidator {
                 when (it) {
                     "subject_signed_id_token" -> IdTokenType.SubjectSigned
                     "attester_signed_id_token" -> IdTokenType.AttesterSigned
-                    else -> throw IllegalArgumentException("Invalid id_token_type $it")
+                    else -> error("Invalid id_token_type $it")
                 }
-            } ?: emptyList()
+            }
+            ?: emptyList()
     }
 
     private fun requiredResponseMode(unvalidated: RequestObject): Result<ResponseMode> {
@@ -228,13 +224,10 @@ internal object RequestObjectValidator {
             }
 
         fun requiredResponseUriAndNotProvidedRedirectUri(): Result<URL> =
-            if (unvalidated.redirectUri != null) {
-                RequestValidationError.RedirectUriMustNotBeProvided.asFailure()
-            } else {
-                when (val uri = unvalidated.responseUri) {
-                    null -> RequestValidationError.MissingResponseUri.asFailure()
-                    else -> uri.asURL { RequestValidationError.InvalidResponseUri.asException() }
-                }
+            if (unvalidated.redirectUri != null) RequestValidationError.RedirectUriMustNotBeProvided.asFailure()
+            else when (val uri = unvalidated.responseUri) {
+                null -> RequestValidationError.MissingResponseUri.asFailure()
+                else -> uri.asURL { RequestValidationError.InvalidResponseUri.asException() }
             }
 
         return when (unvalidated.responseMode) {
@@ -333,12 +326,10 @@ internal object RequestObjectValidator {
     }
 
     private fun optionalClientIdScheme(unvalidated: RequestObject): Result<ClientIdScheme?> =
-        if (unvalidated.clientIdScheme.isNullOrEmpty()) {
-            Result.success(null)
-        } else {
-            ClientIdScheme.make(unvalidated.clientIdScheme)?.success()
-                ?: RequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
-        }
+        if (unvalidated.clientIdScheme.isNullOrEmpty()) Result.success(null)
+        else ClientIdScheme.make(unvalidated.clientIdScheme)
+            ?.success()
+            ?: RequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
 
     private fun requiredClientId(unvalidated: RequestObject): Result<String> =
         unvalidated.clientId?.success() ?: RequestValidationError.MissingClientId.asFailure()

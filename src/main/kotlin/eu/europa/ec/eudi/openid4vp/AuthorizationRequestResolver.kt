@@ -272,9 +272,7 @@ fun interface AuthorizationRequestResolver {
         operator fun invoke(
             httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
-            httpClientFactory,
-            walletOpenId4VPConfig,
-        )
+        ): AuthorizationRequestResolver =
+            DefaultAuthorizationRequestResolver.make(httpClientFactory, walletOpenId4VPConfig)
     }
 }

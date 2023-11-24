@@ -171,7 +171,7 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
                 val mockEngine = MockEngine { request ->
                     assertEquals(HttpMethod.Post, request.method)
 
@@ -230,7 +230,7 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
                 val mockEngine = MockEngine { request ->
                     assertEquals(HttpMethod.Post, request.method)
@@ -296,7 +296,7 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfigWithSignAndEncryptionAlgorithms)
+                val response = AuthorizationResponseBuilder(walletConfigWithSignAndEncryptionAlgorithms)
                     .build(resolvedRequest, vpTokenConsensus)
 
                 val mockEngine = MockEngine { request ->
@@ -360,7 +360,7 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
                 val mockEngine = MockEngine { request ->
                     assertEquals(HttpMethod.Post, request.method)

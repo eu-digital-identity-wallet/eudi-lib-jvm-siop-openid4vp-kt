@@ -90,7 +90,7 @@ internal class DefaultAuthorizationRequestResolver(
         /**
          * Factory method for creating a [DefaultAuthorizationRequestResolver]
          */
-        internal fun make(
+        internal operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,

@@ -86,7 +86,7 @@ fun interface Dispatcher {
          *
          * @see DefaultDispatcher
          */
-        fun make(
+        operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): Dispatcher =

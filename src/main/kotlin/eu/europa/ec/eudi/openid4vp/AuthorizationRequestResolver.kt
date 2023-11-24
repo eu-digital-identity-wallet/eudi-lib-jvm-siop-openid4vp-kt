@@ -382,11 +382,11 @@ fun interface AuthorizationRequestResolver {
          * A factory method for obtaining an instance of [AuthorizationRequestResolver]
          * Caller should provide a [KtorHttpClientFactory] instance.
          */
-        fun make(
+        operator fun invoke(
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
+        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
             ioCoroutineDispatcher,
             httpClientFactory,
             walletOpenId4VPConfig,

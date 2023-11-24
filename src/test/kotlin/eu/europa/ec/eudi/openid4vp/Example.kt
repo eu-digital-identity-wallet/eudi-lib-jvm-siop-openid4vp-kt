@@ -236,7 +236,7 @@ private class Wallet(
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp.make(walletConfig) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig) { createHttpClient() }
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {

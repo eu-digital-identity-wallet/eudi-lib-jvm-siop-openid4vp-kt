@@ -45,15 +45,15 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
          */
-        fun make(
+        operator fun invoke(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
             ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): SiopOpenId4Vp =
-            make(
-                AuthorizationRequestResolver.make(ioCoroutineDispatcher, httpClientFactory, walletOpenId4VPConfig),
-                Dispatcher.make(ioCoroutineDispatcher, httpClientFactory),
-                AuthorizationResponseBuilder.make(walletOpenId4VPConfig),
+            SiopOpenId4Vp(
+                AuthorizationRequestResolver(ioCoroutineDispatcher, httpClientFactory, walletOpenId4VPConfig),
+                Dispatcher(ioCoroutineDispatcher, httpClientFactory),
+                AuthorizationResponseBuilder(walletOpenId4VPConfig),
             )
 
         /**
@@ -64,7 +64,7 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          * @param authorizationResponseBuilder the [AuthorizationResponseBuilder] instance to use
          * @return a [SiopOpenId4Vp]
          */
-        fun make(
+        operator fun invoke(
             authorizationRequestResolver: AuthorizationRequestResolver,
             dispatcher: Dispatcher,
             authorizationResponseBuilder: AuthorizationResponseBuilder,

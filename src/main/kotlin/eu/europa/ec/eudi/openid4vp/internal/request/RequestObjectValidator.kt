@@ -197,7 +197,7 @@ internal object RequestObjectValidator {
     ): Result<PresentationDefinitionSource?> {
         return when (responseType) {
             ResponseType.VpToken, ResponseType.VpAndIdToken ->
-                parsePresentationDefinitionSource(authorizationRequest, scopeProvider.invoke())
+                parsePresentationDefinitionSource(authorizationRequest, scopeProvider())
 
             ResponseType.IdToken -> Result.success(null)
         }

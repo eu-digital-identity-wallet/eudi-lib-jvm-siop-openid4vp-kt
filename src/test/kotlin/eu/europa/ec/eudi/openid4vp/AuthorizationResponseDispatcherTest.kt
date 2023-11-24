@@ -142,7 +142,7 @@ class AuthorizationResponseDispatcherTest {
             val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
             when (
                 val response =
-                    AuthorizationResponseBuilder.make(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
+                    AuthorizationResponseBuilder(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
             ) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)

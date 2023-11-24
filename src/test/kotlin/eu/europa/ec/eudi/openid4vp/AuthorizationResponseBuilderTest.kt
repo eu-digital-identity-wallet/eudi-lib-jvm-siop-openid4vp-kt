@@ -122,7 +122,7 @@ class AuthorizationResponseBuilderTest {
             ),
         )
 
-        val response = AuthorizationResponseBuilder.make(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
+        val response = AuthorizationResponseBuilder(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
 
         when (response) {
             is AuthorizationResponse.DirectPost ->
@@ -172,7 +172,7 @@ class AuthorizationResponseBuilderTest {
             "dummy_vp_token",
             PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
         )
-        val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+        val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
         assertNotNull((response as AuthorizationResponse.DirectPostJwt).jarmSpec)

@@ -22,16 +22,12 @@ import eu.europa.ec.eudi.openid4vp.internal.success
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.net.URL
 
 /**
  * Resolves a [PresentationDefinitionSource] into a [PresentationDefinition]
  */
 internal class PresentationDefinitionResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) {
 
@@ -75,15 +71,10 @@ internal class PresentationDefinitionResolver(
         config: WalletOpenId4VPConfig,
     ): Result<PresentationDefinition> =
         if (config.presentationDefinitionUriSupported) {
-            withContext(ioCoroutineDispatcher) {
-                httpClientFactory().use {
-                    runCatching {
-                        it.get(url).body<PresentationDefinition>()
-                    }.mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
-                }
-
+            httpClientFactory().use { client ->
+                runCatching {
+                    client.get(url).body<PresentationDefinition>()
+                }.mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
             }
-        } else {
-            ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
-        }
+        } else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
 }

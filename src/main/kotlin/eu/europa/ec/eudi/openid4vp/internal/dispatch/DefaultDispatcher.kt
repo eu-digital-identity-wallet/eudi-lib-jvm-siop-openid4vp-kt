@@ -24,9 +24,7 @@ import io.ktor.client.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.URL
@@ -34,11 +32,9 @@ import java.net.URL
 /**
  * Default implementation of [Dispatcher]
  *
- * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
  * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) : Dispatcher {
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
@@ -58,7 +54,7 @@ internal class DefaultDispatcher(
      * @see DirectPostForm on how the given [response] is encoded into form data
      */
     private suspend fun directPost(response: AuthorizationResponse.DirectPost): DispatchOutcome.VerifierResponse =
-        withContext(ioCoroutineDispatcher) {
+        coroutineScope {
             val parameters = DirectPostForm.of(response.data)
                 .let {
                     Parameters.build {
@@ -66,14 +62,12 @@ internal class DefaultDispatcher(
                     }
                 }
 
-            submitForm(response.responseUri, parameters)
-                .map {
-                    when (it.status) {
-                        HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
-                        else -> DispatchOutcome.VerifierResponse.Rejected
-                    }
+            submitForm(response.responseUri, parameters).map { res ->
+                when (res.status) {
+                    HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
+                    else -> DispatchOutcome.VerifierResponse.Rejected
                 }
-                .getOrElse { DispatchOutcome.VerifierResponse.Rejected }
+            }.getOrElse { DispatchOutcome.VerifierResponse.Rejected }
         }
 
     /**
@@ -81,8 +75,8 @@ internal class DefaultDispatcher(
      */
     private suspend fun submitForm(url: URL, parameters: Parameters): Result<HttpResponse> =
         runCatching {
-            httpClientFactory().use {
-                it.submitForm(url.toExternalForm(), parameters)
+            httpClientFactory().use { client ->
+                client.submitForm(url.toExternalForm(), parameters)
             }
         }
 
@@ -101,7 +95,7 @@ internal class DefaultDispatcher(
      * for details about direct_post.jwt response type
      */
     private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
-        withContext(ioCoroutineDispatcher) {
+        coroutineScope {
             val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
             val parameters = Parameters.build {
                 append("response", joseResponse)

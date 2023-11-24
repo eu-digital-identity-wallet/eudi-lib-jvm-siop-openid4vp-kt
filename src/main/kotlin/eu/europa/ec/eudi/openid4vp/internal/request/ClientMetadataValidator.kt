@@ -21,15 +21,11 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.success
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
 internal class ClientMetadataValidator(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
 
@@ -147,23 +143,20 @@ internal class ClientMetadataValidator(
         fun requiredJwks() = try {
             Result.success(JWKSet.parse(clientMetadata.jwks?.toString()))
         } catch (ex: ParseException) {
-            ResolutionError.ClientMetadataJwkUriUnparsable(ex)
-                .asFailure()
+            ResolutionError.ClientMetadataJwkUriUnparsable(ex).asFailure()
         }
 
         fun requiredJwksUri() = try {
             Result.success(JWKSet.load(URL(clientMetadata.jwksUri)))
         } catch (ex: IOException) {
-            ResolutionError.ClientMetadataJwkResolutionFailed(ex)
-                .asFailure()
+            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
         } catch (ex: ParseException) {
-            ResolutionError.ClientMetadataJwkResolutionFailed(ex)
-                .asFailure()
+            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
         }
 
         return when {
             clientMetadata.jwksUri.isNullOrEmpty() -> requiredJwks()
-            else -> withContext(ioCoroutineDispatcher) { requiredJwksUri() }
+            else -> requiredJwksUri()
         }
     }
 

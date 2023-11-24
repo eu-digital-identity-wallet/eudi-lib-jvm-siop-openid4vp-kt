@@ -84,7 +84,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
     sealed interface Failed : AuthorizationResponsePayload
 
     /**
-     * In response of an [Resolution.Invalid] [AuthorizationRequest]
+     * In response of an [Resolution.Invalid] authorization request
      * @param error the cause
      * @param state the state of the request
      */

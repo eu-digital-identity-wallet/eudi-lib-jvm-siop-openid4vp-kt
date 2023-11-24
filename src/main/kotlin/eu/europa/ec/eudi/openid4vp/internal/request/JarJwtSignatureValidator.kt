@@ -34,9 +34,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.IsoX509
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.success
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -45,24 +43,17 @@ import java.text.ParseException
 /**
  * Validates a JWT that represents an Authorization Request according to RFC9101
  *
- *
- *
- * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
  * @param walletOpenId4VPConfig wallet's configuration
  */
 internal class JarJwtSignatureValidator(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
 
     suspend fun validate(clientId: String, jwt: Jwt): Result<RequestObject> = runCatching {
         val signedJwt = parse(jwt).getOrThrow()
         val error = doValidate(clientId, signedJwt)
-        if (null == error) {
-            signedJwt.jwtClaimsSet.toType { requestObject(it) }
-        } else {
-            throw error.asException()
-        }
+        if (null == error) signedJwt.jwtClaimsSet.toType { requestObject(it) }
+        else throw error.asException()
     }
 
     private fun parse(jwt: Jwt): Result<SignedJWT> =
@@ -73,7 +64,7 @@ internal class JarJwtSignatureValidator(
         }
 
     private suspend fun doValidate(clientId: String, signedJwt: SignedJWT): AuthorizationRequestError? =
-        withContext(ioCoroutineDispatcher) {
+        coroutineScope {
             val untrustedClaimSet = signedJwt.jwtClaimsSet
             val jwtClientId = untrustedClaimSet.getStringClaim("client_id")
             if (null == jwtClientId) {
@@ -118,11 +109,8 @@ private fun validatePreregistered(
         }
 
     val trustedClient = supportedClientIdScheme.clients[clientId]
-    return if (null == trustedClient) {
-        invalidJarJwt("Client with client_id $clientId is not pre-registered")
-    } else {
-        trustedClient.verifySignature()
-    }
+    return if (null == trustedClient) invalidJarJwt("Client with client_id $clientId is not pre-registered")
+    else trustedClient.verifySignature()
 }
 
 private fun jwtProcessor(client: PreregisteredClient): ConfigurableJWTProcessor<SecurityContext> =

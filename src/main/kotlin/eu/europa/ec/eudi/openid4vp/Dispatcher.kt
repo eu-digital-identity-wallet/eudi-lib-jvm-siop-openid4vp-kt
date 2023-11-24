@@ -16,8 +16,6 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import java.io.Serializable
 import java.net.URI
 
@@ -80,16 +78,14 @@ fun interface Dispatcher {
         /**
          * Factory method to create a [Dispatcher].
          *
-         * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [Dispatcher]
          *
          * @see DefaultDispatcher
          */
         operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): Dispatcher =
-            DefaultDispatcher(ioCoroutineDispatcher, httpClientFactory)
+            DefaultDispatcher(httpClientFactory)
     }
 }

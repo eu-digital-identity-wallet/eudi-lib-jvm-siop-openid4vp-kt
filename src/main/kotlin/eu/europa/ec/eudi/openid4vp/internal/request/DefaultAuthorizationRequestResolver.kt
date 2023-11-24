@@ -24,9 +24,6 @@ import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.NotSecu
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -141,7 +138,6 @@ private sealed interface AuthorizationRequest : java.io.Serializable {
 }
 
 internal class DefaultAuthorizationRequestResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
@@ -165,7 +161,8 @@ internal class DefaultAuthorizationRequestResolver(
         try {
             val requestObject = requestObjectOf(request).getOrThrow()
             val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
-            val resolved = validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
+            val resolved =
+                validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
             Resolution.Success(resolved)
         } catch (t: AuthorizationRequestException) {
             Resolution.Invalid(t.error)
@@ -176,12 +173,10 @@ internal class DefaultAuthorizationRequestResolver(
      */
     private suspend fun requestObjectOf(request: AuthorizationRequest): Result<RequestObject> = runCatching {
         suspend fun fetchJwt(request: PassByReference): Jwt =
-            withContext(ioCoroutineDispatcher) {
-                httpClientFactory().use {
-                    it.get(request.jwtURI) {
-                        accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                    }.body<String>()
-                }
+            httpClientFactory().use { client ->
+                client.get(request.jwtURI) {
+                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                }.body<String>()
             }
 
         when (request) {
@@ -206,7 +201,7 @@ internal class DefaultAuthorizationRequestResolver(
      * @param clientId The client that placed request
      */
     private suspend fun requestObjectFromJwt(clientId: String, jwt: Jwt): Result<RequestObject> {
-        val validator = JarJwtSignatureValidator(ioCoroutineDispatcher, walletOpenId4VPConfig)
+        val validator = JarJwtSignatureValidator(walletOpenId4VPConfig)
         return validator.validate(clientId, jwt)
     }
 
@@ -215,24 +210,15 @@ internal class DefaultAuthorizationRequestResolver(
         /**
          * Factory method for creating a [DefaultAuthorizationRequestResolver]
          */
-        internal operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        internal fun make(
             httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
         ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
-            ioCoroutineDispatcher,
             walletOpenId4VPConfig,
             httpClientFactory,
             ValidatedRequestObjectResolver(
-                presentationDefinitionResolver = PresentationDefinitionResolver(
-                    ioCoroutineDispatcher,
-                    httpClientFactory,
-                ),
-                clientMetaDataResolver = ClientMetaDataResolver(
-                    ioCoroutineDispatcher,
-                    httpClientFactory,
-                    walletOpenId4VPConfig,
-                ),
+                presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
+                clientMetaDataResolver = ClientMetaDataResolver(httpClientFactory, walletOpenId4VPConfig),
             ),
         )
     }

@@ -19,20 +19,16 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.mapError
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 
 internal class ClientMetaDataResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
     walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
-    private val clientMetadataValidator = ClientMetadataValidator(ioCoroutineDispatcher, walletOpenId4VPConfig)
+    private val clientMetadataValidator = ClientMetadataValidator(walletOpenId4VPConfig)
     suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): Result<ClientMetaData> {
         val unvalidatedClientMetaData = when (clientMetaDataSource) {
             is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
@@ -42,14 +38,12 @@ internal class ClientMetaDataResolver(
     }
 
     private suspend fun fetch(url: URL): Result<UnvalidatedClientMetaData> =
-        withContext(ioCoroutineDispatcher) {
-            httpClientFactory()
-                .use {
-                    runCatching {
-                        it.get(url).body<UnvalidatedClientMetaData>()
-                    }.mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
-                }
-        }
+        httpClientFactory()
+            .use { client ->
+                runCatching {
+                    client.get(url).body<UnvalidatedClientMetaData>()
+                }.mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
+            }
 }
 
 @Serializable

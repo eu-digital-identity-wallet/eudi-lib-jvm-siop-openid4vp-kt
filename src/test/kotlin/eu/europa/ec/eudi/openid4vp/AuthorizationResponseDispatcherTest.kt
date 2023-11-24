@@ -29,7 +29,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
@@ -79,7 +78,7 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`(): Unit = runBlocking {
-        val validated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaData)
+        val validated = ClientMetadataValidator(walletConfig).validate(clientMetaData)
 
         val stateVal = genState()
 

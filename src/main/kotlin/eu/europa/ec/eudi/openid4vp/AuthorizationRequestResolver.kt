@@ -19,8 +19,6 @@ import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.prex.PresentationDefinition
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import java.io.Serializable
 
 /**
@@ -272,11 +270,9 @@ fun interface AuthorizationRequestResolver {
          * Caller should provide a [KtorHttpClientFactory] instance.
          */
         operator fun invoke(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
-            ioCoroutineDispatcher,
+        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
             httpClientFactory,
             walletOpenId4VPConfig,
         )

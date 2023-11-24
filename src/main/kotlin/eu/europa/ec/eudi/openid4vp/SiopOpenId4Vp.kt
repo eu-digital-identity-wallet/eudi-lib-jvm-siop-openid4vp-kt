@@ -15,9 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-
 /**
  * An interface providing support for handling
  * an OAUTH2 authorization request that represents
@@ -37,22 +34,29 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
 
     companion object {
 
+        @Deprecated(
+            message = "Will be removed. Use invoke",
+            replaceWith = ReplaceWith("SiopOpenId4Vp.invoke(walletOpenId4VPConfig,httpClientFactory)"),
+        )
+        fun ktor(
+            walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+        ): SiopOpenId4Vp = SiopOpenId4Vp(walletOpenId4VPConfig, httpClientFactory)
+
         /**
          * Factory method to create a [SiopOpenId4Vp].
          *
-         * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
          * @param walletOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
          */
         operator fun invoke(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): SiopOpenId4Vp =
             SiopOpenId4Vp(
-                AuthorizationRequestResolver(ioCoroutineDispatcher, httpClientFactory, walletOpenId4VPConfig),
-                Dispatcher(ioCoroutineDispatcher, httpClientFactory),
+                AuthorizationRequestResolver(httpClientFactory, walletOpenId4VPConfig),
+                Dispatcher(httpClientFactory),
                 AuthorizationResponseBuilder(walletOpenId4VPConfig),
             )
 

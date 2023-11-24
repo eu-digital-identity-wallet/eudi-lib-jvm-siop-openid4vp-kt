@@ -15,102 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.eygraber.uri.Uri
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import java.io.Serializable
-import java.net.URL
-
-/**
- * OAUTH2 authorization request
- *
- * This is merely a data carrier structure that doesn't enforce any rules.
- */
-sealed interface AuthorizationRequest : Serializable {
-
-    data class NotSecured(val requestObject: RequestObject) :
-        AuthorizationRequest
-
-    /**
-     * JWT Secured authorization request (JAR)
-     */
-    sealed interface JwtSecured : AuthorizationRequest {
-        /**
-         * The <em>client_id</em> of the relying party (verifier)
-         */
-        val clientId: String
-
-        /**
-         * A JAR passed by value
-         */
-        data class PassByValue(override val clientId: String, val jwt: Jwt) :
-            JwtSecured
-
-        /**
-         * A JAR passed by reference
-         */
-        data class PassByReference(override val clientId: String, val jwtURI: URL) :
-            JwtSecured
-    }
-
-    companion object {
-
-        /**
-         * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
-         */
-        fun make(uriStr: String): Result<AuthorizationRequest> = runCatching {
-            val uri = Uri.parse(uriStr)
-            fun clientId(): String =
-                uri.getQueryParameter("client_id")
-                    ?: throw RequestValidationError.MissingClientId.asException()
-
-            val requestValue = uri.getQueryParameter("request")
-            val requestUriValue = uri.getQueryParameter("request_uri")
-
-            when {
-                !requestValue.isNullOrEmpty() -> PassByValue(clientId(), requestValue)
-                !requestUriValue.isNullOrEmpty() -> requestUriValue.asURL().map { PassByReference(clientId(), it) }
-                    .getOrThrow()
-
-                else -> notSecured(uri)
-            }
-        }
-
-        /**
-         * Populates a [NotSecured] from the query parameters of the given [uri]
-         */
-        private fun notSecured(uri: Uri): NotSecured {
-            fun jsonObject(p: String): JsonObject? =
-                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
-
-            return NotSecured(
-                RequestObject(
-                    responseType = uri.getQueryParameter("response_type"),
-                    presentationDefinition = jsonObject("presentation_definition"),
-                    presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
-                    scope = uri.getQueryParameter("scope"),
-                    nonce = uri.getQueryParameter("nonce"),
-                    responseMode = uri.getQueryParameter("response_mode"),
-                    clientIdScheme = uri.getQueryParameter("client_id_scheme"),
-                    clientMetaData = jsonObject("client_metadata"),
-                    clientId = uri.getQueryParameter("client_id"),
-                    responseUri = uri.getQueryParameter("response_uri"),
-                    redirectUri = uri.getQueryParameter("redirect_uri"),
-                    state = uri.getQueryParameter("state"),
-                ),
-            )
-        }
-    }
-}
 
 /**
  * Represents an OAUTH2 authorization request. In particular
@@ -166,14 +77,12 @@ sealed interface ResolvedRequestObject : Serializable {
 }
 
 /**
- * Errors that can occur while validating & resolving
- * an [AuthorizationRequest]
+ * Errors that can occur while validating & resolving an authorization request
  */
 sealed interface AuthorizationRequestError : Serializable
 
 /**
- * Validation errors that can occur while validating
- * an [AuthorizationRequest]
+ * Validation errors that can occur while validating an authorization request
  */
 sealed interface RequestValidationError : AuthorizationRequestError {
 
@@ -288,7 +197,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 }
 
 /**
- * Errors that can occur while resolving an [AuthorizationRequest]
+ * Errors that can occur while resolving an authorization request
  */
 sealed interface ResolutionError : AuthorizationRequestError {
     data class PresentationDefinitionNotFoundForScope(val scope: Scope) :
@@ -307,7 +216,7 @@ sealed interface ResolutionError : AuthorizationRequestError {
 
 /**
  * An exception indicating an expected [error] while validating and/or resolving
- * an [AuthorizationRequest]
+ * an authorization request
  */
 data class AuthorizationRequestException(val error: AuthorizationRequestError) : RuntimeException()
 
@@ -327,54 +236,34 @@ fun <T> AuthorizationRequestError.asFailure(): Result<T> =
 
 /**
  * The outcome of [validating & resolving][AuthorizationRequestResolver.resolveRequestUri]
- * an [AuthorizationRequest].
+ * an authorization request.
  */
 sealed interface Resolution {
     /**
-     * Represents the success of validating & resolving an [AuthorizationRequest]
+     * Represents the success of validating & resolving an authorization request
      * into a [requestObject]
      */
-    data class Success(val requestObject: ResolvedRequestObject) :
-        Resolution
+    data class Success(val requestObject: ResolvedRequestObject) : Resolution
 
     /**
-     * Represents the failure of validating or resolving an [AuthorizationRequest]
+     * Represents the failure of validating or resolving an authorization request
      * due to [error]
      */
-    data class Invalid(val error: AuthorizationRequestError) :
-        Resolution
+    data class Invalid(val error: AuthorizationRequestError) : Resolution
 }
 
 /**
  * An interface that describes a service
- * that accepts an [authorization request][AuthorizationRequest], validates it and resolves it (that is
+ * that accepts an [authorization request]authorization request, validates it and resolves it (that is
  * fetches parts of the authorization request that are provided by reference)
  *
  */
 fun interface AuthorizationRequestResolver {
 
     /**
-     * Tries to validate and request the provided [uri] into
-     * a [ResolvedRequestObject]
+     * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
-    suspend fun resolveRequestUri(uri: String): Resolution = AuthorizationRequest.make(
-        uri,
-    ).fold(
-        onSuccess = { request -> resolveRequest(request) },
-        onFailure = { throwable ->
-            if (throwable is AuthorizationRequestException) {
-                Resolution.Invalid(throwable.error)
-            } else {
-                throw throwable
-            }
-        },
-    )
-
-    /**
-     * Tries to validate and request the provided [request] into
-     * a [ResolvedRequestObject]
-     */
-    suspend fun resolveRequest(request: AuthorizationRequest): Resolution
+    suspend fun resolveRequestUri(uri: String): Resolution
 
     companion object {
 

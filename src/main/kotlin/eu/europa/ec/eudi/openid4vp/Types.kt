@@ -21,10 +21,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.internal.mapError
-import kotlinx.serialization.Required
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.net.URL
 
@@ -156,30 +152,6 @@ enum class ResponseType {
     IdToken,
     VpAndIdToken,
 }
-
-/**
- * The data of an OpenID4VP authorization request or SIOP Authentication request
- * or a combined OpenId4VP & SIOP request
- * without any validation and regardless of the way they sent to the wallet
- */
-@Serializable
-data class RequestObject(
-    @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
-    @SerialName("client_id_scheme") val clientIdScheme: String? = null,
-    @Required val nonce: String? = null,
-    @SerialName("client_id") val clientId: String? = null,
-    @SerialName("response_type") val responseType: String? = null,
-    @SerialName("response_mode") val responseMode: String? = null,
-    @SerialName("response_uri") val responseUri: String? = null,
-    @SerialName("presentation_definition") val presentationDefinition: JsonObject? = null,
-    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null, // Not utilized from ISO-23330-4
-    @SerialName("redirect_uri") val redirectUri: String? = null,
-    val scope: String? = null,
-    @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
-    val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
-    @SerialName("id_token_type") val idTokenType: String? = null,
-) : java.io.Serializable
 
 typealias Jwt = String
 typealias VpToken = String

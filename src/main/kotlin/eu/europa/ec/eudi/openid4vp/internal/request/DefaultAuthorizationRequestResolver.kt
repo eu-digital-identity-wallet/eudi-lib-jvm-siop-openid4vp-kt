@@ -15,17 +15,130 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.eygraber.uri.Uri
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.NotSecured
+import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured
+import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByReference
+import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByValue
+import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.NotSecured
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import java.net.URL
+
+/**
+ * The data of an OpenID4VP authorization request or SIOP Authentication request
+ * or a combined OpenId4VP & SIOP request
+ * without any validation and regardless of the way they sent to the wallet
+ */
+@Serializable
+internal data class RequestObject(
+    @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
+    @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
+    @SerialName("client_id_scheme") val clientIdScheme: String? = null,
+    @Required val nonce: String? = null,
+    @SerialName("client_id") val clientId: String? = null,
+    @SerialName("response_type") val responseType: String? = null,
+    @SerialName("response_mode") val responseMode: String? = null,
+    @SerialName("response_uri") val responseUri: String? = null,
+    @SerialName("presentation_definition") val presentationDefinition: JsonObject? = null,
+    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null, // Not utilized from ISO-23330-4
+    @SerialName("redirect_uri") val redirectUri: String? = null,
+    val scope: String? = null,
+    @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
+    val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
+    @SerialName("id_token_type") val idTokenType: String? = null,
+) : java.io.Serializable
+
+/**
+ * OAUTH2 authorization request
+ *
+ * This is merely a data carrier structure that doesn't enforce any rules.
+ */
+private sealed interface AuthorizationRequest : java.io.Serializable {
+
+    data class NotSecured(val requestObject: RequestObject) : AuthorizationRequest
+
+    /**
+     * JWT Secured authorization request (JAR)
+     */
+    sealed interface JwtSecured : AuthorizationRequest {
+        /**
+         * The <em>client_id</em> of the relying party (verifier)
+         */
+        val clientId: String
+
+        /**
+         * A JAR passed by value
+         */
+        data class PassByValue(override val clientId: String, val jwt: Jwt) : JwtSecured
+
+        /**
+         * A JAR passed by reference
+         */
+        data class PassByReference(override val clientId: String, val jwtURI: URL) : JwtSecured
+    }
+
+    companion object {
+
+        /**
+         * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
+         */
+        fun make(uriStr: String): Result<AuthorizationRequest> = runCatching {
+            val uri = Uri.parse(uriStr)
+            fun clientId(): String =
+                uri.getQueryParameter("client_id")
+                    ?: throw RequestValidationError.MissingClientId.asException()
+
+            val requestValue = uri.getQueryParameter("request")
+            val requestUriValue = uri.getQueryParameter("request_uri")
+
+            when {
+                !requestValue.isNullOrEmpty() -> PassByValue(clientId(), requestValue)
+                !requestUriValue.isNullOrEmpty() ->
+                    requestUriValue.asURL()
+                        .map { PassByReference(clientId(), it) }
+                        .getOrThrow()
+
+                else -> notSecured(uri)
+            }
+        }
+
+        /**
+         * Populates a [NotSecured] from the query parameters of the given [uri]
+         */
+        private fun notSecured(uri: Uri): NotSecured {
+            fun jsonObject(p: String): JsonObject? =
+                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
+
+            return NotSecured(
+                RequestObject(
+                    responseType = uri.getQueryParameter("response_type"),
+                    presentationDefinition = jsonObject("presentation_definition"),
+                    presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
+                    scope = uri.getQueryParameter("scope"),
+                    nonce = uri.getQueryParameter("nonce"),
+                    responseMode = uri.getQueryParameter("response_mode"),
+                    clientIdScheme = uri.getQueryParameter("client_id_scheme"),
+                    clientMetaData = jsonObject("client_metadata"),
+                    clientId = uri.getQueryParameter("client_id"),
+                    responseUri = uri.getQueryParameter("response_uri"),
+                    redirectUri = uri.getQueryParameter("redirect_uri"),
+                    state = uri.getQueryParameter("state"),
+                ),
+            )
+        }
+    }
+}
 
 internal class DefaultAuthorizationRequestResolver(
     private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -34,9 +147,21 @@ internal class DefaultAuthorizationRequestResolver(
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
-    override suspend fun resolveRequest(
-        request: AuthorizationRequest,
-    ): Resolution =
+    override suspend fun resolveRequestUri(uri: String): Resolution =
+        AuthorizationRequest.make(
+            uri,
+        ).fold(
+            onSuccess = { request -> resolveRequest(request) },
+            onFailure = { throwable ->
+                if (throwable is AuthorizationRequestException) {
+                    Resolution.Invalid(throwable.error)
+                } else {
+                    throw throwable
+                }
+            },
+        )
+
+    private suspend fun resolveRequest(request: AuthorizationRequest): Resolution =
         try {
             val requestObject = requestObjectOf(request).getOrThrow()
             val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()

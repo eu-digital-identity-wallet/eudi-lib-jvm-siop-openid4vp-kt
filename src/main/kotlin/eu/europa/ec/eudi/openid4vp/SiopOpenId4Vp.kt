@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import eu.europa.ec.eudi.openid4vp.internal.DefaultSiopOpenId4Vp
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -45,8 +44,6 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          * @param walletOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
-         *
-         * @see DefaultSiopOpenId4Vp
          */
         fun make(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
@@ -62,18 +59,20 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
         /**
          * Factory method to create a [SiopOpenId4Vp].
          *
-         * @param authorizationResolver the [AuthorizationRequestResolver] instance to use
+         * @param authorizationRequestResolver the [AuthorizationRequestResolver] instance to use
          * @param dispatcher the [Dispatcher] instance to use
          * @param authorizationResponseBuilder the [AuthorizationResponseBuilder] instance to use
          * @return a [SiopOpenId4Vp]
-         *
-         * @see DefaultSiopOpenId4Vp
          */
         fun make(
-            authorizationResolver: AuthorizationRequestResolver,
+            authorizationRequestResolver: AuthorizationRequestResolver,
             dispatcher: Dispatcher,
             authorizationResponseBuilder: AuthorizationResponseBuilder,
         ): SiopOpenId4Vp =
-            DefaultSiopOpenId4Vp(authorizationResolver, dispatcher, authorizationResponseBuilder)
+            object :
+                SiopOpenId4Vp,
+                AuthorizationRequestResolver by authorizationRequestResolver,
+                Dispatcher by dispatcher,
+                AuthorizationResponseBuilder by authorizationResponseBuilder {}
     }
 }

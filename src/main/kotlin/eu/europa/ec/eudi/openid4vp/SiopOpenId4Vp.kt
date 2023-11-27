@@ -34,9 +34,16 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
 
     companion object {
 
+        /**
+         * Factory method to create a [SiopOpenId4Vp].
+         *
+         * @param walletOpenId4VPConfig wallet's configuration
+         * @param httpClientFactory a factory to obtain a Ktor http client
+         * @return a [SiopOpenId4Vp]
+         */
         @Deprecated(
-            message = "Will be removed. Use invoke",
-            replaceWith = ReplaceWith("SiopOpenId4Vp.invoke(walletOpenId4VPConfig,httpClientFactory)"),
+            message = "Will be removed. Use invoke instead.",
+            replaceWith = ReplaceWith("SiopOpenId4Vp(walletOpenId4VPConfig, httpClientFactory)"),
         )
         fun ktor(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,

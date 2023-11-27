@@ -84,7 +84,7 @@ sealed interface AuthorizationResponsePayload : Serializable {
     sealed interface Failed : AuthorizationResponsePayload
 
     /**
-     * In response of an [Resolution.Invalid] [AuthorizationRequest]
+     * In response of an [Resolution.Invalid] authorization request
      * @param error the cause
      * @param state the state of the request
      */
@@ -115,9 +115,8 @@ sealed interface Consensus : Serializable {
      * No consensus. Holder decided to reject
      * the request
      */
-    object NegativeConsensus : Consensus {
+    data object NegativeConsensus : Consensus {
         private fun readResolve(): Any = NegativeConsensus
-        override fun toString(): String = "NegativeConsensus"
     }
 
     /**
@@ -229,7 +228,7 @@ fun interface AuthorizationResponseBuilder {
     suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse
 
     companion object {
-        fun make(walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationResponseBuilder =
+        operator fun invoke(walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationResponseBuilder =
             DefaultAuthorizationResponseBuilder(walletOpenId4VPConfig)
     }
 }

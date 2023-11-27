@@ -2,15 +2,15 @@
 dependency-check = "8.4.2"
 sonarqube = "4.4.1.3373"
 spotless = "6.22.0"
-kotlin = "1.8.21"
-ktor = "2.3.3"
+kotlin = "1.9.21"
+ktor = "2.3.6"
 presentation-exchange = "0.1.0-SNAPSHOT"
 nimbus-sdk = "11.0"
 uri-kmp = "0.0.15"
 java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.0"
-maven-publish="0.25.3"
+maven-publish = "0.25.3"
 
 [libraries]
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -23,6 +23,7 @@ ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negoti
 presentation-exchange = { module = "eu.europa.ec.eudi:eudi-lib-jvm-presentation-exchange-kt", version.ref = "presentation-exchange" }
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
 uri-kmp = { module = "com.eygraber:uri-kmp", version.ref = "uri-kmp" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 [plugins]
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }
@@ -31,4 +32,4 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
-maven-publish = { id = "com.vanniktech.maven.publish", version.ref="maven-publish" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }

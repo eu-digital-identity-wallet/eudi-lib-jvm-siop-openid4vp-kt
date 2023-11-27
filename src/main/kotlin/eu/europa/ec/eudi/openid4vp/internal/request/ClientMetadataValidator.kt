@@ -21,15 +21,15 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.success
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.withContext
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
 internal class ClientMetadataValidator(
-    private val ioCoroutineDispatcher: CoroutineDispatcher,
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) {
 
     suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
@@ -146,23 +146,24 @@ internal class ClientMetadataValidator(
         fun requiredJwks() = try {
             Result.success(JWKSet.parse(clientMetadata.jwks?.toString()))
         } catch (ex: ParseException) {
-            ResolutionError.ClientMetadataJwkUriUnparsable(ex)
-                .asFailure()
+            ResolutionError.ClientMetadataJwkUriUnparsable(ex).asFailure()
         }
 
-        fun requiredJwksUri() = try {
-            Result.success(JWKSet.load(URL(clientMetadata.jwksUri)))
+        suspend fun requiredJwksUri() = try {
+            val unparsed = httpClientFactory().use { client ->
+                client.get(URL(clientMetadata.jwksUri)).body<String>()
+            }
+            val jwkSet = JWKSet.parse(unparsed)
+            Result.success(jwkSet)
         } catch (ex: IOException) {
-            ResolutionError.ClientMetadataJwkResolutionFailed(ex)
-                .asFailure()
+            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
         } catch (ex: ParseException) {
-            ResolutionError.ClientMetadataJwkResolutionFailed(ex)
-                .asFailure()
+            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
         }
 
         return when {
             clientMetadata.jwksUri.isNullOrEmpty() -> requiredJwks()
-            else -> withContext(ioCoroutineDispatcher) { requiredJwksUri() }
+            else -> requiredJwksUri()
         }
     }
 

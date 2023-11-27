@@ -15,102 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.eygraber.uri.Uri
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByReference
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.prex.PresentationDefinition
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import java.io.Serializable
-import java.net.URL
-
-/**
- * OAUTH2 authorization request
- *
- * This is merely a data carrier structure that doesn't enforce any rules.
- */
-sealed interface AuthorizationRequest : Serializable {
-
-    data class NotSecured(val requestObject: RequestObject) :
-        AuthorizationRequest
-
-    /**
-     * JWT Secured authorization request (JAR)
-     */
-    sealed interface JwtSecured : AuthorizationRequest {
-        /**
-         * The <em>client_id</em> of the relying party (verifier)
-         */
-        val clientId: String
-
-        /**
-         * A JAR passed by value
-         */
-        data class PassByValue(override val clientId: String, val jwt: Jwt) :
-            JwtSecured
-
-        /**
-         * A JAR passed by reference
-         */
-        data class PassByReference(override val clientId: String, val jwtURI: URL) :
-            JwtSecured
-    }
-
-    companion object {
-
-        /**
-         * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
-         */
-        fun make(uriStr: String): Result<AuthorizationRequest> = runCatching {
-            val uri = Uri.parse(uriStr)
-            fun clientId(): String =
-                uri.getQueryParameter("client_id")
-                    ?: throw RequestValidationError.MissingClientId.asException()
-
-            val requestValue = uri.getQueryParameter("request")
-            val requestUriValue = uri.getQueryParameter("request_uri")
-
-            when {
-                !requestValue.isNullOrEmpty() -> PassByValue(clientId(), requestValue)
-                !requestUriValue.isNullOrEmpty() -> requestUriValue.asURL().map { PassByReference(clientId(), it) }
-                    .getOrThrow()
-
-                else -> notSecured(uri)
-            }
-        }
-
-        /**
-         * Populates a [NotSecured] from the query parameters of the given [uri]
-         */
-        private fun notSecured(uri: Uri): NotSecured {
-            fun jsonObject(p: String): JsonObject? =
-                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
-
-            return NotSecured(
-                RequestObject(
-                    responseType = uri.getQueryParameter("response_type"),
-                    presentationDefinition = jsonObject("presentation_definition"),
-                    presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
-                    scope = uri.getQueryParameter("scope"),
-                    nonce = uri.getQueryParameter("nonce"),
-                    responseMode = uri.getQueryParameter("response_mode"),
-                    clientIdScheme = uri.getQueryParameter("client_id_scheme"),
-                    clientMetaData = jsonObject("client_metadata"),
-                    clientId = uri.getQueryParameter("client_id"),
-                    responseUri = uri.getQueryParameter("response_uri"),
-                    redirectUri = uri.getQueryParameter("redirect_uri"),
-                    state = uri.getQueryParameter("state"),
-                ),
-            )
-        }
-    }
-}
 
 /**
  * Represents an OAUTH2 authorization request. In particular
@@ -166,14 +75,12 @@ sealed interface ResolvedRequestObject : Serializable {
 }
 
 /**
- * Errors that can occur while validating & resolving
- * an [AuthorizationRequest]
+ * Errors that can occur while validating & resolving an authorization request
  */
 sealed interface AuthorizationRequestError : Serializable
 
 /**
- * Validation errors that can occur while validating
- * an [AuthorizationRequest]
+ * Validation errors that can occur while validating an authorization request
  */
 sealed interface RequestValidationError : AuthorizationRequestError {
 
@@ -183,9 +90,9 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     // Response Type errors
     //
     data class UnsupportedResponseType(val value: String) : RequestValidationError
-    object MissingResponseType : RequestValidationError {
+
+    data object MissingResponseType : RequestValidationError {
         private fun readResolve(): Any = MissingResponseType
-        override fun toString(): String = "MissingResponseType"
     }
 
     //
@@ -196,110 +103,90 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     //
     // Presentation Definition errors
     //
-    object MissingPresentationDefinition : RequestValidationError {
+    data object MissingPresentationDefinition : RequestValidationError {
         private fun readResolve(): Any = MissingPresentationDefinition
-        override fun toString(): String = "MissingPresentationDefinition"
     }
 
     data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
-    object InvalidPresentationDefinitionUri : RequestValidationError {
+
+    data object InvalidPresentationDefinitionUri : RequestValidationError {
         private fun readResolve(): Any = InvalidPresentationDefinitionUri
-        override fun toString(): String = "InvalidPresentationDefinitionUri"
     }
 
-    object InvalidRedirectUri : RequestValidationError {
+    data object InvalidRedirectUri : RequestValidationError {
         private fun readResolve(): Any = InvalidRedirectUri
-        override fun toString(): String = "InvalidRedirectUri"
     }
 
-    object MissingRedirectUri : RequestValidationError {
+    data object MissingRedirectUri : RequestValidationError {
         private fun readResolve(): Any = MissingRedirectUri
-        override fun toString(): String = "MissingRedirectUri"
     }
 
-    object MissingResponseUri : RequestValidationError {
+    data object MissingResponseUri : RequestValidationError {
         private fun readResolve(): Any = MissingResponseUri
-        override fun toString(): String = "MissingResponseUri"
     }
 
-    object InvalidResponseUri : RequestValidationError {
+    data object InvalidResponseUri : RequestValidationError {
         private fun readResolve(): Any = InvalidResponseUri
-        override fun toString(): String = "InvalidResponseUri"
     }
 
-    object ResponseUriMustNotBeProvided : RequestValidationError {
+    data object ResponseUriMustNotBeProvided : RequestValidationError {
         private fun readResolve(): Any = ResponseUriMustNotBeProvided
-        override fun toString(): String = "ResponseUriMustNotBeProvided"
     }
 
-    object RedirectUriMustNotBeProvided : RequestValidationError {
+    data object RedirectUriMustNotBeProvided : RequestValidationError {
         private fun readResolve(): Any = RedirectUriMustNotBeProvided
-        override fun toString(): String = "RedirectUriMustNotBeProvided"
     }
 
-    object MissingState : RequestValidationError {
+    data object MissingState : RequestValidationError {
         private fun readResolve(): Any = MissingState
-        override fun toString(): String = "MissingState"
     }
 
-    object MissingNonce : RequestValidationError {
+    data object MissingNonce : RequestValidationError {
         private fun readResolve(): Any = MissingNonce
-        override fun toString(): String = "MissingNonce"
     }
 
-    object MissingScope : RequestValidationError {
+    data object MissingScope : RequestValidationError {
         private fun readResolve(): Any = MissingScope
-        override fun toString(): String = "MissingScope"
     }
 
-    object MissingClientId : RequestValidationError {
+    data object MissingClientId : RequestValidationError {
         private fun readResolve(): Any = MissingClientId
-        override fun toString(): String = "MissingClientId"
     }
 
-    object InvalidClientMetaDataUri : RequestValidationError {
+    data object InvalidClientMetaDataUri : RequestValidationError {
         private fun readResolve(): Any = InvalidClientMetaDataUri
-        override fun toString(): String = "InvalidClientMetaDataUri"
     }
 
-    object OneOfClientMedataOrUri : RequestValidationError {
+    data object OneOfClientMedataOrUri : RequestValidationError {
         private fun readResolve(): Any = OneOfClientMedataOrUri
-        override fun toString(): String = "OneOfClientMedataOrUri"
     }
 
-    object SubjectSyntaxTypesNoMatch : RequestValidationError {
+    data object SubjectSyntaxTypesNoMatch : RequestValidationError {
         private fun readResolve(): Any = SubjectSyntaxTypesNoMatch
-        override fun toString(): String = "SubjectSyntaxTypesNoMatch"
     }
 
-    object MissingClientMetadataJwksSource : RequestValidationError {
+    data object MissingClientMetadataJwksSource : RequestValidationError {
         private fun readResolve(): Any = MissingClientMetadataJwksSource
-        override fun toString(): String = "MissingClientMetadataJwksSource"
     }
 
-    object BothJwkUriAndInlineJwks : RequestValidationError {
+    data object BothJwkUriAndInlineJwks : RequestValidationError {
         private fun readResolve(): Any = BothJwkUriAndInlineJwks
-        override fun toString(): String = "BothJwkUriAndInlineJwks"
     }
 
-    object SubjectSyntaxTypesWrongSyntax : RequestValidationError {
+    data object SubjectSyntaxTypesWrongSyntax : RequestValidationError {
         private fun readResolve(): Any = SubjectSyntaxTypesWrongSyntax
-        override fun toString(): String = "SubjectSyntaxTypesWrongSyntax"
     }
 
-    object IdTokenSigningAlgMissing : RequestValidationError {
+    data object IdTokenSigningAlgMissing : RequestValidationError {
         private fun readResolve(): Any = IdTokenSigningAlgMissing
-        override fun toString(): String = "IdTokenSigningAlgMissing"
     }
 
-    object IdTokenEncryptionAlgMissing : RequestValidationError {
+    data object IdTokenEncryptionAlgMissing : RequestValidationError {
         private fun readResolve(): Any = IdTokenEncryptionAlgMissing
-        override fun toString(): String = "IdTokenEncryptionAlgMissing"
     }
 
-    object IdTokenEncryptionMethodMissing : RequestValidationError {
+    data object IdTokenEncryptionMethodMissing : RequestValidationError {
         private fun readResolve(): Any = IdTokenEncryptionMethodMissing
-        override fun toString(): String = "IdTokenEncryptionMethodMissing"
     }
 
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
@@ -308,15 +195,16 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 }
 
 /**
- * Errors that can occur while resolving an [AuthorizationRequest]
+ * Errors that can occur while resolving an authorization request
  */
 sealed interface ResolutionError : AuthorizationRequestError {
     data class PresentationDefinitionNotFoundForScope(val scope: Scope) :
         ResolutionError
-    object FetchingPresentationDefinitionNotSupported : ResolutionError {
+
+    data object FetchingPresentationDefinitionNotSupported : ResolutionError {
         private fun readResolve(): Any = FetchingPresentationDefinitionNotSupported
-        override fun toString(): String = "FetchingPresentationDefinitionNotSupported"
     }
+
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
     data class UnableToFetchClientMetadata(val cause: Throwable) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
@@ -326,7 +214,7 @@ sealed interface ResolutionError : AuthorizationRequestError {
 
 /**
  * An exception indicating an expected [error] while validating and/or resolving
- * an [AuthorizationRequest]
+ * an authorization request
  */
 data class AuthorizationRequestException(val error: AuthorizationRequestError) : RuntimeException()
 
@@ -346,76 +234,45 @@ fun <T> AuthorizationRequestError.asFailure(): Result<T> =
 
 /**
  * The outcome of [validating & resolving][AuthorizationRequestResolver.resolveRequestUri]
- * an [AuthorizationRequest].
+ * an authorization request.
  */
 sealed interface Resolution {
     /**
-     * Represents the success of validating & resolving an [AuthorizationRequest]
+     * Represents the success of validating & resolving an authorization request
      * into a [requestObject]
      */
-    data class Success(val requestObject: ResolvedRequestObject) :
-        Resolution
+    data class Success(val requestObject: ResolvedRequestObject) : Resolution
 
     /**
-     * Represents the failure of validating or resolving an [AuthorizationRequest]
+     * Represents the failure of validating or resolving an authorization request
      * due to [error]
      */
-    data class Invalid(val error: AuthorizationRequestError) :
-        Resolution
+    data class Invalid(val error: AuthorizationRequestError) : Resolution
 }
 
 /**
  * An interface that describes a service
- * that accepts an [authorization request][AuthorizationRequest], validates it and resolves it (that is
+ * that accepts an [authorization request]authorization request, validates it and resolves it (that is
  * fetches parts of the authorization request that are provided by reference)
  *
  */
 fun interface AuthorizationRequestResolver {
 
     /**
-     * Tries to validate and request the provided [uri] into
-     * a [ResolvedRequestObject]
+     * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
-    suspend fun resolveRequestUri(uri: String): Resolution = AuthorizationRequest.make(
-        uri,
-    ).fold(
-        onSuccess = { request -> resolveRequest(request) },
-        onFailure = { throwable ->
-            if (throwable is AuthorizationRequestException) {
-                Resolution.Invalid(throwable.error)
-            } else {
-                throw throwable
-            }
-        },
-    )
-
-    /**
-     * Tries to validate and request the provided [request] into
-     * a [ResolvedRequestObject]
-     */
-    suspend fun resolveRequest(request: AuthorizationRequest): Resolution
+    suspend fun resolveRequestUri(uri: String): Resolution
 
     companion object {
 
         /**
          * A factory method for obtaining an instance of [AuthorizationRequestResolver]
-         * Caller should provide a http client in terms of implementing the [HttpGet]
-         * interface.
-         *
-         * For an example implementation that uses ktor client please check [SiopOpenId4VpKtor]
+         * Caller should provide a [KtorHttpClientFactory] instance.
          */
-        fun make(
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            getRequestObjectJwt: HttpGet<String>,
-            getPresentationDefinition: HttpGet<PresentationDefinition>,
-            getClientMetaData: HttpGet<UnvalidatedClientMetaData>,
+        operator fun invoke(
+            httpClientFactory: KtorHttpClientFactory,
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-        ): AuthorizationRequestResolver = DefaultAuthorizationRequestResolver.make(
-            ioCoroutineDispatcher,
-            getRequestObjectJwt,
-            getPresentationDefinition,
-            getClientMetaData,
-            walletOpenId4VPConfig,
-        )
+        ): AuthorizationRequestResolver =
+            DefaultAuthorizationRequestResolver.make(httpClientFactory, walletOpenId4VPConfig)
     }
 }

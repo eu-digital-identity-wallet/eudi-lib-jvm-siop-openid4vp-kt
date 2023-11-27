@@ -32,12 +32,15 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.*
@@ -48,6 +51,7 @@ import java.net.URI
 import java.security.interfaces.ECPrivateKey
 import java.time.Duration
 import java.util.*
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DefaultDispatcherTest {
@@ -127,7 +131,8 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM"}
             """.trimIndent().trimMargin()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-            val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaDataDecoded)
+            val clientMetadataValidated =
+                ClientMetadataValidator(walletConfig).validate(clientMetaDataDecoded)
             assertFalse(clientMetadataValidated.isSuccess)
         }
 
@@ -142,10 +147,8 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM" }
                 """.trimIndent()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(
-                    Dispatchers.IO,
-                    walletConfigWithSignAndEncryptionAlgorithms,
-                ).validate(clientMetaDataDecoded)
+                val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                    .validate(clientMetaDataDecoded)
 
                 assertTrue(clientMetadataValidated.isSuccess)
 
@@ -166,21 +169,27 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val mockEngine = MockEngine { request ->
+                    assertEquals(HttpMethod.Post, request.method)
 
-                DefaultDispatcher { _, parameters ->
-                    runCatching {
-                        val joseResponse = parameters.get("response") as String
-                        val decryptedJWT = ecdhDecrypt(ecKey.toECPrivateKey(), joseResponse)
+                    val body = assertIs<FormDataContent>(request.body)
+                    val joseResponse = body.formData["response"] as String
+                    val decryptedJWT = ecdhDecrypt(ecKey.toECPrivateKey(), joseResponse)
 
-                        assertNotNull(decryptedJWT)
-                        assertNotNull(decryptedJWT.issuer)
-                        assertNotNull(decryptedJWT.audience)
-                        assertEquals(decryptedJWT.getClaim("vp_token"), "dummy_vp_token")
+                    assertNotNull(decryptedJWT)
+                    assertNotNull(decryptedJWT.issuer)
+                    assertNotNull(decryptedJWT.audience)
+                    assertEquals(decryptedJWT.getClaim("vp_token"), "dummy_vp_token")
 
-                        DispatchOutcome.VerifierResponse.Accepted(null)
-                    }.getOrThrow()
-                }.dispatch(response)
+                    respondOk()
+                }
+
+                val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+                assertEquals(
+                    DispatchOutcome.VerifierResponse.Accepted(null),
+                    outcome,
+                )
             }
 
         @Test
@@ -196,7 +205,6 @@ class DefaultDispatcherTest {
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated = ClientMetadataValidator(
-                    Dispatchers.IO,
                     walletConfigWithSignAndEncryptionAlgorithms,
                 ).validate(clientMetaDataDecoded)
 
@@ -219,27 +227,35 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
-                DefaultDispatcher { _, parameters ->
-                    runCatching {
-                        val joseResponse = parameters.get("response") as String
-                        val encrypted = EncryptedJWT.parse(joseResponse)
-                        val rsaDecrypter = ECDHDecrypter(ecKey.toECPrivateKey())
+                val mockEngine = MockEngine { request ->
+                    assertEquals(HttpMethod.Post, request.method)
 
-                        encrypted.decrypt(rsaDecrypter)
-                        assertTrue(encrypted.state == JWEObject.State.DECRYPTED)
+                    val body = assertIs<FormDataContent>(request.body)
+                    val joseResponse = body.formData["response"] as String
+                    val encrypted = EncryptedJWT.parse(joseResponse)
+                    val rsaDecrypter = ECDHDecrypter(ecKey.toECPrivateKey())
 
-                        val signedJWT = encrypted.payload.toSignedJWT()
-                        signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
-                        assertTrue(signedJWT.state == JWSObject.State.VERIFIED)
+                    encrypted.decrypt(rsaDecrypter)
+                    assertEquals(encrypted.state, JWEObject.State.DECRYPTED)
 
-                        assertNotNull(signedJWT.jwtClaimsSet.issuer)
-                        assertNotNull(signedJWT.jwtClaimsSet.audience)
-                        assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
-                        DispatchOutcome.VerifierResponse.Accepted(null)
-                    }.getOrThrow()
-                }.dispatch(response)
+                    val signedJWT = encrypted.payload.toSignedJWT()
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
+                    assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
+
+                    assertNotNull(signedJWT.jwtClaimsSet.issuer)
+                    assertNotNull(signedJWT.jwtClaimsSet.audience)
+                    assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
+
+                    respondOk()
+                }
+
+                val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+                assertEquals(
+                    DispatchOutcome.VerifierResponse.Accepted(null),
+                    outcome,
+                )
             }
 
         @Test
@@ -255,7 +271,9 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM"}
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(Dispatchers.IO, walletConfigWithSignAndEncryptionAlgorithms).validate(clientMetaDataDecoded)
+                val clientMetadataValidated =
+                    ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                        .validate(clientMetaDataDecoded)
                 assertTrue(clientMetadataValidated.isSuccess)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
@@ -274,28 +292,36 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfigWithSignAndEncryptionAlgorithms).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder(walletConfigWithSignAndEncryptionAlgorithms)
+                    .build(resolvedRequest, vpTokenConsensus)
 
-                DefaultDispatcher { _, parameters ->
-                    runCatching {
-                        val joseResponse = parameters.get("response") as String
-                        val encrypted = EncryptedJWT.parse(joseResponse)
-                        val rsaDecrypter = ECDHDecrypter(ecKey.toECPrivateKey())
+                val mockEngine = MockEngine { request ->
+                    assertEquals(HttpMethod.Post, request.method)
 
-                        encrypted.decrypt(rsaDecrypter)
-                        assertTrue(encrypted.state == JWEObject.State.DECRYPTED)
+                    val body = assertIs<FormDataContent>(request.body)
+                    val joseResponse = body.formData["response"] as String
+                    val encrypted = EncryptedJWT.parse(joseResponse)
+                    val rsaDecrypter = ECDHDecrypter(ecKey.toECPrivateKey())
 
-                        val signedJWT = encrypted.payload.toSignedJWT()
-                        signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
-                        assertTrue(signedJWT.state == JWSObject.State.VERIFIED)
+                    encrypted.decrypt(rsaDecrypter)
+                    assertEquals(encrypted.state, JWEObject.State.DECRYPTED)
 
-                        assertNotNull(signedJWT.jwtClaimsSet.issuer)
-                        assertNotNull(signedJWT.jwtClaimsSet.audience)
-                        assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
+                    val signedJWT = encrypted.payload.toSignedJWT()
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
+                    assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
 
-                        DispatchOutcome.VerifierResponse.Accepted(null)
-                    }.getOrThrow()
-                }.dispatch(response)
+                    assertNotNull(signedJWT.jwtClaimsSet.issuer)
+                    assertNotNull(signedJWT.jwtClaimsSet.audience)
+                    assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
+
+                    respondOk()
+                }
+
+                val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+                assertEquals(
+                    DispatchOutcome.VerifierResponse.Accepted(null),
+                    outcome
+                )
             }
 
         @Test
@@ -308,10 +334,8 @@ class DefaultDispatcherTest {
                     "authorization_signed_response_alg":"RS256" }
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(
-                    Dispatchers.IO,
-                    walletConfigWithSignAndEncryptionAlgorithms,
-                ).validate(clientMetaDataDecoded)
+                val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                    .validate(clientMetaDataDecoded)
                 assertTrue(clientMetadataValidated.isSuccess)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
@@ -330,22 +354,29 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder.make(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
-                DefaultDispatcher { _, parameters ->
-                    runCatching {
-                        val joseResponse = parameters.get("response") as String
-                        val signedJWT = SignedJWT.parse(joseResponse)
-                        signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
+                val mockEngine = MockEngine { request ->
+                    assertEquals(HttpMethod.Post, request.method)
 
-                        assertNotNull(signedJWT)
-                        assertNotNull(signedJWT.jwtClaimsSet.issuer)
-                        assertNotNull(signedJWT.jwtClaimsSet.audience)
-                        assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
+                    val body = assertIs<FormDataContent>(request.body)
+                    val joseResponse = body.formData["response"] as String
+                    val signedJWT = SignedJWT.parse(joseResponse)
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
 
-                        DispatchOutcome.VerifierResponse.Accepted(null)
-                    }.getOrThrow()
-                }.dispatch(response)
+                    assertNotNull(signedJWT)
+                    assertNotNull(signedJWT.jwtClaimsSet.issuer)
+                    assertNotNull(signedJWT.jwtClaimsSet.audience)
+                    assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
+
+                    respondOk()
+                }
+
+                val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+                assertEquals(
+                    DispatchOutcome.VerifierResponse.Accepted(null),
+                    outcome,
+                )
             }
 
         private fun ecdhDecrypt(ecPrivateKey: ECPrivateKey, jwtString: String): JWTClaimsSet {
@@ -360,7 +391,7 @@ class DefaultDispatcherTest {
     @DisplayName("In query response")
     inner class QueryResponse {
 
-        private val dispatcher = DefaultDispatcher { _, _ -> error("Not used") }
+        private val dispatcher = DefaultDispatcher(httpClientFactory = { error("Not used") })
         private val redirectUriBase = URI("https://foo.bar")
         private val signingKey = RSAKeyGenerator(2048)
             .keyUse(KeyUse.SIGNATURE)
@@ -451,7 +482,7 @@ class DefaultDispatcherTest {
     @DisplayName("In fragment response")
     inner class FragmentResponse {
 
-        private val dispatcher = DefaultDispatcher { _, _ -> error("Not used") }
+        private val dispatcher = DefaultDispatcher(httpClientFactory = { error("Not used") })
         private val redirectUriBase = URI("https://foo.bar")
         private val signingKey = RSAKeyGenerator(2048)
             .keyUse(KeyUse.SIGNATURE)

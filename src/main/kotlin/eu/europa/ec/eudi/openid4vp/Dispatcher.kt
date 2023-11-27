@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import java.io.Serializable
 import java.net.URI
 
@@ -43,9 +44,8 @@ sealed interface DispatchOutcome : Serializable {
         /**
          * When verifier/RP reject the direct post
          */
-        object Rejected : VerifierResponse {
+        data object Rejected : VerifierResponse {
             private fun readResolve(): Any = Rejected
-            override fun toString(): String = "Rejected"
         }
     }
 }
@@ -72,4 +72,20 @@ fun interface Dispatcher {
      * method returns an appropriate [redirect_uri][DispatchOutcome.RedirectURI]
      */
     suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome
+
+    companion object {
+
+        /**
+         * Factory method to create a [Dispatcher].
+         *
+         * @param httpClientFactory a factory to obtain a Ktor http client
+         * @return a [Dispatcher]
+         *
+         * @see DefaultDispatcher
+         */
+        operator fun invoke(
+            httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+        ): Dispatcher =
+            DefaultDispatcher(httpClientFactory)
+    }
 }

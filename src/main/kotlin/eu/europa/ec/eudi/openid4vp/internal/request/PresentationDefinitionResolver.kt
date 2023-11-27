@@ -20,20 +20,15 @@ import eu.europa.ec.eudi.openid4vp.internal.mapError
 import eu.europa.ec.eudi.openid4vp.internal.request.PresentationDefinitionSource.*
 import eu.europa.ec.eudi.openid4vp.internal.success
 import eu.europa.ec.eudi.prex.PresentationDefinition
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import java.net.URL
 
 /**
  * Resolves a [PresentationDefinitionSource] into a [PresentationDefinition]
- *
- * @param getPresentationDefinition a way of performing an HTTP GET to obtain a [PresentationDefinition] provided
- *  by [reference][PresentationDefinitionSource.ByReference]
  */
 internal class PresentationDefinitionResolver(
-    private val ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val getPresentationDefinition: HttpGet<PresentationDefinition>,
+    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) {
 
     /**
@@ -76,11 +71,10 @@ internal class PresentationDefinitionResolver(
         config: WalletOpenId4VPConfig,
     ): Result<PresentationDefinition> =
         if (config.presentationDefinitionUriSupported) {
-            withContext(ioCoroutineDispatcher) {
-                getPresentationDefinition.get(url)
-                    .mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
+            httpClientFactory().use { client ->
+                runCatching {
+                    client.get(url).body<PresentationDefinition>()
+                }.mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
             }
-        } else {
-            ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
-        }
+        } else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
 }

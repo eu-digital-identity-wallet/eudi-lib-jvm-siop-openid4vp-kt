@@ -15,9 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-
 /**
  * An interface providing support for handling
  * an OAUTH2 authorization request that represents
@@ -38,20 +35,55 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
     companion object {
 
         /**
-         * Factory method to create a [SiopOpenId4Vp] based
-         * on ktor
+         * Factory method to create a [SiopOpenId4Vp].
          *
-         * @param ioCoroutineDispatcher the coroutine dispatcher to handle IO
          * @param walletOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
-         *
-         * @see SiopOpenId4VpKtor
          */
+        @Deprecated(
+            message = "Will be removed. Use invoke instead.",
+            replaceWith = ReplaceWith("SiopOpenId4Vp(walletOpenId4VPConfig, httpClientFactory)"),
+        )
         fun ktor(
             walletOpenId4VPConfig: WalletOpenId4VPConfig,
-            ioCoroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-            httpClientFactory: KtorHttpClientFactory = SiopOpenId4VpKtor.DefaultFactory,
-        ): SiopOpenId4Vp = SiopOpenId4VpKtor(ioCoroutineDispatcher, walletOpenId4VPConfig, httpClientFactory)
+            httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+        ): SiopOpenId4Vp = SiopOpenId4Vp(walletOpenId4VPConfig, httpClientFactory)
+
+        /**
+         * Factory method to create a [SiopOpenId4Vp].
+         *
+         * @param walletOpenId4VPConfig wallet's configuration
+         * @param httpClientFactory a factory to obtain a Ktor http client
+         * @return a [SiopOpenId4Vp]
+         */
+        operator fun invoke(
+            walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+        ): SiopOpenId4Vp =
+            SiopOpenId4Vp(
+                AuthorizationRequestResolver(httpClientFactory, walletOpenId4VPConfig),
+                Dispatcher(httpClientFactory),
+                AuthorizationResponseBuilder(walletOpenId4VPConfig),
+            )
+
+        /**
+         * Factory method to create a [SiopOpenId4Vp].
+         *
+         * @param authorizationRequestResolver the [AuthorizationRequestResolver] instance to use
+         * @param dispatcher the [Dispatcher] instance to use
+         * @param authorizationResponseBuilder the [AuthorizationResponseBuilder] instance to use
+         * @return a [SiopOpenId4Vp]
+         */
+        operator fun invoke(
+            authorizationRequestResolver: AuthorizationRequestResolver,
+            dispatcher: Dispatcher,
+            authorizationResponseBuilder: AuthorizationResponseBuilder,
+        ): SiopOpenId4Vp =
+            object :
+                SiopOpenId4Vp,
+                AuthorizationRequestResolver by authorizationRequestResolver,
+                Dispatcher by dispatcher,
+                AuthorizationResponseBuilder by authorizationResponseBuilder {}
     }
 }

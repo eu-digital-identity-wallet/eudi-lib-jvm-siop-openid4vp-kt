@@ -19,7 +19,9 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -27,7 +29,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
@@ -77,7 +78,7 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`(): Unit = runBlocking {
-        val validated = ClientMetadataValidator(Dispatchers.IO, walletConfig).validate(clientMetaData)
+        val validated = ClientMetadataValidator(walletConfig).validate(clientMetaData)
 
         val stateVal = genState()
 
@@ -138,8 +139,11 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = SiopOpenId4VpKtor.dispatcher { managedHttpClient }
-            when (val response = AuthorizationResponseBuilder.make(walletConfig).build(siopAuthRequestObject, idTokenConsensus)) {
+            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
+            when (
+                val response =
+                    AuthorizationResponseBuilder(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
+            ) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
                 }

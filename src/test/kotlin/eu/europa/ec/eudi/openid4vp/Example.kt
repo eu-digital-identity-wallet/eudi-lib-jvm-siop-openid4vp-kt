@@ -210,7 +210,7 @@ sealed interface Transaction {
             is OpenId4VP -> "OpenId4Vp"
         }
 
-    object SIOP : Transaction
+    data object SIOP : Transaction
     data class OpenId4VP(val presentationDefinition: String) : Transaction
 
     companion object {
@@ -236,7 +236,7 @@ private class Wallet(
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp.ktor(walletConfig) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig) { createHttpClient() }
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {

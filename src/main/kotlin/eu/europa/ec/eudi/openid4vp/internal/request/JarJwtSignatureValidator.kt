@@ -34,7 +34,6 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.IsoX509
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.success
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -49,7 +48,7 @@ internal class JarJwtSignatureValidator(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
 
-    suspend fun validate(clientId: String, jwt: Jwt): Result<RequestObject> = runCatching {
+    fun validate(clientId: String, jwt: Jwt): Result<RequestObject> = runCatching {
         val signedJwt = parse(jwt).getOrThrow()
         val error = doValidate(clientId, signedJwt)
         if (null == error) signedJwt.jwtClaimsSet.toType { requestObject(it) }
@@ -63,31 +62,31 @@ internal class JarJwtSignatureValidator(
             RequestValidationError.InvalidJarJwt("JAR JWT parse error").asFailure()
         }
 
-    private suspend fun doValidate(clientId: String, signedJwt: SignedJWT): AuthorizationRequestError? =
-        coroutineScope {
-            val untrustedClaimSet = signedJwt.jwtClaimsSet
-            val jwtClientId = untrustedClaimSet.getStringClaim("client_id")
-            if (null == jwtClientId) {
-                RequestValidationError.MissingClientId
-            } else if (clientId != jwtClientId) {
-                invalidJarJwt("ClientId mismatch. Found in JAR request $clientId, in JAR Jwt $jwtClientId")
-            } else {
-                val supportedClientIdScheme =
-                    untrustedClaimSet.getStringClaim("client_id_scheme")
-                        ?.let { ClientIdScheme.make(it) }
-                        ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
-                //
-                // Currently is not defined how to
-                // process client_id when the scheme is IsoX509 or not provided
-                // Thus, we don't validate the signature
-                //
-                when (supportedClientIdScheme) {
-                    null -> null
-                    IsoX509 -> null
-                    is Preregistered -> validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
-                }
+    private fun doValidate(clientId: String, signedJwt: SignedJWT): AuthorizationRequestError? {
+        val untrustedClaimSet = signedJwt.jwtClaimsSet
+        val jwtClientId = untrustedClaimSet.getStringClaim("client_id")
+
+        return if (null == jwtClientId) {
+            RequestValidationError.MissingClientId
+        } else if (clientId != jwtClientId) {
+            invalidJarJwt("ClientId mismatch. Found in JAR request $clientId, in JAR Jwt $jwtClientId")
+        } else {
+            val supportedClientIdScheme =
+                untrustedClaimSet.getStringClaim("client_id_scheme")
+                    ?.let { ClientIdScheme.make(it) }
+                    ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
+            //
+            // Currently is not defined how to
+            // process client_id when the scheme is IsoX509 or not provided
+            // Thus, we don't validate the signature
+            //
+            when (supportedClientIdScheme) {
+                null -> null
+                IsoX509 -> null
+                is Preregistered -> validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
             }
         }
+    }
 }
 
 private fun invalidJarJwt(cause: String): AuthorizationRequestError = RequestValidationError.InvalidJarJwt(cause)

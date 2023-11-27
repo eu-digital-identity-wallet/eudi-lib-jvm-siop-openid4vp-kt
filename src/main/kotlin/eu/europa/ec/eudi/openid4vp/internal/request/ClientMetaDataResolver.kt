@@ -28,7 +28,7 @@ internal class ClientMetaDataResolver(
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
     walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
-    private val clientMetadataValidator = ClientMetadataValidator(walletOpenId4VPConfig)
+    private val clientMetadataValidator = ClientMetadataValidator(walletOpenId4VPConfig, httpClientFactory)
     suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): Result<ClientMetaData> {
         val unvalidatedClientMetaData = when (clientMetaDataSource) {
             is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData

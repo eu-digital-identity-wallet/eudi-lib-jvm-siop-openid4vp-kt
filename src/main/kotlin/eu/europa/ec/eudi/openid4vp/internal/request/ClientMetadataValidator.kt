@@ -21,12 +21,15 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.success
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
 internal class ClientMetadataValidator(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) {
 
     suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
@@ -130,7 +133,7 @@ internal class ClientMetadataValidator(
         if (encryptionMethod.isNullOrEmpty()) RequestValidationError.IdTokenEncryptionMethodMissing.asFailure()
         else Result.success(EncryptionMethod.parse(encryptionMethod))
 
-    private fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {
+    private suspend fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {
         val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
         if (!atLeastOneJwkSourceDefined) {
             return RequestValidationError.MissingClientMetadataJwksSource.asFailure()
@@ -146,8 +149,12 @@ internal class ClientMetadataValidator(
             ResolutionError.ClientMetadataJwkUriUnparsable(ex).asFailure()
         }
 
-        fun requiredJwksUri() = try {
-            Result.success(JWKSet.load(URL(clientMetadata.jwksUri)))
+        suspend fun requiredJwksUri() = try {
+            val unparsed = httpClientFactory().use { client ->
+                client.get(URL(clientMetadata.jwksUri)).body<String>()
+            }
+            val jwkSet = JWKSet.parse(unparsed)
+            Result.success(jwkSet)
         } catch (ex: IOException) {
             ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
         } catch (ex: ParseException) {

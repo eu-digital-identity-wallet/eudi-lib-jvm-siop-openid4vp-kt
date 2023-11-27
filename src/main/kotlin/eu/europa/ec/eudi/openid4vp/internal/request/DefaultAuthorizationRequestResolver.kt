@@ -201,7 +201,7 @@ internal class DefaultAuthorizationRequestResolver(
      * @param clientId The client that placed request
      */
     private suspend fun requestObjectFromJwt(clientId: String, jwt: Jwt): Result<RequestObject> {
-        val validator = JarJwtSignatureValidator(walletOpenId4VPConfig)
+        val validator = JarJwtSignatureValidator(walletOpenId4VPConfig, httpClientFactory)
         return validator.validate(clientId, jwt)
     }
 

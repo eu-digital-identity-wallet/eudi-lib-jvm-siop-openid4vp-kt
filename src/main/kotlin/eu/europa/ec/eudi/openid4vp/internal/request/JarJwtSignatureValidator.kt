@@ -21,11 +21,9 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.jwk.source.JWKSource
-import com.nimbusds.jose.proc.BadJOSEException
-import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
-import com.nimbusds.jose.proc.JWSVerificationKeySelector
-import com.nimbusds.jose.proc.SecurityContext
+import com.nimbusds.jose.proc.*
 import com.nimbusds.jose.shaded.gson.Gson
+import com.nimbusds.jose.util.X509CertUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor
@@ -33,6 +31,7 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.IsoX509
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
+import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
 import eu.europa.ec.eudi.openid4vp.internal.success
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -85,9 +84,14 @@ internal class JarJwtSignatureValidator(
             // Thus, we don't validate the signature
             //
             when (supportedClientIdScheme) {
-                null -> null
+                null -> null // TODO Return an error indicating unsupported client_scheme_id
                 IsoX509 -> null
                 is Preregistered -> validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
+                is SupportedClientIdScheme.X509SanUri -> validateX509SanUri(
+                    supportedClientIdScheme,
+                    clientId,
+                    signedJwt,
+                )
             }
         }
     }
@@ -111,6 +115,41 @@ internal class JarJwtSignatureValidator(
         val trustedClient = supportedClientIdScheme.clients[clientId]
         return if (null == trustedClient) invalidJarJwt("Client with client_id $clientId is not pre-registered")
         else trustedClient.verifySignature()
+    }
+
+    private suspend fun validateX509SanUri(
+        supportedClientIdScheme: SupportedClientIdScheme.X509SanUri,
+        clientId: String,
+        signedJwt: SignedJWT,
+    ): AuthorizationRequestError? {
+        val pubCertChain = signedJwt.header
+            ?.x509CertChain
+            ?.mapNotNull { X509CertUtils.parse(it.decode()) }
+            ?: emptyList()
+        if (pubCertChain.isEmpty()) return invalidJarJwt("Missing or invalid x5c")
+        val cert = pubCertChain[0]
+        val subjectAlternativeNames = cert.sanOfUniformResourceIdentifier().getOrDefault(emptyList())
+        if (subjectAlternativeNames.isEmpty()) return invalidJarJwt(
+            "x5c misses Subject Alternative Names of type UniformResourceIdentifier",
+        )
+        if (!subjectAlternativeNames.contains(clientId)) return invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
+        if (!supportedClientIdScheme.validator(pubCertChain)) return invalidJarJwt("Untrusted x5c")
+        return try {
+            val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
+                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(
+                    JOSEObjectType("oauth-authz-req+jwt"),
+                )
+                jwsKeySelector = JWSKeySelector { _, _ ->
+                    listOf(cert.publicKey)
+                }
+            }
+            jwtProcessor.process(signedJwt, null)
+            null
+        } catch (e: JOSEException) {
+            throw RuntimeException(e)
+        } catch (e: BadJOSEException) {
+            invalidJarJwt("Invalid signature ${e.message}")
+        }
     }
 
     private suspend fun jwtProcessor(client: PreregisteredClient): ConfigurableJWTProcessor<SecurityContext> =

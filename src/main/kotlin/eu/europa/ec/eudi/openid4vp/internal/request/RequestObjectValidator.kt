@@ -69,7 +69,7 @@ internal sealed interface ClientMetaDataSource {
 internal sealed interface ValidatedRequestObject {
 
     val clientId: String
-    val clientIdScheme: ClientIdScheme?
+    val clientIdScheme: ClientIdScheme? // TODO Remove
     val clientMetaDataSource: ClientMetaDataSource?
     val nonce: String
     val responseMode: ResponseMode
@@ -134,7 +134,7 @@ internal object RequestObjectValidator {
         val nonce = requiredNonce(authorizationRequest).getOrThrow()
         val responseType = requiredResponseType(authorizationRequest).getOrThrow()
         val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
-        val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow()
+        val clientIdScheme = optionalClientIdScheme(authorizationRequest).getOrThrow() // TODO Remove
         val clientId = requiredClientId(authorizationRequest).getOrThrow()
         val presentationDefinitionSource =
             optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }

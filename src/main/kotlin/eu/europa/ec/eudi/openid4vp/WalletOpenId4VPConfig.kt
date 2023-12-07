@@ -25,6 +25,7 @@ import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.SupportedClaimFormat
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
+import java.security.cert.X509Certificate
 import java.time.Duration
 
 sealed interface JwkSetSource {
@@ -42,12 +43,16 @@ sealed interface SupportedClientIdScheme {
     val scheme: ClientIdScheme
         get() = when (this) {
             is Preregistered -> ClientIdScheme.PreRegistered
+            is X509SanUri -> ClientIdScheme.X509_SAN_URI
             is IsoX509 -> ClientIdScheme.ISO_X509
         }
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
 
+    @Deprecated("Will be removed in 0.3.0")
     data object IsoX509 : SupportedClientIdScheme
+
+    data class X509SanUri(val validator: (List<X509Certificate>) -> Boolean = { true }) : SupportedClientIdScheme
 }
 
 data class WalletOpenId4VPConfig(

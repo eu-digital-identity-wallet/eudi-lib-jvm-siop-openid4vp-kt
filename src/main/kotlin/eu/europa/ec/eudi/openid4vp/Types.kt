@@ -108,7 +108,10 @@ enum class ClientIdScheme {
 
     DID,
 
+    @Deprecated("Will be removed in 0.3.0")
     ISO_X509,
+
+    X509_SAN_URI,
 
     ;
 
@@ -120,6 +123,7 @@ enum class ClientIdScheme {
             "entity_id" -> EntityId
             "did" -> DID
             "iso_x509" -> ISO_X509
+            "x509_san_uri" -> X509_SAN_URI
             else -> null
         }
     }

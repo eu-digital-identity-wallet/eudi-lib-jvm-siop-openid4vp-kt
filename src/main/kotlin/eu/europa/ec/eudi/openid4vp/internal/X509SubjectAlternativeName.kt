@@ -19,6 +19,8 @@ import java.security.cert.X509Certificate
 
 fun X509Certificate.sanOfUniformResourceIdentifier(): Result<List<String>> =
     san(X509SubjectAlternativeNameType.UniformResourceIdentifier)
+fun X509Certificate.sanOfDNSName(): Result<List<String>> =
+    san(X509SubjectAlternativeNameType.DNSName)
 
 private fun X509Certificate.san(type: X509SubjectAlternativeNameType): Result<List<String>> = runCatching {
     buildList {

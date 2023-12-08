@@ -180,7 +180,15 @@ internal class DefaultAuthorizationRequestResolver(
             }
 
         when (request) {
-            is NotSecured -> request.requestObject
+            is NotSecured -> {
+                request.requestObject.clientIdScheme?.let {
+                    val scheme = ClientIdScheme.make(it)
+                    require(scheme !in listOf(ClientIdScheme.X509_SAN_DNS, ClientIdScheme.X509_SAN_URI, ClientIdScheme.DID)) {
+                        "Invalid client_id_scheme. $it is only allowed when authorization request is sent as a signed JWT."
+                    }
+                }
+                request.requestObject
+            }
             is JwtSecured -> {
                 val jwt: Jwt = when (request) {
                     is PassByValue -> request.jwt

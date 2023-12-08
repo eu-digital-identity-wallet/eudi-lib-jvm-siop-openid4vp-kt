@@ -30,7 +30,11 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -50,7 +54,7 @@ import javax.net.ssl.X509TrustManager
  * Examples assume that you have cloned and running
  * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
  */
-fun main(): Unit = runBlocking {
+fun main(): Unit = runTest {
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,

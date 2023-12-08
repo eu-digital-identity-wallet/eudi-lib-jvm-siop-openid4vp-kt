@@ -1,4 +1,5 @@
 [versions]
+coroutines = "1.7.3"
 dependency-check = "8.4.2"
 sonarqube = "4.4.1.3373"
 spotless = "6.23.0"
@@ -13,6 +14,7 @@ dokka = "1.9.10"
 maven-publish = "0.25.3"
 
 [libraries]
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-client-serialization = { module = "io.ktor:ktor-client-serialization", version.ref = "ktor" }

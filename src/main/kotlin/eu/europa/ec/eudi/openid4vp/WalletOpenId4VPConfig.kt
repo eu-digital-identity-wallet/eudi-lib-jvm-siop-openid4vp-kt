@@ -44,15 +44,14 @@ sealed interface SupportedClientIdScheme {
         get() = when (this) {
             is Preregistered -> ClientIdScheme.PreRegistered
             is X509SanUri -> ClientIdScheme.X509_SAN_URI
-            is IsoX509 -> ClientIdScheme.ISO_X509
+            is X509SanDns -> ClientIdScheme.X509_SAN_DNS
         }
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
 
-    @Deprecated("Will be removed in 0.3.0")
-    data object IsoX509 : SupportedClientIdScheme
-
     data class X509SanUri(val validator: (List<X509Certificate>) -> Boolean = { true }) : SupportedClientIdScheme
+
+    data class X509SanDns(val validator: (List<X509Certificate>) -> Boolean = { true }) : SupportedClientIdScheme
 }
 
 data class WalletOpenId4VPConfig(

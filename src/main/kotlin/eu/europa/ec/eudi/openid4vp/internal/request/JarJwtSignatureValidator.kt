@@ -29,8 +29,8 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.IsoX509
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
+import eu.europa.ec.eudi.openid4vp.internal.sanOfDNSName
 import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
 import eu.europa.ec.eudi.openid4vp.internal.success
 import io.ktor.client.call.*
@@ -38,6 +38,7 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import java.security.cert.X509Certificate
 import java.text.ParseException
 
 /**
@@ -78,19 +79,22 @@ internal class JarJwtSignatureValidator(
                 untrustedClaimSet.getStringClaim("client_id_scheme")
                     ?.let { ClientIdScheme.make(it) }
                     ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
-            //
-            // Currently is not defined how to
-            // process client_id when the scheme is IsoX509 or not provided
-            // Thus, we don't validate the signature
-            //
+
             when (supportedClientIdScheme) {
-                null -> null // TODO Return an error indicating unsupported client_scheme_id
-                IsoX509 -> null
+                null -> RequestValidationError.UnsupportedClientIdScheme
                 is Preregistered -> validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
-                is SupportedClientIdScheme.X509SanUri -> validateX509SanUri(
-                    supportedClientIdScheme,
+                is SupportedClientIdScheme.X509SanUri -> validateX509San(
+                    supportedClientIdScheme.validator,
                     clientId,
                     signedJwt,
+                    X509Certificate::sanOfUniformResourceIdentifier,
+                )
+
+                is SupportedClientIdScheme.X509SanDns -> validateX509San(
+                    supportedClientIdScheme.validator,
+                    clientId,
+                    signedJwt,
+                    X509Certificate::sanOfDNSName,
                 )
             }
         }
@@ -117,23 +121,25 @@ internal class JarJwtSignatureValidator(
         else trustedClient.verifySignature()
     }
 
-    private suspend fun validateX509SanUri(
-        supportedClientIdScheme: SupportedClientIdScheme.X509SanUri,
+    private fun validateX509San(
+        trustChainValidator: (List<X509Certificate>) -> Boolean,
         clientId: String,
         signedJwt: SignedJWT,
+        subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
     ): AuthorizationRequestError? {
         val pubCertChain = signedJwt.header
             ?.x509CertChain
             ?.mapNotNull { X509CertUtils.parse(it.decode()) }
-            ?: emptyList()
-        if (pubCertChain.isEmpty()) return invalidJarJwt("Missing or invalid x5c")
+            ?: return invalidJarJwt("Missing or invalid x5c")
+
         val cert = pubCertChain[0]
-        val subjectAlternativeNames = cert.sanOfUniformResourceIdentifier().getOrDefault(emptyList())
-        if (subjectAlternativeNames.isEmpty()) return invalidJarJwt(
-            "x5c misses Subject Alternative Names of type UniformResourceIdentifier",
-        )
-        if (!subjectAlternativeNames.contains(clientId)) return invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
-        if (!supportedClientIdScheme.validator(pubCertChain)) return invalidJarJwt("Untrusted x5c")
+        val sans = cert.subjectAlternativeNames().getOrElse {
+            return invalidJarJwt(
+                "x5c misses Subject Alternative Names of type UniformResourceIdentifier",
+            )
+        }
+        if (!sans.contains(clientId)) return invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
+        if (!trustChainValidator(pubCertChain)) return invalidJarJwt("Untrusted x5c")
         return try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(

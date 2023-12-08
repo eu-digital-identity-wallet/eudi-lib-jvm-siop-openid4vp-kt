@@ -153,6 +153,10 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = MissingClientId
     }
 
+    data object UnsupportedClientIdScheme : RequestValidationError {
+        private fun readResolve(): Any = UnsupportedClientIdScheme
+    }
+
     data object InvalidClientMetaDataUri : RequestValidationError {
         private fun readResolve(): Any = InvalidClientMetaDataUri
     }

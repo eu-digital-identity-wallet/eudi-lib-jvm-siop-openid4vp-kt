@@ -37,6 +37,7 @@ import java.io.File
 import java.io.InputStream
 import java.net.URLEncoder
 import java.security.KeyStore
+import java.security.cert.X509Certificate
 import java.time.Duration
 import java.util.*
 import kotlin.test.Test
@@ -80,15 +81,15 @@ class AuthorizationRequestResolverTest {
             SupportedClientIdScheme.Preregistered(
                 mapOf(
                     "Verifier" to
-                        PreregisteredClient(
-                            clientId = "Verifier",
-                            jarSigningAlg = "RS256",
-                            jwkSetSource = JwkSetSource.ByValue(jwkSet),
-                        ),
+                            PreregisteredClient(
+                                clientId = "Verifier",
+                                jarSigningAlg = "RS256",
+                                jwkSetSource = JwkSetSource.ByValue(jwkSet),
+                            ),
                 ),
             ),
-            SupportedClientIdScheme.X509SanDns({ chain -> true }),
-            SupportedClientIdScheme.X509SanUri({ chain -> true }),
+            SupportedClientIdScheme.X509SanDns(::validateChain),
+            SupportedClientIdScheme.X509SanUri(::validateChain),
         ),
         vpFormatsSupported = emptyList(),
         subjectSyntaxTypesSupported = listOf(
@@ -128,14 +129,14 @@ class AuthorizationRequestResolverTest {
     fun `vp token auth request`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
-                "response_type=vp_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&presentation_definition=$pd" +
-                "&client_metadata=$clientMetadataJwksInline"
+                    "response_type=vp_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}" +
+                    "&presentation_definition=$pd" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
         val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -146,14 +147,14 @@ class AuthorizationRequestResolverTest {
     fun `id token auth request`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
-                "response_type=id_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&scope=openid" +
-                "&client_metadata=$clientMetadataJwksInline"
+                    "response_type=id_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}" +
+                    "&scope=openid" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
         val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -164,15 +165,15 @@ class AuthorizationRequestResolverTest {
     fun `id and vp token auth request`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
-                "response_type=id_token vp_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&scope=openid" +
-                "&state=${genState()}" +
-                "&presentation_definition=$pd" +
-                "&client_metadata=$clientMetadataJwksInline"
+                    "response_type=id_token vp_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&scope=openid" +
+                    "&state=${genState()}" +
+                    "&presentation_definition=$pd" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
         val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -191,13 +192,12 @@ class AuthorizationRequestResolverTest {
         resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
     }
 
-
     @Test
     fun `JAR auth request, request passed as JWT, verified with x509_san_dns scheme`() = runTest {
         val keyStore = KeyStore.getInstance("JKS")
         keyStore.load(
             load("certificates/certificates.jks"),
-            "12345".toCharArray()
+            "12345".toCharArray(),
         )
         val signedJwt = createSignedRequestJwt(keyStore, "request-object/request_object_claimset-san_dns.json")
         val authRequest = "http://localhost:8080/public_url?client_id=verifier.example.gr&request=$signedJwt"
@@ -211,7 +211,7 @@ class AuthorizationRequestResolverTest {
         val keyStore = KeyStore.getInstance("JKS")
         keyStore.load(
             load("certificates/certificates.jks"),
-            "12345".toCharArray()
+            "12345".toCharArray(),
         )
         val signedJwt = createSignedRequestJwt(keyStore, "request-object/request_object_claimset-san_uri.json")
         val authRequest = "http://localhost:8080/public_url?client_id=https%3A%2F%2Fverifier.example.gr&request=$signedJwt"
@@ -243,7 +243,7 @@ class AuthorizationRequestResolverTest {
             JWKMatcher.Builder()
                 .keyType(KeyType.RSA)
                 .keyID("verifierexample")
-                .build()
+                .build(),
         ).keys[0]
 
         val signer = DefaultJWSSignerFactory().createJWSSigner(signingKey)
@@ -256,13 +256,13 @@ class AuthorizationRequestResolverTest {
     fun `response type provided comma separated`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
-                "response_type=id_token,vp_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&client_metadata=$clientMetadataJwksInline"
+                    "response_type=id_token,vp_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
         val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -273,13 +273,13 @@ class AuthorizationRequestResolverTest {
     fun `response type provided is miss-spelled`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
-                "response_type=id_tokens" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&client_metadata=$clientMetadataJwksInline"
+                    "response_type=id_tokens" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
         val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -290,12 +290,12 @@ class AuthorizationRequestResolverTest {
     fun `nonce validation`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
-                "response_type=id_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&state=${genState()}" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_metadata=$clientMetadataJwksInline"
+                    "response_type=id_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&state=${genState()}" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
         val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -306,12 +306,12 @@ class AuthorizationRequestResolverTest {
     fun `if client_id is missing reject the request`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
-                "response_type=id_token" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&client_metadata=$clientMetadataJwksInline"
+                    "response_type=id_token" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&state=${genState()}" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
         val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -320,7 +320,17 @@ class AuthorizationRequestResolverTest {
 
     @OptIn(ExperimentalSerializationApi::class)
     fun readFileAsText(fileName: String): String {
-        return  json.decodeFromStream<JsonObject>(load(fileName)).jsonObject.toString()
+        return json.decodeFromStream<JsonObject>(load(fileName)).jsonObject.toString()
+    }
+
+    private fun validateChain(chain: List<X509Certificate>): Boolean {
+        return try {
+            for (i in chain.indices)
+                if (i > 0) chain[i - 1].verify(chain[i].publicKey)
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun load(f: String): InputStream =

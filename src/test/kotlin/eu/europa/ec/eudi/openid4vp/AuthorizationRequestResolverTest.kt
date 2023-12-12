@@ -202,7 +202,7 @@ class AuthorizationRequestResolverTest {
             load("certificates/certificates.jks"),
             "12345".toCharArray(),
         )
-        val clientId = "eudi.netcompany-intrasoft.com"
+        val clientId = "verifier.example.gr"
         val signedJwt = createSignedRequestJwt(keyStore, "request-object/request_object_claimset-san_dns.json")
         val authRequest = "http://localhost:8080/public_url?client_id=$clientId&request=$signedJwt"
 
@@ -218,7 +218,7 @@ class AuthorizationRequestResolverTest {
             "12345".toCharArray(),
 
         )
-        val clientId: URI = URI.create("https://eudi.netcompany-intrasoft.com/wallet/direct_post")
+        val clientId: URI = URI.create("https://verifier.example.gr")
         val clientIdEncoded = URLEncoder.encode(clientId.toString(), "UTF-8")
         val signedJwt = createSignedRequestJwt(keyStore, "request-object/request_object_claimset-san_uri.json")
         val authRequest = "http://localhost:8080/public_url?client_id=$clientIdEncoded&request=$signedJwt"

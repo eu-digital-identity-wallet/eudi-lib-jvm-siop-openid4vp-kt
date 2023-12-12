@@ -80,9 +80,9 @@ internal class JarJwtSignatureValidator(
         val jwtClientId = untrustedClaimSet.getStringClaim("client_id")
 
         return if (null == jwtClientId) {
-            Either.Left(RequestValidationError.MissingClientId)
+            RequestValidationError.MissingClientId.left()
         } else if (clientId != jwtClientId) {
-            Either.Left(invalidJarJwt("ClientId mismatch. Found in JAR request $clientId, in JAR Jwt $jwtClientId"))
+            invalidJarJwt("ClientId mismatch. Found in JAR request $clientId, in JAR Jwt $jwtClientId").left()
         } else {
             val supportedClientIdScheme =
                 untrustedClaimSet.getStringClaim("client_id_scheme")
@@ -90,10 +90,9 @@ internal class JarJwtSignatureValidator(
                     ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
 
             when (supportedClientIdScheme) {
-                null -> Either.Left(RequestValidationError.UnsupportedClientIdScheme)
+                null -> RequestValidationError.UnsupportedClientIdScheme.left()
                 is Preregistered -> {
-                    validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
-                    Either.Right(supportedClientIdScheme)
+                    validatePreregistered(supportedClientIdScheme, clientId, signedJwt).map { supportedClientIdScheme }
                 }
 
                 is SupportedClientIdScheme.X509SanUri -> {
@@ -102,8 +101,7 @@ internal class JarJwtSignatureValidator(
                         clientId,
                         signedJwt,
                         X509Certificate::sanOfUniformResourceIdentifier,
-                    )
-                    Either.Right(supportedClientIdScheme)
+                    ).map { supportedClientIdScheme }
                 }
 
                 is SupportedClientIdScheme.X509SanDns -> {
@@ -112,8 +110,7 @@ internal class JarJwtSignatureValidator(
                         clientId,
                         signedJwt,
                         X509Certificate::sanOfDNSName,
-                    )
-                    Either.Right(supportedClientIdScheme)
+                    ).map { supportedClientIdScheme }
                 }
 
                 SupportedClientIdScheme.RedirectUri -> Either.Left(invalidJarJwt("RedirectURI cannot be used with JAR"))
@@ -125,21 +122,22 @@ internal class JarJwtSignatureValidator(
         supportedClientIdScheme: Preregistered,
         clientId: String,
         signedJwt: SignedJWT,
-    ): AuthorizationRequestError? {
+    ): Either<AuthorizationRequestError, Unit> {
         suspend fun PreregisteredClient.verifySignature() =
             try {
                 val jwtProcessor = jwtProcessor(this)
                 jwtProcessor.process(signedJwt, null)
-                null
+                Unit.right()
             } catch (e: JOSEException) {
                 throw RuntimeException(e)
             } catch (e: BadJOSEException) {
-                invalidJarJwt("Invalid signature ${e.message}")
+                invalidJarJwt("Invalid signature ${e.message}").left()
             }
 
         val trustedClient = supportedClientIdScheme.clients[clientId]
-        return if (null == trustedClient) invalidJarJwt("Client with client_id $clientId is not pre-registered")
-        else trustedClient.verifySignature()
+        return trustedClient
+            ?.verifySignature()
+            ?: invalidJarJwt("Client with client_id $clientId is not pre-registered").left()
     }
 
     private fun validateX509San(
@@ -147,20 +145,20 @@ internal class JarJwtSignatureValidator(
         clientId: String,
         signedJwt: SignedJWT,
         subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
-    ): AuthorizationRequestError? {
+    ): Either<AuthorizationRequestError, Unit> {
         val pubCertChain = signedJwt.header
             ?.x509CertChain
             ?.mapNotNull { X509CertUtils.parse(it.decode()) }
-            ?: return invalidJarJwt("Missing or invalid x5c")
+            ?: return invalidJarJwt("Missing or invalid x5c").left()
 
         val cert = pubCertChain[0]
         val sans = cert.subjectAlternativeNames().getOrElse {
             return invalidJarJwt(
                 "x5c misses Subject Alternative Names of type UniformResourceIdentifier",
-            )
+            ).left()
         }
-        if (!sans.contains(clientId)) return invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
-        if (!trustChainValidator(pubCertChain)) return invalidJarJwt("Untrusted x5c")
+        if (!sans.contains(clientId)) return invalidJarJwt("ClientId not found in x5c Subject Alternative Names").left()
+        if (!trustChainValidator(pubCertChain)) return invalidJarJwt("Untrusted x5c").left()
         return try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(
@@ -171,11 +169,11 @@ internal class JarJwtSignatureValidator(
                 }
             }
             jwtProcessor.process(signedJwt, null)
-            null
+            Unit.right()
         } catch (e: JOSEException) {
             throw RuntimeException(e)
         } catch (e: BadJOSEException) {
-            invalidJarJwt("Invalid signature ${e.message}")
+            invalidJarJwt("Invalid signature ${e.message}").left()
         }
     }
 
@@ -241,4 +239,12 @@ private fun requestObject(cs: JWTClaimsSet): RequestObject {
 private sealed interface Either<out L, out R> {
     data class Left<L, R>(val value: L) : Either<L, R>
     data class Right<L, R>(val value: R) : Either<L, R>
+
+    fun <R1> map(f: (R) -> R1): Either<L, R1> = when (this) {
+        is Left<L, R> -> Left(value)
+        is Right<L, R> -> Right(f(value))
+    }
 }
+
+private fun <L, R> L.left(): Either.Left<L, R> = Either.Left(this)
+private fun <L, R> R.right(): Either.Right<L, R> = Either.Right(this)

@@ -1,6 +1,6 @@
 {
-  "response_uri": "https://eudi.netcompany-intrasoft.com/wallet/direct_post",
-  "client_id": "eudi.netcompany-intrasoft.com",
+  "response_uri": "https://verifier.example.gr/wallet/direct_post",
+  "client_id": "verifier.example.gr",
   "client_id_scheme": "x509_san_dns",
   "response_type": "vp_token",
   "nonce": "nonce",

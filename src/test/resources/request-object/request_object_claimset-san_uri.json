@@ -1,0 +1,234 @@
+{
+  "response_uri": "https://eudi.netcompany-intrasoft.com/wallet/direct_post",
+  "client_id": "https://verifier.example.gr",
+  "client_id_scheme": "x509_san_uri",
+  "response_type": "vp_token",
+  "nonce": "nonce",
+  "response_mode": "direct_post",
+  "aud": "https://self-issued.me/v2",
+  "iat": 1701970394,
+  "scope": "",
+  "presentation_definition": {
+    "id": "32f54163-7166-48f1-93d8-ff217bdb0653",
+    "input_descriptors": [
+      {
+        "id": "eudi_pid",
+        "name": "EUDI PID",
+        "purpose": "We need to verify your identity",
+        "constraints": {
+          "fields": [
+            {
+              "path": [
+                "$.mdoc.doctype"
+              ],
+              "filter": {
+                "type": "string",
+                "const": "eu.europa.ec.eudiw.pid.1"
+              }
+            },
+            {
+              "path": [
+                "$.mdoc.namespace"
+              ],
+              "filter": {
+                "type": "string",
+                "const": "eu.europa.ec.eudiw.pid.1"
+              }
+            },
+            {
+              "path": [
+                "$.mdoc.family_name"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.given_name"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.birth_date"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.age_over_18"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.age_in_years"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.age_birth_year"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.family_name_birth"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.given_name_birth"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.birth_place"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.birth_country"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.birth_state"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.birth_city"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.resident_address"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.resident_country"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.resident_state"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.resident_city"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.resident_postal_code"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.resident_street"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.resident_house_number"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.gender"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.nationality"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.issuance_date"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.expiry_date"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.issuing_authority"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.document_number"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.administrative_number"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.issuing_country"
+              ],
+              "intent_to_retain": false
+            },
+            {
+              "path": [
+                "$.mdoc.issuing_jurisdiction"
+              ],
+              "intent_to_retain": false
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "state": "638JwH0b2jrhGlAZQVa50KysVazkI-YpiFcLj2DLMalJpZK6XC22vAsPqXkpwAwXzfYpK-WLc3GhHYK8lbT6rw",
+  "client_metadata": {
+    "jwks": {
+      "keys": [
+        {
+          "kty": "RSA",
+          "e": "AQAB",
+          "use": "sig",
+          "kid": "a0779cde-0615-41b3-89b7-aec75faa159d",
+          "iat": 1701436001,
+          "n": "k4gz8H4Rvuh7ShPHpOwSPN9SWWBUxApgOuBYzDQOa4rXMmUs20egROvtDQYf2C0o-mZEPUXNq8-I79v9j_Uacum2CQWpOPd7Z-kXGZsE7Z9HAqVPqQnMNUU2aQPc8WYbkrXOrFjFIo0GQuVObVMN_1wh2k94JLFoqRAx2TLMrRu-pQUQfN1iTL-2yL3Cn-Ri3W_sxhdLV0uKdviKcU437LdvrpE3eoXePxofmDxG2udX6TSqNvzRZpKR9Vqy9hKaTppAHp_0G1fQ4dSCLpSY9hxGEuTFgFAyvtZZhZrL2OFa6XHPC60uX5-Iir2K0IymSPrVpftxNUACKebkh5FTGw"
+        }
+      ]
+    },
+    "id_token_encrypted_response_alg": "RS256",
+    "id_token_encrypted_response_enc": "A128CBC-HS256",
+    "subject_syntax_types_supported": [
+      "urn:ietf:params:oauth:jwk-thumbprint",
+      "did:example",
+      "did:key"
+    ],
+    "id_token_signed_response_alg": "RS256"
+  }
+}

@@ -159,10 +159,11 @@ internal class DefaultAuthorizationRequestResolver(
 
     private suspend fun resolveRequest(request: AuthorizationRequest): Resolution =
         try {
-            val requestObject = requestObjectOf(request).getOrThrow()
-            val validatedRequestObject = RequestObjectValidator.validate(requestObject).getOrThrow()
+            val (supportedClientIdScheme, requestObject) = requestObjectOf(request)
+            val validatedRequestObject =
+                RequestObjectValidator.validate(supportedClientIdScheme, requestObject)
             val resolved =
-                validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig).getOrThrow()
+                validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig)
             Resolution.Success(resolved)
         } catch (t: AuthorizationRequestException) {
             Resolution.Invalid(t.error)
@@ -171,7 +172,7 @@ internal class DefaultAuthorizationRequestResolver(
     /**
      * Extracts the [request object][RequestObject] of an [AuthorizationRequest]
      */
-    private suspend fun requestObjectOf(request: AuthorizationRequest): Result<RequestObject> = runCatching {
+    private suspend fun requestObjectOf(request: AuthorizationRequest): Pair<SupportedClientIdScheme, RequestObject> {
         suspend fun fetchJwt(request: PassByReference): Jwt =
             httpClientFactory().use { client ->
                 client.get(request.jwtURI) {
@@ -179,28 +180,34 @@ internal class DefaultAuthorizationRequestResolver(
                 }.body<String>()
             }
 
-        when (request) {
-            is NotSecured -> {
-                request.requestObject.clientIdScheme?.let {
-                    val scheme = ClientIdScheme.make(it)
-                    if (scheme != null) {
-                        require(ClientIdScheme.supportsNonJar(scheme)) {
-                            "Invalid client_id_scheme. $it is only allowed when authorization request is sent as a signed JWT."
-                        }
-                    }
-                }
-                request.requestObject
-            }
+        return when (request) {
+            is NotSecured -> supportedClientIdSchemeFor(request) to request.requestObject
             is JwtSecured -> {
                 val jwt: Jwt = when (request) {
                     is PassByValue -> request.jwt
                     is PassByReference -> fetchJwt(request)
                 }
                 val clientId = request.clientId
-
-                requestObjectFromJwt(clientId, jwt).getOrThrow()
+                requestObjectFromJwt(clientId, jwt)
             }
         }
+    }
+
+    private fun supportedClientIdSchemeFor(request: AuthorizationRequest.NotSecured): SupportedClientIdScheme {
+        val requestObject = request.requestObject
+        val clientIdScheme = requestObject.clientIdScheme?.let {
+            ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
+        } ?: throw RequestValidationError.InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty())
+            .asException()
+        return walletOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)?.takeIf { supportedClientIdScheme ->
+            when (supportedClientIdScheme) {
+                is SupportedClientIdScheme.Preregistered -> supportedClientIdScheme.clients.containsKey(
+                    requestObject.clientId,
+                )
+
+                else -> true
+            }
+        } ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
     }
 
     /**
@@ -211,9 +218,12 @@ internal class DefaultAuthorizationRequestResolver(
      * a [RequestObject]
      * @param clientId The client that placed request
      */
-    private suspend fun requestObjectFromJwt(clientId: String, jwt: Jwt): Result<RequestObject> {
+    private suspend fun requestObjectFromJwt(
+        clientId: String,
+        jwt: Jwt,
+    ): Pair<SupportedClientIdScheme, RequestObject> {
         val validator = JarJwtSignatureValidator(walletOpenId4VPConfig, httpClientFactory)
-        return validator.validate(clientId, jwt)
+        return validator.validate(clientId, jwt).getOrThrow()
     }
 
     companion object {
@@ -234,3 +244,10 @@ internal class DefaultAuthorizationRequestResolver(
         )
     }
 }
+
+private val OnlyNonJar = listOf(ClientIdScheme.RedirectUri)
+private val OnlyJar = listOf(ClientIdScheme.X509_SAN_DNS, ClientIdScheme.X509_SAN_URI, ClientIdScheme.DID)
+private val EitherJarOrNoJar = listOf(ClientIdScheme.PreRegistered, ClientIdScheme.EntityId)
+
+internal fun ClientIdScheme.supportsNonJar() = this in OnlyNonJar || this in EitherJarOrNoJar
+internal fun ClientIdScheme.supportsJar() = this in OnlyJar || this in EitherJarOrNoJar

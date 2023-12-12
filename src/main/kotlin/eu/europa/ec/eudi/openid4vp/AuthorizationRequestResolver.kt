@@ -107,6 +107,10 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = MissingPresentationDefinition
     }
 
+    data object InvalidClientId : RequestValidationError {
+        private fun readResolve(): Any = InvalidClientId
+    }
+
     data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
 
     data object InvalidPresentationDefinitionUri : RequestValidationError {

@@ -52,12 +52,18 @@ internal class JarJwtSignatureValidator(
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) {
 
-    suspend fun validate(clientId: String, jwt: Jwt): Result<RequestObject> = runCatching {
-        val signedJwt = parse(jwt).getOrThrow()
-        val error = doValidate(clientId, signedJwt)
-        if (null == error) signedJwt.jwtClaimsSet.toType { requestObject(it) }
-        else throw error.asException()
-    }
+    suspend fun validate(clientId: String, jwt: Jwt): Result<Pair<SupportedClientIdScheme, RequestObject>> =
+        runCatching {
+            val signedJwt = parse(jwt).getOrThrow()
+            when (val validation = doValidate(clientId, signedJwt)) {
+                is Either.Left -> throw validation.value.asException()
+                is Either.Right -> {
+                    val supportedClientIdScheme = validation.value
+                    val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
+                    supportedClientIdScheme to requestObject
+                }
+            }
+        }
 
     private fun parse(jwt: Jwt): Result<SignedJWT> =
         try {
@@ -66,36 +72,51 @@ internal class JarJwtSignatureValidator(
             RequestValidationError.InvalidJarJwt("JAR JWT parse error").asFailure()
         }
 
-    private suspend fun doValidate(clientId: String, signedJwt: SignedJWT): AuthorizationRequestError? {
+    private suspend fun doValidate(
+        clientId: String,
+        signedJwt: SignedJWT,
+    ): Either<AuthorizationRequestError, SupportedClientIdScheme> {
         val untrustedClaimSet = signedJwt.jwtClaimsSet
         val jwtClientId = untrustedClaimSet.getStringClaim("client_id")
 
         return if (null == jwtClientId) {
-            RequestValidationError.MissingClientId
+            Either.Left(RequestValidationError.MissingClientId)
         } else if (clientId != jwtClientId) {
-            invalidJarJwt("ClientId mismatch. Found in JAR request $clientId, in JAR Jwt $jwtClientId")
+            Either.Left(invalidJarJwt("ClientId mismatch. Found in JAR request $clientId, in JAR Jwt $jwtClientId"))
         } else {
             val supportedClientIdScheme =
                 untrustedClaimSet.getStringClaim("client_id_scheme")
-                    ?.let { ClientIdScheme.make(it)?.takeIf(ClientIdScheme.Companion::supportsJar) }
+                    ?.let { ClientIdScheme.make(it)?.takeIf { x -> x.supportsJar() } }
                     ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
 
             when (supportedClientIdScheme) {
-                null -> RequestValidationError.UnsupportedClientIdScheme
-                is Preregistered -> validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
-                is SupportedClientIdScheme.X509SanUri -> validateX509San(
-                    supportedClientIdScheme.validator,
-                    clientId,
-                    signedJwt,
-                    X509Certificate::sanOfUniformResourceIdentifier,
-                )
+                null -> Either.Left(RequestValidationError.UnsupportedClientIdScheme)
+                is Preregistered -> {
+                    validatePreregistered(supportedClientIdScheme, clientId, signedJwt)
+                    Either.Right(supportedClientIdScheme)
+                }
 
-                is SupportedClientIdScheme.X509SanDns -> validateX509San(
-                    supportedClientIdScheme.validator,
-                    clientId,
-                    signedJwt,
-                    X509Certificate::sanOfDNSName,
-                )
+                is SupportedClientIdScheme.X509SanUri -> {
+                    validateX509San(
+                        supportedClientIdScheme.validator,
+                        clientId,
+                        signedJwt,
+                        X509Certificate::sanOfUniformResourceIdentifier,
+                    )
+                    Either.Right(supportedClientIdScheme)
+                }
+
+                is SupportedClientIdScheme.X509SanDns -> {
+                    validateX509San(
+                        supportedClientIdScheme.validator,
+                        clientId,
+                        signedJwt,
+                        X509Certificate::sanOfDNSName,
+                    )
+                    Either.Right(supportedClientIdScheme)
+                }
+
+                SupportedClientIdScheme.RedirectUri -> Either.Left(invalidJarJwt("RedirectURI cannot be used with JAR"))
             }
         }
     }
@@ -215,4 +236,9 @@ private fun requestObject(cs: JWTClaimsSet): RequestObject {
             idTokenType = getStringClaim("id_token_type"),
         )
     }
+}
+
+private sealed interface Either<out L, out R> {
+    data class Left<L, R>(val value: L) : Either<L, R>
+    data class Right<L, R>(val value: R) : Either<L, R>
 }

@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.mapError
 import eu.europa.ec.eudi.openid4vp.internal.request.PresentationDefinitionSource.*
-import eu.europa.ec.eudi.openid4vp.internal.success
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -50,8 +49,8 @@ internal class PresentationDefinitionResolver(
     suspend fun resolve(
         source: PresentationDefinitionSource,
         config: WalletOpenId4VPConfig,
-    ): Result<PresentationDefinition> = when (source) {
-        is ByValue -> source.presentationDefinition.success()
+    ): PresentationDefinition = when (source) {
+        is ByValue -> source.presentationDefinition
         is ByReference -> fetch(source.url, config)
         is Implied -> lookupKnownPresentationDefinitions(source.scope, config)
     }
@@ -59,22 +58,22 @@ internal class PresentationDefinitionResolver(
     private fun lookupKnownPresentationDefinitions(
         scope: Scope,
         config: WalletOpenId4VPConfig,
-    ): Result<PresentationDefinition> =
+    ): PresentationDefinition =
         scope.items()
             .firstNotNullOfOrNull { config.knownPresentationDefinitionsPerScope[it] }
-            ?.success()
-            ?: ResolutionError.PresentationDefinitionNotFoundForScope(scope).asFailure()
+            ?: throw ResolutionError.PresentationDefinitionNotFoundForScope(scope).asException()
 
     @Suppress("ktlint")
     private suspend fun fetch(
         url: URL,
         config: WalletOpenId4VPConfig,
-    ): Result<PresentationDefinition> =
+    ): PresentationDefinition =
         if (config.presentationDefinitionUriSupported) {
             httpClientFactory().use { client ->
                 runCatching {
                     client.get(url).body<PresentationDefinition>()
                 }.mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
+                    .getOrThrow()
             }
-        } else ResolutionError.FetchingPresentationDefinitionNotSupported.asFailure()
+        } else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
 }

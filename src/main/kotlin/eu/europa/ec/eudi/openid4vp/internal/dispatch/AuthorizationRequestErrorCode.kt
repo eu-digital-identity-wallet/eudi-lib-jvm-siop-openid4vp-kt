@@ -55,6 +55,7 @@ enum class AuthorizationRequestErrorCode(val code: String) {
                 InvalidRedirectUri,
                 InvalidResponseUri,
                 MissingClientId,
+                InvalidClientId,
                 UnsupportedClientIdScheme,
                 MissingNonce,
                 MissingPresentationDefinition,

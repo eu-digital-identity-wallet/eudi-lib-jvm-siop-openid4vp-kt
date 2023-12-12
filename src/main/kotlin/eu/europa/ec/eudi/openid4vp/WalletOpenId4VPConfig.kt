@@ -49,6 +49,7 @@ sealed interface SupportedClientIdScheme {
             is Preregistered -> ClientIdScheme.PreRegistered
             is X509SanUri -> ClientIdScheme.X509_SAN_URI
             is X509SanDns -> ClientIdScheme.X509_SAN_DNS
+            RedirectUri -> ClientIdScheme.RedirectUri
         }
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
@@ -56,6 +57,8 @@ sealed interface SupportedClientIdScheme {
     data class X509SanUri(val validator: (List<X509Certificate>) -> Boolean = { true }) : SupportedClientIdScheme
 
     data class X509SanDns(val validator: (List<X509Certificate>) -> Boolean = { true }) : SupportedClientIdScheme
+
+    data object RedirectUri : SupportedClientIdScheme
 }
 
 data class WalletOpenId4VPConfig(

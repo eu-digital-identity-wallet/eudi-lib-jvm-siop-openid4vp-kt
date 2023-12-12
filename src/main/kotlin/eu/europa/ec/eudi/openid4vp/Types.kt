@@ -115,13 +115,6 @@ enum class ClientIdScheme {
 
     companion object {
 
-        private val OnlyNonJar = listOf(RedirectUri)
-        private val OnlyJar = listOf(X509_SAN_DNS, X509_SAN_URI, DID)
-        private val EitherJarOrNoJar = listOf(PreRegistered, EntityId)
-
-        fun supportsNonJar(c: ClientIdScheme) = c in OnlyNonJar || c in EitherJarOrNoJar
-        fun supportsJar(c: ClientIdScheme) = c in OnlyJar || c in EitherJarOrNoJar
-
         fun make(s: String): ClientIdScheme? = when (s) {
             "pre-registered" -> PreRegistered
             "redirect_uri" -> RedirectUri
@@ -154,6 +147,15 @@ sealed interface ResponseMode : java.io.Serializable {
     data class FragmentJwt(val redirectUri: URI) : ResponseMode
     data class DirectPost(val responseURI: URL) : ResponseMode
     data class DirectPostJwt(val responseURI: URL) : ResponseMode
+
+    fun uri(): URI = when (this) {
+        is DirectPost -> responseURI.toURI()
+        is DirectPostJwt -> responseURI.toURI()
+        is Fragment -> redirectUri
+        is FragmentJwt -> redirectUri
+        is Query -> redirectUri
+        is QueryJwt -> redirectUri
+    }
 }
 
 enum class ResponseType {

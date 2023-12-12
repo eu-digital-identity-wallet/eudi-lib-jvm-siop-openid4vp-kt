@@ -124,13 +124,16 @@ internal object RequestObjectValidator {
      * returns a [failure][Result.Failure]. Validation rules violations are reported using [AuthorizationRequestError]
      * wrapped inside a [specific exception][AuthorizationRequestException]
      */
-    fun validate(authorizationRequest: RequestObject): Result<ValidatedRequestObject> = runCatching {
+    fun validate(
+        supportedClientIdScheme: SupportedClientIdScheme,
+        authorizationRequest: RequestObject,
+    ): ValidatedRequestObject {
         fun scope() = requiredScope(authorizationRequest)
         val state = requiredState(authorizationRequest).getOrThrow()
         val nonce = requiredNonce(authorizationRequest).getOrThrow()
         val responseType = requiredResponseType(authorizationRequest).getOrThrow()
         val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
-        val clientId = requiredClientId(authorizationRequest).getOrThrow()
+        val clientId = validClientId(supportedClientIdScheme, authorizationRequest, responseMode).getOrThrow()
         val presentationDefinitionSource =
             optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
         val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest).getOrThrow()
@@ -169,7 +172,7 @@ internal object RequestObjectValidator {
         )
 
         @Suppress("ktlint")
-        when (responseType) {
+        return when (responseType) {
             ResponseType.VpAndIdToken -> idAndVpToken()
             ResponseType.IdToken -> idToken()
             ResponseType.VpToken ->
@@ -317,14 +320,21 @@ internal object RequestObjectValidator {
         }
     }
 
-    private fun optionalClientIdScheme(unvalidated: RequestObject): Result<ClientIdScheme?> =
-        if (unvalidated.clientIdScheme.isNullOrEmpty()) Result.success(null)
-        else ClientIdScheme.make(unvalidated.clientIdScheme)
-            ?.success()
-            ?: RequestValidationError.InvalidClientIdScheme(unvalidated.clientIdScheme).asFailure()
-
-    private fun requiredClientId(unvalidated: RequestObject): Result<String> =
-        unvalidated.clientId?.success() ?: RequestValidationError.MissingClientId.asFailure()
+    private fun validClientId(
+        supportedClientIdScheme: SupportedClientIdScheme,
+        unvalidated: RequestObject,
+        responseMode: ResponseMode,
+    ): Result<String> = runCatching {
+        val clientId = unvalidated.clientId ?: throw RequestValidationError.MissingClientId.asException()
+        val uri = responseMode.uri()
+        clientId.takeIf {
+            when (supportedClientIdScheme) {
+                is SupportedClientIdScheme.Preregistered -> true
+                is SupportedClientIdScheme.X509SanDns -> it == uri.host
+                is SupportedClientIdScheme.X509SanUri, SupportedClientIdScheme.RedirectUri -> it == uri.toString()
+            }
+        } ?: throw RequestValidationError.InvalidClientId.asException()
+    }
 
     private fun optionalClientMetaDataSource(unvalidated: RequestObject): Result<ClientMetaDataSource?> {
         val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()

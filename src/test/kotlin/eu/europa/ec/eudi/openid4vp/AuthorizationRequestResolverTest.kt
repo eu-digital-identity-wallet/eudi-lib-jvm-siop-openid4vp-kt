@@ -27,6 +27,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
+import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -35,6 +36,7 @@ import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonObject
 import java.io.File
 import java.io.InputStream
+import java.net.URI
 import java.net.URLEncoder
 import java.security.KeyStore
 import java.security.cert.X509Certificate
@@ -90,6 +92,7 @@ class AuthorizationRequestResolverTest {
             ),
             SupportedClientIdScheme.X509SanDns(::validateChain),
             SupportedClientIdScheme.X509SanUri(::validateChain),
+            SupportedClientIdScheme.RedirectUri,
         ),
         vpFormatsSupported = emptyList(),
         subjectSyntaxTypesSupported = listOf(
@@ -199,8 +202,9 @@ class AuthorizationRequestResolverTest {
             load("certificates/certificates.jks"),
             "12345".toCharArray(),
         )
+        val clientId = "eudi.netcompany-intrasoft.com"
         val signedJwt = createSignedRequestJwt(keyStore, "request-object/request_object_claimset-san_dns.json")
-        val authRequest = "http://localhost:8080/public_url?client_id=verifier.example.gr&request=$signedJwt"
+        val authRequest = "http://localhost:8080/public_url?client_id=$clientId&request=$signedJwt"
 
         val resolution = resolver.resolveRequestUri(authRequest)
         resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
@@ -212,9 +216,12 @@ class AuthorizationRequestResolverTest {
         keyStore.load(
             load("certificates/certificates.jks"),
             "12345".toCharArray(),
+
         )
+        val clientId: URI = URI.create("https://eudi.netcompany-intrasoft.com/wallet/direct_post")
+        val clientIdEncoded = URLEncoder.encode(clientId.toString(), "UTF-8")
         val signedJwt = createSignedRequestJwt(keyStore, "request-object/request_object_claimset-san_uri.json")
-        val authRequest = "http://localhost:8080/public_url?client_id=https%3A%2F%2Fverifier.example.gr&request=$signedJwt"
+        val authRequest = "http://localhost:8080/public_url?client_id=$clientIdEncoded&request=$signedJwt"
 
         val resolution = resolver.resolveRequestUri(authRequest)
         resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
@@ -238,7 +245,7 @@ class AuthorizationRequestResolverTest {
 
         val signedJWT = SignedJWT(headerBuilder.build(), claimSet)
 
-        val jwkSet = JWKSet.load(keyStore, { keyName -> "12345".toCharArray() })
+        val jwkSet = JWKSet.load(keyStore) { _ -> "12345".toCharArray() }
         val signingKey = jwkSet.filter(
             JWKMatcher.Builder()
                 .keyType(KeyType.RSA)

@@ -132,7 +132,7 @@ internal object RequestObjectValidator {
         val state = requiredState(authorizationRequest).getOrThrow()
         val nonce = requiredNonce(authorizationRequest).getOrThrow()
         val responseType = requiredResponseType(authorizationRequest).getOrThrow()
-        val responseMode = requiredResponseMode(authorizationRequest).getOrThrow()
+        val responseMode = requiredResponseMode(supportedClientIdScheme, authorizationRequest).getOrThrow()
         val clientId = validClientId(supportedClientIdScheme, authorizationRequest, responseMode).getOrThrow()
         val presentationDefinitionSource =
             optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
@@ -207,12 +207,19 @@ internal object RequestObjectValidator {
             ?: emptyList()
     }
 
-    private fun requiredResponseMode(unvalidated: RequestObject): Result<ResponseMode> {
+    private fun requiredResponseMode(
+        supportedClientIdScheme: SupportedClientIdScheme,
+        unvalidated: RequestObject,
+    ): Result<ResponseMode> {
         fun requiredRedirectUriAndNotProvidedResponseUri(): Result<URI> =
             if (unvalidated.responseUri != null) {
                 RequestValidationError.ResponseUriMustNotBeProvided.asFailure()
             } else {
-                when (val uri = unvalidated.redirectUri) {
+                // Redirect URI can be omitted in case of RedirectURI
+                // and use clientId instead
+                val uri = unvalidated.redirectUri
+                    ?: if (supportedClientIdScheme is SupportedClientIdScheme.RedirectUri) unvalidated.clientId else null
+                when (uri) {
                     null -> RequestValidationError.MissingRedirectUri.asFailure()
                     else -> uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }
                 }

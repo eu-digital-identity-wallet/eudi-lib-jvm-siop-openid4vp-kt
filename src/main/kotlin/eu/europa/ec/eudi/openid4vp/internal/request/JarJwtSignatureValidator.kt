@@ -77,7 +77,7 @@ internal class JarJwtSignatureValidator(
         } else {
             val supportedClientIdScheme =
                 untrustedClaimSet.getStringClaim("client_id_scheme")
-                    ?.let { ClientIdScheme.make(it) }
+                    ?.let { ClientIdScheme.make(it)?.takeIf(ClientIdScheme.Companion::supportsJar) }
                     ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
 
             when (supportedClientIdScheme) {

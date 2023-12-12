@@ -38,7 +38,11 @@ data class PreregisteredClient(
     val jarSigningAlg: String,
     val jwkSetSource: JwkSetSource,
 )
-
+enum class Channel {
+    NotSecured,
+    Secured,
+    Both,
+}
 sealed interface SupportedClientIdScheme {
     val scheme: ClientIdScheme
         get() = when (this) {

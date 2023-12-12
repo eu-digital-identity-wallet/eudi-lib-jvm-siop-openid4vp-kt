@@ -183,8 +183,10 @@ internal class DefaultAuthorizationRequestResolver(
             is NotSecured -> {
                 request.requestObject.clientIdScheme?.let {
                     val scheme = ClientIdScheme.make(it)
-                    require(scheme !in listOf(ClientIdScheme.X509_SAN_DNS, ClientIdScheme.X509_SAN_URI, ClientIdScheme.DID)) {
-                        "Invalid client_id_scheme. $it is only allowed when authorization request is sent as a signed JWT."
+                    if (scheme != null) {
+                        require(ClientIdScheme.supportsNonJar(scheme)) {
+                            "Invalid client_id_scheme. $it is only allowed when authorization request is sent as a signed JWT."
+                        }
                     }
                 }
                 request.requestObject
@@ -195,6 +197,7 @@ internal class DefaultAuthorizationRequestResolver(
                     is PassByReference -> fetchJwt(request)
                 }
                 val clientId = request.clientId
+
                 requestObjectFromJwt(clientId, jwt).getOrThrow()
             }
         }

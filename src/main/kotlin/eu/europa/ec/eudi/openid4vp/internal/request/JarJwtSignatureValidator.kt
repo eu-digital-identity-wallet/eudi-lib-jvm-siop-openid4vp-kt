@@ -49,14 +49,13 @@ internal class JarJwtSignatureValidator(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) {
-
-    suspend fun validate(clientId: String, unverifiedJwt: Jwt): Result<Pair<SupportedClientIdScheme, RequestObject>> =
-        runCatching {
-            val signedJwt = parse(unverifiedJwt)
-            val supportedClientIdScheme = validateSignatureForClientIdScheme(clientId, signedJwt)
-            val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
-            supportedClientIdScheme to requestObject
-        }
+    @Throws(AuthorizationRequestException::class)
+    suspend fun validate(clientId: String, unverifiedJwt: Jwt): Pair<SupportedClientIdScheme, RequestObject> {
+        val signedJwt = parse(unverifiedJwt)
+        val supportedClientIdScheme = validateSignatureForClientIdScheme(clientId, signedJwt)
+        val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
+        return supportedClientIdScheme to requestObject
+    }
 
     /**
      * Parses the given [unverifiedJwt] to verify that has the form
@@ -189,7 +188,8 @@ private fun x509SanJwsSelector(
     return JWSKeySelector<SecurityContext> { _, _ -> listOf(cert.publicKey) }
 }
 
-private fun invalidJarJwt(cause: String): AuthorizationRequestException = RequestValidationError.InvalidJarJwt(cause).asException()
+private fun invalidJarJwt(cause: String): AuthorizationRequestException =
+    RequestValidationError.InvalidJarJwt(cause).asException()
 
 private fun requestObject(cs: JWTClaimsSet): RequestObject {
     fun Map<String, Any?>.asJsonObject(): JsonObject {

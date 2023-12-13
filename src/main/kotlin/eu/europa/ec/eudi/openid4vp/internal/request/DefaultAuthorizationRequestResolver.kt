@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.eygraber.uri.Uri
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.InvalidClientIdScheme
 import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured
 import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByValue
@@ -143,6 +144,8 @@ internal class DefaultAuthorizationRequestResolver(
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
+    private val jarJwtValidator = JarJwtSignatureValidator(walletOpenId4VPConfig, httpClientFactory)
+
     override suspend fun resolveRequestUri(uri: String): Resolution =
         AuthorizationRequest.make(
             uri,
@@ -193,21 +196,21 @@ internal class DefaultAuthorizationRequestResolver(
         }
     }
 
-    private fun supportedClientIdSchemeFor(request: AuthorizationRequest.NotSecured): SupportedClientIdScheme {
+    private fun supportedClientIdSchemeFor(request: NotSecured): SupportedClientIdScheme {
         val requestObject = request.requestObject
+        fun invalidScheme() = InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty()).asException()
         val clientIdScheme = requestObject.clientIdScheme?.let {
             ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
-        } ?: throw RequestValidationError.InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty())
-            .asException()
-        return walletOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)?.takeIf { supportedClientIdScheme ->
-            when (supportedClientIdScheme) {
-                is SupportedClientIdScheme.Preregistered -> supportedClientIdScheme.clients.containsKey(
-                    requestObject.clientId,
-                )
+        } ?: throw invalidScheme()
 
-                else -> true
-            }
-        } ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
+        val supportedClientIdScheme = walletOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
+        fun knownClient(s: SupportedClientIdScheme) =
+            if (supportedClientIdScheme !is SupportedClientIdScheme.Preregistered) true
+            else supportedClientIdScheme.clients.containsKey(requestObject.clientId)
+
+        return supportedClientIdScheme
+            ?.takeIf(::knownClient)
+            ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
     }
 
     /**
@@ -218,13 +221,11 @@ internal class DefaultAuthorizationRequestResolver(
      * a [RequestObject]
      * @param clientId The client that placed request
      */
+    @Throws(AuthorizationRequestException::class)
     private suspend fun requestObjectFromJwt(
         clientId: String,
         jwt: Jwt,
-    ): Pair<SupportedClientIdScheme, RequestObject> {
-        val validator = JarJwtSignatureValidator(walletOpenId4VPConfig, httpClientFactory)
-        return validator.validate(clientId, jwt).getOrThrow()
-    }
+    ): Pair<SupportedClientIdScheme, RequestObject> = jarJwtValidator.validate(clientId, jwt)
 
     companion object {
 

@@ -35,6 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
 import java.time.Duration
 import java.util.*
@@ -82,14 +83,16 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`(): Unit = runTest {
-        val validated = ClientMetadataValidator(walletConfig).validate(clientMetaData)
+        val validated = assertDoesNotThrow {
+            ClientMetadataValidator(walletConfig).validate(clientMetaData)
+        }
 
         val stateVal = genState()
 
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
-                clientMetaData = validated.getOrThrow(),
+                clientMetaData = validated,
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
@@ -159,8 +162,9 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch vp_token with direct post`(): Unit = runTest {
-        val validated = ClientMetadataValidator(walletConfig).validate(clientMetaData)
-
+        val validated = assertDoesNotThrow {
+            ClientMetadataValidator(walletConfig).validate(clientMetaData)
+        }
         val stateVal = genState()
 
         val presentationDefinition =
@@ -173,7 +177,7 @@ class AuthorizationResponseDispatcherTest {
 
         val openId4VPAuthRequestObject =
             ResolvedRequestObject.OpenId4VPAuthorization(
-                clientMetaData = validated.getOrThrow(),
+                clientMetaData = validated,
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),

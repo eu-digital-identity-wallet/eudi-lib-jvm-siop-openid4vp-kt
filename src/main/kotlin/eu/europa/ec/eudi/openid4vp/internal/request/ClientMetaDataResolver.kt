@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.mapError
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.SerialName
@@ -24,26 +23,37 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
 
+/**
+ * Extracts the client meta-data and validates them
+ */
 internal class ClientMetaDataResolver(
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
     walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
     private val clientMetadataValidator = ClientMetadataValidator(walletOpenId4VPConfig, httpClientFactory)
-    suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): Result<ClientMetaData> {
+
+    /**
+     * Gets the meta-data from the [clientMetaDataSource] and then validates them
+     * @param clientMetaDataSource the source to obtain the meta-data
+     * @throws AuthorizationRequestException in case of a problem
+     */
+    @Throws(AuthorizationRequestException::class)
+    suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): ClientMetaData {
         val unvalidatedClientMetaData = when (clientMetaDataSource) {
             is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
-            is ClientMetaDataSource.ByReference -> fetch(clientMetaDataSource.url).getOrThrow()
+            is ClientMetaDataSource.ByReference -> fetch(clientMetaDataSource.url)
         }
         return clientMetadataValidator.validate(unvalidatedClientMetaData)
     }
 
-    private suspend fun fetch(url: URL): Result<UnvalidatedClientMetaData> =
-        httpClientFactory()
-            .use { client ->
-                runCatching {
-                    client.get(url).body<UnvalidatedClientMetaData>()
-                }.mapError { ResolutionError.UnableToFetchClientMetadata(it).asException() }
-            }
+    @Throws(AuthorizationRequestException::class)
+    private suspend fun fetch(url: URL): UnvalidatedClientMetaData = httpClientFactory().use { client ->
+        try {
+            client.get(url).body<UnvalidatedClientMetaData>()
+        } catch (t: Throwable) {
+            throw ResolutionError.UnableToFetchClientMetadata(t).asException()
+        }
+    }
 }
 
 @Serializable

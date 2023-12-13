@@ -43,7 +43,7 @@ internal class ValidatedRequestObjectResolver(
         return ResolvedRequestObject.SiopOpenId4VPAuthentication(
             idTokenType = validated.idTokenType,
             presentationDefinition = presentationDefinition,
-            clientMetaData = resolveClientMetaData(validated).getOrThrow(),
+            clientMetaData = resolveClientMetaData(validated),
             clientId = validated.clientId,
             state = validated.state,
             scope = validated.scope,
@@ -59,7 +59,7 @@ internal class ValidatedRequestObjectResolver(
         val presentationDefinition = resolvePd(validated.presentationDefinitionSource, walletOpenId4VPConfig)
         return ResolvedRequestObject.OpenId4VPAuthorization(
             presentationDefinition = presentationDefinition,
-            clientMetaData = resolveClientMetaData(validated).getOrThrow(),
+            clientMetaData = resolveClientMetaData(validated),
             clientId = validated.clientId,
             state = validated.state,
             nonce = validated.nonce,
@@ -68,7 +68,7 @@ internal class ValidatedRequestObjectResolver(
     }
 
     private suspend fun resolveIdTokenRequest(validated: SiopAuthentication): ResolvedRequestObject {
-        val clientMetaData = resolveClientMetaData(validated).getOrThrow()
+        val clientMetaData = resolveClientMetaData(validated)
         return ResolvedRequestObject.SiopAuthentication(
             idTokenType = validated.idTokenType,
             clientMetaData = clientMetaData,
@@ -86,8 +86,8 @@ internal class ValidatedRequestObjectResolver(
     ): PresentationDefinition =
         presentationDefinitionResolver.resolve(presentationDefinitionSource, walletOpenId4VPConfig)
 
-    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): Result<ClientMetaData> =
-        validated.clientMetaDataSource
-            ?.let { clientMetaDataResolver.resolve(it) }
-            ?: error("Missing or invalid client metadata")
+    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ClientMetaData {
+        val source = checkNotNull(validated.clientMetaDataSource) { "Missing or invalid client metadata" }
+        return clientMetaDataResolver.resolve(source)
+    }
 }

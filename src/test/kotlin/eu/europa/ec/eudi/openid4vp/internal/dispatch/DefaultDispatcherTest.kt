@@ -43,16 +43,14 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.net.URI
 import java.security.interfaces.ECPrivateKey
 import java.time.Duration
 import java.util.*
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class DefaultDispatcherTest {
 
@@ -131,13 +129,13 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM"}
             """.trimIndent().trimMargin()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-            val clientMetadataValidated =
+            assertThrows<Throwable> {
                 ClientMetadataValidator(walletConfig).validate(clientMetaDataDecoded)
-            assertFalse(clientMetadataValidated.isSuccess)
+            }
         }
 
         @Test
-        fun `if response type direct_post jwt, JWE should be returned if encryption alg specified`(): Unit = runTest {
+        fun `if response type direct_post jwt, JWE should be returned if encryption alg specified`() = runTest {
             val clientMetadataStr = """
                     { "jwks": { "keys": [${
                 ecKey.toPublicJWK().toJSONString()
@@ -146,10 +144,10 @@ class DefaultDispatcherTest {
                     "authorization_encrypted_response_enc":"A256GCM" }
             """.trimIndent()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-            val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
-                .validate(clientMetaDataDecoded)
+            val clientMetadataValidated =
 
-            assertTrue(clientMetadataValidated.isSuccess)
+                ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                    .validate(clientMetaDataDecoded)
 
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
@@ -157,7 +155,7 @@ class DefaultDispatcherTest {
                         id = Id("pdId"),
                         inputDescriptors = emptyList(),
                     ),
-                    clientMetaData = clientMetadataValidated.getOrThrow(),
+                    clientMetaData = clientMetadataValidated,
                     clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                     nonce = "0S6_WzA2Mj",
                     responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
@@ -206,15 +204,13 @@ class DefaultDispatcherTest {
                 walletConfigWithSignAndEncryptionAlgorithms,
             ).validate(clientMetaDataDecoded)
 
-            assertTrue(clientMetadataValidated.isSuccess)
-
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     presentationDefinition = PresentationDefinition(
                         id = Id("pdId"),
                         inputDescriptors = emptyList(),
                     ),
-                    clientMetaData = clientMetadataValidated.getOrThrow(),
+                    clientMetaData = clientMetadataValidated,
                     clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                     nonce = "0S6_WzA2Mj",
                     responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
@@ -272,14 +268,14 @@ class DefaultDispatcherTest {
                 val clientMetadataValidated =
                     ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
                         .validate(clientMetaDataDecoded)
-                assertTrue(clientMetadataValidated.isSuccess)
+
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(
                         presentationDefinition = PresentationDefinition(
                             id = Id("pdId"),
                             inputDescriptors = emptyList(),
                         ),
-                        clientMetaData = clientMetadataValidated.getOrThrow(),
+                        clientMetaData = clientMetadataValidated,
                         clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                         nonce = "0S6_WzA2Mj",
                         responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
@@ -323,58 +319,58 @@ class DefaultDispatcherTest {
             }
 
         @Test
-        fun `if enc and sign algs specified, JWE should be returned with signed JWT as encrypted payload`(): Unit = runTest {
-            val clientMetadataStr = """
+        fun `if enc and sign algs specified, JWE should be returned with signed JWT as encrypted payload`(): Unit =
+            runTest {
+                val clientMetadataStr = """
                     { "jwks": { "keys": [${
-                ecKey.toPublicJWK().toJSONString()
-            }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
+                    ecKey.toPublicJWK().toJSONString()
+                }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
                     "authorization_signed_response_alg":"RS256" }
-            """.trimIndent().trimMargin()
-            val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-            val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
-                .validate(clientMetaDataDecoded)
-            assertTrue(clientMetadataValidated.isSuccess)
-            val resolvedRequest =
-                ResolvedRequestObject.OpenId4VPAuthorization(
-                    presentationDefinition = PresentationDefinition(
-                        id = Id("pdId"),
-                        inputDescriptors = emptyList(),
-                    ),
-                    clientMetaData = clientMetadataValidated.getOrThrow(),
-                    clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
-                    nonce = "0S6_WzA2Mj",
-                    responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
-                    state = State().value,
+                """.trimIndent().trimMargin()
+                val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
+                val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                    .validate(clientMetaDataDecoded)
+                val resolvedRequest =
+                    ResolvedRequestObject.OpenId4VPAuthorization(
+                        presentationDefinition = PresentationDefinition(
+                            id = Id("pdId"),
+                            inputDescriptors = emptyList(),
+                        ),
+                        clientMetaData = clientMetadataValidated,
+                        clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
+                        nonce = "0S6_WzA2Mj",
+                        responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
+                        state = State().value,
+                    )
+
+                val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+                    "dummy_vp_token",
+                    PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
+                val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
 
-            val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                "dummy_vp_token",
-                PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
-            )
-            val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
+                val mockEngine = MockEngine { request ->
+                    assertEquals(HttpMethod.Post, request.method)
 
-            val mockEngine = MockEngine { request ->
-                assertEquals(HttpMethod.Post, request.method)
+                    val body = assertIs<FormDataContent>(request.body)
+                    val joseResponse = body.formData["response"] as String
+                    val signedJWT = SignedJWT.parse(joseResponse)
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
 
-                val body = assertIs<FormDataContent>(request.body)
-                val joseResponse = body.formData["response"] as String
-                val signedJWT = SignedJWT.parse(joseResponse)
-                signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
+                    assertNotNull(signedJWT)
+                    assertNotNull(signedJWT.jwtClaimsSet.issuer)
+                    assertNotNull(signedJWT.jwtClaimsSet.audience)
+                    assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
 
-                assertNotNull(signedJWT)
-                assertNotNull(signedJWT.jwtClaimsSet.issuer)
-                assertNotNull(signedJWT.jwtClaimsSet.audience)
-                assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
+                    respondOk()
+                }
 
-                respondOk()
+                val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+                assertEquals(
+                    DispatchOutcome.VerifierResponse.Accepted(null),
+                    outcome,
+                )
             }
-
-            val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
-            assertEquals(
-                DispatchOutcome.VerifierResponse.Accepted(null),
-                outcome,
-            )
-        }
 
         private fun ecdhDecrypt(ecPrivateKey: ECPrivateKey, jwtString: String): JWTClaimsSet {
             val jwt = EncryptedJWT.parse(jwtString)
@@ -434,30 +430,31 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() = runTest {
-            val state = State().value
-            val dummyJwt = "dummy"
-            val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-            val jarmSpec = JarmSpec(
-                holderId = "DID:example:123",
-                jarmOption = JarmOption.SignedResponse(
-                    responseSigningAlg = JWSAlgorithm.RS256,
-                    signingKeySet = signingKeySet,
-                ),
-            )
-            val response =
-                AuthorizationResponse.QueryJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
-            testQueryResponse(data, response) {
-                assertNotNull(getQueryParameter("response"))
-                assertNotNull(getQueryParameter("state"))
-                val signedJWT = SignedJWT.parse(getQueryParameter("response"))
-                signedJWT.verify(RSASSAVerifier(signingKey))
-                assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
-                assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
-                assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
-                assertEquals(dummyJwt, signedJWT.jwtClaimsSet.getClaim("id_token"))
+        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() =
+            runTest {
+                val state = State().value
+                val dummyJwt = "dummy"
+                val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
+                val jarmSpec = JarmSpec(
+                    holderId = "DID:example:123",
+                    jarmOption = JarmOption.SignedResponse(
+                        responseSigningAlg = JWSAlgorithm.RS256,
+                        signingKeySet = signingKeySet,
+                    ),
+                )
+                val response =
+                    AuthorizationResponse.QueryJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
+                testQueryResponse(data, response) {
+                    assertNotNull(getQueryParameter("response"))
+                    assertNotNull(getQueryParameter("state"))
+                    val signedJWT = SignedJWT.parse(getQueryParameter("response"))
+                    signedJWT.verify(RSASSAVerifier(signingKey))
+                    assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
+                    assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
+                    assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
+                    assertEquals(dummyJwt, signedJWT.jwtClaimsSet.getClaim("id_token"))
+                }
             }
-        }
 
         private fun testQueryResponse(
             data: AuthorizationResponsePayload,
@@ -520,30 +517,31 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() = runTest {
-            val state = State().value
-            val dummyJwt = "dummy"
-            val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-            val jarmSpec = JarmSpec(
-                holderId = "DID:example:123",
-                jarmOption = JarmOption.SignedResponse(
-                    responseSigningAlg = JWSAlgorithm.RS256,
-                    signingKeySet = signingKeySet,
-                ),
-            )
-            val response =
-                AuthorizationResponse.FragmentJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
-            testFragmentResponse(data, response) { fragmentData ->
-                assertNotNull(fragmentData["state"])
-                assertNotNull(fragmentData["response"])
-                val signedJWT = SignedJWT.parse(fragmentData["response"])
-                signedJWT.verify(RSASSAVerifier(signingKey))
-                assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
-                assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
-                assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
-                assertEquals(dummyJwt, signedJWT.jwtClaimsSet.getClaim("id_token"))
+        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() =
+            runTest {
+                val state = State().value
+                val dummyJwt = "dummy"
+                val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
+                val jarmSpec = JarmSpec(
+                    holderId = "DID:example:123",
+                    jarmOption = JarmOption.SignedResponse(
+                        responseSigningAlg = JWSAlgorithm.RS256,
+                        signingKeySet = signingKeySet,
+                    ),
+                )
+                val response =
+                    AuthorizationResponse.FragmentJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
+                testFragmentResponse(data, response) { fragmentData ->
+                    assertNotNull(fragmentData["state"])
+                    assertNotNull(fragmentData["response"])
+                    val signedJWT = SignedJWT.parse(fragmentData["response"])
+                    signedJWT.verify(RSASSAVerifier(signingKey))
+                    assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
+                    assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
+                    assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
+                    assertEquals(dummyJwt, signedJWT.jwtClaimsSet.getClaim("id_token"))
+                }
             }
-        }
 
         private fun testFragmentResponse(
             data: AuthorizationResponsePayload,

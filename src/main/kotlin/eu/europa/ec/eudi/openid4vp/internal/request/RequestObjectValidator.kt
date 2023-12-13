@@ -138,7 +138,7 @@ internal object RequestObjectValidator {
         val presentationDefinitionSource =
             optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
         val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest)
-        val idTokenType = optionalIdTokenType(authorizationRequest).getOrThrow()
+        val idTokenType = optionalIdTokenType(authorizationRequest)
 
         fun idAndVpToken() = SiopOpenId4VPAuthentication(
             idTokenType,
@@ -170,7 +170,6 @@ internal object RequestObjectValidator {
             state,
         )
 
-        @Suppress("ktlint")
         return when (responseType) {
             ResponseType.VpAndIdToken -> idAndVpToken()
             ResponseType.IdToken -> idToken()
@@ -192,19 +191,18 @@ internal object RequestObjectValidator {
         ResponseType.IdToken -> null
     }
 
-    private fun optionalIdTokenType(unvalidated: RequestObject): Result<List<IdTokenType>> = runCatching {
+    private fun optionalIdTokenType(unvalidated: RequestObject): List<IdTokenType> =
         unvalidated.idTokenType
             ?.trim()
             ?.split(" ")
-            ?.map {
-                when (it) {
+            ?.map { type ->
+                when (type) {
                     "subject_signed_id_token" -> IdTokenType.SubjectSigned
                     "attester_signed_id_token" -> IdTokenType.AttesterSigned
-                    else -> error("Invalid id_token_type $it")
+                    else -> error("Invalid id_token_type $type")
                 }
             }
             ?: emptyList()
-    }
 
     private fun requiredResponseMode(
         supportedClientIdScheme: SupportedClientIdScheme,
@@ -247,7 +245,6 @@ internal object RequestObjectValidator {
      * @param unvalidated the request to validate
      * @return the state or [RequestValidationError.MissingState]
      */
-    @Suppress("ktlint")
     private fun requiredState(unvalidated: RequestObject): String =
         if (!unvalidated.state.isNullOrBlank()) unvalidated.state
         else throw RequestValidationError.MissingState.asException()

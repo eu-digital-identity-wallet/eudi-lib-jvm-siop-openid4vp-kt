@@ -121,12 +121,16 @@ class DefaultDispatcherTest {
         @Test
         fun `client metadata does not match with wallet's supported algorithms`(): Unit = runTest {
             val clientMetadataStr = """
-                    { "jwks": { "keys": [${
-                ecKey.toPublicJWK().toJSONString()
-            }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
-                    "authorization_signed_response_alg":"RS256",
-                    "authorization_encryptd_response_alg":"ECDH-ES", 
-                    "authorization_encrypted_response_enc":"A256GCM"}
+            { 
+                "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
+                "id_token_encrypted_response_alg": "RS256", 
+                "id_token_encrypted_response_enc": "A128CBC-HS256", 
+                "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
+                "id_token_signed_response_alg": "RS256",
+                "authorization_signed_response_alg":"RS256",
+                "authorization_encryptd_response_alg":"ECDH-ES", 
+                "authorization_encrypted_response_enc":"A256GCM"
+            }
             """.trimIndent().trimMargin()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             assertThrows<Throwable> {
@@ -137,17 +141,19 @@ class DefaultDispatcherTest {
         @Test
         fun `if response type direct_post jwt, JWE should be returned if encryption alg specified`() = runTest {
             val clientMetadataStr = """
-                    { "jwks": { "keys": [${
-                ecKey.toPublicJWK().toJSONString()
-            }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
-                    "authorization_encrypted_response_alg":"ECDH-ES", 
-                    "authorization_encrypted_response_enc":"A256GCM" }
+               { 
+               "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
+               "id_token_encrypted_response_alg": "RS256", 
+                "id_token_encrypted_response_enc": "A128CBC-HS256", 
+                "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
+                "id_token_signed_response_alg": "RS256",
+                "authorization_encrypted_response_alg":"ECDH-ES", 
+                "authorization_encrypted_response_enc":"A256GCM"
+              }
             """.trimIndent()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-            val clientMetadataValidated =
-
-                ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
-                    .validate(clientMetaDataDecoded)
+            val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                .validate(clientMetaDataDecoded)
 
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
@@ -192,12 +198,16 @@ class DefaultDispatcherTest {
         @Test
         fun `if response type direct_post jwt, JWT should be returned if only signing alg specified`(): Unit = runTest {
             val clientMetadataStr = """
-                    { "jwks": { "keys": [${
-                ecKey.toPublicJWK().toJSONString()
-            }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
-                    "authorization_signed_response_alg":"RS256",
-                    "authorization_encrypted_response_alg":"ECDH-ES", 
-                    "authorization_encrypted_response_enc":"A256GCM"}
+            { 
+                "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
+                "id_token_encrypted_response_alg": "RS256", 
+                "id_token_encrypted_response_enc": "A128CBC-HS256", 
+                "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
+                "id_token_signed_response_alg": "RS256",
+                "authorization_signed_response_alg":"RS256",
+                "authorization_encrypted_response_alg":"ECDH-ES", 
+                "authorization_encrypted_response_enc":"A256GCM"
+            }
             """.trimIndent().trimMargin()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             val clientMetadataValidated = ClientMetadataValidator(
@@ -257,12 +267,16 @@ class DefaultDispatcherTest {
         fun `if response type direct_post jwt, JWT should be returned if only signing alg, encryption alg and encryption method are specified and supported by wallet`(): Unit =
             runTest {
                 val clientMetadataStr = """
-                    { "jwks": { "keys": [${
-                    ecKey.toPublicJWK().toJSONString()
-                }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
+                {
+                    "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
+                    "id_token_encrypted_response_alg": "RS256", 
+                    "id_token_encrypted_response_enc": "A128CBC-HS256", 
+                    "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
+                    "id_token_signed_response_alg": "RS256",
                     "authorization_signed_response_alg":"RS256",
                     "authorization_encrypted_response_alg":"ECDH-ES", 
-                    "authorization_encrypted_response_enc":"A256GCM"}
+                    "authorization_encrypted_response_enc":"A256GCM"
+                }
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated =
@@ -322,10 +336,14 @@ class DefaultDispatcherTest {
         fun `if enc and sign algs specified, JWE should be returned with signed JWT as encrypted payload`(): Unit =
             runTest {
                 val clientMetadataStr = """
-                    { "jwks": { "keys": [${
-                    ecKey.toPublicJWK().toJSONString()
-                }, $rsaKey ]}, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256",
-                    "authorization_signed_response_alg":"RS256" }
+                { 
+                    "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
+                    "id_token_encrypted_response_alg": "RS256", 
+                    "id_token_encrypted_response_enc": "A128CBC-HS256", 
+                    "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
+                    "id_token_signed_response_alg": "RS256",
+                    "authorization_signed_response_alg":"RS256" 
+                }
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)

@@ -70,6 +70,7 @@ enum class AuthorizationRequestErrorCode(val code: String) {
                 IdTokenSigningAlgMissing,
                 IdTokenEncryptionAlgMissing,
                 IdTokenEncryptionMethodMissing,
+                is InvalidClientMetaData,
                 is UnsupportedResponseMode,
                 is UnsupportedResponseType,
                 is InvalidIdTokenType,

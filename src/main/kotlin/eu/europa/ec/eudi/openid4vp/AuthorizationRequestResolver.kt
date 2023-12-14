@@ -169,6 +169,8 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = OneOfClientMedataOrUri
     }
 
+    data class InvalidClientMetaData(val cause: String) : RequestValidationError
+
     data object SubjectSyntaxTypesNoMatch : RequestValidationError {
         private fun readResolve(): Any = SubjectSyntaxTypesNoMatch
     }

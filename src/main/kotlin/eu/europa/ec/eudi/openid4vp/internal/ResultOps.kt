@@ -15,9 +15,20 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal
 
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
+
 //
 // Helper methods
 //
 internal fun <T> T.success(): Result<T> = Result.success(this)
 internal fun <T> Result<T>.mapError(map: (Throwable) -> Throwable): Result<T> =
     fold(onSuccess = { it.success() }, onFailure = { Result.failure(map(it)) })
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun requireOrThrow(value: Boolean, ex: () -> Throwable) {
+    contract {
+        returns() implies value
+    }
+    if (!value) throw ex()
+}

@@ -99,7 +99,7 @@ class AuthorizationResponseBuilderTest {
 
     @Test
     fun `id token request should produce a response with id token JWT`(): Unit = runTest {
-        val validated = ClientMetadataValidator(walletConfig).validate(clientMetaData)
+        val validated = ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
 
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
@@ -150,7 +150,7 @@ class AuthorizationResponseBuilderTest {
             """.trimIndent()
         val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
         val clientMetadataValidated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms).validate(clientMetaDataDecoded)
+            ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms, DefaultHttpClientFactory).validate(clientMetaDataDecoded)
         }
 
         val resolvedRequest =

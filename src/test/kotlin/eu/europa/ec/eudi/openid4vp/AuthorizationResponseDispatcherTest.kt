@@ -84,7 +84,7 @@ class AuthorizationResponseDispatcherTest {
     @Test
     fun `dispatch direct post response`(): Unit = runTest {
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig).validate(clientMetaData)
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
         }
 
         val stateVal = genState()
@@ -163,7 +163,7 @@ class AuthorizationResponseDispatcherTest {
     @Test
     fun `dispatch vp_token with direct post`(): Unit = runTest {
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig).validate(clientMetaData)
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
         }
         val stateVal = genState()
 

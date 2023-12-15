@@ -134,7 +134,7 @@ class DefaultDispatcherTest {
             """.trimIndent().trimMargin()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             assertThrows<Throwable> {
-                ClientMetadataValidator(walletConfig).validate(clientMetaDataDecoded)
+                ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaDataDecoded)
             }
         }
 
@@ -152,8 +152,10 @@ class DefaultDispatcherTest {
               }
             """.trimIndent()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-            val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
-                .validate(clientMetaDataDecoded)
+            val clientMetadataValidated = ClientMetadataValidator(
+                walletConfigWithSignAndEncryptionAlgorithms,
+                DefaultHttpClientFactory,
+            ).validate(clientMetaDataDecoded)
 
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
@@ -212,6 +214,7 @@ class DefaultDispatcherTest {
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             val clientMetadataValidated = ClientMetadataValidator(
                 walletConfigWithSignAndEncryptionAlgorithms,
+                DefaultHttpClientFactory,
             ).validate(clientMetaDataDecoded)
 
             val resolvedRequest =
@@ -280,7 +283,7 @@ class DefaultDispatcherTest {
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
                 val clientMetadataValidated =
-                    ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                    ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms, DefaultHttpClientFactory)
                         .validate(clientMetaDataDecoded)
 
                 val resolvedRequest =
@@ -346,7 +349,10 @@ class DefaultDispatcherTest {
                 }
                 """.trimIndent().trimMargin()
                 val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
-                val clientMetadataValidated = ClientMetadataValidator(walletConfigWithSignAndEncryptionAlgorithms)
+                val clientMetadataValidated = ClientMetadataValidator(
+                    walletConfigWithSignAndEncryptionAlgorithms,
+                    DefaultHttpClientFactory,
+                )
                     .validate(clientMetaDataDecoded)
                 val resolvedRequest =
                     ResolvedRequestObject.OpenId4VPAuthorization(

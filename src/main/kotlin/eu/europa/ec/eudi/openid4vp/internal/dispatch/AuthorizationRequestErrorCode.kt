@@ -19,7 +19,7 @@ import eu.europa.ec.eudi.openid4vp.AuthorizationRequestError
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
 import eu.europa.ec.eudi.openid4vp.ResolutionError.*
 
-enum class AuthorizationRequestErrorCode(val code: String) {
+internal enum class AuthorizationRequestErrorCode(val code: String) {
 
     /**
      * OpenId4VP Error Codes
@@ -50,13 +50,13 @@ enum class AuthorizationRequestErrorCode(val code: String) {
          */
         fun fromError(error: AuthorizationRequestError): AuthorizationRequestErrorCode {
             return when (error) {
+                InvalidClientId, UnsupportedClientIdScheme -> INVALID_CLIENT
+
                 is InvalidJarJwt,
                 is InvalidClientIdScheme,
                 InvalidRedirectUri,
                 InvalidResponseUri,
                 MissingClientId,
-                InvalidClientId,
-                UnsupportedClientIdScheme,
                 MissingNonce,
                 MissingPresentationDefinition,
                 MissingRedirectUri,

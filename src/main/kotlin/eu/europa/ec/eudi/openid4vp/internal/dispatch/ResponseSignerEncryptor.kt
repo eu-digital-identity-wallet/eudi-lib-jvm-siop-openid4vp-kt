@@ -36,6 +36,17 @@ import java.time.Instant
 
 internal object ResponseSignerEncryptor {
 
+    /**
+     * Signs the [response to be sent to the verifier][data] according ot the [spec]
+     *
+     * @param data the response to be sent to the verifier, that needs to be signed
+     * @param spec the specification of how to create the JARM response
+     *
+     * @return a JWT containing the [data] which depending on the [spec] it could be
+     * - a signed JWT
+     * - an encrypted JWT
+     * - an encrypted JWT containing a signed JWT
+     */
     fun signEncryptResponse(spec: JarmSpec, data: AuthorizationResponsePayload): String =
         when (val jarmOption = spec.jarmOption) {
             is JarmOption.SignedResponse -> sign(spec.holderId, jarmOption, data).serialize()
@@ -100,9 +111,7 @@ internal object ResponseSignerEncryptor {
     ): Pair<JWK, JWEEncrypter> =
         EncrypterFactory
             .findEncrypters(jweAlgorithm, jwkSet)
-            .entries
-            .firstOrNull()
-            ?.toPair()
+            .firstNotNullOfOrNull { it.toPair() }
             ?: error("Cannot find appropriate encryption key for ${jweAlgorithm.name}")
 }
 

@@ -22,6 +22,8 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.prex.PresentationExchange
+import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -29,9 +31,12 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertDoesNotThrow
+import java.io.InputStream
 import java.time.Duration
 import java.util.*
 import kotlin.test.assertEquals
@@ -49,7 +54,7 @@ class AuthorizationResponseDispatcherTest {
 
     private val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
-        supportedClientIdSchemes = listOf(SupportedClientIdScheme.IsoX509),
+        supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
         vpFormatsSupported = emptyList(),
         subjectSyntaxTypesSupported = listOf(
             SubjectSyntaxType.JWKThumbprint,
@@ -77,15 +82,17 @@ class AuthorizationResponseDispatcherTest {
     }
 
     @Test
-    fun `dispatch direct post response`(): Unit = runBlocking {
-        val validated = ClientMetadataValidator(walletConfig).validate(clientMetaData)
+    fun `dispatch direct post response`(): Unit = runTest {
+        val validated = assertDoesNotThrow {
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
+        }
 
         val stateVal = genState()
 
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
-                clientMetaData = validated.getOrThrow(),
+                clientMetaData = validated,
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
@@ -152,4 +159,80 @@ class AuthorizationResponseDispatcherTest {
             }
         }
     }
+
+    @Test
+    fun `dispatch vp_token with direct post`(): Unit = runTest {
+        val validated = assertDoesNotThrow {
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
+        }
+        val stateVal = genState()
+
+        val presentationDefinition =
+            PresentationExchange.jsonParser.decodePresentationDefinition(load("presentation-definition/mDL-example.json")!!)
+                .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
+
+        val presentationSubmission =
+            PresentationExchange.jsonParser.decodePresentationSubmission(load("presentation-submission/example.json")!!)
+                .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
+
+        val openId4VPAuthRequestObject =
+            ResolvedRequestObject.OpenId4VPAuthorization(
+                clientMetaData = validated,
+                clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
+                nonce = "0S6_WzA2Mj",
+                responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
+                state = stateVal,
+                presentationDefinition = presentationDefinition,
+            )
+
+        val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+            vpToken = "vp_token",
+            presentationSubmission = presentationSubmission,
+        )
+
+        testApplication {
+            externalServices {
+                hosts("https://respond.here") {
+                    install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
+                        json()
+                    }
+                    routing {
+                        post("/") {
+                            val formParameters = call.receiveParameters()
+                            val vpTokenTxt = formParameters["vp_token"].toString()
+                            val presentationSubmissionStr = formParameters["presentation_submission"].toString()
+                            val state = formParameters["state"].toString()
+
+                            assertEquals(
+                                "application/x-www-form-urlencoded; charset=UTF-8",
+                                call.request.headers["Content-Type"],
+                            )
+                            assertEquals(stateVal, state)
+                            assertEquals(vpTokenTxt, "vp_token")
+                            assertEquals(presentationSubmissionStr, Json.encodeToString<PresentationSubmission>(presentationSubmission))
+
+                            call.respondText("ok")
+                        }
+                    }
+                }
+            }
+            val managedHttpClient = createClient {
+                install(ContentNegotiation) {
+                    json()
+                }
+            }
+
+            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
+            when (val response = AuthorizationResponseBuilder(walletConfig).build(openId4VPAuthRequestObject, vpTokenConsensus)) {
+                is AuthorizationResponse.DirectPost -> {
+                    dispatcher.dispatch(response)
+                }
+
+                else -> fail("Not a direct post response")
+            }
+        }
+    }
+
+    private fun load(f: String): InputStream? =
+        AuthorizationResponseDispatcherTest::class.java.classLoader.getResourceAsStream(f)
 }

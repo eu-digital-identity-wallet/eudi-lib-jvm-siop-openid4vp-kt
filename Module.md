@@ -3,7 +3,7 @@
 The `eudi-lib-jvm-siop-openid4vp-kt` is a Kotlin library, targeting JVM, that supports
 the [SIOPv2 (draft 12)](https://openid.bitbucket.io/connect/openid-connect-self-issued-v2-1_0.html)
 and [OpenId4VP (draft 18)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) protocols.
-In particular, the library focus on the wallet's role using those two protocols with  constraints
+In particular, the library focus on the wallet's role using those two protocols with constraints
 included in ISO 23220-4 and ISO-18013-7
 
 
@@ -35,8 +35,8 @@ val authorizationRequestUri : String // obtained via deep link or scanning a QR 
 
 val resolution = siopOpenId4Vp.resolveRequestUri(authorizationRequestUri)
 val requestObject = when (resolution) {
-    is Resolution.Invalid -> throw resolution.error.asException()
-    is Resolution.Success -> resolution.requestObject
+  is Resolution.Invalid -> throw resolution.error.asException()
+  is Resolution.Success -> resolution.requestObject
 }
 
 ```
@@ -46,8 +46,8 @@ After receiving a valid authorization wallet has to process it. Depending on the
 
 * For a SIOPv2 authentication request, wallet must get holder's consensus and provide an `id_token`
 * For a OpenID4VP authorization request,
-    * wallet should check whether holder has claims that can fulfill verifier's requirements
-    * let the holder choose which claims will be presented to the verifier and form a `vp_token`
+  * wallet should check whether holder has claims that can fulfill verifier's requirements
+  * let the holder choose which claims will be presented to the verifier and form a `vp_token`
 * For a combined SIOP & OpenID4VP request, wallet should perform both actions described above.
 
 This functionality is a wallet concern, and it is not supported directly by the library
@@ -70,22 +70,36 @@ val authorizationResponse = siopOpenId4Vp.build(requestObject, consensus)
 ### Dispatch authorization response to verifier / RP
 
 The final step, of processing an authorization request, is to dispatch to the verifier the authorization response.
-Depending on the `response_mode` that the verifier included in his authorization request, this is done either
-* via a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`), or
+Depending on the `response_mode` that the verifier included in his authorization request, this is done via
+* either a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`), or
 * by forming an appropriate `redirect_uri` (when response mode is `fragment`, `fragment.jwt`, `query` or `query.jwt`)
 
-Library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Dispatcher.kt)
+The library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Dispatcher.kt)
 
 ```kotlin
 val authorizationResponse // from previous step
 val dispatchOutcome = siopOpenId4Vp.dispatch(authorizationResponse)
 ```
+### Example
 
-### SIOPv2 & OpenId4VP features supported
+Project contains an [example](src/test/kotlin/eu/europa/ec/eudi/openid4vp/Example.kt) which
+demonstrates the functionality of the library and in particular the interaction of a
+`Verifier` and a `Wallet` via Verifier's trusted end-point to perform an SIOP Authentication.
 
-#### Response Mode
+To run the example you will need to clone [Verifier's trusted end-point](https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt)
+and run it using
 
-A Wallet can take the form a web or mobile application.
+```bash
+./gradlew bootRun
+```
+and then run the Example.
+
+
+## SIOPv2 & OpenId4VP features supported
+
+### `response_mode`
+
+A Wallet can take the form of a web or mobile application.
 OpenId4VP describes flows for both cases. Given that we are focusing on a mobile wallet we could
 assume that `AuthorizationRequest` contains always a `response_mode`
 
@@ -98,28 +112,32 @@ Library currently supports `response_mode`
 * `query.jwt`
 
 
-#### Supported Client ID Scheme
+### Supported Client ID Scheme
 
-Library requires the presence of `client_id_scheme` with value
-`pre-registered` assuming out of bound knowledge of verifier meta-data
+Library requires the presence of `client_id_scheme` with one of the following values:
 
-#### Authorization Request encoding
+- `pre-registered` assuming out of bound knowledge of verifier meta-data. A verifier may send an authorization request signed (JAR) or plain
+- `x509-san-dns` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
+- `x509-san-uri` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
+- `redirect_uri` where verifier must send the authorization request in plain (JAR cannot be used)
+-
+### Authorization Request encoding
 
 OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET
 request which contains specific HTTP parameters.
 
-OpenID4VP on the other hand foresees in addition, support to
+OpenID4VP on the other hand, foresees in addition, support to
 [RFC 9101](https://www.rfc-editor.org/rfc/rfc9101.html#request_object) where
 the aforementioned HTTP Get contains a JWT encoded `AuthorizationRequest`
 
-Finally, ISO-23220-4 requires the  usage of RFC 9101
+Finally, ISO-23220-4 requires the usage of RFC 9101
 
 Library supports obtaining the request object both by value (using `request` attribute) or
 by reference (using `request_uri`)
 
 
-#### Presentation Definition
-The Verifier articulates requirements of the Credential(s) that are requested using
+### Presentation Definition
+The Verifier articulated requirements of the Credential(s) that are requested using
 `presentation_definition` and `presentation_definition_uri` parameters that contain a
 Presentation Definition JSON object.
 
@@ -131,13 +149,13 @@ According to OpenId4VP, verifier may pass the `presentation_definition` either
 
 Library supports all these options
 
-#### Client metadata in Authorization Request
+### Client metadata in Authorization Request
 According to [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request) verifier may pass his metadata (client metadata) either
 * by value, or
 * by reference
 
 Library supports both options
 
-#### Supported response types
+### Supported response types
 
 Library currently supports `response_type` equal to `id_token`, `vp_token` or `vp_token id_token`

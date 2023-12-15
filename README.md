@@ -125,11 +125,11 @@ val authorizationResponse = siopOpenId4Vp.build(requestObject, consensus)
 ### Dispatch authorization response to verifier / RP
 
 The final step, of processing an authorization request, is to dispatch to the verifier the authorization response.
-Depending on the `response_mode` that the verifier included in his authorization request, this is done either
-* via a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`), or
+Depending on the `response_mode` that the verifier included in his authorization request, this is done via 
+* either a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`), or
 * by forming an appropriate `redirect_uri` (when response mode is `fragment`, `fragment.jwt`, `query` or `query.jwt`)
 
-Library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Dispatcher.kt)
+The library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Dispatcher.kt)
 
 ```kotlin
 val authorizationResponse // from previous step
@@ -154,7 +154,7 @@ and then run the Example.
 
 ### `response_mode`
 
-A Wallet can take the form a web or mobile application.
+A Wallet can take the form of a web or mobile application.
 OpenId4VP describes flows for both cases. Given that we are focusing on a mobile wallet we could
 assume that `AuthorizationRequest` contains always a `response_mode`
 
@@ -169,26 +169,30 @@ Library currently supports `response_mode`
 
 ### Supported Client ID Scheme
 
-Library requires the presence of `client_id_scheme` with value
-`pre-registered` assuming out of bound knowledge of verifier meta-data
-
+Library requires the presence of `client_id_scheme` with one of the following values:
+ 
+- `pre-registered` assuming out of bound knowledge of verifier meta-data. A verifier may send an authorization request signed (JAR) or plain
+- `x509-san-dns` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
+- `x509-san-uri` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
+- `redirect_uri` where verifier must send the authorization request in plain (JAR cannot be used)
+- 
 ### Authorization Request encoding
 
 OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET
 request which contains specific HTTP parameters.
 
-OpenID4VP on the other hand foresees in addition, support to
+OpenID4VP on the other hand, foresees in addition, support to
 [RFC 9101](https://www.rfc-editor.org/rfc/rfc9101.html#request_object) where
 the aforementioned HTTP Get contains a JWT encoded `AuthorizationRequest`
 
-Finally, ISO-23220-4 requires the  usage of RFC 9101
+Finally, ISO-23220-4 requires the usage of RFC 9101
 
 Library supports obtaining the request object both by value (using `request` attribute) or
 by reference (using `request_uri`)
 
 
 ### Presentation Definition
-The Verifier articulates requirements of the Credential(s) that are requested using
+The Verifier articulated requirements of the Credential(s) that are requested using
 `presentation_definition` and `presentation_definition_uri` parameters that contain a
 Presentation Definition JSON object.
 

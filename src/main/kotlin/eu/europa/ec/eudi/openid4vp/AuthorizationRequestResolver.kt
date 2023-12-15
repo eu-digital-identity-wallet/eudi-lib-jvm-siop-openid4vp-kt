@@ -107,6 +107,10 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = MissingPresentationDefinition
     }
 
+    data object InvalidClientId : RequestValidationError {
+        private fun readResolve(): Any = InvalidClientId
+    }
+
     data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
 
     data object InvalidPresentationDefinitionUri : RequestValidationError {
@@ -153,6 +157,10 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = MissingClientId
     }
 
+    data object UnsupportedClientIdScheme : RequestValidationError {
+        private fun readResolve(): Any = UnsupportedClientIdScheme
+    }
+
     data object InvalidClientMetaDataUri : RequestValidationError {
         private fun readResolve(): Any = InvalidClientMetaDataUri
     }
@@ -160,6 +168,8 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data object OneOfClientMedataOrUri : RequestValidationError {
         private fun readResolve(): Any = OneOfClientMedataOrUri
     }
+
+    data class InvalidClientMetaData(val cause: String) : RequestValidationError
 
     data object SubjectSyntaxTypesNoMatch : RequestValidationError {
         private fun readResolve(): Any = SubjectSyntaxTypesNoMatch

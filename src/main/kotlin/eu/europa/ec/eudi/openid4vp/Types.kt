@@ -108,8 +108,9 @@ enum class ClientIdScheme {
 
     DID,
 
-    ISO_X509,
+    X509_SAN_URI,
 
+    X509_SAN_DNS,
     ;
 
     companion object {
@@ -119,7 +120,8 @@ enum class ClientIdScheme {
             "redirect_uri" -> RedirectUri
             "entity_id" -> EntityId
             "did" -> DID
-            "iso_x509" -> ISO_X509
+            "x509_san_uri" -> X509_SAN_URI
+            "x509_san_dns" -> X509_SAN_DNS
             else -> null
         }
     }
@@ -145,6 +147,15 @@ sealed interface ResponseMode : java.io.Serializable {
     data class FragmentJwt(val redirectUri: URI) : ResponseMode
     data class DirectPost(val responseURI: URL) : ResponseMode
     data class DirectPostJwt(val responseURI: URL) : ResponseMode
+
+    fun uri(): URI = when (this) {
+        is DirectPost -> responseURI.toURI()
+        is DirectPostJwt -> responseURI.toURI()
+        is Fragment -> redirectUri
+        is FragmentJwt -> redirectUri
+        is Query -> redirectUri
+        is QueryJwt -> redirectUri
+    }
 }
 
 enum class ResponseType {

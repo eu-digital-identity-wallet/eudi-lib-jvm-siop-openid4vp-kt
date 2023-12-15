@@ -20,57 +20,36 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.success
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
+import eu.europa.ec.eudi.openid4vp.ResolutionError.ClientMetadataJwkResolutionFailed
+import eu.europa.ec.eudi.openid4vp.ResolutionError.ClientMetadataJwkUriUnparsable
+import eu.europa.ec.eudi.openid4vp.internal.requireOrThrow
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import kotlinx.serialization.json.JsonObject
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
 internal class ClientMetadataValidator(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory,
 ) {
 
-    suspend fun validate(unvalidatedClientMetadata: UnvalidatedClientMetaData): Result<ClientMetaData> = runCatching {
-        val jwkSets = parseRequiredJwks(unvalidatedClientMetadata).getOrThrow()
-        val types = parseRequiredSubjectSyntaxTypes(unvalidatedClientMetadata).getOrThrow()
-        val idTokenJWSAlg =
-            parseRequiredSigningAlgorithm(unvalidatedClientMetadata.idTokenSignedResponseAlg).getOrThrow()
-        val idTokenJWEAlg =
-            parseRequiredEncryptionAlgorithm(unvalidatedClientMetadata.idTokenEncryptedResponseAlg).getOrThrow()
-        val idTokenJWEEnc =
-            parseRequiredEncryptionMethod(unvalidatedClientMetadata.idTokenEncryptedResponseEnc).getOrThrow()
-        if ((
-                !unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
-                    unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
-                ) ||
-            (
-                unvalidatedClientMetadata.authorizationEncryptedResponseAlg.isNullOrEmpty() &&
-                    !unvalidatedClientMetadata.authorizationEncryptedResponseEnc.isNullOrEmpty()
-                )
-        ) {
-            val msg = """Cannot construct ResponseSigningEncryptionSpec from client metadata:
-                    property authorization_encrypted_response_alg exists 
-                    but no property authorization_encrypted_response_enc found
-            """.trimIndent()
-            throw RuntimeException(msg)
-        }
+    suspend fun validate(unvalidated: UnvalidatedClientMetaData): ClientMetaData {
+        val jwkSets = jwkSet(unvalidated)
+        val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
+        val idTokenJWSAlg = unvalidated.idTokenSignedResponseAlg.signingAlg()
+            ?: throw IdTokenSigningAlgMissing.asException()
+        val idTokenJWEAlg = unvalidated.idTokenEncryptedResponseAlg.encAlg()
+            ?: throw IdTokenEncryptionAlgMissing.asException()
+        val idTokenJWEEnc = unvalidated.idTokenEncryptedResponseEnc.encMeth()
+            ?: throw IdTokenEncryptionMethodMissing.asException()
 
-        val authSgnRespAlg: JWSAlgorithm? =
-            parseOptionalSigningAlgorithm(
-                unvalidatedClientMetadata.authorizationSignedResponseAlg,
-            )
-        val authEncRespAlg: JWEAlgorithm? =
-            parseOptionalEncryptionAlgorithm(
-                unvalidatedClientMetadata.authorizationEncryptedResponseAlg,
-            )
-        val authEncRespEnc: EncryptionMethod? =
-            parseOptionalEncryptionMethod(
-                unvalidatedClientMetadata.authorizationEncryptedResponseEnc,
-            )
+        val authSgnRespAlg = authSgnRespAlg(unvalidated)
+        val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated)
 
-        ClientMetaData(
+        return ClientMetaData(
             idTokenJWSAlg = idTokenJWSAlg,
             idTokenJWEAlg = idTokenJWEAlg,
             idTokenJWEEnc = idTokenJWEEnc,
@@ -82,102 +61,91 @@ internal class ClientMetadataValidator(
         )
     }
 
-    @Suppress("ktlint")
-    private fun parseOptionalSigningAlgorithm(signingAlg: String?): JWSAlgorithm? {
-        if (signingAlg.isNullOrEmpty()) {
-            return null
-        }
-        val parsedSigningAlg = JWSAlgorithm.parse(signingAlg)
-        if (!walletOpenId4VPConfig.authorizationSigningAlgValuesSupported.contains(parsedSigningAlg)) {
-            throw IllegalArgumentException("The Signing algorithm specified in received client metadata is not supported")
-        }
-        return parsedSigningAlg
-    }
-
-    @Suppress("ktlint")
-    private fun parseOptionalEncryptionAlgorithm(encryptionAlg: String?): JWEAlgorithm? {
-        if (encryptionAlg.isNullOrEmpty()) {
-            return null
-        }
-        val parsedEncryptionAlgorithm = JWEAlgorithm.parse(encryptionAlg)
-        if (!walletOpenId4VPConfig.authorizationEncryptionAlgValuesSupported.contains(parsedEncryptionAlgorithm)) {
-            throw IllegalArgumentException("The Encryption algorithm specified in received client metadata is not supported")
-        }
-        return parsedEncryptionAlgorithm
-    }
-
-    @Suppress("ktlint")
-    private fun parseOptionalEncryptionMethod(encryptionMethod: String?): EncryptionMethod? {
-        if (encryptionMethod.isNullOrEmpty()) {
-            return null
-        }
-        val parsedEncryptionMethodAlgorithm = EncryptionMethod.parse(encryptionMethod)
-        if (!walletOpenId4VPConfig.authorizationEncryptionEncValuesSupported.contains(parsedEncryptionMethodAlgorithm)) {
-            throw UnsupportedOperationException("The Encryption Encoding method specified in received client metadata is not supported")
-        }
-        return parsedEncryptionMethodAlgorithm
-    }
-
-    @Suppress("ktlint")
-    private fun parseRequiredSigningAlgorithm(signingAlg: String?): Result<JWSAlgorithm> =
-        if (signingAlg.isNullOrEmpty()) RequestValidationError.IdTokenSigningAlgMissing.asFailure()
-        else Result.success(JWSAlgorithm.parse(signingAlg))
-
-    @Suppress("ktlint")
-    private fun parseRequiredEncryptionAlgorithm(encryptionAlg: String?): Result<JWEAlgorithm> =
-        if (encryptionAlg.isNullOrEmpty()) RequestValidationError.IdTokenEncryptionAlgMissing.asFailure()
-        else Result.success(JWEAlgorithm.parse(encryptionAlg))
-
-    @Suppress("ktlint")
-    private fun parseRequiredEncryptionMethod(encryptionMethod: String?): Result<EncryptionMethod> =
-        if (encryptionMethod.isNullOrEmpty()) RequestValidationError.IdTokenEncryptionMethodMissing.asFailure()
-        else Result.success(EncryptionMethod.parse(encryptionMethod))
-
-    private suspend fun parseRequiredJwks(clientMetadata: UnvalidatedClientMetaData): Result<JWKSet> {
-        val atLeastOneJwkSourceDefined = !clientMetadata.jwks.isNullOrEmpty() || !clientMetadata.jwksUri.isNullOrEmpty()
-        if (!atLeastOneJwkSourceDefined) {
-            return RequestValidationError.MissingClientMetadataJwksSource.asFailure()
-        }
-
-        val bothJwksSourcesDefined = !clientMetadata.jwks.isNullOrEmpty() && !clientMetadata.jwksUri.isNullOrEmpty()
-        if (bothJwksSourcesDefined) {
-            return RequestValidationError.BothJwkUriAndInlineJwks.asFailure()
-        }
-        fun requiredJwks() = try {
-            Result.success(JWKSet.parse(clientMetadata.jwks?.toString()))
-        } catch (ex: ParseException) {
-            ResolutionError.ClientMetadataJwkUriUnparsable(ex).asFailure()
-        }
-
-        suspend fun requiredJwksUri() = try {
-            val unparsed = httpClientFactory().use { client ->
-                client.get(URL(clientMetadata.jwksUri)).body<String>()
+    private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData): JWSAlgorithm? =
+        unvalidated.authorizationSignedResponseAlg?.signingAlg()?.also {
+            requireOrThrow(walletOpenId4VPConfig.authorizationSigningAlgValuesSupported.contains(it)) {
+                InvalidClientMetaData("The Signing algorithm ${it.name} is not supported").asException()
             }
-            val jwkSet = JWKSet.parse(unparsed)
-            Result.success(jwkSet)
-        } catch (ex: IOException) {
-            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
-        } catch (ex: ParseException) {
-            ResolutionError.ClientMetadataJwkResolutionFailed(ex).asFailure()
         }
 
-        return when {
-            clientMetadata.jwksUri.isNullOrEmpty() -> requiredJwks()
+    private fun authEncRespAlgAndMethod(
+        unvalidated: UnvalidatedClientMetaData,
+    ): Pair<JWEAlgorithm?, EncryptionMethod?> {
+        val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.encAlg()?.also {
+            requireOrThrow(walletOpenId4VPConfig.authorizationEncryptionAlgValuesSupported.contains(it)) {
+                InvalidClientMetaData("The Encryption algorithm ${it.name} is not supported").asException()
+            }
+        }
+
+        val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.encMeth()?.also {
+            requireOrThrow(walletOpenId4VPConfig.authorizationEncryptionEncValuesSupported.contains(it)) {
+                InvalidClientMetaData("The Encryption Encoding method ${it.name} is not supported").asException()
+            }
+        }
+
+        requireOrThrow(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {
+            InvalidClientMetaData(
+                """
+                Attributes authorization_encrypted_response_alg & authorization_encrypted_response_enc 
+                should be either both provided or not provided.
+                """.trimIndent(),
+            ).asException()
+        }
+        return authEncRespAlg to authEncRespEnc
+    }
+
+    private suspend fun jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet {
+        val jwks = clientMetadata.jwks
+        val jwksUri = clientMetadata.jwksUri
+
+        fun JsonObject.asJWKSet(): JWKSet = try {
+            JWKSet.parse(this.toString())
+        } catch (ex: ParseException) {
+            throw ClientMetadataJwkUriUnparsable(ex).asException()
+        }
+
+        suspend fun requiredJwksUri() = httpClientFactory().use { client ->
+            try {
+                val unparsed = client.get(URL(jwksUri)).body<String>()
+                JWKSet.parse(unparsed)
+            } catch (ex: IOException) {
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
+            } catch (ex: ParseException) {
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
+            }
+        }
+
+        return when (!jwks.isNullOrEmpty() to !jwksUri.isNullOrEmpty()) {
+            false to false -> throw MissingClientMetadataJwksSource.asException()
+            true to true -> throw BothJwkUriAndInlineJwks.asException()
+            true to false -> checkNotNull(jwks).asJWKSet()
             else -> requiredJwksUri()
         }
     }
+}
 
-    private fun parseRequiredSubjectSyntaxTypes(clientMetadata: UnvalidatedClientMetaData): Result<List<SubjectSyntaxType>> {
-        val listNotEmpty = clientMetadata.subjectSyntaxTypesSupported.isNotEmpty()
-        val allValidTypes = clientMetadata.subjectSyntaxTypesSupported.all(SubjectSyntaxType::isValid)
-        fun String.asSubjectSyntaxType(): SubjectSyntaxType = when {
-            SubjectSyntaxType.JWKThumbprint.isValid(this) -> SubjectSyntaxType.JWKThumbprint
-            else -> SubjectSyntaxType.DecentralizedIdentifier.parse(this)
-        }
-        return if (listNotEmpty && allValidTypes) {
-            clientMetadata.subjectSyntaxTypesSupported.map { it.asSubjectSyntaxType() }.success()
-        } else {
-            RequestValidationError.SubjectSyntaxTypesWrongSyntax.asFailure()
-        }
+private fun String.signingAlg(): JWSAlgorithm? =
+    JWSAlgorithm.parse(this).takeIf { JWSAlgorithm.Family.SIGNATURE.contains(it) }
+
+private fun String.encAlg(): JWEAlgorithm? = JWEAlgorithm.parse(this)
+
+private fun String.encMeth(): EncryptionMethod? = EncryptionMethod.parse(this)
+
+private fun subjectSyntaxTypes(subjectSyntaxTypesSupported: List<String>): List<SubjectSyntaxType> {
+    val notEmpty = subjectSyntaxTypesSupported.isNotEmpty()
+    val allValidTypes = subjectSyntaxTypesSupported.all(SubjectSyntaxType::isValid)
+    fun asSubjectSyntaxType(s: String): SubjectSyntaxType = when {
+        SubjectSyntaxType.JWKThumbprint.isValid(s) -> SubjectSyntaxType.JWKThumbprint
+        else -> SubjectSyntaxType.DecentralizedIdentifier.parse(s)
+    }
+    return if (notEmpty && allValidTypes) subjectSyntaxTypesSupported.map(::asSubjectSyntaxType)
+    else throw SubjectSyntaxTypesWrongSyntax.asException()
+}
+
+private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { test ->
+    when (test(left) to test(right)) {
+        true to true -> true
+        false to false -> true
+        else -> false
     }
 }

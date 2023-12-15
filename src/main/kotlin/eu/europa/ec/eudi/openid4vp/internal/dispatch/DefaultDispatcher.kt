@@ -37,6 +37,7 @@ import java.net.URL
 internal class DefaultDispatcher(
     private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
 ) : Dispatcher {
+
     override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
         when (response) {
             is AuthorizationResponse.DirectPost -> directPost(response)
@@ -56,28 +57,25 @@ internal class DefaultDispatcher(
     private suspend fun directPost(response: AuthorizationResponse.DirectPost): DispatchOutcome.VerifierResponse =
         coroutineScope {
             val parameters = DirectPostForm.of(response.data)
-                .let {
+                .let { form ->
                     Parameters.build {
-                        it.entries.forEach { append(it.key, it.value) }
+                        form.entries.forEach { append(it.key, it.value) }
                     }
                 }
 
-            submitForm(response.responseUri, parameters).map { res ->
-                when (res.status) {
-                    HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
-                    else -> DispatchOutcome.VerifierResponse.Rejected
-                }
-            }.getOrElse { DispatchOutcome.VerifierResponse.Rejected }
+            val verifierResponse = submitForm(response.responseUri, parameters)
+            when (verifierResponse.status) {
+                HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
+                else -> DispatchOutcome.VerifierResponse.Rejected
+            }
         }
 
     /**
      * Submits an HTTP Form to [url] with the provided [parameters].
      */
-    private suspend fun submitForm(url: URL, parameters: Parameters): Result<HttpResponse> =
-        runCatching {
-            httpClientFactory().use { client ->
-                client.submitForm(url.toExternalForm(), parameters)
-            }
+    private suspend fun submitForm(url: URL, parameters: Parameters): HttpResponse =
+        httpClientFactory().use { client ->
+            client.submitForm(url.toExternalForm(), parameters)
         }
 
     /**
@@ -102,14 +100,11 @@ internal class DefaultDispatcher(
                 append("state", response.data.state)
             }
 
-            submitForm(response.responseUri, parameters)
-                .map {
-                    when (it.status) {
-                        HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
-                        else -> DispatchOutcome.VerifierResponse.Rejected
-                    }
-                }
-                .getOrElse { DispatchOutcome.VerifierResponse.Rejected }
+            val verifierResponse = submitForm(response.responseUri, parameters)
+            when (verifierResponse.status) {
+                HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
+                else -> DispatchOutcome.VerifierResponse.Rejected
+            }
         }
 
     private fun fragment(response: AuthorizationResponse.Fragment): DispatchOutcome.RedirectURI =

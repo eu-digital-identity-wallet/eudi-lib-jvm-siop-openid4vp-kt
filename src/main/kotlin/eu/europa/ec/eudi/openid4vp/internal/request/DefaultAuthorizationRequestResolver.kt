@@ -22,6 +22,7 @@ import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecu
 import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByValue
 import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.NotSecured
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -140,7 +141,7 @@ private sealed interface AuthorizationRequest : java.io.Serializable {
 
 internal class DefaultAuthorizationRequestResolver(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory,
     private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
 ) : AuthorizationRequestResolver {
 

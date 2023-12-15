@@ -33,7 +33,7 @@ import java.text.ParseException
 
 internal class ClientMetadataValidator(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory,
 ) {
 
     suspend fun validate(unvalidated: UnvalidatedClientMetaData): ClientMetaData {
@@ -104,16 +104,17 @@ internal class ClientMetadataValidator(
             throw ClientMetadataJwkUriUnparsable(ex).asException()
         }
 
-        suspend fun requiredJwksUri() = try {
-            httpClientFactory().use { client ->
+        suspend fun requiredJwksUri() = httpClientFactory().use { client ->
+            try {
                 val unparsed = client.get(URL(jwksUri)).body<String>()
                 JWKSet.parse(unparsed)
+            } catch (ex: IOException) {
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
+            } catch (ex: ParseException) {
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
             }
-        } catch (ex: IOException) {
-            throw ClientMetadataJwkResolutionFailed(ex).asException()
-        } catch (ex: ParseException) {
-            throw ClientMetadataJwkResolutionFailed(ex).asException()
         }
+
         return when (!jwks.isNullOrEmpty() to !jwksUri.isNullOrEmpty()) {
             false to false -> throw MissingClientMetadataJwksSource.asException()
             true to true -> throw BothJwkUriAndInlineJwks.asException()

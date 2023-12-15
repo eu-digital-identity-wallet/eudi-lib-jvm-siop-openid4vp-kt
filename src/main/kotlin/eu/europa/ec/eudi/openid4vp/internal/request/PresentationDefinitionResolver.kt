@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.mapError
 import eu.europa.ec.eudi.openid4vp.internal.request.PresentationDefinitionSource.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import io.ktor.client.call.*
@@ -70,10 +69,11 @@ internal class PresentationDefinitionResolver(
     ): PresentationDefinition =
         if (config.presentationDefinitionUriSupported) {
             httpClientFactory().use { client ->
-                runCatching {
+                try {
                     client.get(url).body<PresentationDefinition>()
-                }.mapError { ResolutionError.UnableToFetchPresentationDefinition(it).asException() }
-                    .getOrThrow()
+                } catch (t: Throwable) {
+                    throw ResolutionError.UnableToFetchPresentationDefinition(t).asException()
+                }
             }
         } else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
 }

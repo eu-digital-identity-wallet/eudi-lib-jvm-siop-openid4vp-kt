@@ -31,6 +31,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.sanOfDNSName
 import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
@@ -47,8 +48,9 @@ import java.text.ParseException
  */
 internal class JarJwtSignatureValidator(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory,
 ) {
+
     @Throws(AuthorizationRequestException::class)
     suspend fun validate(clientId: String, unverifiedJwt: Jwt): Pair<SupportedClientIdScheme, RequestObject> {
         val signedJwt = parse(unverifiedJwt)

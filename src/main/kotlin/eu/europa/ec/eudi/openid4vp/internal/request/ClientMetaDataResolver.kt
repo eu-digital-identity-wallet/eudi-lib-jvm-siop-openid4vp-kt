@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.SerialName
@@ -27,7 +28,7 @@ import java.net.URL
  * Extracts the client meta-data and validates them
  */
 internal class ClientMetaDataResolver(
-    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory,
     walletOpenId4VPConfig: WalletOpenId4VPConfig,
 ) {
     private val clientMetadataValidator = ClientMetadataValidator(walletOpenId4VPConfig, httpClientFactory)

@@ -21,7 +21,7 @@ import eu.europa.ec.eudi.openid4vp.WalletOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 
-internal class ValidatedRequestObjectResolver(
+internal class RequestObjectResolver(
     private val presentationDefinitionResolver: PresentationDefinitionResolver,
     private val clientMetaDataResolver: ClientMetaDataResolver,
 ) {

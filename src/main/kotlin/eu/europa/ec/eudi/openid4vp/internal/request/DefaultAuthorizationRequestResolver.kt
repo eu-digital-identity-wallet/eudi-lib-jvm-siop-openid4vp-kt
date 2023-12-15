@@ -142,7 +142,7 @@ private sealed interface AuthorizationRequest : java.io.Serializable {
 internal class DefaultAuthorizationRequestResolver(
     private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
-    private val validatedRequestObjectResolver: ValidatedRequestObjectResolver,
+    private val requestObjectResolver: RequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
     private val jarJwtValidator = JarJwtSignatureValidator(walletOpenId4VPConfig, httpClientFactory)
@@ -167,7 +167,7 @@ internal class DefaultAuthorizationRequestResolver(
             val validatedRequestObject =
                 RequestObjectValidator.validate(supportedClientIdScheme, requestObject)
             val resolved =
-                validatedRequestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig)
+                requestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig)
             Resolution.Success(resolved)
         } catch (t: AuthorizationRequestException) {
             Resolution.Invalid(t.error)
@@ -239,7 +239,7 @@ internal class DefaultAuthorizationRequestResolver(
         ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
             walletOpenId4VPConfig,
             httpClientFactory,
-            ValidatedRequestObjectResolver(
+            RequestObjectResolver(
                 presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
                 clientMetaDataResolver = ClientMetaDataResolver(httpClientFactory, walletOpenId4VPConfig),
             ),

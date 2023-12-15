@@ -50,7 +50,9 @@ internal class PresentationDefinitionResolver(
         config: WalletOpenId4VPConfig,
     ): PresentationDefinition = when (source) {
         is ByValue -> source.presentationDefinition
-        is ByReference -> fetch(source.url, config)
+        is ByReference ->
+            if (config.presentationDefinitionUriSupported) fetchPresentationDefinition(source.url)
+            else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
         is Implied -> lookupKnownPresentationDefinitions(source.scope, config)
     }
 
@@ -62,18 +64,12 @@ internal class PresentationDefinitionResolver(
             .firstNotNullOfOrNull { config.knownPresentationDefinitionsPerScope[it] }
             ?: throw ResolutionError.PresentationDefinitionNotFoundForScope(scope).asException()
 
-    @Suppress("ktlint")
-    private suspend fun fetch(
-        url: URL,
-        config: WalletOpenId4VPConfig,
-    ): PresentationDefinition =
-        if (config.presentationDefinitionUriSupported) {
-            httpClientFactory().use { client ->
-                try {
-                    client.get(url).body<PresentationDefinition>()
-                } catch (t: Throwable) {
-                    throw ResolutionError.UnableToFetchPresentationDefinition(t).asException()
-                }
+    private suspend fun fetchPresentationDefinition(url: URL): PresentationDefinition =
+        httpClientFactory().use { client ->
+            try {
+                client.get(url).body()
+            } catch (t: Throwable) {
+                throw ResolutionError.UnableToFetchPresentationDefinition(t).asException()
             }
-        } else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
+        }
 }

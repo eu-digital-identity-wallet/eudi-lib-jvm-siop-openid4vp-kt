@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
-import eu.europa.ec.eudi.openid4vp.internal.success
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -257,7 +256,8 @@ internal object RequestObjectValidator {
      */
     private fun requiredScope(unvalidated: RequestObject): Result<Scope> {
         val scope = unvalidated.scope?.let { Scope.make(it) }
-        return scope?.success() ?: RequestValidationError.MissingScope.asFailure()
+        return if (scope != null) Result.success(scope)
+        else RequestValidationError.MissingScope.asFailure()
     }
 
     /**

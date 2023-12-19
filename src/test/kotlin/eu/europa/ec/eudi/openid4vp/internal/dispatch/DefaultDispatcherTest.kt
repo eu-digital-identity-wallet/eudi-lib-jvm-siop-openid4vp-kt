@@ -48,7 +48,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertThrows
 import java.net.URI
 import java.security.interfaces.ECPrivateKey
-import java.time.Duration
 import java.util.*
 import kotlin.test.*
 
@@ -70,16 +69,8 @@ class DefaultDispatcherTest {
             presentationDefinitionUriSupported = true,
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
             vpFormatsSupported = emptyList(),
-            subjectSyntaxTypesSupported = listOf(
-                SubjectSyntaxType.JWKThumbprint,
-                SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
-                SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
-            ),
-            signingKey = signingKey,
             signingKeySet = JWKSet(signingKey),
-            idTokenTTL = Duration.ofMinutes(10),
-            preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-            decentralizedIdentifier = "DID:example:12341512#$",
+            holderId = "DID:example:12341512#$",
             authorizationSigningAlgValuesSupported = emptyList(),
             authorizationEncryptionAlgValuesSupported = emptyList(),
             authorizationEncryptionEncValuesSupported = emptyList(),
@@ -89,16 +80,8 @@ class DefaultDispatcherTest {
             presentationDefinitionUriSupported = true,
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
             vpFormatsSupported = emptyList(),
-            subjectSyntaxTypesSupported = listOf(
-                SubjectSyntaxType.JWKThumbprint,
-                SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
-                SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
-            ),
-            signingKey = signingKey,
             signingKeySet = JWKSet(signingKey),
-            idTokenTTL = Duration.ofMinutes(10),
-            preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-            decentralizedIdentifier = "DID:example:12341512#$",
+            holderId = "DID:example:12341512#$",
             authorizationSigningAlgValuesSupported = listOf(JWSAlgorithm.parse("RS256")),
             authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
             authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
@@ -248,7 +231,7 @@ class DefaultDispatcherTest {
                 assertEquals(encrypted.state, JWEObject.State.DECRYPTED)
 
                 val signedJWT = encrypted.payload.toSignedJWT()
-                signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
+                signedJWT.verify(RSASSAVerifier(RSAKey.parse(signingKey.toJSONObject())))
                 assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
 
                 assertNotNull(signedJWT.jwtClaimsSet.issuer)
@@ -318,7 +301,7 @@ class DefaultDispatcherTest {
                     assertEquals(encrypted.state, JWEObject.State.DECRYPTED)
 
                     val signedJWT = encrypted.payload.toSignedJWT()
-                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(signingKey.toJSONObject())))
                     assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
 
                     assertNotNull(signedJWT.jwtClaimsSet.issuer)
@@ -379,7 +362,7 @@ class DefaultDispatcherTest {
                     val body = assertIs<FormDataContent>(request.body)
                     val joseResponse = body.formData["response"] as String
                     val signedJWT = SignedJWT.parse(joseResponse)
-                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(walletConfig.signingKey.toJSONObject())))
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(signingKey.toJSONObject())))
 
                     assertNotNull(signedJWT)
                     assertNotNull(signedJWT.jwtClaimsSet.issuer)

@@ -39,20 +39,10 @@ internal class ClientMetadataValidator(
     suspend fun validate(unvalidated: UnvalidatedClientMetaData): ClientMetaData {
         val jwkSets = jwkSet(unvalidated)
         val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
-        val idTokenJWSAlg = unvalidated.idTokenSignedResponseAlg.signingAlg()
-            ?: throw IdTokenSigningAlgMissing.asException()
-        val idTokenJWEAlg = unvalidated.idTokenEncryptedResponseAlg.encAlg()
-            ?: throw IdTokenEncryptionAlgMissing.asException()
-        val idTokenJWEEnc = unvalidated.idTokenEncryptedResponseEnc.encMeth()
-            ?: throw IdTokenEncryptionMethodMissing.asException()
-
         val authSgnRespAlg = authSgnRespAlg(unvalidated)
         val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated)
 
         return ClientMetaData(
-            idTokenJWSAlg = idTokenJWSAlg,
-            idTokenJWEAlg = idTokenJWEAlg,
-            idTokenJWEEnc = idTokenJWEEnc,
             jwkSet = jwkSets,
             subjectSyntaxTypesSupported = types,
             authorizationSignedResponseAlg = authSgnRespAlg,
@@ -131,15 +121,17 @@ private fun String.encAlg(): JWEAlgorithm? = JWEAlgorithm.parse(this)
 
 private fun String.encMeth(): EncryptionMethod? = EncryptionMethod.parse(this)
 
-private fun subjectSyntaxTypes(subjectSyntaxTypesSupported: List<String>): List<SubjectSyntaxType> {
-    val notEmpty = subjectSyntaxTypesSupported.isNotEmpty()
-    val allValidTypes = subjectSyntaxTypesSupported.all(SubjectSyntaxType::isValid)
-    fun asSubjectSyntaxType(s: String): SubjectSyntaxType = when {
-        SubjectSyntaxType.JWKThumbprint.isValid(s) -> SubjectSyntaxType.JWKThumbprint
-        else -> SubjectSyntaxType.DecentralizedIdentifier.parse(s)
+private fun subjectSyntaxTypes(subjectSyntaxTypesSupported: List<String>?): List<SubjectSyntaxType>? {
+    fun String.asSubjectSyntaxType(): SubjectSyntaxType = when {
+        SubjectSyntaxType.JWKThumbprint.isValid(this) -> SubjectSyntaxType.JWKThumbprint
+        else -> SubjectSyntaxType.DecentralizedIdentifier.parse(this)
     }
-    return if (notEmpty && allValidTypes) subjectSyntaxTypesSupported.map(::asSubjectSyntaxType)
-    else throw SubjectSyntaxTypesWrongSyntax.asException()
+    return subjectSyntaxTypesSupported?.map {
+        it.takeIf {
+            SubjectSyntaxType.isValid(it)
+        }?.asSubjectSyntaxType()
+            ?: throw SubjectSyntaxTypesWrongSyntax.asException()
+    }
 }
 
 private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { test ->

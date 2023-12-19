@@ -32,7 +32,6 @@ import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.assertDoesNotThrow
-import java.time.Duration
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -53,16 +52,8 @@ class AuthorizationResponseBuilderTest {
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
         vpFormatsSupported = emptyList(),
-        subjectSyntaxTypesSupported = listOf(
-            SubjectSyntaxType.JWKThumbprint,
-            SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
-            SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
-        ),
-        signingKey = signingKey,
         signingKeySet = JWKSet(signingKey),
-        idTokenTTL = Duration.ofMinutes(10),
-        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-        decentralizedIdentifier = "DID:example:12341512#$",
+        holderId = "DID:example:12341512#$",
         authorizationSigningAlgValuesSupported = emptyList(),
         authorizationEncryptionAlgValuesSupported = emptyList(),
         authorizationEncryptionEncValuesSupported = emptyList(),
@@ -72,16 +63,8 @@ class AuthorizationResponseBuilderTest {
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
         vpFormatsSupported = emptyList(),
-        subjectSyntaxTypesSupported = listOf(
-            SubjectSyntaxType.JWKThumbprint,
-            SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
-            SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
-        ),
-        signingKey = signingKey,
         signingKeySet = JWKSet(signingKey),
-        idTokenTTL = Duration.ofMinutes(10),
-        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-        decentralizedIdentifier = "DID:example:12341512#$",
+        holderId = "DID:example:12341512#$",
         authorizationSigningAlgValuesSupported = listOf(JWSAlgorithm.parse("RS256")),
         authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
         authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
@@ -119,7 +102,6 @@ class AuthorizationResponseBuilderTest {
                 request = siopAuthRequestObject,
                 holderInfo = HolderInfo("foo@bar.com", "foo bar"),
                 rsaJWK = rsaJWK,
-                walletConfig = walletConfig,
             ),
         )
 

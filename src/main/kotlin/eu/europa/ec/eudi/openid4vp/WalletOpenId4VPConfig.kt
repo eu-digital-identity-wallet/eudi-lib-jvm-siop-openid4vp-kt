@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
@@ -26,7 +25,6 @@ import eu.europa.ec.eudi.prex.SupportedClaimFormat
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.cert.X509Certificate
-import java.time.Duration
 
 sealed interface JwkSetSource {
     data class ByValue(val jwks: JsonObject) : JwkSetSource
@@ -54,21 +52,17 @@ sealed interface SupportedClientIdScheme {
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
 
-    data class X509SanUri(val validator: (List<X509Certificate>) -> Boolean = { true }) : SupportedClientIdScheme
+    data class X509SanUri(val validator: (List<X509Certificate>) -> Boolean) : SupportedClientIdScheme
 
-    data class X509SanDns(val validator: (List<X509Certificate>) -> Boolean = { true }) : SupportedClientIdScheme
+    data class X509SanDns(val validator: (List<X509Certificate>) -> Boolean) : SupportedClientIdScheme
 
     data object RedirectUri : SupportedClientIdScheme
 }
 
 data class WalletOpenId4VPConfig(
-    val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
-    val preferredSubjectSyntaxType: SubjectSyntaxType,
-    val decentralizedIdentifier: String,
-    val idTokenTTL: Duration,
-    val presentationDefinitionUriSupported: Boolean,
-    val signingKey: JWK,
+    val holderId: String,
     val signingKeySet: JWKSet,
+    val presentationDefinitionUriSupported: Boolean,
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),

@@ -42,6 +42,7 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.ktor.server.content.negotiation)
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.fasterxml.jackson.module.kotlin)
 }
 
 java {

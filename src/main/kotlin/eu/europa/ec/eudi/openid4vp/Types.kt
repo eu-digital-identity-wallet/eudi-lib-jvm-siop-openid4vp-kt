@@ -26,10 +26,7 @@ import java.net.URL
 
 data class ClientMetaData(
     val jwkSet: JWKSet? = null,
-    val idTokenJWSAlg: JWSAlgorithm,
-    val idTokenJWEAlg: JWEAlgorithm,
-    val idTokenJWEEnc: EncryptionMethod,
-    val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
+    val subjectSyntaxTypesSupported: List<SubjectSyntaxType>? = null,
     val authorizationSignedResponseAlg: JWSAlgorithm? = null,
     val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
     val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
@@ -219,7 +216,7 @@ data class JarmSpec(val holderId: String, val jarmOption: JarmOption) {
     companion object {
         fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? =
             JarmOption.make(clientMetaData, walletOpenId4VPConfig)?.let { jarmOption ->
-                val holderId = walletOpenId4VPConfig.decentralizedIdentifier
+                val holderId = walletOpenId4VPConfig.holderId
                 JarmSpec(holderId, jarmOption)
             }
     }

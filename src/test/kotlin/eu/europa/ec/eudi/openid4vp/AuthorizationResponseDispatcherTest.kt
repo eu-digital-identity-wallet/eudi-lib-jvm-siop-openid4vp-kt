@@ -74,8 +74,9 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`(): Unit = runTest {
+        val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
 
         val stateVal = genState()
@@ -86,7 +87,7 @@ class AuthorizationResponseDispatcherTest {
                 clientMetaData = validated,
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
-                responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
+                responseMode = responseMode,
                 state = stateVal,
                 scope = Scope.make("openid") ?: throw IllegalStateException(),
             )
@@ -151,8 +152,9 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch vp_token with direct post`(): Unit = runTest {
+        val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
         val stateVal = genState()
 
@@ -169,7 +171,7 @@ class AuthorizationResponseDispatcherTest {
                 clientMetaData = validated,
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
-                responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
+                responseMode = responseMode,
                 state = stateVal,
                 presentationDefinition = presentationDefinition,
             )

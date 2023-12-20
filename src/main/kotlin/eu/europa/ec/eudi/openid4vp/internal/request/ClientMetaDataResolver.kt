@@ -36,15 +36,16 @@ internal class ClientMetaDataResolver(
     /**
      * Gets the meta-data from the [clientMetaDataSource] and then validates them
      * @param clientMetaDataSource the source to obtain the meta-data
+     * @param responseMode the response mode under which the meta-data should be validated
      * @throws AuthorizationRequestException in case of a problem
      */
     @Throws(AuthorizationRequestException::class)
-    suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): ClientMetaData {
+    suspend fun resolve(clientMetaDataSource: ClientMetaDataSource, responseMode: ResponseMode): ClientMetaData {
         val unvalidatedClientMetaData = when (clientMetaDataSource) {
             is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
             is ClientMetaDataSource.ByReference -> fetch(clientMetaDataSource.url)
         }
-        return clientMetadataValidator.validate(unvalidatedClientMetaData)
+        return clientMetadataValidator.validate(unvalidatedClientMetaData, responseMode)
     }
 
     @Throws(AuthorizationRequestException::class)
@@ -65,4 +66,4 @@ internal data class UnvalidatedClientMetaData(
     @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
-) : java.io.Serializable
+)

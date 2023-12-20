@@ -37,7 +37,6 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
-import java.time.Duration
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -56,16 +55,8 @@ class AuthorizationResponseDispatcherTest {
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
         vpFormatsSupported = emptyList(),
-        subjectSyntaxTypesSupported = listOf(
-            SubjectSyntaxType.JWKThumbprint,
-            SubjectSyntaxType.DecentralizedIdentifier.parse("did:example"),
-            SubjectSyntaxType.DecentralizedIdentifier.parse("did:key"),
-        ),
-        signingKey = signingKey,
         signingKeySet = JWKSet(signingKey),
-        idTokenTTL = Duration.ofMinutes(10),
-        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-        decentralizedIdentifier = "DID:example:12341512#$",
+        holderId = "DID:example:12341512#$",
         authorizationSigningAlgValuesSupported = emptyList(),
         authorizationEncryptionAlgValuesSupported = emptyList(),
         authorizationEncryptionEncValuesSupported = emptyList(),
@@ -83,8 +74,9 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`(): Unit = runTest {
+        val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
 
         val stateVal = genState()
@@ -95,7 +87,7 @@ class AuthorizationResponseDispatcherTest {
                 clientMetaData = validated,
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
-                responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
+                responseMode = responseMode,
                 state = stateVal,
                 scope = Scope.make("openid") ?: throw IllegalStateException(),
             )
@@ -107,8 +99,6 @@ class AuthorizationResponseDispatcherTest {
                 email = "foo@bar.com",
                 name = "Foo bar",
             ),
-
-            walletConfig,
             walletKeyPair,
         )
 
@@ -162,8 +152,9 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch vp_token with direct post`(): Unit = runTest {
+        val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData)
+            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
         val stateVal = genState()
 
@@ -180,7 +171,7 @@ class AuthorizationResponseDispatcherTest {
                 clientMetaData = validated,
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
-                responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
+                responseMode = responseMode,
                 state = stateVal,
                 presentationDefinition = presentationDefinition,
             )

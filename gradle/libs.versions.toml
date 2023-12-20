@@ -12,8 +12,10 @@ java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.10"
 maven-publish = "0.25.3"
+fasterxml-jackson="2.15.2"
 
 [libraries]
+fasterxml-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "fasterxml-jackson" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }

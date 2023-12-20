@@ -116,6 +116,8 @@ internal sealed interface ValidatedRequestObject {
 
 internal object RequestObjectValidator {
 
+    private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
+
     /**
      * Validates that the given [authorizationRequest] represents a valid and supported [ValidatedRequestObject]
      *
@@ -298,11 +300,10 @@ internal object RequestObjectValidator {
         val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
         val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
         val hasScope = null != scope
-        val json = Json { ignoreUnknownKeys = true }
 
         fun requiredPd() = try {
             checkNotNull(unvalidated.presentationDefinition)
-            val pd = json.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
+            val pd = jsonSupport.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
             PresentationDefinitionSource.ByValue(pd)
         } catch (t: SerializationException) {
             throw RequestValidationError.InvalidPresentationDefinition(t).asException()
@@ -348,7 +349,7 @@ internal object RequestObjectValidator {
 
         fun requiredClientMetaData(): ClientMetaDataSource.ByValue {
             checkNotNull(unvalidated.clientMetaData)
-            return ClientMetaDataSource.ByValue(Json.decodeFromJsonElement(unvalidated.clientMetaData))
+            return ClientMetaDataSource.ByValue(jsonSupport.decodeFromJsonElement(unvalidated.clientMetaData))
         }
 
         fun requiredClientMetaDataUri(): ClientMetaDataSource.ByReference {

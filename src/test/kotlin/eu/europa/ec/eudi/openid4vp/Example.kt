@@ -58,7 +58,7 @@ fun main(): Unit = runTest {
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
-        walletConfig = walletConfig(Verifier.X509SanDns, walletKeyPair),
+        walletConfig = walletConfig(Verifier.PreregisteredClient, walletKeyPair),
     )
 
     suspend fun runUseCase(transaction: Transaction) {

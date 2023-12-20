@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
@@ -371,9 +370,8 @@ private fun walletConfig(walletKeyPair: RSAKey, vararg supportedClientIdScheme: 
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = supportedClientIdScheme.toList(),
         vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(walletKeyPair),
         holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationResponseSigners = emptyList(),
         authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
         authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
     )

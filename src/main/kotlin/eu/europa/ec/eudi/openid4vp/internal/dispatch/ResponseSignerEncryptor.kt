@@ -19,7 +19,6 @@ import com.nimbusds.jose.*
 import com.nimbusds.jose.JWEAlgorithm.Family
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
-import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
@@ -59,13 +58,12 @@ internal object ResponseSignerEncryptor {
         option: JarmOption.SignedResponse,
         data: AuthorizationResponsePayload,
     ): SignedJWT {
-        val (signingAlg, signingKeySet) = option
-        val (signingKey, jwsSigner) = keyAndSigner(signingAlg, signingKeySet)
+        val (signingAlg, signer) = option
         val header = JWSHeader.Builder(signingAlg)
-            .keyID(signingKey.keyID)
+            .keyID(signer.getKeyId())
             .build()
         val dataAsJWT = JwtPayloadFactory.create(data, holderId, Instant.now())
-        return SignedJWT(header, dataAsJWT).apply { sign(jwsSigner) }
+        return SignedJWT(header, dataAsJWT).apply { sign(signer) }
     }
 
     private fun encrypt(
@@ -92,17 +90,6 @@ internal object ResponseSignerEncryptor {
             JWEHeader(jweAlgorithm, encryptionMethod),
             Payload(signedJwt),
         ).apply { encrypt(jweEncrypter) }
-    }
-
-    private fun keyAndSigner(
-        jwsAlgorithm: JWSAlgorithm,
-        keySet: JWKSet,
-    ): Pair<JWK, JWSSigner> {
-        val signerFactory = DefaultJWSSignerFactory()
-        fun signer(key: JWK) = runCatching { signerFactory.createJWSSigner(key, jwsAlgorithm) }.getOrNull()
-        return keySet.keys.firstNotNullOfOrNull { key ->
-            signer(key)?.let { signer -> key to signer }
-        } ?: error("Cannot find appropriate signing key for ${jwsAlgorithm.name}")
     }
 
     private fun keyAndEncryptor(

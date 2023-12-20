@@ -57,7 +57,7 @@ internal class ClientMetadataValidator(
 
     private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData): JWSAlgorithm? =
         unvalidated.authorizationSignedResponseAlg?.signingAlg()?.also {
-            requireOrThrow(walletOpenId4VPConfig.authorizationSigningAlgValuesSupported.contains(it)) {
+            requireOrThrow(walletOpenId4VPConfig.supportedResponseSigner(it) != null) {
                 InvalidClientMetaData("The Signing algorithm ${it.name} is not supported").asException()
             }
         }

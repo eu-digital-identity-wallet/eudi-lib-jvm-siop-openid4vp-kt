@@ -19,7 +19,6 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.RSASSAVerifier
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
@@ -52,9 +51,8 @@ class AuthorizationResponseBuilderTest {
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
         vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(signingKey),
         holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationResponseSigners = emptyList(),
         authorizationEncryptionAlgValuesSupported = emptyList(),
         authorizationEncryptionEncValuesSupported = emptyList(),
     )
@@ -63,9 +61,8 @@ class AuthorizationResponseBuilderTest {
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
         vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(signingKey),
         holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = listOf(JWSAlgorithm.parse("RS256")),
+        authorizationResponseSigners = listOf(DelegatingResponseSigner(signingKey, JWSAlgorithm.parse("RS256"))),
         authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
         authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
     )

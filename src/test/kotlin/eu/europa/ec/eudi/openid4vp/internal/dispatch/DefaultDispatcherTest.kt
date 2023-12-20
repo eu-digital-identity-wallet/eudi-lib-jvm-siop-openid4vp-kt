@@ -21,7 +21,6 @@ import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
@@ -53,39 +52,17 @@ import kotlin.test.*
 
 class DefaultDispatcherTest {
 
+    private val rsaSigningKey = RSAKeyGenerator(2048)
+        .keyUse(KeyUse.SIGNATURE)
+        .keyID(UUID.randomUUID().toString())
+        .issueTime(Date(System.currentTimeMillis()))
+        .generate()
+
     @Nested
     @DisplayName("Encrypted/Signed response")
     inner class DirectPostJwtResponse {
 
         private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
-
-        private val signingKey = RSAKeyGenerator(2048)
-            .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
-            .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
-            .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
-            .generate()
-
-        private val walletConfig = WalletOpenId4VPConfig(
-            presentationDefinitionUriSupported = true,
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-            vpFormatsSupported = emptyList(),
-            signingKeySet = JWKSet(signingKey),
-            holderId = "DID:example:12341512#$",
-            authorizationSigningAlgValuesSupported = emptyList(),
-            authorizationEncryptionAlgValuesSupported = emptyList(),
-            authorizationEncryptionEncValuesSupported = emptyList(),
-        )
-
-        private val walletConfigWithSignAndEncryptionAlgorithms = WalletOpenId4VPConfig(
-            presentationDefinitionUriSupported = true,
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-            vpFormatsSupported = emptyList(),
-            signingKeySet = JWKSet(signingKey),
-            holderId = "DID:example:12341512#$",
-            authorizationSigningAlgValuesSupported = listOf(JWSAlgorithm.parse("RS256")),
-            authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
-        )
 
         private val ecKey = ECKeyGenerator(Curve.P_256)
             .keyUse(KeyUse.ENCRYPTION)
@@ -101,19 +78,36 @@ class DefaultDispatcherTest {
                 "Bl62k90RaMZpXCxNO4Ew\"}"
             ).trimIndent()
 
+        private val walletConfig = WalletOpenId4VPConfig(
+            presentationDefinitionUriSupported = true,
+            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
+            vpFormatsSupported = emptyList(),
+            holderId = "DID:example:12341512#$",
+            authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
+            authorizationEncryptionAlgValuesSupported = emptyList(),
+            authorizationEncryptionEncValuesSupported = emptyList(),
+        )
+
+        private val walletConfigWithSignAndEncryptionAlgorithms = WalletOpenId4VPConfig(
+            presentationDefinitionUriSupported = true,
+            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
+            vpFormatsSupported = emptyList(),
+            holderId = "DID:example:12341512#$",
+            authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
+            authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+        )
+
         @Test
         fun `client metadata does not match with wallet's supported algorithms`(): Unit = runTest {
             val clientMetadataStr = """
-            { 
-                "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
-                "id_token_encrypted_response_alg": "RS256", 
-                "id_token_encrypted_response_enc": "A128CBC-HS256", 
-                "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
-                "id_token_signed_response_alg": "RS256",
-                "authorization_signed_response_alg":"RS256",
-                "authorization_encrypted_response_alg":"ECDH-ES", 
-                "authorization_encrypted_response_enc":"A256GCM"
-            }
+                { 
+                    "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]},
+                    "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ],
+                    "authorization_signed_response_alg":"RS256",
+                    "authorization_encrypted_response_alg":"ECDH-ES", 
+                    "authorization_encrypted_response_enc":"A256GCM"
+                }
             """.trimIndent().trimMargin()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
             val responseMode = ResponseMode.QueryJwt(URI.create("foo://bar"))
@@ -128,13 +122,10 @@ class DefaultDispatcherTest {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
             val clientMetadataStr = """
                { 
-               "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
-               "id_token_encrypted_response_alg": "RS256", 
-                "id_token_encrypted_response_enc": "A128CBC-HS256", 
-                "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
-                "id_token_signed_response_alg": "RS256",
-                "authorization_encrypted_response_alg":"ECDH-ES", 
-                "authorization_encrypted_response_enc":"A256GCM"
+                  "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]},
+                  "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ],
+                  "authorization_encrypted_response_alg":"ECDH-ES", 
+                  "authorization_encrypted_response_enc":"A256GCM"
               }
             """.trimIndent()
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
@@ -188,11 +179,8 @@ class DefaultDispatcherTest {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
             val clientMetadataStr = """
             { 
-                "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]}, 
-                "id_token_encrypted_response_alg": "RS256", 
-                "id_token_encrypted_response_enc": "A128CBC-HS256", 
-                "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], 
-                "id_token_signed_response_alg": "RS256",
+                "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]},                 
+                "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ],                
                 "authorization_signed_response_alg":"RS256",
                 "authorization_encrypted_response_alg":"ECDH-ES", 
                 "authorization_encrypted_response_enc":"A256GCM"
@@ -235,7 +223,7 @@ class DefaultDispatcherTest {
                 assertEquals(encrypted.state, JWEObject.State.DECRYPTED)
 
                 val signedJWT = encrypted.payload.toSignedJWT()
-                signedJWT.verify(RSASSAVerifier(RSAKey.parse(signingKey.toJSONObject())))
+                signedJWT.verify(RSASSAVerifier(RSAKey.parse(rsaSigningKey.toJSONObject())))
                 assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
 
                 assertNotNull(signedJWT.jwtClaimsSet.issuer)
@@ -306,7 +294,7 @@ class DefaultDispatcherTest {
                     assertEquals(encrypted.state, JWEObject.State.DECRYPTED)
 
                     val signedJWT = encrypted.payload.toSignedJWT()
-                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(signingKey.toJSONObject())))
+                    signedJWT.verify(RSASSAVerifier(RSAKey.parse(rsaSigningKey.toJSONObject())))
                     assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
 
                     assertNotNull(signedJWT.jwtClaimsSet.issuer)
@@ -366,7 +354,7 @@ class DefaultDispatcherTest {
                 val body = assertIs<FormDataContent>(request.body)
                 val joseResponse = body.formData["response"] as String
                 val signedJWT = SignedJWT.parse(joseResponse)
-                signedJWT.verify(RSASSAVerifier(RSAKey.parse(signingKey.toJSONObject())))
+                signedJWT.verify(RSASSAVerifier(RSAKey.parse(rsaSigningKey.toJSONObject())))
 
                 assertNotNull(signedJWT)
                 assertNotNull(signedJWT.jwtClaimsSet.issuer)
@@ -397,12 +385,6 @@ class DefaultDispatcherTest {
 
         private val dispatcher = DefaultDispatcher(httpClientFactory = { error("Not used") })
         private val redirectUriBase = URI("https://foo.bar")
-        private val signingKey = RSAKeyGenerator(2048)
-            .keyUse(KeyUse.SIGNATURE)
-            .keyID(UUID.randomUUID().toString())
-            .issueTime(Date(System.currentTimeMillis()))
-            .generate()
-        private val signingKeySet: JWKSet = JWKSet(signingKey)
 
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() = runTest {
@@ -450,7 +432,7 @@ class DefaultDispatcherTest {
                     holderId = "DID:example:123",
                     jarmOption = JarmOption.SignedResponse(
                         responseSigningAlg = JWSAlgorithm.RS256,
-                        signingKeySet = signingKeySet,
+                        responseSigner = DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256")),
                     ),
                 )
                 val response =
@@ -459,7 +441,7 @@ class DefaultDispatcherTest {
                     assertNotNull(getQueryParameter("response"))
                     assertNotNull(getQueryParameter("state"))
                     val signedJWT = SignedJWT.parse(getQueryParameter("response"))
-                    signedJWT.verify(RSASSAVerifier(signingKey))
+                    signedJWT.verify(RSASSAVerifier(rsaSigningKey))
                     assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
                     assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
                     assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
@@ -487,12 +469,6 @@ class DefaultDispatcherTest {
 
         private val dispatcher = DefaultDispatcher(httpClientFactory = { error("Not used") })
         private val redirectUriBase = URI("https://foo.bar")
-        private val signingKey = RSAKeyGenerator(2048)
-            .keyUse(KeyUse.SIGNATURE)
-            .keyID(UUID.randomUUID().toString())
-            .issueTime(Date(System.currentTimeMillis()))
-            .generate()
-        private val signingKeySet: JWKSet = JWKSet(signingKey)
 
         @Test
         fun `when no consensus, fragment must contain an error`() = runTest {
@@ -537,7 +513,7 @@ class DefaultDispatcherTest {
                     holderId = "DID:example:123",
                     jarmOption = JarmOption.SignedResponse(
                         responseSigningAlg = JWSAlgorithm.RS256,
-                        signingKeySet = signingKeySet,
+                        responseSigner = DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256")),
                     ),
                 )
                 val response =
@@ -546,8 +522,8 @@ class DefaultDispatcherTest {
                     assertNotNull(fragmentData["state"])
                     assertNotNull(fragmentData["response"])
                     val signedJWT = SignedJWT.parse(fragmentData["response"])
-                    signedJWT.verify(RSASSAVerifier(signingKey))
-                    assertEquals(signedJWT.state, JWSObject.State.VERIFIED)
+                    signedJWT.verify(RSASSAVerifier(rsaSigningKey))
+                    assertEquals(JWSObject.State.VERIFIED, signedJWT.state)
                     assertNotNull(signedJWT.jwtClaimsSet.getClaim("state"))
                     assertNotNull(signedJWT.jwtClaimsSet.getClaim("id_token"))
                     assertEquals(dummyJwt, signedJWT.jwtClaimsSet.getClaim("id_token"))

@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.internal.mapError
@@ -172,7 +173,7 @@ enum class IdTokenType {
 sealed interface JarmOption {
     data class SignedResponse(
         val responseSigningAlg: JWSAlgorithm,
-        val signingKeySet: JWKSet,
+        val responseSigner: AuthorizationResponseSigner,
     ) : JarmOption
 
     data class EncryptedResponse(
@@ -189,7 +190,13 @@ sealed interface JarmOption {
     companion object {
         fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmOption? {
             val signed: SignedResponse? = clientMetaData.authorizationSignedResponseAlg?.let {
-                SignedResponse(it, walletOpenId4VPConfig.signingKeySet)
+                SignedResponse(
+                    responseSigningAlg = it,
+                    responseSigner = walletOpenId4VPConfig.supportedResponseSigner(it)
+                        ?: throw RequestValidationError.InvalidClientMetaData(
+                            "The Signing algorithm ${it.name} is not supported",
+                        ).asException(),
+                )
             }
 
             val encrypted: EncryptedResponse? =
@@ -209,6 +216,11 @@ sealed interface JarmOption {
             }
         }
     }
+}
+
+interface AuthorizationResponseSigner : JWSSigner {
+
+    fun getKeyId(): String
 }
 
 data class JarmSpec(val holderId: String, val jarmOption: JarmOption) {

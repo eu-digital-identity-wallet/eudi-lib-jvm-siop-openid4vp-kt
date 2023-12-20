@@ -15,9 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
@@ -37,7 +34,6 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
@@ -45,19 +41,12 @@ class AuthorizationResponseDispatcherTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
 
-    private val signingKey = RSAKeyGenerator(2048)
-        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
-        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
-        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
-        .generate()
-
     private val walletConfig = WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
         vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(signingKey),
         holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationResponseSigners = emptyList(),
         authorizationEncryptionAlgValuesSupported = emptyList(),
         authorizationEncryptionEncValuesSupported = emptyList(),
     )

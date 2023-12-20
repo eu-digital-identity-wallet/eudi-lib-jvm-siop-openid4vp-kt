@@ -102,9 +102,8 @@ class AuthorizationRequestResolverTest {
             SupportedClientIdScheme.RedirectUri,
         ),
         vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(signingKey),
         holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationResponseSigners = emptyList(),
         authorizationEncryptionAlgValuesSupported = emptyList(),
         authorizationEncryptionEncValuesSupported = emptyList(),
     )

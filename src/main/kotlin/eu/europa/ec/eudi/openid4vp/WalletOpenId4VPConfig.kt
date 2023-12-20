@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.SupportedClaimFormat
@@ -36,18 +35,14 @@ data class PreregisteredClient(
     val jarSigningAlg: String,
     val jwkSetSource: JwkSetSource,
 )
-enum class Channel {
-    NotSecured,
-    Secured,
-    Both,
-}
+
 sealed interface SupportedClientIdScheme {
     val scheme: ClientIdScheme
         get() = when (this) {
             is Preregistered -> ClientIdScheme.PreRegistered
             is X509SanUri -> ClientIdScheme.X509_SAN_URI
             is X509SanDns -> ClientIdScheme.X509_SAN_DNS
-            RedirectUri -> ClientIdScheme.RedirectUri
+            is RedirectUri -> ClientIdScheme.RedirectUri
         }
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme {
@@ -63,15 +58,17 @@ sealed interface SupportedClientIdScheme {
 
 data class WalletOpenId4VPConfig(
     val holderId: String,
-    val signingKeySet: JWKSet,
+    val authorizationResponseSigners: List<AuthorizationResponseSigner>,
     val presentationDefinitionUriSupported: Boolean,
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
     val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
-    val authorizationSigningAlgValuesSupported: List<JWSAlgorithm>,
     val authorizationEncryptionAlgValuesSupported: List<JWEAlgorithm>,
     val authorizationEncryptionEncValuesSupported: List<EncryptionMethod>,
 )
 
 fun WalletOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
     supportedClientIdSchemes.firstOrNull { it.scheme == scheme }
+
+fun WalletOpenId4VPConfig.supportedResponseSigner(signingAlgorithm: JWSAlgorithm): AuthorizationResponseSigner? =
+    authorizationResponseSigners.firstOrNull { it.supportedJWSAlgorithms().contains(signingAlgorithm) }

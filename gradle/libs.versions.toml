@@ -12,7 +12,8 @@ java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.10"
 maven-publish = "0.25.3"
-fasterxml-jackson="2.15.2"
+fasterxml-jackson = "2.15.2"
+bouncyCastle = "1.77"
 
 [libraries]
 fasterxml-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "fasterxml-jackson" }
@@ -28,6 +29,7 @@ presentation-exchange = { module = "eu.europa.ec.eudi:eudi-lib-jvm-presentation-
 nimbus-oauth2-oidc-sdk = { module = "com.nimbusds:oauth2-oidc-sdk", version.ref = "nimbus-sdk" }
 uri-kmp = { module = "com.eygraber:uri-kmp", version.ref = "uri-kmp" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+bouncy-castle = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncyCastle" }
 
 [plugins]
 dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }

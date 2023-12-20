@@ -36,6 +36,7 @@ dependencies {
     api(libs.ktor.client.content.negotiation)
     api(libs.ktor.client.serialization)
     api(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.bouncy.castle)
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.okhttp)

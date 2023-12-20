@@ -313,7 +313,7 @@ private class Wallet(
                     ),
                 ),
 
-                ),
+            ),
         )
     }
 

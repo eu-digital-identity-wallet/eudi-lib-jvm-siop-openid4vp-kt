@@ -42,6 +42,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
 import java.net.URLEncoder
+import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.time.Duration
@@ -59,7 +60,7 @@ fun main(): Unit = runTest {
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
-        walletConfig = walletConfig(Verifier.OutBandMeta, walletKeyPair),
+        walletConfig = walletConfig(Verifier.X509SanDns, walletKeyPair),
     )
 
     suspend fun runUseCase(transaction: Transaction) {
@@ -117,11 +118,33 @@ class Verifier private constructor(
 
         private const val VERIFIER_API = "http://localhost:8080"
 
-        val OutBandMeta = PreregisteredClient(
-            "Verifier",
-            JWSAlgorithm.RS256.name,
-            JwkSetSource.ByReference(URI("$VERIFIER_API/wallet/public-keys.json")),
-        )
+        val PreregisteredClient: SupportedClientIdScheme.Preregistered by lazy {
+            val client = PreregisteredClient(
+                "Verifier",
+                JWSAlgorithm.RS256.name,
+                JwkSetSource.ByReference(URI("$VERIFIER_API/wallet/public-keys.json")),
+            )
+
+            SupportedClientIdScheme.Preregistered(mapOf(client.clientId to client))
+        }
+
+        val X509SanDns: SupportedClientIdScheme.X509SanDns by lazy {
+            Verifier::class.java.classLoader.getResourceAsStream("certificates/certificates.jks")!!
+                .use { inputStream ->
+                    val keystore = KeyStore.getInstance(KeyStore.getDefaultType())
+                    keystore.load(inputStream, "12345".toCharArray())
+
+                    val trustedChain = keystore.getCertificateChain("verifier")
+                        .orEmpty()
+                        .map { it as X509Certificate }
+                        .toList()
+                        .also { trustedChain ->
+                            check(trustedChain.size == 3) { "expected to load a trusted chain with 3 certificates " }
+                        }
+
+                    SupportedClientIdScheme.X509SanDns { untrustedChain -> untrustedChain == trustedChain }
+                }
+        }
 
         /**
          * Creates a new verifier that knows (out of bound) the
@@ -306,7 +329,7 @@ private class Wallet(
                     ),
                 ),
 
-            ),
+                ),
         )
     }
 
@@ -348,20 +371,21 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun walletConfig(verifierMetaData: PreregisteredClient, walletKeyPair: RSAKey) = WalletOpenId4VPConfig(
-    presentationDefinitionUriSupported = true,
-    supportedClientIdSchemes = listOf(SupportedClientIdScheme.Preregistered(mapOf(verifierMetaData.clientId to verifierMetaData))),
-    vpFormatsSupported = emptyList(),
-    subjectSyntaxTypesSupported = emptyList(),
-    signingKey = walletKeyPair,
-    signingKeySet = JWKSet(walletKeyPair),
-    idTokenTTL = Duration.ofMinutes(10),
-    preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-    decentralizedIdentifier = "DID:example:12341512#$",
-    authorizationSigningAlgValuesSupported = emptyList(),
-    authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-    authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
-)
+private fun walletConfig(supportedClientIdScheme: SupportedClientIdScheme, walletKeyPair: RSAKey) =
+    WalletOpenId4VPConfig(
+        presentationDefinitionUriSupported = true,
+        supportedClientIdSchemes = listOf(supportedClientIdScheme),
+        vpFormatsSupported = emptyList(),
+        subjectSyntaxTypesSupported = emptyList(),
+        signingKey = walletKeyPair,
+        signingKeySet = JWKSet(walletKeyPair),
+        idTokenTTL = Duration.ofMinutes(10),
+        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
+        decentralizedIdentifier = "DID:example:12341512#$",
+        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
+        authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+    )
 
 val PidPresentationDefinition = """
             {

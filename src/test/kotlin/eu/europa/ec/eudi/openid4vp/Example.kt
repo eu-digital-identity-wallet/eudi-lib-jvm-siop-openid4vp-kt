@@ -45,7 +45,6 @@ import java.net.URLEncoder
 import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.time.Duration
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
@@ -306,7 +305,7 @@ private class Wallet(
 
         val userConsent: Boolean = showScreen()
         return if (userConsent) {
-            val idToken = SiopIdTokenBuilder.build(request, holder, walletConfig, walletKeyPair)
+            val idToken = SiopIdTokenBuilder.build(request, holder, walletKeyPair)
             Consensus.PositiveConsensus.IdTokenConsensus(idToken)
         } else {
             Consensus.NegativeConsensus
@@ -329,7 +328,7 @@ private class Wallet(
                     ),
                 ),
 
-                ),
+            ),
         )
     }
 
@@ -371,21 +370,16 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun walletConfig(supportedClientIdScheme: SupportedClientIdScheme, walletKeyPair: RSAKey) =
-    WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
-        supportedClientIdSchemes = listOf(supportedClientIdScheme),
-        vpFormatsSupported = emptyList(),
-        subjectSyntaxTypesSupported = emptyList(),
-        signingKey = walletKeyPair,
-        signingKeySet = JWKSet(walletKeyPair),
-        idTokenTTL = Duration.ofMinutes(10),
-        preferredSubjectSyntaxType = SubjectSyntaxType.JWKThumbprint,
-        decentralizedIdentifier = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
-        authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-        authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
-    )
+private fun walletConfig(supportedClientIdScheme: SupportedClientIdScheme, walletKeyPair: RSAKey) = WalletOpenId4VPConfig(
+    presentationDefinitionUriSupported = true,
+    supportedClientIdSchemes = listOf(supportedClientIdScheme),
+    vpFormatsSupported = emptyList(),
+    signingKeySet = JWKSet(walletKeyPair),
+    holderId = "DID:example:12341512#$",
+    authorizationSigningAlgValuesSupported = emptyList(),
+    authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
+    authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+)
 
 val PidPresentationDefinition = """
             {

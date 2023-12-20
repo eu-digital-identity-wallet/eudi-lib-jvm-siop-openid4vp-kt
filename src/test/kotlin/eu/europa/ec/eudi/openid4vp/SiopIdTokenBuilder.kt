@@ -38,6 +38,7 @@ import com.nimbusds.oauth2.sdk.id.Subject
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import java.io.Serializable
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.util.*
@@ -72,7 +73,6 @@ object SiopIdTokenBuilder {
     fun build(
         request: ResolvedRequestObject.SiopAuthentication,
         holderInfo: HolderInfo,
-        walletConfig: WalletOpenId4VPConfig,
         rsaJWK: RSAKey,
         clock: Clock = Clock.systemDefaultZone(),
     ): String {
@@ -88,14 +88,9 @@ object SiopIdTokenBuilder {
 
         fun buildJWKThumbprint(): String = ThumbprintUtils.compute("SHA-256", rsaJWK).toString()
 
-        fun buildIssuerClaim(): String = when (walletConfig.preferredSubjectSyntaxType) {
-            is SubjectSyntaxType.JWKThumbprint -> buildJWKThumbprint()
-            is SubjectSyntaxType.DecentralizedIdentifier -> walletConfig.decentralizedIdentifier
-        }
-
         fun computeTokenDates(clock: Clock): Pair<Date, Date> {
             val iat = clock.instant()
-            val exp = iat.plusMillis(walletConfig.idTokenTTL.toMillis())
+            val exp = iat.plusMillis(Duration.ofMinutes(10).toMillis())
             fun Instant.toDate() = Date.from(atZone(ZoneId.systemDefault()).toInstant())
             return iat.toDate() to exp.toDate()
         }
@@ -104,8 +99,8 @@ object SiopIdTokenBuilder {
 
         return with(
             IDTokenClaimsSet(
-                Issuer(buildIssuerClaim()),
-                Subject(buildIssuerClaim()),
+                Issuer(buildJWKThumbprint()),
+                Subject(buildJWKThumbprint()),
                 listOf(request.clientId).map { Audience(it) },
                 exp,
                 iat,

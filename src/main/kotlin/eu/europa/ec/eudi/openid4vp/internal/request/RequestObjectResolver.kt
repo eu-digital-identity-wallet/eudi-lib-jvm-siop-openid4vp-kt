@@ -88,6 +88,7 @@ internal class RequestObjectResolver(
 
     private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ClientMetaData {
         val source = checkNotNull(validated.clientMetaDataSource) { "Missing or invalid client metadata" }
-        return clientMetaDataResolver.resolve(source)
+
+        return clientMetaDataResolver.resolve(source, validated.responseMode)
     }
 }

@@ -58,7 +58,7 @@ fun main(): Unit = runTest {
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
-        walletConfig = walletConfig(Verifier.OutBandMeta, walletKeyPair),
+        walletConfig = walletConfig(Verifier.PreregisteredClient, walletKeyPair),
     )
 
     suspend fun runUseCase(transaction: Transaction) {
@@ -116,11 +116,19 @@ class Verifier private constructor(
 
         private const val VERIFIER_API = "http://localhost:8080"
 
-        val OutBandMeta = PreregisteredClient(
-            "Verifier",
-            JWSAlgorithm.RS256.name,
-            JwkSetSource.ByReference(URI("$VERIFIER_API/wallet/public-keys.json")),
-        )
+        val PreregisteredClient: SupportedClientIdScheme.Preregistered by lazy {
+            val client = PreregisteredClient(
+                "Verifier",
+                JWSAlgorithm.RS256.name,
+                JwkSetSource.ByReference(URI("$VERIFIER_API/wallet/public-keys.json")),
+            )
+
+            SupportedClientIdScheme.Preregistered(mapOf(client.clientId to client))
+        }
+
+        val X509SanDns: SupportedClientIdScheme.X509SanDns by lazy {
+            SupportedClientIdScheme.X509SanDns { true }
+        }
 
         /**
          * Creates a new verifier that knows (out of bound) the
@@ -347,16 +355,17 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun walletConfig(verifierMetaData: PreregisteredClient, walletKeyPair: RSAKey) = WalletOpenId4VPConfig(
-    presentationDefinitionUriSupported = true,
-    supportedClientIdSchemes = listOf(SupportedClientIdScheme.Preregistered(mapOf(verifierMetaData.clientId to verifierMetaData))),
-    vpFormatsSupported = emptyList(),
-    signingKeySet = JWKSet(walletKeyPair),
-    holderId = "DID:example:12341512#$",
-    authorizationSigningAlgValuesSupported = emptyList(),
-    authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-    authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
-)
+private fun walletConfig(supportedClientIdScheme: SupportedClientIdScheme, walletKeyPair: RSAKey) =
+    WalletOpenId4VPConfig(
+        presentationDefinitionUriSupported = true,
+        supportedClientIdSchemes = listOf(supportedClientIdScheme),
+        vpFormatsSupported = emptyList(),
+        signingKeySet = JWKSet(walletKeyPair),
+        holderId = "DID:example:12341512#$",
+        authorizationSigningAlgValuesSupported = emptyList(),
+        authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
+        authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+    )
 
 val PidPresentationDefinition = """
             {

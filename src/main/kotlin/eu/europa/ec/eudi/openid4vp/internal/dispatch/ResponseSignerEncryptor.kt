@@ -114,6 +114,7 @@ private object JwtPayloadFactory {
         buildJsonObject {
             put("iss", holderId)
             put("iat", issuedAt.epochSecond)
+            put("aud", data.clientId)
             put(STATE_CLAIM, data.state)
 
             when (data) {

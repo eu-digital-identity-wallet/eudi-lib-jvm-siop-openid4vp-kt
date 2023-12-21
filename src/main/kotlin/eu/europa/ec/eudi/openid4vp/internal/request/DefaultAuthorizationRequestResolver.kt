@@ -140,12 +140,12 @@ private sealed interface AuthorizationRequest : java.io.Serializable {
 }
 
 internal class DefaultAuthorizationRequestResolver(
-    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
     private val requestObjectResolver: RequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
-    private val jarJwtValidator = JarJwtSignatureValidator(walletOpenId4VPConfig, httpClientFactory)
+    private val jarJwtValidator = JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory)
 
     override suspend fun resolveRequestUri(uri: String): Resolution =
         AuthorizationRequest.make(
@@ -167,7 +167,7 @@ internal class DefaultAuthorizationRequestResolver(
             val validatedRequestObject =
                 RequestObjectValidator.validate(supportedClientIdScheme, requestObject)
             val resolved =
-                requestObjectResolver.resolve(validatedRequestObject, walletOpenId4VPConfig)
+                requestObjectResolver.resolve(validatedRequestObject, siopOpenId4VPConfig)
             Resolution.Success(resolved)
         } catch (t: AuthorizationRequestException) {
             Resolution.Invalid(t.error)
@@ -204,11 +204,11 @@ internal class DefaultAuthorizationRequestResolver(
             ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
         } ?: throw invalidScheme()
 
-        val supportedClientIdScheme = walletOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
         fun knownClient(s: SupportedClientIdScheme) =
-            if (supportedClientIdScheme !is SupportedClientIdScheme.Preregistered) true
-            else supportedClientIdScheme.clients.containsKey(requestObject.clientId)
+            if (s !is SupportedClientIdScheme.Preregistered) true
+            else s.clients.containsKey(requestObject.clientId)
 
+        val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
         return supportedClientIdScheme
             ?.takeIf(::knownClient)
             ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
@@ -235,13 +235,13 @@ internal class DefaultAuthorizationRequestResolver(
          */
         internal fun make(
             httpClientFactory: KtorHttpClientFactory,
-            walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            siopOpenId4VPConfig: SiopOpenId4VPConfig,
         ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
-            walletOpenId4VPConfig,
+            siopOpenId4VPConfig,
             httpClientFactory,
             RequestObjectResolver(
                 presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
-                clientMetaDataResolver = ClientMetaDataResolver(httpClientFactory, walletOpenId4VPConfig),
+                clientMetaDataResolver = ClientMetaDataResolver(httpClientFactory, siopOpenId4VPConfig),
             ),
         )
     }

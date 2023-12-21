@@ -43,11 +43,11 @@ import java.text.ParseException
 /**
  * Validates a JWT that represents an Authorization Request according to RFC9101
  *
- * @param walletOpenId4VPConfig wallet's configuration
+ * @param siopOpenId4VPConfig wallet's configuration
  * @param httpClientFactory a factory to obtain a Ktor http client
  */
 internal class JarJwtSignatureValidator(
-    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
 ) {
 
@@ -85,7 +85,7 @@ internal class JarJwtSignatureValidator(
         val supportedClientIdScheme =
             untrustedClaimSet.getStringClaim("client_id_scheme")
                 ?.let { ClientIdScheme.make(it)?.takeIf { x -> x.supportsJar() } }
-                ?.let { walletOpenId4VPConfig.supportedClientIdScheme(it) }
+                ?.let { siopOpenId4VPConfig.supportedClientIdScheme(it) }
 
         fun clientIdMismatch() = invalidJarJwt("ClientId mismatch. JAR request $clientId, jwt $jwtClientId")
 

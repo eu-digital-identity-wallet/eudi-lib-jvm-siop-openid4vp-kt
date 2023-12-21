@@ -80,8 +80,7 @@ class AuthorizationRequestResolverTest {
         """.trimIndent(),
     ).jsonObject
 
-    private val walletConfig = WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
+    private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(
             SupportedClientIdScheme.Preregistered(
                 mapOf(
@@ -101,11 +100,16 @@ class AuthorizationRequestResolverTest {
             SupportedClientIdScheme.X509SanUri(::validateChain),
             SupportedClientIdScheme.RedirectUri,
         ),
-        vpFormatsSupported = emptyList(),
-        holderId = "DID:example:12341512#$",
-        authorizationResponseSigners = emptyList(),
-        authorizationEncryptionAlgValuesSupported = emptyList(),
-        authorizationEncryptionEncValuesSupported = emptyList(),
+        vpConfiguration = VPConfiguration(
+            presentationDefinitionUriSupported = true,
+            vpFormatsSupported = emptyList(),
+        ),
+        jarmConfiguration = JarmConfiguration(
+            holderId = "DID:example:12341512#$",
+            authorizationResponseSigners = emptyList(),
+            authorizationEncryptionAlgValuesSupported = emptyList(),
+            authorizationEncryptionEncValuesSupported = emptyList(),
+        ),
     )
 
     private val resolver = SiopOpenId4Vp(walletConfig)

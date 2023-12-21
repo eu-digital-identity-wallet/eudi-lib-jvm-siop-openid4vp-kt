@@ -23,7 +23,7 @@ import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
  * Default implementation of [AuthorizationResponseBuilder]
  */
 internal class DefaultAuthorizationResponseBuilder(
-    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ) : AuthorizationResponseBuilder {
 
     override suspend fun build(
@@ -82,7 +82,7 @@ internal class DefaultAuthorizationResponseBuilder(
         requestObject: ResolvedRequestObject,
         responseData: AuthorizationResponsePayload,
     ): AuthorizationResponse {
-        fun jarmSpec() = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
+        fun jarmSpec() = JarmSpec.make(requestObject.clientMetaData, siopOpenId4VPConfig)
             ?: error("Cannot create JarmSpec from passed Client Metadata")
 
         return when (val responseMode = requestObject.responseMode) {

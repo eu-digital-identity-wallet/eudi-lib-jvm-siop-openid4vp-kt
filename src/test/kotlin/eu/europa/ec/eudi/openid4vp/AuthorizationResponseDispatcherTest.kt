@@ -41,14 +41,18 @@ class AuthorizationResponseDispatcherTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
 
-    private val walletConfig = WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
+    private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-        vpFormatsSupported = emptyList(),
-        holderId = "DID:example:12341512#$",
-        authorizationResponseSigners = emptyList(),
-        authorizationEncryptionAlgValuesSupported = emptyList(),
-        authorizationEncryptionEncValuesSupported = emptyList(),
+        vpConfiguration = VPConfiguration(
+            presentationDefinitionUriSupported = true,
+            vpFormatsSupported = emptyList(),
+        ),
+        jarmConfiguration = JarmConfiguration(
+            holderId = "DID:example:12341512#$",
+            authorizationResponseSigners = emptyList(),
+            authorizationEncryptionAlgValuesSupported = emptyList(),
+            authorizationEncryptionEncValuesSupported = emptyList(),
+        ),
     )
 
     private val clientMetadataStr =

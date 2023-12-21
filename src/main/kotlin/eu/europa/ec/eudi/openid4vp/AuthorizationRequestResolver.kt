@@ -161,6 +161,8 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = UnsupportedClientIdScheme
     }
 
+    data class UnsupportedResponseSigningAlgorithm(val value: String) : RequestValidationError
+
     data object InvalidClientMetaDataUri : RequestValidationError {
         private fun readResolve(): Any = InvalidClientMetaDataUri
     }
@@ -281,8 +283,8 @@ fun interface AuthorizationRequestResolver {
          */
         operator fun invoke(
             httpClientFactory: KtorHttpClientFactory,
-            walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            siopOpenId4VPConfig: SiopOpenId4VPConfig,
         ): AuthorizationRequestResolver =
-            DefaultAuthorizationRequestResolver.make(httpClientFactory, walletOpenId4VPConfig)
+            DefaultAuthorizationRequestResolver.make(httpClientFactory, siopOpenId4VPConfig)
     }
 }

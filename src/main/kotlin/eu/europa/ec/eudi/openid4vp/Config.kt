@@ -42,7 +42,7 @@ sealed interface SupportedClientIdScheme {
             is Preregistered -> ClientIdScheme.PreRegistered
             is X509SanUri -> ClientIdScheme.X509_SAN_URI
             is X509SanDns -> ClientIdScheme.X509_SAN_DNS
-            is RedirectUri -> ClientIdScheme.RedirectUri
+            RedirectUri -> ClientIdScheme.RedirectUri
         }
 
     data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme {
@@ -56,19 +56,27 @@ sealed interface SupportedClientIdScheme {
     data object RedirectUri : SupportedClientIdScheme
 }
 
-data class WalletOpenId4VPConfig(
+data class SiopOpenId4VPConfig(
+    val supportedClientIdSchemes: List<SupportedClientIdScheme>,
+    val vpConfiguration: VPConfiguration,
+    val jarmConfiguration: JarmConfiguration,
+)
+
+data class VPConfiguration(
+    val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
+    val presentationDefinitionUriSupported: Boolean,
+    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+)
+
+data class JarmConfiguration(
     val holderId: String,
     val authorizationResponseSigners: List<AuthorizationResponseSigner>,
-    val presentationDefinitionUriSupported: Boolean,
-    val supportedClientIdSchemes: List<SupportedClientIdScheme>,
-    val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
-    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val authorizationEncryptionAlgValuesSupported: List<JWEAlgorithm>,
     val authorizationEncryptionEncValuesSupported: List<EncryptionMethod>,
 )
 
-fun WalletOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
+fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
     supportedClientIdSchemes.firstOrNull { it.scheme == scheme }
 
-fun WalletOpenId4VPConfig.supportedResponseSigner(signingAlgorithm: JWSAlgorithm): AuthorizationResponseSigner? =
-    authorizationResponseSigners.firstOrNull { it.supportedJWSAlgorithms().contains(signingAlgorithm) }
+fun SiopOpenId4VPConfig.supportedResponseSigner(signingAlgorithm: JWSAlgorithm): AuthorizationResponseSigner? =
+    jarmConfiguration.authorizationResponseSigners.firstOrNull { it.supportedJWSAlgorithms().contains(signingAlgorithm) }

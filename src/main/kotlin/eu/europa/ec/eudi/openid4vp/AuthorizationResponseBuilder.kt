@@ -228,7 +228,7 @@ fun interface AuthorizationResponseBuilder {
     suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse
 
     companion object {
-        operator fun invoke(walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationResponseBuilder =
-            DefaultAuthorizationResponseBuilder(walletOpenId4VPConfig)
+        operator fun invoke(siopOpenId4VPConfig: SiopOpenId4VPConfig): AuthorizationResponseBuilder =
+            DefaultAuthorizationResponseBuilder(siopOpenId4VPConfig)
     }
 }

@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.ClientMetaData
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
-import eu.europa.ec.eudi.openid4vp.WalletOpenId4VPConfig
+import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 
@@ -28,18 +28,18 @@ internal class RequestObjectResolver(
 
     suspend fun resolve(
         validated: ValidatedRequestObject,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig,
+        siopOpenId4VPConfig: SiopOpenId4VPConfig,
     ): ResolvedRequestObject = when (validated) {
         is SiopAuthentication -> resolveIdTokenRequest(validated)
-        is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, walletOpenId4VPConfig)
-        is SiopOpenId4VPAuthentication -> resolveIdAndVpTokenRequest(validated, walletOpenId4VPConfig)
+        is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, siopOpenId4VPConfig)
+        is SiopOpenId4VPAuthentication -> resolveIdAndVpTokenRequest(validated, siopOpenId4VPConfig)
     }
 
     private suspend fun resolveIdAndVpTokenRequest(
         validated: SiopOpenId4VPAuthentication,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig,
+        siopOpenId4VPConfig: SiopOpenId4VPConfig,
     ): ResolvedRequestObject {
-        val presentationDefinition = resolvePd(validated.presentationDefinitionSource, walletOpenId4VPConfig)
+        val presentationDefinition = resolvePd(validated.presentationDefinitionSource, siopOpenId4VPConfig)
         return ResolvedRequestObject.SiopOpenId4VPAuthentication(
             idTokenType = validated.idTokenType,
             presentationDefinition = presentationDefinition,
@@ -54,9 +54,9 @@ internal class RequestObjectResolver(
 
     private suspend fun resolveVpTokenRequest(
         validated: OpenId4VPAuthorization,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig,
+        siopOpenId4VPConfig: SiopOpenId4VPConfig,
     ): ResolvedRequestObject {
-        val presentationDefinition = resolvePd(validated.presentationDefinitionSource, walletOpenId4VPConfig)
+        val presentationDefinition = resolvePd(validated.presentationDefinitionSource, siopOpenId4VPConfig)
         return ResolvedRequestObject.OpenId4VPAuthorization(
             presentationDefinition = presentationDefinition,
             clientMetaData = resolveClientMetaData(validated),
@@ -82,9 +82,9 @@ internal class RequestObjectResolver(
 
     private suspend fun resolvePd(
         presentationDefinitionSource: PresentationDefinitionSource,
-        walletOpenId4VPConfig: WalletOpenId4VPConfig,
+        siopOpenId4VPConfig: SiopOpenId4VPConfig,
     ): PresentationDefinition =
-        presentationDefinitionResolver.resolve(presentationDefinitionSource, walletOpenId4VPConfig)
+        presentationDefinitionResolver.resolve(presentationDefinitionSource, siopOpenId4VPConfig)
 
     private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ClientMetaData {
         val source = checkNotNull(validated.clientMetaDataSource) { "Missing or invalid client metadata" }

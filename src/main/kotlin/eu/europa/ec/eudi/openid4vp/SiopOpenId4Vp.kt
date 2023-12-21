@@ -37,34 +37,34 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
         /**
          * Factory method to create a [SiopOpenId4Vp].
          *
-         * @param walletOpenId4VPConfig wallet's configuration
+         * @param siopOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
          */
         @Deprecated(
             message = "Will be removed. Use invoke instead.",
-            replaceWith = ReplaceWith("SiopOpenId4Vp(walletOpenId4VPConfig, httpClientFactory)"),
+            replaceWith = ReplaceWith("SiopOpenId4Vp(siopOpenId4VPConfig, httpClientFactory)"),
         )
         fun ktor(
-            walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            siopOpenId4VPConfig: SiopOpenId4VPConfig,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): SiopOpenId4Vp = SiopOpenId4Vp(walletOpenId4VPConfig, httpClientFactory)
+        ): SiopOpenId4Vp = SiopOpenId4Vp(siopOpenId4VPConfig, httpClientFactory)
 
         /**
          * Factory method to create a [SiopOpenId4Vp].
          *
-         * @param walletOpenId4VPConfig wallet's configuration
+         * @param siopOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain a Ktor http client
          * @return a [SiopOpenId4Vp]
          */
         operator fun invoke(
-            walletOpenId4VPConfig: WalletOpenId4VPConfig,
+            siopOpenId4VPConfig: SiopOpenId4VPConfig,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): SiopOpenId4Vp =
             SiopOpenId4Vp(
-                AuthorizationRequestResolver(httpClientFactory, walletOpenId4VPConfig),
+                AuthorizationRequestResolver(httpClientFactory, siopOpenId4VPConfig),
                 Dispatcher(httpClientFactory),
-                AuthorizationResponseBuilder(walletOpenId4VPConfig),
+                AuthorizationResponseBuilder(siopOpenId4VPConfig),
             )
 
         /**

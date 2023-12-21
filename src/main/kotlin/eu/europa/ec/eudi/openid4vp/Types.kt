@@ -174,7 +174,11 @@ sealed interface JarmOption {
     data class SignedResponse(
         val responseSigningAlg: JWSAlgorithm,
         val responseSigner: AuthorizationResponseSigner,
-    ) : JarmOption
+    ) : JarmOption {
+        init {
+            require(responseSigningAlg in responseSigner.supportedJWSAlgorithms())
+        }
+    }
 
     data class EncryptedResponse(
         val responseEncryptionAlg: JWEAlgorithm,
@@ -188,15 +192,11 @@ sealed interface JarmOption {
     ) : JarmOption
 
     companion object {
-        fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmOption? {
-            val signed: SignedResponse? = clientMetaData.authorizationSignedResponseAlg?.let {
-                SignedResponse(
-                    responseSigningAlg = it,
-                    responseSigner = walletOpenId4VPConfig.supportedResponseSigner(it)
-                        ?: throw RequestValidationError.InvalidClientMetaData(
-                            "The Signing algorithm ${it.name} is not supported",
-                        ).asException(),
-                )
+        fun make(clientMetaData: ClientMetaData, siopOpenId4VPConfig: SiopOpenId4VPConfig): JarmOption? {
+            val signed: SignedResponse? = clientMetaData.authorizationSignedResponseAlg?.let { jwsAlgorithm ->
+                siopOpenId4VPConfig.supportedResponseSigner(jwsAlgorithm)?.let { signer ->
+                    SignedResponse(jwsAlgorithm, signer)
+                }
             }
 
             val encrypted: EncryptedResponse? =
@@ -226,9 +226,9 @@ interface AuthorizationResponseSigner : JWSSigner {
 data class JarmSpec(val holderId: String, val jarmOption: JarmOption) {
 
     companion object {
-        fun make(clientMetaData: ClientMetaData, walletOpenId4VPConfig: WalletOpenId4VPConfig): JarmSpec? =
-            JarmOption.make(clientMetaData, walletOpenId4VPConfig)?.let { jarmOption ->
-                val holderId = walletOpenId4VPConfig.holderId
+        fun make(clientMetaData: ClientMetaData, siopOpenId4VPConfig: SiopOpenId4VPConfig): JarmSpec? =
+            JarmOption.make(clientMetaData, siopOpenId4VPConfig)?.let { jarmOption ->
+                val holderId = siopOpenId4VPConfig.jarmConfiguration.holderId
                 JarmSpec(holderId, jarmOption)
             }
     }

@@ -65,12 +65,12 @@ class DefaultDispatcherTest {
         .generate()
 
     private val rsaKey = (
-            "{\"kty\": \"RSA\", \"e\": \"AQAB\", \"use\": \"sig\", \"kid\": \"a4e1bbe6-26e8-480b-a364-f43497894453\"," +
-                    " \"iat\": 1683559586, \"n\": \"xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeE" +
-                    "Dy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCC" +
-                    "lO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcr" +
-                    "Bl62k90RaMZpXCxNO4Ew\"}"
-            ).trimIndent()
+        "{\"kty\": \"RSA\", \"e\": \"AQAB\", \"use\": \"sig\", \"kid\": \"a4e1bbe6-26e8-480b-a364-f43497894453\"," +
+            " \"iat\": 1683559586, \"n\": \"xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeE" +
+            "Dy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCC" +
+            "lO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcr" +
+            "Bl62k90RaMZpXCxNO4Ew\"}"
+        ).trimIndent()
 
     private val clientId = "https://client.example.org"
 
@@ -82,7 +82,7 @@ class DefaultDispatcherTest {
                 "authorization_encrypted_response_alg":"ECDH-ES", 
                 "authorization_encrypted_response_enc":"A256GCM"
             }       
-            """.trimIndent().trimMargin()
+    """.trimIndent().trimMargin()
 
     val clientMetadataEncryptionOnly = """
                { 
@@ -91,7 +91,7 @@ class DefaultDispatcherTest {
                   "authorization_encrypted_response_alg":"ECDH-ES", 
                   "authorization_encrypted_response_enc":"A256GCM"
                }
-            """.trimIndent()
+    """.trimIndent()
 
     val clientMetadataStrSigning = """
                 { 
@@ -99,7 +99,7 @@ class DefaultDispatcherTest {
                     "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ],
                     "authorization_signed_response_alg":"RS256" 
                 }
-            """.trimIndent().trimMargin()
+    """.trimIndent().trimMargin()
 
     @Nested
     @DisplayName("Encrypted/Signed response")
@@ -107,24 +107,32 @@ class DefaultDispatcherTest {
 
         private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
 
-        private val walletConfig = WalletOpenId4VPConfig(
-            presentationDefinitionUriSupported = true,
+        private val walletConfig = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-            vpFormatsSupported = emptyList(),
-            holderId = "DID:example:12341512#$",
-            authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
-            authorizationEncryptionAlgValuesSupported = emptyList(),
-            authorizationEncryptionEncValuesSupported = emptyList(),
+            vpConfiguration = VPConfiguration(
+                presentationDefinitionUriSupported = true,
+                vpFormatsSupported = emptyList(),
+            ),
+            jarmConfiguration = JarmConfiguration(
+                holderId = "DID:example:12341512#$",
+                authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
+                authorizationEncryptionAlgValuesSupported = emptyList(),
+                authorizationEncryptionEncValuesSupported = emptyList(),
+            ),
         )
 
-        private val walletConfigWithSignAndEncryptionAlgorithms = WalletOpenId4VPConfig(
-            presentationDefinitionUriSupported = true,
+        private val walletConfigWithSignAndEncryptionAlgorithms = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-            vpFormatsSupported = emptyList(),
-            holderId = "DID:example:12341512#$",
-            authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
-            authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+            vpConfiguration = VPConfiguration(
+                presentationDefinitionUriSupported = true,
+                vpFormatsSupported = emptyList(),
+            ),
+            jarmConfiguration = JarmConfiguration(
+                holderId = "DID:example:12341512#$",
+                authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
+                authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
+                authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+            ),
         )
 
         @Test
@@ -194,11 +202,11 @@ class DefaultDispatcherTest {
 
                 assertTrue("Claim 'aud' must be provided and be equal to holder id") {
                     signedJWT.jwtClaimsSet.getClaim("iss") != null &&
-                            signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.holderId
+                        signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.jarmConfiguration.holderId
                 }
                 assertTrue("Claim 'aud' must be provided and be equal to client_id") {
                     signedJWT.jwtClaimsSet.getClaim("aud") != null &&
-                            signedJWT.jwtClaimsSet.getListClaim("aud")[0] == clientId
+                        signedJWT.jwtClaimsSet.getListClaim("aud")[0] == clientId
                 }
                 assertEquals(signedJWT.jwtClaimsSet.getClaim("vp_token"), "dummy_vp_token")
 
@@ -243,7 +251,7 @@ class DefaultDispatcherTest {
                     assertEquals(JWSObject.State.VERIFIED, signedJWT.state)
                     assertTrue("Claim 'aud' must be provided and be equal to holder id") {
                         signedJWT.jwtClaimsSet.getClaim("iss") != null &&
-                                signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.holderId
+                                signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.jarmConfiguration.holderId
                     }
                     assertTrue("Claim 'aud' must be provided and be equal to client_id") {
                         signedJWT.jwtClaimsSet.getClaim("aud") != null &&
@@ -282,7 +290,7 @@ class DefaultDispatcherTest {
                 assertEquals(JWSObject.State.VERIFIED, signedJWT.state)
                 assertTrue("Claim 'aud' must be provided and be equal to holder id") {
                     signedJWT.jwtClaimsSet.getClaim("iss") != null &&
-                        signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.holderId
+                        signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.jarmConfiguration.holderId
                 }
                 assertTrue("Claim 'aud' must be provided and be equal to client_id") {
                     signedJWT.jwtClaimsSet.getClaim("aud") != null &&
@@ -302,7 +310,7 @@ class DefaultDispatcherTest {
 
         private suspend fun resolvedRequestObject(
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
-            responseMode: ResponseMode.DirectPostJwt
+            responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val clientMetadataValidated = ClientMetadataValidator(
                 walletConfigWithSignAndEncryptionAlgorithms,
@@ -310,16 +318,16 @@ class DefaultDispatcherTest {
             ).validate(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                    presentationDefinition = PresentationDefinition(
-                        id = Id("pdId"),
-                        inputDescriptors = emptyList(),
-                    ),
-                    clientMetaData = clientMetadataValidated,
-                    clientId = clientId,
-                    nonce = "0S6_WzA2Mj",
-                    responseMode = responseMode,
-                    state = State().value,
-                )
+                presentationDefinition = PresentationDefinition(
+                    id = Id("pdId"),
+                    inputDescriptors = emptyList(),
+                ),
+                clientMetaData = clientMetadataValidated,
+                clientId = clientId,
+                nonce = "0S6_WzA2Mj",
+                responseMode = responseMode,
+                state = State().value,
+            )
         }
 
         private fun ecdhDecrypt(ecPrivateKey: ECPrivateKey, jwtString: String): JWTClaimsSet {

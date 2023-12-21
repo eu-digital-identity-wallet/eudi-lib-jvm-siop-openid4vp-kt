@@ -29,9 +29,9 @@ import java.net.URL
  */
 internal class ClientMetaDataResolver(
     private val httpClientFactory: KtorHttpClientFactory,
-    walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ) {
-    private val clientMetadataValidator = ClientMetadataValidator(walletOpenId4VPConfig, httpClientFactory)
+    private val clientMetadataValidator = ClientMetadataValidator(siopOpenId4VPConfig, httpClientFactory)
 
     /**
      * Gets the meta-data from the [clientMetaDataSource] and then validates them

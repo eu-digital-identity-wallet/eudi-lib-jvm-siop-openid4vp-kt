@@ -47,21 +47,21 @@ internal class PresentationDefinitionResolver(
      */
     suspend fun resolve(
         source: PresentationDefinitionSource,
-        config: WalletOpenId4VPConfig,
+        config: SiopOpenId4VPConfig,
     ): PresentationDefinition = when (source) {
         is ByValue -> source.presentationDefinition
         is ByReference ->
-            if (config.presentationDefinitionUriSupported) fetchPresentationDefinition(source.url)
+            if (config.vpConfiguration.presentationDefinitionUriSupported) fetchPresentationDefinition(source.url)
             else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
         is Implied -> lookupKnownPresentationDefinitions(source.scope, config)
     }
 
     private fun lookupKnownPresentationDefinitions(
         scope: Scope,
-        config: WalletOpenId4VPConfig,
+        config: SiopOpenId4VPConfig,
     ): PresentationDefinition =
         scope.items()
-            .firstNotNullOfOrNull { config.knownPresentationDefinitionsPerScope[it] }
+            .firstNotNullOfOrNull { config.vpConfiguration.knownPresentationDefinitionsPerScope[it] }
             ?: throw ResolutionError.PresentationDefinitionNotFoundForScope(scope).asException()
 
     private suspend fun fetchPresentationDefinition(url: URL): PresentationDefinition =

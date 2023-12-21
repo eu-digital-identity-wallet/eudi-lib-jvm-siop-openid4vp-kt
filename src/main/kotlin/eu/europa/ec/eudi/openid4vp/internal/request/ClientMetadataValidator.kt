@@ -32,7 +32,7 @@ import java.net.URL
 import java.text.ParseException
 
 internal class ClientMetadataValidator(
-    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
 ) {
 
@@ -57,8 +57,8 @@ internal class ClientMetadataValidator(
 
     private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData): JWSAlgorithm? =
         unvalidated.authorizationSignedResponseAlg?.signingAlg()?.also {
-            requireOrThrow(walletOpenId4VPConfig.supportedResponseSigner(it) != null) {
-                InvalidClientMetaData("The Signing algorithm ${it.name} is not supported").asException()
+            requireOrThrow(siopOpenId4VPConfig.supportedResponseSigner(it) != null) {
+                UnsupportedResponseSigningAlgorithm("The Signing algorithm ${it.name} is not supported").asException()
             }
         }
 
@@ -69,13 +69,13 @@ internal class ClientMetadataValidator(
         if (!responseMode.isJarm()) return null to null
 
         val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.encAlg()?.also {
-            requireOrThrow(walletOpenId4VPConfig.authorizationEncryptionAlgValuesSupported.contains(it)) {
+            requireOrThrow(siopOpenId4VPConfig.jarmConfiguration.authorizationEncryptionAlgValuesSupported.contains(it)) {
                 InvalidClientMetaData("The Encryption algorithm ${it.name} is not supported").asException()
             }
         }
 
         val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.encMeth()?.also {
-            requireOrThrow(walletOpenId4VPConfig.authorizationEncryptionEncValuesSupported.contains(it)) {
+            requireOrThrow(siopOpenId4VPConfig.jarmConfiguration.authorizationEncryptionEncValuesSupported.contains(it)) {
                 InvalidClientMetaData("The Encryption Encoding method ${it.name} is not supported").asException()
             }
         }

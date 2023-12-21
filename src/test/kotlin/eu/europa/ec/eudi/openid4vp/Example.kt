@@ -244,7 +244,7 @@ suspend fun <T> Transaction.fold(
 
 private class Wallet(
     private val holder: HolderInfo,
-    private val walletConfig: WalletOpenId4VPConfig,
+    private val walletConfig: SiopOpenId4VPConfig,
     private val walletKeyPair: RSAKey,
 ) {
 
@@ -366,14 +366,18 @@ object SslSettings {
 }
 
 private fun walletConfig(walletKeyPair: RSAKey, vararg supportedClientIdScheme: SupportedClientIdScheme) =
-    WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
+    SiopOpenId4VPConfig(
         supportedClientIdSchemes = supportedClientIdScheme.toList(),
-        vpFormatsSupported = emptyList(),
-        holderId = "DID:example:12341512#$",
-        authorizationResponseSigners = emptyList(),
-        authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-        authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+        vpConfiguration = VPConfiguration(
+            presentationDefinitionUriSupported = true,
+            vpFormatsSupported = emptyList(),
+        ),
+        jarmConfiguration = JarmConfiguration(
+            holderId = "DID:example:12341512#$",
+            authorizationResponseSigners = listOf(DelegatingResponseSigner(walletKeyPair, JWSAlgorithm.RS256)),
+            authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+        ),
     )
 
 val PidPresentationDefinition = """

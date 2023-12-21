@@ -22,6 +22,7 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.*
 import eu.europa.ec.eudi.prex.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -41,6 +42,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
+import java.net.URL
 import java.net.URLEncoder
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -54,16 +56,24 @@ import javax.net.ssl.X509TrustManager
  * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
  */
 fun main(): Unit = runTest {
+    val verifierApi = URL("http://localhost:8080")
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
-        walletConfig = walletConfig(Verifier.PreregisteredClient, walletKeyPair),
+        walletConfig = walletConfig(
+            walletKeyPair,
+            Preregistered(Verifier.asPreregisteredClient(verifierApi)),
+            X509SanDns(TrustAnyX509),
+            X509SanUri(TrustAnyX509),
+            RedirectUri,
+        ),
     )
 
-    suspend fun runUseCase(transaction: Transaction) {
+    suspend fun runUseCase(transaction: Transaction) = coroutineScope {
         println("Running ${transaction.name} ...")
         val verifier = Verifier.make(
+            verifierApi = verifierApi,
             walletPublicKey = wallet.pubKey,
             transaction = transaction,
         )
@@ -90,6 +100,7 @@ fun WalletResponse.idTokenClaimSet(walletPublicKey: RSAKey): IDTokenClaimsSet? =
  * This class is a minimal Verifier / RP application
  */
 class Verifier private constructor(
+    private val verifierApi: URL,
     private val walletPublicKey: RSAKey,
     private val presentationId: String,
     private val nonce: String,
@@ -101,7 +112,7 @@ class Verifier private constructor(
 
     suspend fun getWalletResponse(): WalletResponse {
         val walletResponse = createHttpClient().use {
-            it.get("$VERIFIER_API/ui/presentations/$presentationId?nonce=$nonce") {
+            it.get("$verifierApi/ui/presentations/$presentationId?nonce=$nonce") {
                 accept(ContentType.Application.Json)
             }
         }.body<WalletResponse>()
@@ -114,47 +125,41 @@ class Verifier private constructor(
 
     companion object {
 
-        private const val VERIFIER_API = "http://localhost:8080"
-
-        val PreregisteredClient: SupportedClientIdScheme.Preregistered by lazy {
-            val client = PreregisteredClient(
+        fun asPreregisteredClient(verifierApi: URL): PreregisteredClient {
+            return PreregisteredClient(
                 "Verifier",
                 JWSAlgorithm.RS256.name,
-                JwkSetSource.ByReference(URI("$VERIFIER_API/wallet/public-keys.json")),
+                JwkSetSource.ByReference(URI("$verifierApi/wallet/public-keys.json")),
             )
-
-            SupportedClientIdScheme.Preregistered(mapOf(client.clientId to client))
-        }
-
-        val X509SanDns: SupportedClientIdScheme.X509SanDns by lazy {
-            SupportedClientIdScheme.X509SanDns { true }
         }
 
         /**
          * Creates a new verifier that knows (out of bound) the
          * wallet's public key
          */
-        suspend fun make(walletPublicKey: RSAKey, transaction: Transaction): Verifier = coroutineScope {
+        suspend fun make(verifierApi: URL, walletPublicKey: RSAKey, transaction: Transaction): Verifier = coroutineScope {
             verifierPrintln("Initializing Verifier ...")
             withContext(Dispatchers.IO + CoroutineName("wallet-initTransaction")) {
                 createHttpClient().use { client ->
                     val nonce = randomNonce()
                     val initTransactionResponse = transaction.fold(
                         ifSiop = {
-                            initSiopTransaction(client, nonce)
+                            initSiopTransaction(client, verifierApi, nonce)
                         },
                         ifOpenId4VP = { presentationDefinition ->
-                            initOpenId4VpTransaction(client, nonce, presentationDefinition)
+                            initOpenId4VpTransaction(client, verifierApi, nonce, presentationDefinition)
                         },
                     )
                     val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
                     val uri = formatAuthorizationRequest(initTransactionResponse)
-                    Verifier(walletPublicKey, presentationId, nonce, uri).also { verifierPrintln("Initialized $it") }
+                    Verifier(verifierApi, walletPublicKey, presentationId, nonce, uri).also {
+                        verifierPrintln("Initialized $it")
+                    }
                 }
             }
         }
 
-        private suspend fun initSiopTransaction(client: HttpClient, nonce: String): JsonObject {
+        private suspend fun initSiopTransaction(client: HttpClient, verifierApi: URL, nonce: String): JsonObject {
             verifierPrintln("Placing to verifier endpoint  SIOP authentication request ...")
             val request =
                 """
@@ -166,11 +171,12 @@ class Verifier private constructor(
                         "jar_mode": "by_reference"    
                     }
                 """.trimIndent()
-            return initTransaction(client, request)
+            return initTransaction(client, verifierApi, request)
         }
 
         private suspend fun initOpenId4VpTransaction(
             client: HttpClient,
+            verifierApi: URL,
             nonce: String,
             presentationDefinition: String,
         ): JsonObject {
@@ -186,11 +192,11 @@ class Verifier private constructor(
                         "jar_mode": "by_value"       
                     }
                 """.trimIndent()
-            return initTransaction(client, request)
+            return initTransaction(client, verifierApi, request)
         }
 
-        private suspend inline fun <reified B> initTransaction(client: HttpClient, body: B): JsonObject =
-            client.post("$VERIFIER_API/ui/presentations") {
+        private suspend inline fun <reified B> initTransaction(client: HttpClient, verifierApi: URL, body: B): JsonObject =
+            client.post("$verifierApi/ui/presentations") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
                 setBody(body)
@@ -322,6 +328,11 @@ private class Wallet(
     }
 }
 
+private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
+    println("Warning!! Trusting any certificate. Do not use in production")
+    true
+}
+
 private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
     engine {
         config {
@@ -355,10 +366,10 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun walletConfig(supportedClientIdScheme: SupportedClientIdScheme, walletKeyPair: RSAKey) =
+private fun walletConfig(walletKeyPair: RSAKey, vararg supportedClientIdScheme: SupportedClientIdScheme) =
     WalletOpenId4VPConfig(
         presentationDefinitionUriSupported = true,
-        supportedClientIdSchemes = listOf(supportedClientIdScheme),
+        supportedClientIdSchemes = supportedClientIdScheme.toList(),
         vpFormatsSupported = emptyList(),
         signingKeySet = JWKSet(walletKeyPair),
         holderId = "DID:example:12341512#$",

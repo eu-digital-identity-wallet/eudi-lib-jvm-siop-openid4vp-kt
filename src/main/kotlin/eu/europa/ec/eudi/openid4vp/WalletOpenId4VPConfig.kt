@@ -50,7 +50,9 @@ sealed interface SupportedClientIdScheme {
             RedirectUri -> ClientIdScheme.RedirectUri
         }
 
-    data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme
+    data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme {
+        constructor(vararg clients: PreregisteredClient) : this(clients.toList().associateBy { it.clientId })
+    }
 
     data class X509SanUri(val validator: (List<X509Certificate>) -> Boolean) : SupportedClientIdScheme
 

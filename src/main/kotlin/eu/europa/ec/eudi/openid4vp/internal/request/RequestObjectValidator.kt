@@ -50,10 +50,7 @@ internal sealed interface PresentationDefinitionSource {
     data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
-internal sealed interface ClientMetaDataSource {
-    data class ByValue(val metaData: UnvalidatedClientMetaData) : ClientMetaDataSource
-    data class ByReference(val url: URL) : ClientMetaDataSource
-}
+
 
 /**
  * Represents a [RequestObject] that has been validated to
@@ -367,4 +364,19 @@ internal object RequestObjectValidator {
             else -> null
         }
     }
+}
+
+private fun ResponseMode.uri(): URI = when (this) {
+    is ResponseMode.DirectPost -> responseURI.toURI()
+    is ResponseMode.DirectPostJwt -> responseURI.toURI()
+    is ResponseMode.Fragment -> redirectUri
+    is ResponseMode.FragmentJwt -> redirectUri
+    is ResponseMode.Query -> redirectUri
+    is ResponseMode.QueryJwt -> redirectUri
+}
+
+private enum class ResponseType {
+    VpToken,
+    IdToken,
+    VpAndIdToken,
 }

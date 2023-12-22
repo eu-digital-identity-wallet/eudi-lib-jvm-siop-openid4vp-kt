@@ -20,7 +20,8 @@ import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.supportedJarmSpec
+import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
+
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -75,8 +76,8 @@ class AuthorizationResponseDispatcherTest {
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
-                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported ?: emptyList(),
-                jarmOption = supportedJarmSpec(validated, walletConfig),
+                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
+                jarmOption = validated.jarmOption(walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -160,7 +161,7 @@ class AuthorizationResponseDispatcherTest {
 
         val openId4VPAuthRequestObject =
             ResolvedRequestObject.OpenId4VPAuthorization(
-                jarmOption = supportedJarmSpec(validated, walletConfig),
+                jarmOption = validated.jarmOption(walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -192,7 +193,10 @@ class AuthorizationResponseDispatcherTest {
                             )
                             assertEquals(stateVal, state)
                             assertEquals(vpTokenTxt, "vp_token")
-                            assertEquals(presentationSubmissionStr, Json.encodeToString<PresentationSubmission>(presentationSubmission))
+                            assertEquals(
+                                presentationSubmissionStr,
+                                Json.encodeToString<PresentationSubmission>(presentationSubmission)
+                            )
 
                             call.respondText("ok")
                         }
@@ -206,7 +210,8 @@ class AuthorizationResponseDispatcherTest {
             }
 
             val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
-            when (val response = DefaultAuthorizationResponseBuilder.build(openId4VPAuthRequestObject, vpTokenConsensus)) {
+            when (val response =
+                DefaultAuthorizationResponseBuilder.build(openId4VPAuthRequestObject, vpTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
                 }

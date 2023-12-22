@@ -23,10 +23,10 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
-import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.supportedJarmSpec
+import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
@@ -86,13 +86,13 @@ class AuthorizationResponseBuilderTest {
     fun `id token request should produce a response with id token JWT`(): Unit = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated =
-            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
 
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
-                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported ?: emptyList(),
-                jarmOption = supportedJarmSpec(validated, walletConfig),
+                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
+                jarmOption = validated.jarmOption(walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -143,7 +143,7 @@ class AuthorizationResponseBuilderTest {
             """.trimIndent()
         val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
         val clientMetadataValidated = assertDoesNotThrow {
-            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaDataDecoded, responseMode)
+            ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaDataDecoded, responseMode)
         }
 
         val resolvedRequest =
@@ -152,7 +152,7 @@ class AuthorizationResponseBuilderTest {
                     id = Id("pdId"),
                     inputDescriptors = emptyList(),
                 ),
-                jarmOption = supportedJarmSpec(clientMetadataValidated, walletConfigWithSignAndEncryptionAlgorithms),
+                jarmOption = clientMetadataValidated.jarmOption(walletConfigWithSignAndEncryptionAlgorithms),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,

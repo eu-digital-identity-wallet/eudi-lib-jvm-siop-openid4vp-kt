@@ -19,25 +19,23 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.RequestValidationError.InvalidClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.requireOrThrow
-import io.ktor.client.*
+import eu.europa.ec.eudi.openid4vp.ResolutionError.ClientMetadataJwkResolutionFailed
+import eu.europa.ec.eudi.openid4vp.ResolutionError.UnableToFetchClientMetadata
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
 /**
- * Extracts the client meta-data and validates them
+ * Resolves the client meta-data and validates them
  */
-internal class ClientMetadataValidator(
-    private val httpClientFactory: KtorHttpClientFactory,
-) {
+internal class ClientMetaDataValidator(private val httpClientFactory: KtorHttpClientFactory) {
 
     /**
      * Gets the meta-data from the [clientMetaDataSource] and then validates them
@@ -46,73 +44,46 @@ internal class ClientMetadataValidator(
      * @throws AuthorizationRequestException in case of a problem
      */
     @Throws(AuthorizationRequestException::class)
-    suspend fun validate(clientMetaDataSource: ClientMetaDataSource, responseMode: ResponseMode): ClientMetaData {
-        val unvalidatedClientMetaData = when (clientMetaDataSource) {
-            is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
-            is ClientMetaDataSource.ByReference -> fetch(clientMetaDataSource.url)
-        }
+    suspend fun validate(
+        clientMetaDataSource: ClientMetaDataSource,
+        responseMode: ResponseMode,
+    ): ValidatedClientMetaData {
+        val unvalidatedClientMetaData = resolve(clientMetaDataSource)
         return validate(unvalidatedClientMetaData, responseMode)
     }
 
+    private suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): UnvalidatedClientMetaData =
+        when (clientMetaDataSource) {
+            is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
+            is ClientMetaDataSource.ByReference -> httpClientFactory().use { client ->
+                try {
+                    client.get(clientMetaDataSource.url).body<UnvalidatedClientMetaData>()
+                } catch (t: IOException) {
+                    throw UnableToFetchClientMetadata(t).asException()
+                } catch (t: SerializationException) {
+                    throw UnableToFetchClientMetadata(t).asException()
+                }
+            }
+        }
+
     @Throws(AuthorizationRequestException::class)
-    suspend fun validate(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): ClientMetaData {
+    suspend fun validate(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): ValidatedClientMetaData {
         val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
         val authSgnRespAlg = authSgnRespAlg(unvalidated, responseMode)
         val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated, responseMode)
         val requiresEncryption = responseMode.isJarm() && null != authEncRespAlg && authEncRespEnc != null
         val jwkSets = if (requiresEncryption) jwkSet(unvalidated) else null
-        requireOrThrow(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
-            InvalidClientMetaData("None of the JARM related metadata provided").asException()
+        ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
+            RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
         }
 
-        return ClientMetaData(
+        return ValidatedClientMetaData(
             jwkSet = jwkSets,
             subjectSyntaxTypesSupported = types,
             authorizationSignedResponseAlg = authSgnRespAlg,
             authorizationEncryptedResponseAlg = authEncRespAlg,
             authorizationEncryptedResponseEnc = authEncRespEnc,
         )
-    }
-
-    private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): JWSAlgorithm? {
-        val unvalidatedAlg = unvalidated.authorizationSignedResponseAlg
-        return if (!responseMode.isJarm() || unvalidatedAlg.isNullOrEmpty()) null
-        else unvalidatedAlg.signingAlg()
-            ?: throw InvalidClientMetaData("Invalid signing algorithm $unvalidatedAlg").asException()
-    }
-
-    private fun authEncRespAlgAndMethod(
-        unvalidated: UnvalidatedClientMetaData,
-        responseMode: ResponseMode,
-    ): Pair<JWEAlgorithm?, EncryptionMethod?> {
-        if (!responseMode.isJarm()) return null to null
-
-        val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.let { alg ->
-            alg.encAlg() ?: throw InvalidClientMetaData("Invalid encryption algorithm $alg").asException()
-        }
-
-        val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.let { encMeth ->
-            encMeth.encMeth() ?: throw InvalidClientMetaData("Invalid encryption method $encMeth").asException()
-        }
-
-        requireOrThrow(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {
-            InvalidClientMetaData(
-                """
-                Attributes authorization_encrypted_response_alg & authorization_encrypted_response_enc 
-                should be either both provided or not provided to support JARM.
-                """.trimIndent(),
-            ).asException()
-        }
-        return authEncRespAlg to authEncRespEnc
-    }
-
-    private fun ResponseMode.isJarm() = when (this) {
-        is ResponseMode.DirectPost -> false
-        is ResponseMode.DirectPostJwt -> true
-        is ResponseMode.Fragment -> false
-        is ResponseMode.FragmentJwt -> true
-        is ResponseMode.Query -> false
-        is ResponseMode.QueryJwt -> true
     }
 
     private suspend fun jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet {
@@ -130,9 +101,9 @@ internal class ClientMetadataValidator(
                 val unparsed = client.get(URL(jwksUri)).body<String>()
                 JWKSet.parse(unparsed)
             } catch (ex: IOException) {
-                throw ResolutionError.ClientMetadataJwkResolutionFailed(ex).asException()
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
             } catch (ex: ParseException) {
-                throw ResolutionError.ClientMetadataJwkResolutionFailed(ex).asException()
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
             }
         }
 
@@ -143,26 +114,23 @@ internal class ClientMetadataValidator(
             else -> requiredJwksUri()
         }
     }
-
-    @Throws(AuthorizationRequestException::class)
-    private suspend fun fetch(url: URL): UnvalidatedClientMetaData = httpClientFactory().use { client ->
-        try {
-            client.get(url).body<UnvalidatedClientMetaData>()
-        } catch (t: Throwable) {
-            throw ResolutionError.UnableToFetchClientMetadata(t).asException()
-        }
-    }
 }
 
-@Serializable
-internal data class UnvalidatedClientMetaData(
-    @SerialName("jwks_uri") val jwksUri: String? = null,
-    @SerialName("jwks") val jwks: JsonObject? = null,
-    @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>? = emptyList(),
-    @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
-    @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
-    @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
-)
+private fun ResponseMode.isJarm() = when (this) {
+    is ResponseMode.DirectPost -> false
+    is ResponseMode.DirectPostJwt -> true
+    is ResponseMode.Fragment -> false
+    is ResponseMode.FragmentJwt -> true
+    is ResponseMode.Query -> false
+    is ResponseMode.QueryJwt -> true
+}
+
+private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): JWSAlgorithm? {
+    val unvalidatedAlg = unvalidated.authorizationSignedResponseAlg
+    return if (!responseMode.isJarm() || unvalidatedAlg.isNullOrEmpty()) null
+    else unvalidatedAlg.signingAlg()
+        ?: throw RequestValidationError.InvalidClientMetaData("Invalid signing algorithm $unvalidatedAlg").asException()
+}
 
 private fun String.signingAlg(): JWSAlgorithm? =
     JWSAlgorithm.parse(this).takeIf { JWSAlgorithm.Family.SIGNATURE.contains(it) }
@@ -170,14 +138,62 @@ private fun String.signingAlg(): JWSAlgorithm? =
 private fun String.encAlg(): JWEAlgorithm? = JWEAlgorithm.parse(this)
 
 private fun String.encMeth(): EncryptionMethod? = EncryptionMethod.parse(this)
+private fun authEncRespAlgAndMethod(
+    unvalidated: UnvalidatedClientMetaData,
+    responseMode: ResponseMode,
+): Pair<JWEAlgorithm?, EncryptionMethod?> {
+    if (!responseMode.isJarm()) return null to null
 
-private fun subjectSyntaxTypes(subjectSyntaxTypesSupported: List<String>?): List<SubjectSyntaxType>? {
-    fun String.asSubjectSyntaxType(): SubjectSyntaxType = when {
-        !SubjectSyntaxType.isValid(this) -> throw RequestValidationError.SubjectSyntaxTypesWrongSyntax.asException()
-        SubjectSyntaxType.JWKThumbprint.isValid(this) -> SubjectSyntaxType.JWKThumbprint
-        else -> SubjectSyntaxType.DecentralizedIdentifier.parse(this)
+    val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.let { alg ->
+        alg.encAlg() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption algorithm $alg")
+            .asException()
     }
-    return subjectSyntaxTypesSupported?.map { it.asSubjectSyntaxType() }
+
+    val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.let { encMeth ->
+        encMeth.encMeth() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption method $encMeth")
+            .asException()
+    }
+
+    ensure(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {
+        RequestValidationError.InvalidClientMetaData(
+            """
+                Attributes authorization_encrypted_response_alg & authorization_encrypted_response_enc 
+                should be either both provided or not provided to support JARM.
+            """.trimIndent(),
+        ).asException()
+    }
+    return authEncRespAlg to authEncRespEnc
+}
+
+private fun subjectSyntaxTypes(subjectSyntaxTypesSupported: List<String>?): List<SubjectSyntaxType> {
+    fun subjectSyntax(value: String) =
+        parseSubjectSyntaxType(value)
+            ?: throw RequestValidationError.SubjectSyntaxTypesWrongSyntax.asException()
+
+    return subjectSyntaxTypesSupported?.map { subjectSyntax(it) } ?: emptyList()
+}
+
+private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
+    fun isDecentralizedIdentifier(): Boolean =
+        !(value.isEmpty() || value.count { it == ':' } != 1 || value.split(':').any { it.isEmpty() })
+
+    fun parseDecentralizedIdentifier(): SubjectSyntaxType.DecentralizedIdentifier =
+        when {
+            value.isEmpty() -> error("Cannot create DID from $value: Empty value passed")
+            value.count { it == ':' } != 1 -> error("Cannot create DID from $value: Wrong syntax")
+            value.split(':')
+                .any { it.isEmpty() } -> error("Cannot create DID from $value: DID components cannot be empty")
+
+            else -> SubjectSyntaxType.DecentralizedIdentifier(value.split(':')[1])
+        }
+
+    fun isJWKThumbprint(): Boolean = value != ThumbprintURI.PREFIX
+
+    return when {
+        isJWKThumbprint() -> SubjectSyntaxType.JWKThumbprint
+        isDecentralizedIdentifier() -> parseDecentralizedIdentifier()
+        else -> null
+    }
 }
 
 private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { test ->

@@ -19,66 +19,28 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.jose.jwk.ThumbprintURI
+import java.io.Serializable
 import java.net.URI
 import java.net.URL
 
-data class ClientMetaData(
-    val jwkSet: JWKSet? = null,
-    val subjectSyntaxTypesSupported: List<SubjectSyntaxType>? = null,
-    val authorizationSignedResponseAlg: JWSAlgorithm? = null,
-    val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
-    val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
-) : java.io.Serializable
+sealed interface SubjectSyntaxType : Serializable {
 
-sealed interface SubjectSyntaxType : java.io.Serializable {
-
-    companion object {
-        fun isValid(value: String): Boolean = DecentralizedIdentifier.isValid(value) || JWKThumbprint.isValid(value)
-    }
-
-    data class DecentralizedIdentifier(
-        val method: String,
-    ) : SubjectSyntaxType {
-        companion object {
-
-            fun isValid(value: String): Boolean =
-                !(value.isEmpty() || value.count { it == ':' } != 1 || value.split(':').any { it.isEmpty() })
-
-            fun parse(value: String): DecentralizedIdentifier =
-                when {
-                    value.isEmpty() -> error("Cannot create DID from $value: Empty value passed")
-                    value.count { it == ':' } != 1 -> error("Cannot create DID from $value: Wrong syntax")
-                    value.split(':')
-                        .any { it.isEmpty() } -> error("Cannot create DID from $value: DID components cannot be empty")
-
-                    else -> DecentralizedIdentifier(value.split(':')[1])
-                }
-        }
-    }
+    @JvmInline
+    value class DecentralizedIdentifier(val method: String) : SubjectSyntaxType
 
     data object JWKThumbprint : SubjectSyntaxType {
         private fun readResolve(): Any = JWKThumbprint
-        fun isValid(value: String): Boolean = value != ThumbprintURI.PREFIX
     }
 }
 
 @JvmInline
 value class Scope private constructor(val value: String) {
-    fun items(): List<String> = itemsOf(value)
+    fun items(): List<String> = value.split(" ")
 
     companion object {
-        fun make(s: String): Scope? {
-            val trimmed = s.trim()
-            val scopeItems: List<String> = itemsOf(trimmed)
-            return if (scopeItems.isEmpty()) {
-                null
-            } else {
-                Scope(trimmed)
-            }
-        }
-
-        private fun itemsOf(s: String): List<String> = s.split(" ")
+        fun make(s: String): Scope? = s.trim()
+            .takeIf { trimmed -> trimmed.split(" ").isNotEmpty() }
+            ?.let { Scope(it) }
     }
 }
 
@@ -126,7 +88,7 @@ enum class ClientIdScheme {
 /**
  * @see <a href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html</a>
  */
-sealed interface ResponseMode : java.io.Serializable {
+sealed interface ResponseMode : Serializable {
 
     /**
      * In this mode, Authorization Response parameters are encoded
@@ -143,42 +105,49 @@ sealed interface ResponseMode : java.io.Serializable {
     data class FragmentJwt(val redirectUri: URI) : ResponseMode
     data class DirectPost(val responseURI: URL) : ResponseMode
     data class DirectPostJwt(val responseURI: URL) : ResponseMode
-
-    fun uri(): URI = when (this) {
-        is DirectPost -> responseURI.toURI()
-        is DirectPostJwt -> responseURI.toURI()
-        is Fragment -> redirectUri
-        is FragmentJwt -> redirectUri
-        is Query -> redirectUri
-        is QueryJwt -> redirectUri
-    }
-}
-
-enum class ResponseType {
-    VpToken,
-    IdToken,
-    VpAndIdToken,
 }
 
 typealias Jwt = String
 typealias VpToken = String
 
+/**
+ * The type of the `id_token`
+ * the client (verifier/relying party) requested
+ */
 enum class IdTokenType {
     SubjectSigned,
     AttesterSigned,
 }
 
-sealed interface JarmOption {
+/**
+ * The client's (verifier/relying party) requirement to
+ * reply to an authorization request with JARM
+ */
+sealed interface JarmOption : Serializable {
+    /**
+     * Client requires JARM signed response using the [responseSigningAlg]
+     * signing algorithm
+     */
     data class SignedResponse(
         val responseSigningAlg: JWSAlgorithm,
     ) : JarmOption
 
+    /**
+     * Client requires JARM encrypted response using the
+     * provided [algorithm][responseEncryptionAlg], [encoding method][responseEncryptionEnc]
+     * and [encryption key][encryptionKeySet]
+     */
     data class EncryptedResponse(
         val responseEncryptionAlg: JWEAlgorithm,
         val responseEncryptionEnc: EncryptionMethod,
         val encryptionKeySet: JWKSet,
     ) : JarmOption
 
+    /**
+     * Client requires JARM signed and (then) encrypted
+     * using the provided [signing][signedResponse] and [encryption][encryptResponse]
+     * specifications
+     */
     data class SignedAndEncryptedResponse(
         val signedResponse: SignedResponse,
         val encryptResponse: EncryptedResponse,

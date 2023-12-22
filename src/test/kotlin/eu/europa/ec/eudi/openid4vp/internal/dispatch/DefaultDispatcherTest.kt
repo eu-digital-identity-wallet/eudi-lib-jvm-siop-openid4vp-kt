@@ -30,10 +30,10 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.supportedJarmSpec
+import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
@@ -143,11 +143,11 @@ class DefaultDispatcherTest {
             val clientMetaDataDecoded =
                 json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
             val responseMode = ResponseMode.QueryJwt(URI.create("foo://bar"))
-            assertThrows<Throwable> {
-                val validated = ClientMetadataValidator(DefaultHttpClientFactory)
-                    .validate(clientMetaDataDecoded, responseMode)
-                supportedJarmSpec(validated, walletConfig)
-            }
+            val clientMetaData = ClientMetaDataValidator(DefaultHttpClientFactory)
+                .validate(clientMetaDataDecoded, responseMode)
+
+            val exception = assertThrows<AuthorizationRequestException> { clientMetaData.jarmOption(walletConfig) }
+            assertIs<RequestValidationError.UnsupportedClientMetaData>(exception.error)
         }
 
         @Test
@@ -336,7 +336,7 @@ class DefaultDispatcherTest {
             responseMode: ResponseMode.DirectPostJwt,
             walletConfig: SiopOpenId4VPConfig,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
-            val clientMetadataValidated = ClientMetadataValidator(
+            val clientMetadataValidated = ClientMetaDataValidator(
                 DefaultHttpClientFactory,
             ).validate(unvalidatedClientMetaData, responseMode)
 
@@ -345,7 +345,7 @@ class DefaultDispatcherTest {
                     id = Id("pdId"),
                     inputDescriptors = emptyList(),
                 ),
-                jarmOption = supportedJarmSpec(clientMetadataValidated, walletConfig),
+                jarmOption = clientMetadataValidated.jarmOption(walletConfig),
                 clientId = clientId,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,

@@ -25,7 +25,7 @@ internal fun <T> Result<T>.mapError(map: (Throwable) -> Throwable): Result<T> =
     fold(onSuccess = { Result.success(it) }, onFailure = { Result.failure(map(it)) })
 
 @OptIn(ExperimentalContracts::class)
-internal inline fun requireOrThrow(value: Boolean, ex: () -> Throwable) {
+internal inline fun ensure(value: Boolean, ex: () -> Throwable) {
     contract {
         returns() implies value
     }

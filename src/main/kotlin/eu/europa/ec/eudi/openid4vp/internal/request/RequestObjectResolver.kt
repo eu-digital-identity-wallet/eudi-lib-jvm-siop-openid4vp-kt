@@ -15,15 +15,16 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaData
+import eu.europa.ec.eudi.openid4vp.JarmOption
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
+import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
+import eu.europa.ec.eudi.openid4vp.SubjectSyntaxType
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
-import eu.europa.ec.eudi.openid4vp.internal.requireOrThrow
 import eu.europa.ec.eudi.prex.PresentationDefinition
 
 internal class RequestObjectResolver(
     private val presentationDefinitionResolver: PresentationDefinitionResolver,
-    private val clientMetadataValidator: ClientMetadataValidator,
+    private val clientMetadataValidator: ClientMetaDataValidator,
 ) {
 
     suspend fun resolve(
@@ -31,12 +32,11 @@ internal class RequestObjectResolver(
         siopOpenId4VPConfig: SiopOpenId4VPConfig,
     ): ResolvedRequestObject {
         val clientMetaData = resolveClientMetaData(validated)
-
-        val jarmOption: JarmOption? = supportedJarmSpec(clientMetaData, siopOpenId4VPConfig)
+        val jarmOption: JarmOption? = clientMetaData.jarmOption(siopOpenId4VPConfig)
         return when (validated) {
             is SiopAuthentication -> resolveIdTokenRequest(
                 validated,
-                clientMetaData.subjectSyntaxTypesSupported ?: emptyList(),
+                clientMetaData.subjectSyntaxTypesSupported,
                 jarmOption,
             )
 
@@ -44,7 +44,7 @@ internal class RequestObjectResolver(
             is SiopOpenId4VPAuthentication -> resolveIdAndVpTokenRequest(
                 validated,
                 siopOpenId4VPConfig,
-                clientMetaData.subjectSyntaxTypesSupported ?: emptyList(),
+                clientMetaData.subjectSyntaxTypesSupported,
                 jarmOption,
             )
         }
@@ -109,44 +109,8 @@ internal class RequestObjectResolver(
     ): PresentationDefinition =
         presentationDefinitionResolver.resolve(presentationDefinitionSource, siopOpenId4VPConfig)
 
-    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ClientMetaData {
+    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData {
         val source = checkNotNull(validated.clientMetaDataSource) { "Missing or invalid client metadata" }
         return clientMetadataValidator.validate(source, validated.responseMode)
-    }
-}
-
-internal fun supportedJarmSpec(
-    clientMetaData: ClientMetaData,
-    siopOpenId4VPConfig: SiopOpenId4VPConfig,
-): JarmOption? {
-    val jarmConfig = siopOpenId4VPConfig.jarmConfiguration
-
-    val signedResponse = clientMetaData.authorizationSignedResponseAlg?.let { alg ->
-        requireOrThrow(alg in jarmConfig.supportedSigningAlgorithms()) {
-            UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
-        }
-        JarmOption.SignedResponse(alg)
-    }
-    val encryptedResponse = clientMetaData.authorizationEncryptedResponseAlg?.let { alg ->
-        requireOrThrow(alg in jarmConfig.supportedEncryptionAlgorithms()) {
-            UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
-        }
-        clientMetaData.authorizationEncryptedResponseEnc?.let { enc ->
-            requireOrThrow(enc in jarmConfig.supportedEncryptionMethods()) {
-                UnsupportedClientMetaData("Wallet doesn't support $enc ").asException()
-            }
-            clientMetaData.jwkSet?.let { jwkSet ->
-                JarmOption.EncryptedResponse(alg, enc, jwkSet)
-            }
-        }
-    }
-    return when {
-        signedResponse != null && encryptedResponse != null -> JarmOption.SignedAndEncryptedResponse(
-            signedResponse,
-            encryptedResponse,
-        )
-        signedResponse != null -> signedResponse
-        encryptedResponse != null -> encryptedResponse
-        else -> null
     }
 }

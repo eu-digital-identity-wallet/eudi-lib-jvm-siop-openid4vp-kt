@@ -241,7 +241,7 @@ internal class DefaultAuthorizationRequestResolver(
             httpClientFactory,
             RequestObjectResolver(
                 presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
-                clientMetaDataResolver = ClientMetaDataResolver(httpClientFactory, siopOpenId4VPConfig),
+                clientMetadataValidator = ClientMetadataValidator(httpClientFactory),
             ),
         )
     }

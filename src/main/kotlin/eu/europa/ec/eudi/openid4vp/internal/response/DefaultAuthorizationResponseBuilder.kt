@@ -22,9 +22,7 @@ import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
 /**
  * Default implementation of [AuthorizationResponseBuilder]
  */
-internal class DefaultAuthorizationResponseBuilder(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-) : AuthorizationResponseBuilder {
+internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
 
     override suspend fun build(
         requestObject: ResolvedRequestObject,
@@ -47,7 +45,6 @@ internal class DefaultAuthorizationResponseBuilder(
                 requestObject.state,
                 requestObject.clientId,
             )
-
             else -> null
         }
 
@@ -82,62 +79,26 @@ internal class DefaultAuthorizationResponseBuilder(
         requestObject: ResolvedRequestObject,
         responseData: AuthorizationResponsePayload,
     ): AuthorizationResponse {
-        fun jarmSpec() = supportedJarmSpec(requestObject.clientMetaData, siopOpenId4VPConfig)
-            ?: error("Cannot create JarmSpec from passed Client Metadata")
+        fun requiredJarmOption() = checkNotNull(requestObject.jarmOption)
 
         return when (val responseMode = requestObject.responseMode) {
             is ResponseMode.DirectPost ->
                 AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
 
             is ResponseMode.DirectPostJwt ->
-                AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmSpec())
+                AuthorizationResponse.DirectPostJwt(responseMode.responseURI, requiredJarmOption(), responseData)
 
             is ResponseMode.Fragment ->
                 AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
 
             is ResponseMode.FragmentJwt ->
-                AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmSpec())
+                AuthorizationResponse.FragmentJwt(responseMode.redirectUri, requiredJarmOption(), responseData)
 
             is ResponseMode.Query ->
                 AuthorizationResponse.Query(responseMode.redirectUri, responseData)
 
             is ResponseMode.QueryJwt ->
-                AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec())
+                AuthorizationResponse.QueryJwt(responseMode.redirectUri, requiredJarmOption(), responseData)
         }
     }
-}
-
-private fun supportedJarmSpec(
-    clientMetaData: ClientMetaData,
-    siopOpenId4VPConfig: SiopOpenId4VPConfig,
-): JarmSpec? {
-    val signed: JarmOption.SignedResponse? = clientMetaData.authorizationSignedResponseAlg?.let { jwsAlgorithm ->
-        siopOpenId4VPConfig.supportedResponseSigner(jwsAlgorithm)?.let { signer ->
-            JarmOption.SignedResponse(jwsAlgorithm, signer)
-        }
-    }
-
-    val encrypted: JarmOption.EncryptedResponse? =
-        clientMetaData.authorizationEncryptedResponseAlg?.let { jweAlg ->
-            clientMetaData.authorizationEncryptedResponseEnc?.let { encMethod ->
-                clientMetaData.jwkSet?.let { jwkSet ->
-                    JarmOption.EncryptedResponse(jweAlg, encMethod, jwkSet)
-                }
-            }
-        }
-    val jarmOption = when {
-        signed != null && encrypted != null -> JarmOption.SignedAndEncryptedResponse(signed, encrypted)
-        signed != null && encrypted == null -> signed
-        signed == null && encrypted != null -> encrypted
-        else -> null
-    }
-
-    val holderId = when (val jarmCfg = siopOpenId4VPConfig.jarmConfiguration) {
-        is JarmConfiguration.Signing -> jarmCfg.holderId
-        is JarmConfiguration.Encryption -> jarmCfg.holderId
-        is JarmConfiguration.SigningAndEncryption -> jarmCfg.signing.holderId
-        JarmConfiguration.NotSupported -> null
-    }
-    return if (holderId != null && jarmOption != null) JarmSpec(holderId, jarmOption)
-    else null
 }

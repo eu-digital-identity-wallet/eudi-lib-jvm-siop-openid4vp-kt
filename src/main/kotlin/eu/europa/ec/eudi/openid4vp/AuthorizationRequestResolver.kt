@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
-import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import java.io.Serializable
 
@@ -30,7 +29,7 @@ import java.io.Serializable
 sealed interface ResolvedRequestObject : Serializable {
 
     val responseMode: ResponseMode
-    val clientMetaData: ClientMetaData
+    val jarmOption: JarmOption?
     val state: String
     val clientId: String
 
@@ -39,10 +38,12 @@ sealed interface ResolvedRequestObject : Serializable {
      */
     data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
-        override val clientMetaData: ClientMetaData,
+        val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
+
         override val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
+        override val jarmOption: JarmOption?,
         override val state: String,
         val scope: Scope,
     ) : ResolvedRequestObject
@@ -52,10 +53,10 @@ sealed interface ResolvedRequestObject : Serializable {
      */
     data class OpenId4VPAuthorization(
         val presentationDefinition: PresentationDefinition,
-        override val clientMetaData: ClientMetaData,
         override val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
+        override val jarmOption: JarmOption?,
         override val state: String,
     ) : ResolvedRequestObject
 
@@ -64,11 +65,12 @@ sealed interface ResolvedRequestObject : Serializable {
      */
     data class SiopOpenId4VPAuthentication(
         val idTokenType: List<IdTokenType>,
+        val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val presentationDefinition: PresentationDefinition,
-        override val clientMetaData: ClientMetaData,
         override val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,
+        override val jarmOption: JarmOption?,
         override val state: String,
         val scope: Scope,
     ) : ResolvedRequestObject
@@ -274,17 +276,4 @@ fun interface AuthorizationRequestResolver {
      * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
     suspend fun resolveRequestUri(uri: String): Resolution
-
-    companion object {
-
-        /**
-         * A factory method for obtaining an instance of [AuthorizationRequestResolver]
-         * Caller should provide a [KtorHttpClientFactory] instance.
-         */
-        operator fun invoke(
-            httpClientFactory: KtorHttpClientFactory,
-            siopOpenId4VPConfig: SiopOpenId4VPConfig,
-        ): AuthorizationRequestResolver =
-            DefaultAuthorizationRequestResolver.make(httpClientFactory, siopOpenId4VPConfig)
-    }
 }

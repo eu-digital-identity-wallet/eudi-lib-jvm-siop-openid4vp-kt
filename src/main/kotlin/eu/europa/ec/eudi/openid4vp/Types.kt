@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import java.net.URI
@@ -169,21 +168,10 @@ enum class IdTokenType {
     AttesterSigned,
 }
 
-interface AuthorizationResponseSigner : JWSSigner {
-    fun getKeyId(): String
-}
-
 sealed interface JarmOption {
     data class SignedResponse(
         val responseSigningAlg: JWSAlgorithm,
-        val responseSigner: AuthorizationResponseSigner,
-    ) : JarmOption {
-        init {
-            require(responseSigningAlg in responseSigner.supportedJWSAlgorithms()) {
-                "$responseSigningAlg is not supported by given signer"
-            }
-        }
-    }
+    ) : JarmOption
 
     data class EncryptedResponse(
         val responseEncryptionAlg: JWEAlgorithm,
@@ -195,10 +183,4 @@ sealed interface JarmOption {
         val signedResponse: SignedResponse,
         val encryptResponse: EncryptedResponse,
     ) : JarmOption
-}
-
-data class JarmSpec(val holderId: String, val jarmOption: JarmOption) {
-    init {
-        require(holderId.isNotEmpty()) { "HolderId cannot be null or empty" }
-    }
 }

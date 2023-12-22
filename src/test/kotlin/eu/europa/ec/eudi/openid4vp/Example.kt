@@ -61,7 +61,7 @@ fun main(): Unit = runTest {
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
         walletConfig = walletConfig(
-            walletKeyPair,
+            signer = signer(walletKeyPair),
             Preregistered(Verifier.asPreregisteredClient(verifierApi)),
             X509SanDns(TrustAnyX509),
             X509SanUri(TrustAnyX509),
@@ -252,7 +252,7 @@ private class Wallet(
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp(walletConfig) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig, null) { createHttpClient() }
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {
@@ -365,7 +365,8 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun walletConfig(walletKeyPair: RSAKey, vararg supportedClientIdScheme: SupportedClientIdScheme) =
+fun signer(walletKeyPair: RSAKey) = DelegatingResponseSigner(walletKeyPair, JWSAlgorithm.RS256)
+private fun walletConfig(signer: AuthorizationResponseSigner, vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
         supportedClientIdSchemes = supportedClientIdScheme.toList(),
         vpConfiguration = VPConfiguration(
@@ -374,8 +375,8 @@ private fun walletConfig(walletKeyPair: RSAKey, vararg supportedClientIdScheme: 
         ),
         jarmConfiguration = JarmConfiguration.SigningAndEncryption(
             holderId = "DID:example:12341512#$",
-            signers = listOf(DelegatingResponseSigner(walletKeyPair, JWSAlgorithm.RS256)),
-            supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            supportedSigningAlgorithms = signer.supportedJWSAlgorithms().toList(),
+            supportedEncryptionAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
             supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
         ),
     )

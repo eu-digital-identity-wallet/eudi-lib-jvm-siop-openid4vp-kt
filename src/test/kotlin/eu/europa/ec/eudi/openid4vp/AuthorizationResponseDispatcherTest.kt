@@ -20,6 +20,8 @@ import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
+import eu.europa.ec.eudi.openid4vp.internal.request.supportedJarmSpec
+import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
@@ -65,7 +67,7 @@ class AuthorizationResponseDispatcherTest {
     fun `dispatch direct post response`(): Unit = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
 
         val stateVal = genState()
@@ -73,7 +75,8 @@ class AuthorizationResponseDispatcherTest {
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
-                clientMetaData = validated,
+                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported ?: emptyList(),
+                jarmOption = supportedJarmSpec(validated, walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -125,10 +128,10 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
+            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
             when (
                 val response =
-                    AuthorizationResponseBuilder(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
+                    DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
             ) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
@@ -143,7 +146,7 @@ class AuthorizationResponseDispatcherTest {
     fun `dispatch vp_token with direct post`(): Unit = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
         val stateVal = genState()
 
@@ -157,7 +160,7 @@ class AuthorizationResponseDispatcherTest {
 
         val openId4VPAuthRequestObject =
             ResolvedRequestObject.OpenId4VPAuthorization(
-                clientMetaData = validated,
+                jarmOption = supportedJarmSpec(validated, walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -202,8 +205,8 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
-            when (val response = AuthorizationResponseBuilder(walletConfig).build(openId4VPAuthRequestObject, vpTokenConsensus)) {
+            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
+            when (val response = DefaultAuthorizationResponseBuilder.build(openId4VPAuthRequestObject, vpTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
                 }

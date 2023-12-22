@@ -15,6 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
+import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
+import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
+
 /**
  * An interface providing support for handling
  * an OAUTH2 authorization request that represents
@@ -39,51 +43,39 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
          *
          * @param siopOpenId4VPConfig wallet's configuration
          * @param httpClientFactory a factory to obtain a Ktor http client
-         * @return a [SiopOpenId4Vp]
-         */
-        @Deprecated(
-            message = "Will be removed. Use invoke instead.",
-            replaceWith = ReplaceWith("SiopOpenId4Vp(siopOpenId4VPConfig, httpClientFactory)"),
-        )
-        fun ktor(
-            siopOpenId4VPConfig: SiopOpenId4VPConfig,
-            httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): SiopOpenId4Vp = SiopOpenId4Vp(siopOpenId4VPConfig, httpClientFactory)
-
-        /**
-         * Factory method to create a [SiopOpenId4Vp].
+         * @param signer will be used to sign the response in case the client requires a signed JARM response.
+         * If provided, the signer needs to be aligned with [SiopOpenId4VPConfig.jarmConfiguration].
          *
-         * @param siopOpenId4VPConfig wallet's configuration
-         * @param httpClientFactory a factory to obtain a Ktor http client
+         *
          * @return a [SiopOpenId4Vp]
          */
         operator fun invoke(
             siopOpenId4VPConfig: SiopOpenId4VPConfig,
+            signer: AuthorizationResponseSigner?,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-        ): SiopOpenId4Vp =
-            SiopOpenId4Vp(
-                AuthorizationRequestResolver(httpClientFactory, siopOpenId4VPConfig),
-                Dispatcher(httpClientFactory),
-                AuthorizationResponseBuilder(siopOpenId4VPConfig),
-            )
+        ): SiopOpenId4Vp {
+            fun JarmConfiguration.Signing.requiredSigner() {
+                checkNotNull(signer) { "Configuration requires signer." }
+                require(supportedAlgorithms.all { alg -> alg in signer.supportedJWSAlgorithms() }) {
+                    "Given signer doesn't not aligned with configuration."
+                }
+            }
+            when (val jarmCfg = siopOpenId4VPConfig.jarmConfiguration) {
+                is JarmConfiguration.Encryption -> Unit
+                JarmConfiguration.NotSupported -> Unit
+                is JarmConfiguration.Signing -> jarmCfg.requiredSigner()
+                is JarmConfiguration.SigningAndEncryption -> jarmCfg.signing.requiredSigner()
+            }
 
-        /**
-         * Factory method to create a [SiopOpenId4Vp].
-         *
-         * @param authorizationRequestResolver the [AuthorizationRequestResolver] instance to use
-         * @param dispatcher the [Dispatcher] instance to use
-         * @param authorizationResponseBuilder the [AuthorizationResponseBuilder] instance to use
-         * @return a [SiopOpenId4Vp]
-         */
-        operator fun invoke(
-            authorizationRequestResolver: AuthorizationRequestResolver,
-            dispatcher: Dispatcher,
-            authorizationResponseBuilder: AuthorizationResponseBuilder,
-        ): SiopOpenId4Vp =
-            object :
+            val holderId = siopOpenId4VPConfig.holderId()
+            return object :
                 SiopOpenId4Vp,
-                AuthorizationRequestResolver by authorizationRequestResolver,
-                Dispatcher by dispatcher,
-                AuthorizationResponseBuilder by authorizationResponseBuilder {}
+                AuthorizationRequestResolver by DefaultAuthorizationRequestResolver.make(
+                    httpClientFactory,
+                    siopOpenId4VPConfig,
+                ),
+                AuthorizationResponseBuilder by DefaultAuthorizationResponseBuilder,
+                Dispatcher by DefaultDispatcher(httpClientFactory, holderId, signer) {}
+        }
     }
 }

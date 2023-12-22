@@ -26,6 +26,8 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
+import eu.europa.ec.eudi.openid4vp.internal.request.supportedJarmSpec
+import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -33,10 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.util.*
-import kotlin.test.Test
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import kotlin.test.*
 
 class AuthorizationResponseBuilderTest {
 
@@ -47,6 +46,8 @@ class AuthorizationResponseBuilderTest {
         .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
         .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
         .generate()
+
+    private val signer = DelegatingResponseSigner(signingKey, JWSAlgorithm.RS256)
 
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
@@ -65,8 +66,8 @@ class AuthorizationResponseBuilderTest {
         ),
         jarmConfiguration = JarmConfiguration.SigningAndEncryption(
             holderId = "DID:example:12341512#$",
-            signers = listOf(DelegatingResponseSigner(signingKey, JWSAlgorithm.parse("RS256"))),
-            supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            supportedSigningAlgorithms = signer.supportedJWSAlgorithms().toList(),
+            supportedEncryptionAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
             supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
         ),
     )
@@ -85,12 +86,13 @@ class AuthorizationResponseBuilderTest {
     fun `id token request should produce a response with id token JWT`(): Unit = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated =
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
 
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
-                clientMetaData = validated,
+                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported ?: emptyList(),
+                jarmOption = supportedJarmSpec(validated, walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -108,7 +110,7 @@ class AuthorizationResponseBuilderTest {
             ),
         )
 
-        val response = AuthorizationResponseBuilder(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
+        val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
 
         when (response) {
             is AuthorizationResponse.DirectPost ->
@@ -141,10 +143,7 @@ class AuthorizationResponseBuilderTest {
             """.trimIndent()
         val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
         val clientMetadataValidated = assertDoesNotThrow {
-            ClientMetadataValidator(
-                walletConfigWithSignAndEncryptionAlgorithms,
-                DefaultHttpClientFactory,
-            ).validate(clientMetaDataDecoded, responseMode)
+            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaDataDecoded, responseMode)
         }
 
         val resolvedRequest =
@@ -153,7 +152,7 @@ class AuthorizationResponseBuilderTest {
                     id = Id("pdId"),
                     inputDescriptors = emptyList(),
                 ),
-                clientMetaData = clientMetadataValidated,
+                jarmOption = supportedJarmSpec(clientMetadataValidated, walletConfigWithSignAndEncryptionAlgorithms),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -164,10 +163,12 @@ class AuthorizationResponseBuilderTest {
             "dummy_vp_token",
             PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
         )
-        val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
+        val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
 
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
-        assertNotNull((response as AuthorizationResponse.DirectPostJwt).jarmSpec)
-        assertTrue(response.jarmSpec.jarmOption is JarmOption.EncryptedResponse)
+        assertIs<AuthorizationResponse.DirectPostJwt>(response)
+        val jarmOption = response.jarmOption
+        assertNotNull(jarmOption)
+        assertIs<JarmOption.EncryptedResponse>(jarmOption)
     }
 }

@@ -33,6 +33,8 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
+import eu.europa.ec.eudi.openid4vp.internal.request.supportedJarmSpec
+import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -75,6 +77,8 @@ class DefaultDispatcherTest {
 
     private val clientId = "https://client.example.org"
 
+    private val holderId = "DID:example:12341512#$"
+
     private val clientMetadataStrSigningEncryption = """
             { 
                 "jwks": { "keys": [${ecKey.toPublicJWK().toJSONString()}, $rsaKey ]},                 
@@ -107,7 +111,7 @@ class DefaultDispatcherTest {
     inner class DirectPostJwtResponse {
 
         private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
-
+        private val signer = DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))
         private val walletConfig = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
             vpConfiguration = VPConfiguration(
@@ -115,8 +119,8 @@ class DefaultDispatcherTest {
                 vpFormatsSupported = emptyList(),
             ),
             jarmConfiguration = JarmConfiguration.Signing(
-                holderId = "DID:example:12341512#$",
-                signers = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
+                holderId = holderId,
+                supportedAlgorithms = signer.supportedJWSAlgorithms().toList(),
             ),
         )
 
@@ -127,20 +131,22 @@ class DefaultDispatcherTest {
                 vpFormatsSupported = emptyList(),
             ),
             jarmConfiguration = JarmConfiguration.SigningAndEncryption(
-                holderId = "DID:example:12341512#$",
-                signers = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
-                supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
+                holderId = holderId,
+                supportedSigningAlgorithms = signer.supportedJWSAlgorithms().toList(),
+                supportedEncryptionAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
                 supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
             ),
         )
 
         @Test
         fun `client metadata does not match with wallet's supported algorithms`(): Unit = runTest {
-            val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
+            val clientMetaDataDecoded =
+                json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
             val responseMode = ResponseMode.QueryJwt(URI.create("foo://bar"))
             assertThrows<Throwable> {
-                ClientMetadataValidator(walletConfig, DefaultHttpClientFactory)
+                val validated = ClientMetadataValidator(DefaultHttpClientFactory)
                     .validate(clientMetaDataDecoded, responseMode)
+                supportedJarmSpec(validated, walletConfig)
             }
         }
 
@@ -148,12 +154,12 @@ class DefaultDispatcherTest {
         fun `if response type direct_post jwt, JWE should be returned if only encryption info specified`() = runTest {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataEncryptionOnly)
-            val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode)
+            val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode, walletConfigWithSignAndEncryptionAlgorithms)
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
                 "dummy_vp_token",
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
-            val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
+            val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
 
@@ -166,7 +172,11 @@ class DefaultDispatcherTest {
                 respondOk()
             }
 
-            val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+            val outcome = DefaultDispatcher(
+                httpClientFactory = { HttpClient(mockEngine) },
+                holderId = holderId,
+                signer = signer,
+            ).dispatch(response)
             assertEquals(
                 DispatchOutcome.VerifierResponse.Accepted(null),
                 outcome,
@@ -176,13 +186,14 @@ class DefaultDispatcherTest {
         @Test
         fun `if response type direct_post jwt, JWT should be returned if only signing alg specified`(): Unit = runTest {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
-            val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
-            val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode)
+            val clientMetaDataDecoded =
+                json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
+            val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode, walletConfigWithSignAndEncryptionAlgorithms)
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
                 "dummy_vp_token",
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
-            val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
+            val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
 
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
@@ -212,7 +223,11 @@ class DefaultDispatcherTest {
                 respondOk()
             }
 
-            val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+            val outcome = DefaultDispatcher(
+                httpClientFactory = { HttpClient(mockEngine) },
+                holderId = holderId,
+                signer = signer,
+            ).dispatch(response)
             assertEquals(
                 DispatchOutcome.VerifierResponse.Accepted(null),
                 outcome,
@@ -224,13 +239,14 @@ class DefaultDispatcherTest {
         fun `if response type direct_post jwt, JWT should be returned if only signing alg, encryption alg and encryption method are specified and supported by wallet`(): Unit =
             runTest {
                 val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
-                val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
-                val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode)
+                val clientMetaDataDecoded =
+                    json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
+                val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode, walletConfigWithSignAndEncryptionAlgorithms)
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = AuthorizationResponseBuilder(walletConfigWithSignAndEncryptionAlgorithms)
+                val response = DefaultAuthorizationResponseBuilder
                     .build(resolvedRequest, vpTokenConsensus)
 
                 val mockEngine = MockEngine { request ->
@@ -261,7 +277,11 @@ class DefaultDispatcherTest {
                     respondOk()
                 }
 
-                val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+                val outcome = DefaultDispatcher(
+                    httpClientFactory = { HttpClient(mockEngine) },
+                    holderId = holderId,
+                    signer = signer
+                ).dispatch(response)
                 assertEquals(
                     DispatchOutcome.VerifierResponse.Accepted(null),
                     outcome
@@ -272,12 +292,12 @@ class DefaultDispatcherTest {
         fun `if enc and sign algs specified, JWE should be returned with signed JWT as encrypted payload`() = runTest {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
             val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigning)
-            val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode)
+            val resolvedRequest = resolvedRequestObject(clientMetaDataDecoded, responseMode, walletConfig)
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
                 "dummy_vp_token",
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
-            val response = AuthorizationResponseBuilder(walletConfig).build(resolvedRequest, vpTokenConsensus)
+            val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
 
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
@@ -300,7 +320,11 @@ class DefaultDispatcherTest {
                 respondOk()
             }
 
-            val outcome = DefaultDispatcher(httpClientFactory = { HttpClient(mockEngine) }).dispatch(response)
+            val outcome = DefaultDispatcher(
+                httpClientFactory = { HttpClient(mockEngine) },
+                holderId = holderId,
+                signer = signer,
+            ).dispatch(response)
             assertEquals(
                 DispatchOutcome.VerifierResponse.Accepted(null),
                 outcome,
@@ -310,9 +334,9 @@ class DefaultDispatcherTest {
         private suspend fun resolvedRequestObject(
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
+            walletConfig: SiopOpenId4VPConfig,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val clientMetadataValidated = ClientMetadataValidator(
-                walletConfigWithSignAndEncryptionAlgorithms,
                 DefaultHttpClientFactory,
             ).validate(unvalidatedClientMetaData, responseMode)
 
@@ -321,7 +345,7 @@ class DefaultDispatcherTest {
                     id = Id("pdId"),
                     inputDescriptors = emptyList(),
                 ),
-                clientMetaData = clientMetadataValidated,
+                jarmOption = supportedJarmSpec(clientMetadataValidated, walletConfig),
                 clientId = clientId,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -341,8 +365,10 @@ class DefaultDispatcherTest {
     @DisplayName("In query response")
     inner class QueryResponse {
 
-        private val dispatcher = DefaultDispatcher(httpClientFactory = { error("Not used") })
         private val redirectUriBase = URI("https://foo.bar")
+        private val signer = DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.RS256)
+        private val dispatcher =
+            DefaultDispatcher(httpClientFactory = { error("Not used") }, holderId = holderId, signer = signer)
 
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() = runTest {
@@ -386,15 +412,13 @@ class DefaultDispatcherTest {
                 val state = State().value
                 val dummyJwt = "dummy"
                 val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-                val jarmSpec = JarmSpec(
-                    holderId = "DID:example:123",
-                    jarmOption = JarmOption.SignedResponse(
-                        responseSigningAlg = JWSAlgorithm.RS256,
-                        responseSigner = DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256")),
-                    ),
+
+                val jarmOption = JarmOption.SignedResponse(
+                    responseSigningAlg = JWSAlgorithm.RS256,
                 )
+
                 val response =
-                    AuthorizationResponse.QueryJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
+                    AuthorizationResponse.QueryJwt(redirectUri = redirectUriBase, data = data, jarmOption = jarmOption)
                 testQueryResponse(data, response) {
                     assertNotNull(getQueryParameter("response"))
                     assertNotNull(getQueryParameter("state"))
@@ -425,7 +449,8 @@ class DefaultDispatcherTest {
     @DisplayName("In fragment response")
     inner class FragmentResponse {
 
-        private val dispatcher = DefaultDispatcher(httpClientFactory = { error("Not used") })
+        private val signer = DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.RS256)
+        private val dispatcher = DefaultDispatcher(httpClientFactory = { error("Not used") }, holderId, signer)
         private val redirectUriBase = URI("https://foo.bar")
 
         @Test
@@ -467,15 +492,11 @@ class DefaultDispatcherTest {
                 val state = State().value
                 val dummyJwt = "dummy"
                 val data = AuthorizationResponsePayload.SiopAuthentication(dummyJwt, state, "client_id")
-                val jarmSpec = JarmSpec(
-                    holderId = "DID:example:123",
-                    jarmOption = JarmOption.SignedResponse(
-                        responseSigningAlg = JWSAlgorithm.RS256,
-                        responseSigner = DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256")),
-                    ),
+                val jarmOption = JarmOption.SignedResponse(
+                    responseSigningAlg = JWSAlgorithm.RS256,
                 )
                 val response =
-                    AuthorizationResponse.FragmentJwt(redirectUri = redirectUriBase, data = data, jarmSpec = jarmSpec)
+                    AuthorizationResponse.FragmentJwt(redirectUri = redirectUriBase, data = data, jarmOption = jarmOption)
                 testFragmentResponse(data, response) { fragmentData ->
                     assertNotNull(fragmentData["state"])
                     assertNotNull(fragmentData["response"])
@@ -503,12 +524,5 @@ class DefaultDispatcherTest {
             map.also(assertions)
             assertEquals(data.state, map["state"])
         }
-    }
-
-    private fun SiopOpenId4VPConfig.holderId(): String? = when (val cfg = jarmConfiguration) {
-        is JarmConfiguration.Signing -> cfg.holderId
-        is JarmConfiguration.Encryption -> cfg.holderId
-        is JarmConfiguration.SigningAndEncryption -> cfg.signing.holderId
-        JarmConfiguration.NotSupported -> null
     }
 }

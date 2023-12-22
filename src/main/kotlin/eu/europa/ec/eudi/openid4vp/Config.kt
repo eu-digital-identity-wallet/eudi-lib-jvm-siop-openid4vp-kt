@@ -71,24 +71,33 @@ data class VPConfiguration(
 
 sealed interface JarmConfiguration : Serializable {
 
-    fun signers(): List<AuthorizationResponseSigner> = when (this) {
-        is Signing -> signers
-        is SigningAndEncryption -> signing.signers
-        else -> emptyList()
+    fun supportedSigningAlgorithms(): List<JWSAlgorithm> = when (this) {
+        is Encryption -> emptyList()
+        NotSupported -> emptyList()
+        is Signing -> supportedAlgorithms
+        is SigningAndEncryption -> signing.supportedAlgorithms
     }
 
-    fun encryption(): Encryption? = when (this) {
-        is Encryption -> this
-        is SigningAndEncryption -> encryption
-        else -> null
+    fun supportedEncryptionAlgorithms(): List<JWEAlgorithm> = when (this) {
+        is Encryption -> supportedAlgorithms
+        NotSupported -> emptyList()
+        is Signing -> emptyList()
+        is SigningAndEncryption -> encryption.supportedAlgorithms
+    }
+
+    fun supportedEncryptionMethods(): List<EncryptionMethod> = when (this) {
+        is Encryption -> supportedEncryptionMethods
+        NotSupported -> emptyList()
+        is Signing -> emptyList()
+        is SigningAndEncryption -> encryption.supportedEncryptionMethods
     }
 
     data class Signing(
         val holderId: String,
-        val signers: List<AuthorizationResponseSigner>,
+        val supportedAlgorithms: List<JWSAlgorithm>,
     ) : JarmConfiguration {
         init {
-            require(signers.isNotEmpty()) { "At least a signer must be provided" }
+            require(supportedAlgorithms.isNotEmpty()) { "At least a algorithm must be provided" }
         }
     }
 
@@ -107,10 +116,13 @@ sealed interface JarmConfiguration : Serializable {
 
         constructor(
             holderId: String,
-            signers: List<AuthorizationResponseSigner>,
-            supportedAlgorithms: List<JWEAlgorithm>,
+            supportedSigningAlgorithms: List<JWSAlgorithm>,
+            supportedEncryptionAlgorithms: List<JWEAlgorithm>,
             supportedEncryptionMethods: List<EncryptionMethod>,
-        ) : this(Signing(holderId, signers), Encryption(holderId, supportedAlgorithms, supportedEncryptionMethods))
+        ) : this(
+            Signing(holderId, supportedSigningAlgorithms),
+            Encryption(holderId, supportedEncryptionAlgorithms, supportedEncryptionMethods),
+        )
 
         init {
             require(signing.holderId == encryption.holderId)
@@ -122,9 +134,12 @@ sealed interface JarmConfiguration : Serializable {
     }
 }
 
-fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
+internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
     supportedClientIdSchemes.firstOrNull { it.scheme == scheme }
 
-fun SiopOpenId4VPConfig.supportedResponseSigner(signingAlgorithm: JWSAlgorithm): AuthorizationResponseSigner? {
-    return jarmConfiguration.signers().firstOrNull { signer -> signingAlgorithm in signer.supportedJWSAlgorithms() }
+internal fun SiopOpenId4VPConfig.holderId(): String? = when (val cfg = jarmConfiguration) {
+    is JarmConfiguration.Signing -> cfg.holderId
+    is JarmConfiguration.Encryption -> cfg.holderId
+    is JarmConfiguration.SigningAndEncryption -> cfg.signing.holderId
+    JarmConfiguration.NotSupported -> null
 }

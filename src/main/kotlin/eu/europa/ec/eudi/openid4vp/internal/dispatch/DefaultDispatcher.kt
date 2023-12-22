@@ -35,10 +35,14 @@ import java.net.URL
  * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
-    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+    private val httpClientFactory: KtorHttpClientFactory,
+    private val holderId: String?,
+    private val signer: AuthorizationResponseSigner?,
 ) : Dispatcher {
 
-    override suspend fun dispatch(response: AuthorizationResponse): DispatchOutcome =
+    override suspend fun dispatch(
+        response: AuthorizationResponse,
+    ): DispatchOutcome =
         when (response) {
             is AuthorizationResponse.DirectPost -> directPost(response)
             is AuthorizationResponse.DirectPostJwt -> directPostJwt(response)
@@ -92,15 +96,25 @@ internal class DefaultDispatcher(
      * **See Also:** [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-signed-and-encrypted-respon)
      * for details about direct_post.jwt response type
      */
-    private suspend fun directPostJwt(response: AuthorizationResponse.DirectPostJwt): DispatchOutcome.VerifierResponse =
+    private suspend fun directPostJwt(
+        response: AuthorizationResponse.DirectPostJwt,
+    ): DispatchOutcome.VerifierResponse =
         coroutineScope {
-            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
+            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(
+                holderId = checkNotNull(holderId),
+                signer = signer,
+                jarmOption = response.jarmOption,
+                data = response.data,
+            )
             val parameters = Parameters.build {
                 append("response", joseResponse)
                 append("state", response.data.state)
             }
 
-            val verifierResponse = submitForm(response.responseUri, parameters)
+            val verifierResponse = submitForm(
+                response.responseUri,
+                parameters,
+            )
             when (verifierResponse.status) {
                 HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
                 else -> DispatchOutcome.VerifierResponse.Rejected
@@ -118,9 +132,16 @@ internal class DefaultDispatcher(
             DispatchOutcome.RedirectURI(build().toURI())
         }
 
-    private fun fragmentJwt(response: AuthorizationResponse.FragmentJwt): DispatchOutcome.RedirectURI =
+    private fun fragmentJwt(
+        response: AuthorizationResponse.FragmentJwt,
+    ): DispatchOutcome.RedirectURI =
         with(response.redirectUri.toUri().buildUpon()) {
-            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
+            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(
+                holderId = checkNotNull(holderId),
+                signer = signer,
+                jarmOption = response.jarmOption,
+                data = response.data,
+            )
             val encodedFragment =
                 mapOf(
                     "response" to joseResponse,
@@ -140,9 +161,16 @@ internal class DefaultDispatcher(
             DispatchOutcome.RedirectURI(build().toURI())
         }
 
-    private fun queryJwt(response: AuthorizationResponse.QueryJwt): DispatchOutcome.RedirectURI =
+    private fun queryJwt(
+        response: AuthorizationResponse.QueryJwt,
+    ): DispatchOutcome.RedirectURI =
         with(response.redirectUri.toUri().buildUpon()) {
-            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(response.jarmSpec, response.data)
+            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(
+                holderId = checkNotNull(holderId),
+                signer = signer,
+                jarmOption = response.jarmOption,
+                data = response.data,
+            )
             appendQueryParameter("response", joseResponse)
             appendQueryParameter("state", response.data.state)
             DispatchOutcome.RedirectURI(build().toURI())

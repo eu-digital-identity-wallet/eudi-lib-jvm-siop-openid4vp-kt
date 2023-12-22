@@ -30,11 +30,10 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
-
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
@@ -144,7 +143,7 @@ class DefaultDispatcherTest {
             val clientMetaDataDecoded =
                 json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStrSigningEncryption)
             val responseMode = ResponseMode.QueryJwt(URI.create("foo://bar"))
-           val clientMetaData =  ClientMetadataValidator(DefaultHttpClientFactory)
+            val clientMetaData = ClientMetaDataValidator(DefaultHttpClientFactory)
                 .validate(clientMetaDataDecoded, responseMode)
 
             val exception = assertThrows<AuthorizationRequestException> { clientMetaData.jarmOption(walletConfig) }
@@ -337,7 +336,7 @@ class DefaultDispatcherTest {
             responseMode: ResponseMode.DirectPostJwt,
             walletConfig: SiopOpenId4VPConfig,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
-            val clientMetadataValidated = ClientMetadataValidator(
+            val clientMetadataValidated = ClientMetaDataValidator(
                 DefaultHttpClientFactory,
             ).validate(unvalidatedClientMetaData, responseMode)
 

@@ -50,8 +50,6 @@ internal sealed interface PresentationDefinitionSource {
     data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
-
-
 /**
  * Represents a [RequestObject] that has been validated to
  * represent one of the supported requests.

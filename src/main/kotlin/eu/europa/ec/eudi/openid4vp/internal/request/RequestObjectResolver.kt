@@ -24,7 +24,7 @@ import eu.europa.ec.eudi.prex.PresentationDefinition
 
 internal class RequestObjectResolver(
     private val presentationDefinitionResolver: PresentationDefinitionResolver,
-    private val clientMetadataValidator: ClientMetadataValidator,
+    private val clientMetadataValidator: ClientMetaDataValidator,
 ) {
 
     suspend fun resolve(
@@ -113,5 +113,4 @@ internal class RequestObjectResolver(
         val source = checkNotNull(validated.clientMetaDataSource) { "Missing or invalid client metadata" }
         return clientMetadataValidator.validate(source, validated.responseMode)
     }
-
 }

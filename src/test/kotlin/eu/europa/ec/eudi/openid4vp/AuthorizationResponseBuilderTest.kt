@@ -23,11 +23,10 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
-import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
-
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
@@ -87,7 +86,7 @@ class AuthorizationResponseBuilderTest {
     fun `id token request should produce a response with id token JWT`(): Unit = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated =
-            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
 
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
@@ -144,7 +143,7 @@ class AuthorizationResponseBuilderTest {
             """.trimIndent()
         val clientMetaDataDecoded = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
         val clientMetadataValidated = assertDoesNotThrow {
-            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaDataDecoded, responseMode)
+            ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaDataDecoded, responseMode)
         }
 
         val resolvedRequest =

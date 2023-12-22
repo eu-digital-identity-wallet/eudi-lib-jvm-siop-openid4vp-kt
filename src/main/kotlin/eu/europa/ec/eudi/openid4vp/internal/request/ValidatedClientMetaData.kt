@@ -21,13 +21,11 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.requireOrThrow
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
-
-
 
 @Serializable
 internal data class UnvalidatedClientMetaData(
@@ -44,7 +42,6 @@ internal sealed interface ClientMetaDataSource {
     data class ByReference(val url: URL) : ClientMetaDataSource
 }
 
-
 internal data class ValidatedClientMetaData(
     val jwkSet: JWKSet? = null,
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType> = emptyList(),
@@ -55,25 +52,22 @@ internal data class ValidatedClientMetaData(
 
 @Throws(AuthorizationRequestException::class)
 internal fun ValidatedClientMetaData.jarmOption(cfg: SiopOpenId4VPConfig): JarmOption? {
-
     val jarmConfig = cfg.jarmConfiguration
     val signedResponse = authorizationSignedResponseAlg?.let { alg ->
-        requireOrThrow(alg in jarmConfig.supportedSigningAlgorithms()) {
-            UnsupportedClientMetaData( "Wallet doesn't support $alg ").asException()
+        ensure(alg in jarmConfig.supportedSigningAlgorithms()) {
+            UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
         }
         JarmOption.SignedResponse(alg)
     }
-    val encryptedResponse = this.authorizationEncryptedResponseAlg?.let { alg ->
-        requireOrThrow(alg in jarmConfig.supportedEncryptionAlgorithms()) {
+    val encryptedResponse = authorizationEncryptedResponseAlg?.let { alg ->
+        ensure(alg in jarmConfig.supportedEncryptionAlgorithms()) {
             UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
         }
-        this.authorizationEncryptedResponseEnc?.let { enc ->
-            requireOrThrow(enc in jarmConfig.supportedEncryptionMethods()) {
+        authorizationEncryptedResponseEnc?.let { enc ->
+            ensure(enc in jarmConfig.supportedEncryptionMethods()) {
                 UnsupportedClientMetaData("Wallet doesn't support $enc ").asException()
             }
-            this.jwkSet?.let { jwkSet ->
-                JarmOption.EncryptedResponse(alg, enc, jwkSet)
-            }
+            jwkSet?.let { JarmOption.EncryptedResponse(alg, enc, it) }
         }
     }
 
@@ -87,9 +81,3 @@ internal fun ValidatedClientMetaData.jarmOption(cfg: SiopOpenId4VPConfig): JarmO
         else -> null
     }
 }
-
-
-
-
-
-

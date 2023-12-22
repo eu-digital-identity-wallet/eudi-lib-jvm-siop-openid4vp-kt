@@ -21,9 +21,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.RequestValidationError.InvalidClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.requireOrThrow
-import io.ktor.client.*
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
@@ -34,7 +32,7 @@ import java.text.ParseException
 /**
  * Resolves the client meta-data and validates them
  */
-internal class ClientMetadataValidator(private val httpClientFactory: KtorHttpClientFactory) {
+internal class ClientMetaDataValidator(private val httpClientFactory: KtorHttpClientFactory) {
 
     /**
      * Gets the meta-data from the [clientMetaDataSource] and then validates them
@@ -45,7 +43,7 @@ internal class ClientMetadataValidator(private val httpClientFactory: KtorHttpCl
     @Throws(AuthorizationRequestException::class)
     suspend fun validate(
         clientMetaDataSource: ClientMetaDataSource,
-        responseMode: ResponseMode
+        responseMode: ResponseMode,
     ): ValidatedClientMetaData {
         suspend fun fetch(url: URL): UnvalidatedClientMetaData = httpClientFactory().use { client ->
             try {
@@ -69,8 +67,8 @@ internal class ClientMetadataValidator(private val httpClientFactory: KtorHttpCl
         val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated, responseMode)
         val requiresEncryption = responseMode.isJarm() && null != authEncRespAlg && authEncRespEnc != null
         val jwkSets = if (requiresEncryption) jwkSet(unvalidated) else null
-        requireOrThrow(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
-            InvalidClientMetaData("None of the JARM related metadata provided").asException()
+        ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
+            RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
         }
 
         return ValidatedClientMetaData(
@@ -125,12 +123,11 @@ private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData, responseMode:
     val unvalidatedAlg = unvalidated.authorizationSignedResponseAlg
     return if (!responseMode.isJarm() || unvalidatedAlg.isNullOrEmpty()) null
     else unvalidatedAlg.signingAlg()
-        ?: throw InvalidClientMetaData("Invalid signing algorithm $unvalidatedAlg").asException()
+        ?: throw RequestValidationError.InvalidClientMetaData("Invalid signing algorithm $unvalidatedAlg").asException()
 }
 
 private fun String.signingAlg(): JWSAlgorithm? =
     JWSAlgorithm.parse(this).takeIf { JWSAlgorithm.Family.SIGNATURE.contains(it) }
-
 
 private fun String.encAlg(): JWEAlgorithm? = JWEAlgorithm.parse(this)
 
@@ -142,19 +139,19 @@ private fun authEncRespAlgAndMethod(
     if (!responseMode.isJarm()) return null to null
 
     val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.let { alg ->
-        alg.encAlg() ?: throw InvalidClientMetaData("Invalid encryption algorithm $alg").asException()
+        alg.encAlg() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption algorithm $alg").asException()
     }
 
     val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.let { encMeth ->
-        encMeth.encMeth() ?: throw InvalidClientMetaData("Invalid encryption method $encMeth").asException()
+        encMeth.encMeth() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption method $encMeth").asException()
     }
 
-    requireOrThrow(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {
-        InvalidClientMetaData(
+    ensure(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {
+        RequestValidationError.InvalidClientMetaData(
             """
                 Attributes authorization_encrypted_response_alg & authorization_encrypted_response_enc 
                 should be either both provided or not provided to support JARM.
-                """.trimIndent(),
+            """.trimIndent(),
         ).asException()
     }
     return authEncRespAlg to authEncRespEnc
@@ -198,4 +195,3 @@ private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { t
         else -> false
     }
 }
-

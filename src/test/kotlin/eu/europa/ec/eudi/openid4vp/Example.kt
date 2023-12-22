@@ -65,7 +65,7 @@ fun main(): Unit = runTest {
             X509SanDns(TrustAnyX509),
             X509SanUri(TrustAnyX509),
             RedirectUri,
-        )
+        ),
     )
 
     suspend fun runUseCase(transaction: Transaction) = coroutineScope {
@@ -197,7 +197,7 @@ class Verifier private constructor(
         private suspend inline fun <reified B> initTransaction(
             client: HttpClient,
             verifierApi: URL,
-            body: B
+            body: B,
         ): JsonObject =
             client.post("$verifierApi/ui/presentations") {
                 contentType(ContentType.Application.Json)
@@ -322,7 +322,7 @@ private class Wallet(
                     ),
                 ),
 
-                ),
+            ),
         )
     }
 

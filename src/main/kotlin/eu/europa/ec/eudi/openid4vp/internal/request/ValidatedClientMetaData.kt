@@ -67,7 +67,7 @@ internal fun ValidatedClientMetaData.jarmOption(cfg: SiopOpenId4VPConfig): JarmO
             ensure(enc in jarmConfig.supportedEncryptionMethods()) {
                 UnsupportedClientMetaData("Wallet doesn't support $enc ").asException()
             }
-            jwkSet?.let { JarmOption.EncryptedResponse(alg, enc, it) }
+            jwkSet?.let { set -> JarmOption.EncryptedResponse(alg, enc, set) }
         }
     }
 

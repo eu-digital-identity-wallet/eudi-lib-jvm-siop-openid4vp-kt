@@ -21,9 +21,12 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.ResolutionError.ClientMetadataJwkResolutionFailed
+import eu.europa.ec.eudi.openid4vp.ResolutionError.UnableToFetchClientMetadata
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import java.io.IOException
 import java.net.URL
@@ -45,20 +48,23 @@ internal class ClientMetaDataValidator(private val httpClientFactory: KtorHttpCl
         clientMetaDataSource: ClientMetaDataSource,
         responseMode: ResponseMode,
     ): ValidatedClientMetaData {
-        suspend fun fetch(url: URL): UnvalidatedClientMetaData = httpClientFactory().use { client ->
-            try {
-                client.get(url).body<UnvalidatedClientMetaData>()
-            } catch (t: Throwable) {
-                throw ResolutionError.UnableToFetchClientMetadata(t).asException()
-            }
-        }
-
-        val unvalidatedClientMetaData = when (clientMetaDataSource) {
-            is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
-            is ClientMetaDataSource.ByReference -> fetch(clientMetaDataSource.url)
-        }
+        val unvalidatedClientMetaData = resolve(clientMetaDataSource)
         return validate(unvalidatedClientMetaData, responseMode)
     }
+
+    private suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): UnvalidatedClientMetaData =
+        when (clientMetaDataSource) {
+            is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
+            is ClientMetaDataSource.ByReference -> httpClientFactory().use { client ->
+                try {
+                    client.get(clientMetaDataSource.url).body<UnvalidatedClientMetaData>()
+                } catch (t: IOException) {
+                    throw UnableToFetchClientMetadata(t).asException()
+                } catch (t: SerializationException) {
+                    throw UnableToFetchClientMetadata(t).asException()
+                }
+            }
+        }
 
     @Throws(AuthorizationRequestException::class)
     suspend fun validate(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): ValidatedClientMetaData {
@@ -95,9 +101,9 @@ internal class ClientMetaDataValidator(private val httpClientFactory: KtorHttpCl
                 val unparsed = client.get(URL(jwksUri)).body<String>()
                 JWKSet.parse(unparsed)
             } catch (ex: IOException) {
-                throw ResolutionError.ClientMetadataJwkResolutionFailed(ex).asException()
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
             } catch (ex: ParseException) {
-                throw ResolutionError.ClientMetadataJwkResolutionFailed(ex).asException()
+                throw ClientMetadataJwkResolutionFailed(ex).asException()
             }
         }
 
@@ -139,11 +145,13 @@ private fun authEncRespAlgAndMethod(
     if (!responseMode.isJarm()) return null to null
 
     val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.let { alg ->
-        alg.encAlg() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption algorithm $alg").asException()
+        alg.encAlg() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption algorithm $alg")
+            .asException()
     }
 
     val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.let { encMeth ->
-        encMeth.encMeth() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption method $encMeth").asException()
+        encMeth.encMeth() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption method $encMeth")
+            .asException()
     }
 
     ensure(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {

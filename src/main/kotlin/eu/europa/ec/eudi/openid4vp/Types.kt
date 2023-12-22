@@ -35,20 +35,12 @@ sealed interface SubjectSyntaxType : Serializable {
 
 @JvmInline
 value class Scope private constructor(val value: String) {
-    fun items(): List<String> = itemsOf(value)
+    fun items(): List<String> = value.split(" ")
 
     companion object {
-        fun make(s: String): Scope? {
-            val trimmed = s.trim()
-            val scopeItems: List<String> = itemsOf(trimmed)
-            return if (scopeItems.isEmpty()) {
-                null
-            } else {
-                Scope(trimmed)
-            }
-        }
-
-        private fun itemsOf(s: String): List<String> = s.split(" ")
+        fun make(s: String): Scope? = s.trim()
+            .takeIf { trimmed -> trimmed.split(" ").isNotEmpty() }
+            ?.let { Scope(it) }
     }
 }
 

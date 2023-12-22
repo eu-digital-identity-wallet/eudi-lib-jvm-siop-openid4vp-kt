@@ -57,16 +57,18 @@ import javax.net.ssl.X509TrustManager
 fun main(): Unit = runTest {
     val verifierApi = URL("http://localhost:8080")
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
+    val signer = signer(walletKeyPair)
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
         walletConfig = walletConfig(
-            signer = signer(walletKeyPair),
+            signer = signer,
             Preregistered(Verifier.asPreregisteredClient(verifierApi)),
             X509SanDns(TrustAnyX509),
             X509SanUri(TrustAnyX509),
             RedirectUri,
         ),
+        signer = signer,
     )
 
     suspend fun runUseCase(transaction: Transaction) = coroutineScope {
@@ -244,6 +246,7 @@ suspend fun <T> Transaction.fold(
 
 private class Wallet(
     private val holder: HolderInfo,
+    private val signer: AuthorizationResponseSigner,
     private val walletConfig: SiopOpenId4VPConfig,
     private val walletKeyPair: RSAKey,
 ) {
@@ -252,7 +255,7 @@ private class Wallet(
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp(walletConfig, null) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig, signer) { createHttpClient() }
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {

@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.JWSSigner
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import java.io.Serializable
 import java.net.URI
@@ -161,6 +161,10 @@ sealed interface Consensus : Serializable {
     }
 }
 
+interface AuthorizationResponseSigner : JWSSigner {
+    fun getKeyId(): String
+}
+
 /**
  * An OAUTH2 authorization response
  */
@@ -190,8 +194,8 @@ sealed interface AuthorizationResponse : Serializable {
      */
     data class DirectPostJwt(
         override val responseUri: URL,
+        val jarmOption: JarmOption,
         val data: AuthorizationResponsePayload,
-        val jarmSpec: JarmSpec,
     ) : DirectPostResponse
 
     /**
@@ -203,14 +207,18 @@ sealed interface AuthorizationResponse : Serializable {
     }
 
     data class Query(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
-    data class QueryJwt(override val redirectUri: URI, val data: AuthorizationResponsePayload, val jarmSpec: JarmSpec) :
+    data class QueryJwt(
+        override val redirectUri: URI,
+        val jarmOption: JarmOption,
+        val data: AuthorizationResponsePayload,
+    ) :
         RedirectResponse
 
     data class Fragment(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
     data class FragmentJwt(
         override val redirectUri: URI,
+        val jarmOption: JarmOption,
         val data: AuthorizationResponsePayload,
-        val jarmSpec: JarmSpec,
     ) : RedirectResponse
 }
 
@@ -220,15 +228,10 @@ sealed interface AuthorizationResponse : Serializable {
 fun interface AuthorizationResponseBuilder {
 
     /**
-     * Creates an [AuthorizationResponse] given a request and a consensus
+     * Creates an [AuthorizationResponse] given a request and a consensus.
      *
      * @param requestObject the authorization request for which the response will be created
      * @param consensus the consensus of the wallet
      */
     suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse
-
-    companion object {
-        operator fun invoke(walletOpenId4VPConfig: WalletOpenId4VPConfig): AuthorizationResponseBuilder =
-            DefaultAuthorizationResponseBuilder(walletOpenId4VPConfig)
-    }
 }

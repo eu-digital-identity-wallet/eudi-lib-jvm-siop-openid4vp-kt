@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
@@ -58,16 +57,18 @@ import javax.net.ssl.X509TrustManager
 fun main(): Unit = runTest {
     val verifierApi = URL("http://localhost:8080")
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
+    val signer = signer(walletKeyPair)
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
         walletConfig = walletConfig(
-            walletKeyPair,
+            signer = signer,
             Preregistered(Verifier.asPreregisteredClient(verifierApi)),
             X509SanDns(TrustAnyX509),
             X509SanUri(TrustAnyX509),
             RedirectUri,
         ),
+        signer = signer,
     )
 
     suspend fun runUseCase(transaction: Transaction) = coroutineScope {
@@ -245,7 +246,8 @@ suspend fun <T> Transaction.fold(
 
 private class Wallet(
     private val holder: HolderInfo,
-    private val walletConfig: WalletOpenId4VPConfig,
+    private val signer: AuthorizationResponseSigner,
+    private val walletConfig: SiopOpenId4VPConfig,
     private val walletKeyPair: RSAKey,
 ) {
 
@@ -253,7 +255,7 @@ private class Wallet(
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp(walletConfig) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig, signer) { createHttpClient() }
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {
@@ -366,16 +368,20 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun walletConfig(walletKeyPair: RSAKey, vararg supportedClientIdScheme: SupportedClientIdScheme) =
-    WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
+fun signer(walletKeyPair: RSAKey) = DelegatingResponseSigner(walletKeyPair, JWSAlgorithm.RS256)
+private fun walletConfig(signer: AuthorizationResponseSigner, vararg supportedClientIdScheme: SupportedClientIdScheme) =
+    SiopOpenId4VPConfig(
         supportedClientIdSchemes = supportedClientIdScheme.toList(),
-        vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(walletKeyPair),
-        holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
-        authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-        authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+        vpConfiguration = VPConfiguration(
+            presentationDefinitionUriSupported = true,
+            vpFormatsSupported = emptyList(),
+        ),
+        jarmConfiguration = JarmConfiguration.SigningAndEncryption(
+            holderId = "DID:example:12341512#$",
+            supportedSigningAlgorithms = signer.supportedJWSAlgorithms().toList(),
+            supportedEncryptionAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
+        ),
     )
 
 val PidPresentationDefinition = """

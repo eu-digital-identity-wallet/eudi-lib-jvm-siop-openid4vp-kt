@@ -29,6 +29,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationExchange
@@ -80,8 +81,7 @@ class AuthorizationRequestResolverTest {
         """.trimIndent(),
     ).jsonObject
 
-    private val walletConfig = WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
+    private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(
             SupportedClientIdScheme.Preregistered(
                 mapOf(
@@ -101,15 +101,14 @@ class AuthorizationRequestResolverTest {
             SupportedClientIdScheme.X509SanUri(::validateChain),
             SupportedClientIdScheme.RedirectUri,
         ),
-        vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(signingKey),
-        holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
-        authorizationEncryptionAlgValuesSupported = emptyList(),
-        authorizationEncryptionEncValuesSupported = emptyList(),
+        vpConfiguration = VPConfiguration(
+            presentationDefinitionUriSupported = true,
+            vpFormatsSupported = emptyList(),
+        ),
+        jarmConfiguration = JarmConfiguration.NotSupported,
     )
 
-    private val resolver = SiopOpenId4Vp(walletConfig)
+    private val resolver = DefaultAuthorizationRequestResolver.make(DefaultHttpClientFactory, walletConfig)
 
     private val clientMetadataJwksInline =
         """ {

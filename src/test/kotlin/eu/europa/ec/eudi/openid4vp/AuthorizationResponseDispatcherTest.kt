@@ -15,13 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.jwk.JWKSet
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.asURL
+import eu.europa.ec.eudi.openid4vp.internal.request.supportedJarmSpec
+import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
@@ -37,7 +37,6 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
@@ -45,21 +44,13 @@ class AuthorizationResponseDispatcherTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
 
-    private val signingKey = RSAKeyGenerator(2048)
-        .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
-        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
-        .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
-        .generate()
-
-    private val walletConfig = WalletOpenId4VPConfig(
-        presentationDefinitionUriSupported = true,
+    private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-        vpFormatsSupported = emptyList(),
-        signingKeySet = JWKSet(signingKey),
-        holderId = "DID:example:12341512#$",
-        authorizationSigningAlgValuesSupported = emptyList(),
-        authorizationEncryptionAlgValuesSupported = emptyList(),
-        authorizationEncryptionEncValuesSupported = emptyList(),
+        vpConfiguration = VPConfiguration(
+            presentationDefinitionUriSupported = true,
+            vpFormatsSupported = emptyList(),
+        ),
+        jarmConfiguration = JarmConfiguration.NotSupported,
     )
 
     private val clientMetadataStr =
@@ -76,7 +67,7 @@ class AuthorizationResponseDispatcherTest {
     fun `dispatch direct post response`(): Unit = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
 
         val stateVal = genState()
@@ -84,7 +75,8 @@ class AuthorizationResponseDispatcherTest {
         val siopAuthRequestObject =
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
-                clientMetaData = validated,
+                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported ?: emptyList(),
+                jarmOption = supportedJarmSpec(validated, walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -136,10 +128,10 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
+            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
             when (
                 val response =
-                    AuthorizationResponseBuilder(walletConfig).build(siopAuthRequestObject, idTokenConsensus)
+                    DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
             ) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
@@ -154,7 +146,7 @@ class AuthorizationResponseDispatcherTest {
     fun `dispatch vp_token with direct post`(): Unit = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetadataValidator(walletConfig, DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ClientMetadataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
         val stateVal = genState()
 
@@ -168,7 +160,7 @@ class AuthorizationResponseDispatcherTest {
 
         val openId4VPAuthRequestObject =
             ResolvedRequestObject.OpenId4VPAuthorization(
-                clientMetaData = validated,
+                jarmOption = supportedJarmSpec(validated, walletConfig),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -213,8 +205,8 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient })
-            when (val response = AuthorizationResponseBuilder(walletConfig).build(openId4VPAuthRequestObject, vpTokenConsensus)) {
+            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
+            when (val response = DefaultAuthorizationResponseBuilder.build(openId4VPAuthRequestObject, vpTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
                 }

@@ -22,9 +22,7 @@ import eu.europa.ec.eudi.openid4vp.Consensus.PositiveConsensus.*
 /**
  * Default implementation of [AuthorizationResponseBuilder]
  */
-internal class DefaultAuthorizationResponseBuilder(
-    private val walletOpenId4VPConfig: WalletOpenId4VPConfig,
-) : AuthorizationResponseBuilder {
+internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuilder {
 
     override suspend fun build(
         requestObject: ResolvedRequestObject,
@@ -47,7 +45,6 @@ internal class DefaultAuthorizationResponseBuilder(
                 requestObject.state,
                 requestObject.clientId,
             )
-
             else -> null
         }
 
@@ -82,27 +79,26 @@ internal class DefaultAuthorizationResponseBuilder(
         requestObject: ResolvedRequestObject,
         responseData: AuthorizationResponsePayload,
     ): AuthorizationResponse {
-        fun jarmSpec() = JarmSpec.make(requestObject.clientMetaData, walletOpenId4VPConfig)
-            ?: error("Cannot create JarmSpec from passed Client Metadata")
+        fun requiredJarmOption() = checkNotNull(requestObject.jarmOption)
 
         return when (val responseMode = requestObject.responseMode) {
             is ResponseMode.DirectPost ->
                 AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
 
             is ResponseMode.DirectPostJwt ->
-                AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmSpec())
+                AuthorizationResponse.DirectPostJwt(responseMode.responseURI, requiredJarmOption(), responseData)
 
             is ResponseMode.Fragment ->
                 AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
 
             is ResponseMode.FragmentJwt ->
-                AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmSpec())
+                AuthorizationResponse.FragmentJwt(responseMode.redirectUri, requiredJarmOption(), responseData)
 
             is ResponseMode.Query ->
                 AuthorizationResponse.Query(responseMode.redirectUri, responseData)
 
             is ResponseMode.QueryJwt ->
-                AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec())
+                AuthorizationResponse.QueryJwt(responseMode.redirectUri, requiredJarmOption(), responseData)
         }
     }
 }

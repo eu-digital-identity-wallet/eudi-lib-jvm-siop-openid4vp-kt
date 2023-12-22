@@ -82,7 +82,7 @@ internal class DefaultAuthorizationResponseBuilder(
         requestObject: ResolvedRequestObject,
         responseData: AuthorizationResponsePayload,
     ): AuthorizationResponse {
-        fun jarmSpec() = JarmSpec.make(requestObject.clientMetaData, siopOpenId4VPConfig)
+        fun jarmSpec() = supportedJarmSpec(requestObject.clientMetaData, siopOpenId4VPConfig)
             ?: error("Cannot create JarmSpec from passed Client Metadata")
 
         return when (val responseMode = requestObject.responseMode) {
@@ -105,4 +105,39 @@ internal class DefaultAuthorizationResponseBuilder(
                 AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmSpec())
         }
     }
+}
+
+private fun supportedJarmSpec(
+    clientMetaData: ClientMetaData,
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+): JarmSpec? {
+    val signed: JarmOption.SignedResponse? = clientMetaData.authorizationSignedResponseAlg?.let { jwsAlgorithm ->
+        siopOpenId4VPConfig.supportedResponseSigner(jwsAlgorithm)?.let { signer ->
+            JarmOption.SignedResponse(jwsAlgorithm, signer)
+        }
+    }
+
+    val encrypted: JarmOption.EncryptedResponse? =
+        clientMetaData.authorizationEncryptedResponseAlg?.let { jweAlg ->
+            clientMetaData.authorizationEncryptedResponseEnc?.let { encMethod ->
+                clientMetaData.jwkSet?.let { jwkSet ->
+                    JarmOption.EncryptedResponse(jweAlg, encMethod, jwkSet)
+                }
+            }
+        }
+    val jarmOption = when {
+        signed != null && encrypted != null -> JarmOption.SignedAndEncryptedResponse(signed, encrypted)
+        signed != null && encrypted == null -> signed
+        signed == null && encrypted != null -> encrypted
+        else -> null
+    }
+
+    val holderId = when (val jarmCfg = siopOpenId4VPConfig.jarmConfiguration) {
+        is JarmConfiguration.Signing -> jarmCfg.holderId
+        is JarmConfiguration.Encryption -> jarmCfg.holderId
+        is JarmConfiguration.SigningAndEncryption -> jarmCfg.signing.holderId
+        JarmConfiguration.NotSupported -> null
+    }
+    return if (holderId != null && jarmOption != null) JarmSpec(holderId, jarmOption)
+    else null
 }

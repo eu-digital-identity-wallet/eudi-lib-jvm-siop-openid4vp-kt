@@ -58,7 +58,7 @@ internal class ClientMetadataValidator(
     private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData): JWSAlgorithm? =
         unvalidated.authorizationSignedResponseAlg?.signingAlg()?.also {
             requireOrThrow(siopOpenId4VPConfig.supportedResponseSigner(it) != null) {
-                UnsupportedResponseSigningAlgorithm("The Signing algorithm ${it.name} is not supported").asException()
+                UnsupportedClientMetaData("The Signing algorithm ${it.name} is not supported").asException()
             }
         }
 
@@ -68,16 +68,24 @@ internal class ClientMetadataValidator(
     ): Pair<JWEAlgorithm?, EncryptionMethod?> {
         if (!responseMode.isJarm()) return null to null
 
-        val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.encAlg()?.also {
-            requireOrThrow(siopOpenId4VPConfig.jarmConfiguration.authorizationEncryptionAlgValuesSupported.contains(it)) {
-                InvalidClientMetaData("The Encryption algorithm ${it.name} is not supported").asException()
+        val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.let {
+            val encAlg = it.encAlg() ?: throw InvalidClientMetaData("Invalid encryption algorithm $it").asException()
+            siopOpenId4VPConfig.jarmConfiguration.encryption()?.let { supportedEncryption ->
+                requireOrThrow(encAlg in supportedEncryption.supportedAlgorithms) {
+                    UnsupportedClientMetaData("The Encryption algorithm ${encAlg.name} is not supported").asException()
+                }
             }
+            encAlg
         }
 
-        val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.encMeth()?.also {
-            requireOrThrow(siopOpenId4VPConfig.jarmConfiguration.authorizationEncryptionEncValuesSupported.contains(it)) {
-                InvalidClientMetaData("The Encryption Encoding method ${it.name} is not supported").asException()
+        val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.let {
+            val encMethod = it.encMeth() ?: throw InvalidClientMetaData("Invalid encryption method $it").asException()
+            siopOpenId4VPConfig.jarmConfiguration.encryption()?.let { supportedEncryption ->
+                requireOrThrow(encMethod in supportedEncryption.supportedEncryptionMethods) {
+                    UnsupportedClientMetaData("The Encryption Encoding method ${encMethod.name} is not supported").asException()
+                }
             }
+            encMethod
         }
 
         requireOrThrow(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {

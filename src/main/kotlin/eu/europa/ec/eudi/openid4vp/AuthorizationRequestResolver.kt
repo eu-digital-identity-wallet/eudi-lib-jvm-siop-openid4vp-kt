@@ -161,7 +161,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = UnsupportedClientIdScheme
     }
 
-    data class UnsupportedResponseSigningAlgorithm(val value: String) : RequestValidationError
+    data class UnsupportedClientMetaData(val value: String) : RequestValidationError
 
     data object InvalidClientMetaDataUri : RequestValidationError {
         private fun readResolve(): Any = InvalidClientMetaDataUri

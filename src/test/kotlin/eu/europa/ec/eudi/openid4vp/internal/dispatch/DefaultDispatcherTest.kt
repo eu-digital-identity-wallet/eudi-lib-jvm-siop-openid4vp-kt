@@ -32,6 +32,7 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -113,11 +114,9 @@ class DefaultDispatcherTest {
                 presentationDefinitionUriSupported = true,
                 vpFormatsSupported = emptyList(),
             ),
-            jarmConfiguration = JarmConfiguration(
+            jarmConfiguration = JarmConfiguration.Signing(
                 holderId = "DID:example:12341512#$",
-                authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
-                authorizationEncryptionAlgValuesSupported = emptyList(),
-                authorizationEncryptionEncValuesSupported = emptyList(),
+                signers = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
             ),
         )
 
@@ -127,11 +126,11 @@ class DefaultDispatcherTest {
                 presentationDefinitionUriSupported = true,
                 vpFormatsSupported = emptyList(),
             ),
-            jarmConfiguration = JarmConfiguration(
+            jarmConfiguration = JarmConfiguration.SigningAndEncryption(
                 holderId = "DID:example:12341512#$",
-                authorizationResponseSigners = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
-                authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-                authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+                signers = listOf(DelegatingResponseSigner(rsaSigningKey, JWSAlgorithm.parse("RS256"))),
+                supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
+                supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
             ),
         )
 
@@ -202,7 +201,7 @@ class DefaultDispatcherTest {
 
                 assertTrue("Claim 'aud' must be provided and be equal to holder id") {
                     signedJWT.jwtClaimsSet.getClaim("iss") != null &&
-                        signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.jarmConfiguration.holderId
+                        signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.holderId()
                 }
                 assertTrue("Claim 'aud' must be provided and be equal to client_id") {
                     signedJWT.jwtClaimsSet.getClaim("aud") != null &&
@@ -251,7 +250,7 @@ class DefaultDispatcherTest {
                     assertEquals(JWSObject.State.VERIFIED, signedJWT.state)
                     assertTrue("Claim 'aud' must be provided and be equal to holder id") {
                         signedJWT.jwtClaimsSet.getClaim("iss") != null &&
-                                signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.jarmConfiguration.holderId
+                                signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.holderId()
                     }
                     assertTrue("Claim 'aud' must be provided and be equal to client_id") {
                         signedJWT.jwtClaimsSet.getClaim("aud") != null &&
@@ -290,7 +289,7 @@ class DefaultDispatcherTest {
                 assertEquals(JWSObject.State.VERIFIED, signedJWT.state)
                 assertTrue("Claim 'aud' must be provided and be equal to holder id") {
                     signedJWT.jwtClaimsSet.getClaim("iss") != null &&
-                        signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.jarmConfiguration.holderId
+                        signedJWT.jwtClaimsSet.getStringClaim("iss") == walletConfig.holderId()
                 }
                 assertTrue("Claim 'aud' must be provided and be equal to client_id") {
                     signedJWT.jwtClaimsSet.getClaim("aud") != null &&
@@ -504,5 +503,12 @@ class DefaultDispatcherTest {
             map.also(assertions)
             assertEquals(data.state, map["state"])
         }
+    }
+
+    private fun SiopOpenId4VPConfig.holderId(): String? = when (val cfg = jarmConfiguration) {
+        is JarmConfiguration.Signing -> cfg.holderId
+        is JarmConfiguration.Encryption -> cfg.holderId
+        is JarmConfiguration.SigningAndEncryption -> cfg.signing.holderId
+        JarmConfiguration.NotSupported -> null
     }
 }

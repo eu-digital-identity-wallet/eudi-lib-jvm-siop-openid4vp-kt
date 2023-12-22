@@ -21,7 +21,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
-import eu.europa.ec.eudi.openid4vp.internal.mapError
 import java.net.URI
 import java.net.URL
 
@@ -170,13 +169,19 @@ enum class IdTokenType {
     AttesterSigned,
 }
 
+interface AuthorizationResponseSigner : JWSSigner {
+    fun getKeyId(): String
+}
+
 sealed interface JarmOption {
     data class SignedResponse(
         val responseSigningAlg: JWSAlgorithm,
         val responseSigner: AuthorizationResponseSigner,
     ) : JarmOption {
         init {
-            require(responseSigningAlg in responseSigner.supportedJWSAlgorithms())
+            require(responseSigningAlg in responseSigner.supportedJWSAlgorithms()) {
+                "$responseSigningAlg is not supported by given signer"
+            }
         }
     }
 
@@ -190,58 +195,10 @@ sealed interface JarmOption {
         val signedResponse: SignedResponse,
         val encryptResponse: EncryptedResponse,
     ) : JarmOption
-
-    companion object {
-        fun make(clientMetaData: ClientMetaData, siopOpenId4VPConfig: SiopOpenId4VPConfig): JarmOption? {
-            val signed: SignedResponse? = clientMetaData.authorizationSignedResponseAlg?.let { jwsAlgorithm ->
-                siopOpenId4VPConfig.supportedResponseSigner(jwsAlgorithm)?.let { signer ->
-                    SignedResponse(jwsAlgorithm, signer)
-                }
-            }
-
-            val encrypted: EncryptedResponse? =
-                clientMetaData.authorizationEncryptedResponseAlg?.let { jweAlg ->
-                    clientMetaData.authorizationEncryptedResponseEnc?.let { encMethod ->
-                        clientMetaData.jwkSet?.let { jwkSet ->
-                            EncryptedResponse(jweAlg, encMethod, jwkSet)
-                        }
-                    }
-                }
-
-            return when {
-                signed != null && encrypted != null -> SignedAndEncryptedResponse(signed, encrypted)
-                signed != null && encrypted == null -> signed
-                signed == null && encrypted != null -> encrypted
-                else -> null
-            }
-        }
-    }
-}
-
-interface AuthorizationResponseSigner : JWSSigner {
-
-    fun getKeyId(): String
 }
 
 data class JarmSpec(val holderId: String, val jarmOption: JarmOption) {
-
-    companion object {
-        fun make(clientMetaData: ClientMetaData, siopOpenId4VPConfig: SiopOpenId4VPConfig): JarmSpec? =
-            JarmOption.make(clientMetaData, siopOpenId4VPConfig)?.let { jarmOption ->
-                val holderId = siopOpenId4VPConfig.jarmConfiguration.holderId
-                JarmSpec(holderId, jarmOption)
-            }
+    init {
+        require(holderId.isNotEmpty()) { "HolderId cannot be null or empty" }
     }
 }
-
-/**
- * Convenient method for parsing a string into a [URL]
- */
-internal fun String.asURL(onError: (Throwable) -> Throwable = { it }): Result<URL> =
-    runCatching { URL(this) }.mapError(onError)
-
-/**
- * Convenient method for parsing a string into a [URI]
- */
-internal fun String.asURI(onError: (Throwable) -> Throwable = { it }): Result<URI> =
-    runCatching { URI(this) }.mapError(onError)

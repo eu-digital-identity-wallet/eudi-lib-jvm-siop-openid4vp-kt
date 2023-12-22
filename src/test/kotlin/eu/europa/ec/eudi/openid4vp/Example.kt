@@ -372,11 +372,11 @@ private fun walletConfig(walletKeyPair: RSAKey, vararg supportedClientIdScheme: 
             presentationDefinitionUriSupported = true,
             vpFormatsSupported = emptyList(),
         ),
-        jarmConfiguration = JarmConfiguration(
+        jarmConfiguration = JarmConfiguration.SigningAndEncryption(
             holderId = "DID:example:12341512#$",
-            authorizationResponseSigners = listOf(DelegatingResponseSigner(walletKeyPair, JWSAlgorithm.RS256)),
-            authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+            signers = listOf(DelegatingResponseSigner(walletKeyPair, JWSAlgorithm.RS256)),
+            supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
         ),
     )
 

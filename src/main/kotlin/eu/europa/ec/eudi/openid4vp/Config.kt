@@ -22,6 +22,7 @@ import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.SupportedClaimFormat
 import kotlinx.serialization.json.JsonObject
+import java.io.Serializable
 import java.net.URI
 import java.security.cert.X509Certificate
 
@@ -68,15 +69,62 @@ data class VPConfiguration(
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
 )
 
-data class JarmConfiguration(
-    val holderId: String,
-    val authorizationResponseSigners: List<AuthorizationResponseSigner>,
-    val authorizationEncryptionAlgValuesSupported: List<JWEAlgorithm>,
-    val authorizationEncryptionEncValuesSupported: List<EncryptionMethod>,
-)
+sealed interface JarmConfiguration : Serializable {
+
+    fun signers(): List<AuthorizationResponseSigner> = when (this) {
+        is Signing -> signers
+        is SigningAndEncryption -> signing.signers
+        else -> emptyList()
+    }
+
+    fun encryption(): Encryption? = when (this) {
+        is Encryption -> this
+        is SigningAndEncryption -> encryption
+        else -> null
+    }
+
+    data class Signing(
+        val holderId: String,
+        val signers: List<AuthorizationResponseSigner>,
+    ) : JarmConfiguration {
+        init {
+            require(signers.isNotEmpty()) { "At least a signer must be provided" }
+        }
+    }
+
+    data class Encryption(
+        val holderId: String,
+        val supportedAlgorithms: List<JWEAlgorithm>,
+        val supportedEncryptionMethods: List<EncryptionMethod>,
+    ) : JarmConfiguration {
+        init {
+            require(supportedAlgorithms.isNotEmpty()) { "At least an encryption algorithm must be provided" }
+            require(supportedEncryptionMethods.isNotEmpty()) { "At least an encryption method must be provided" }
+        }
+    }
+
+    data class SigningAndEncryption(val signing: Signing, val encryption: Encryption) : JarmConfiguration {
+
+        constructor(
+            holderId: String,
+            signers: List<AuthorizationResponseSigner>,
+            supportedAlgorithms: List<JWEAlgorithm>,
+            supportedEncryptionMethods: List<EncryptionMethod>,
+        ) : this(Signing(holderId, signers), Encryption(holderId, supportedAlgorithms, supportedEncryptionMethods))
+
+        init {
+            require(signing.holderId == encryption.holderId)
+        }
+    }
+
+    data object NotSupported : JarmConfiguration {
+        private fun readResolve(): Any = NotSupported
+    }
+}
 
 fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
     supportedClientIdSchemes.firstOrNull { it.scheme == scheme }
 
-fun SiopOpenId4VPConfig.supportedResponseSigner(signingAlgorithm: JWSAlgorithm): AuthorizationResponseSigner? =
-    jarmConfiguration.authorizationResponseSigners.firstOrNull { it.supportedJWSAlgorithms().contains(signingAlgorithm) }
+fun SiopOpenId4VPConfig.supportedResponseSigner(signingAlgorithm: JWSAlgorithm): AuthorizationResponseSigner? {
+    return jarmConfiguration.signers().firstOrNull { signer -> signingAlgorithm in signer.supportedJWSAlgorithms() }
+}

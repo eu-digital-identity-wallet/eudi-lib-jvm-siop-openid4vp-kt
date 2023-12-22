@@ -25,6 +25,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -53,12 +54,7 @@ class AuthorizationResponseBuilderTest {
             presentationDefinitionUriSupported = true,
             vpFormatsSupported = emptyList(),
         ),
-        jarmConfiguration = JarmConfiguration(
-            holderId = "DID:example:12341512#$",
-            authorizationResponseSigners = emptyList(),
-            authorizationEncryptionAlgValuesSupported = emptyList(),
-            authorizationEncryptionEncValuesSupported = emptyList(),
-        ),
+        jarmConfiguration = JarmConfiguration.NotSupported,
     )
 
     private val walletConfigWithSignAndEncryptionAlgorithms = SiopOpenId4VPConfig(
@@ -67,11 +63,11 @@ class AuthorizationResponseBuilderTest {
             presentationDefinitionUriSupported = true,
             vpFormatsSupported = emptyList(),
         ),
-        jarmConfiguration = JarmConfiguration(
+        jarmConfiguration = JarmConfiguration.SigningAndEncryption(
             holderId = "DID:example:12341512#$",
-            authorizationResponseSigners = listOf(DelegatingResponseSigner(signingKey, JWSAlgorithm.parse("RS256"))),
-            authorizationEncryptionAlgValuesSupported = listOf(JWEAlgorithm.parse("ECDH-ES")),
-            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.parse("A256GCM")),
+            signers = listOf(DelegatingResponseSigner(signingKey, JWSAlgorithm.parse("RS256"))),
+            supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
+            supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
         ),
     )
 
@@ -138,8 +134,6 @@ class AuthorizationResponseBuilderTest {
             """
                 { 
                 "jwks": { "keys": [{"kty":"EC","use":"enc","crv":"P-256","kid":"123","x":"h9vfgIOK_KS40MNbX6Rpnc5-IkM8Tqvoc_6bG4nD610","y":"Yvo8GGg6axZhyikq8YqeqFk8apbp0PmjKo0cNZwkSDw","alg":"ECDH-ES"}, { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, 
-                "id_token_encrypted_response_alg": "RS256", 
-                "id_token_encrypted_response_enc": "A128CBC-HS256", 
                 "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ],
                 "authorization_encrypted_response_alg":"ECDH-ES", 
                 "authorization_encrypted_response_enc":"A256GCM"

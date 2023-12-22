@@ -19,6 +19,7 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetadataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
@@ -47,12 +48,7 @@ class AuthorizationResponseDispatcherTest {
             presentationDefinitionUriSupported = true,
             vpFormatsSupported = emptyList(),
         ),
-        jarmConfiguration = JarmConfiguration(
-            holderId = "DID:example:12341512#$",
-            authorizationResponseSigners = emptyList(),
-            authorizationEncryptionAlgValuesSupported = emptyList(),
-            authorizationEncryptionEncValuesSupported = emptyList(),
-        ),
+        jarmConfiguration = JarmConfiguration.NotSupported,
     )
 
     private val clientMetadataStr =

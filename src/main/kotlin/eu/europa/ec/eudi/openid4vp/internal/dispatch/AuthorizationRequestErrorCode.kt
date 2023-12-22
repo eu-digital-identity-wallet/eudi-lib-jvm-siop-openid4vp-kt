@@ -73,7 +73,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is InvalidClientMetaData,
                 is UnsupportedResponseMode,
                 is UnsupportedResponseType,
-                is UnsupportedResponseSigningAlgorithm,
+                is UnsupportedClientMetaData,
                 is InvalidIdTokenType,
                 -> INVALID_REQUEST
 

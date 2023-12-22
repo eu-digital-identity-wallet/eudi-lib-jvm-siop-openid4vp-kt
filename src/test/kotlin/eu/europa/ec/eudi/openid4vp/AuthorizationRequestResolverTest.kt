@@ -104,12 +104,7 @@ class AuthorizationRequestResolverTest {
             presentationDefinitionUriSupported = true,
             vpFormatsSupported = emptyList(),
         ),
-        jarmConfiguration = JarmConfiguration(
-            holderId = "DID:example:12341512#$",
-            authorizationResponseSigners = emptyList(),
-            authorizationEncryptionAlgValuesSupported = emptyList(),
-            authorizationEncryptionEncValuesSupported = emptyList(),
-        ),
+        jarmConfiguration = JarmConfiguration.NotSupported,
     )
 
     private val resolver = SiopOpenId4Vp(walletConfig)

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp.internal.dispatch
+package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.eygraber.uri.UriCodec
 import com.eygraber.uri.toURI
@@ -40,7 +40,11 @@ internal class DefaultDispatcher(
     private val signer: AuthorizationResponseSigner?,
 ) : Dispatcher {
 
-    override suspend fun dispatch(
+    override suspend fun dispatch(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome {
+        val response = request.responseWith(consensus)
+        return dispatch(response)
+    }
+    suspend fun dispatch(
         response: AuthorizationResponse,
     ): DispatchOutcome =
         when (response) {
@@ -100,7 +104,7 @@ internal class DefaultDispatcher(
         response: AuthorizationResponse.DirectPostJwt,
     ): DispatchOutcome.VerifierResponse =
         coroutineScope {
-            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(
+            val joseResponse = signEncryptResponse(
                 holderId = checkNotNull(holderId),
                 signer = signer,
                 jarmOption = response.jarmOption,
@@ -136,12 +140,7 @@ internal class DefaultDispatcher(
         response: AuthorizationResponse.FragmentJwt,
     ): DispatchOutcome.RedirectURI =
         with(response.redirectUri.toUri().buildUpon()) {
-            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(
-                holderId = checkNotNull(holderId),
-                signer = signer,
-                jarmOption = response.jarmOption,
-                data = response.data,
-            )
+            val joseResponse = signEncryptResponse(checkNotNull(holderId), signer, response.jarmOption, response.data)
             val encodedFragment =
                 mapOf(
                     "response" to joseResponse,
@@ -165,12 +164,7 @@ internal class DefaultDispatcher(
         response: AuthorizationResponse.QueryJwt,
     ): DispatchOutcome.RedirectURI =
         with(response.redirectUri.toUri().buildUpon()) {
-            val joseResponse = ResponseSignerEncryptor.signEncryptResponse(
-                holderId = checkNotNull(holderId),
-                signer = signer,
-                jarmOption = response.jarmOption,
-                data = response.data,
-            )
+            val joseResponse = signEncryptResponse(checkNotNull(holderId), signer, response.jarmOption, response.data)
             appendQueryParameter("response", joseResponse)
             appendQueryParameter("state", response.data.state)
             DispatchOutcome.RedirectURI(build().toURI())

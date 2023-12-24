@@ -266,8 +266,8 @@ sealed interface Resolution {
 
 /**
  * An interface that describes a service
- * that accepts an [authorization request]authorization request, validates it and resolves it (that is
- * fetches parts of the authorization request that are provided by reference)
+ * that accepts an [authorization request]authorization request, validates it and resolves it (that is,
+ * fetches parts of the authorization request which are provided by reference)
  *
  */
 fun interface AuthorizationRequestResolver {

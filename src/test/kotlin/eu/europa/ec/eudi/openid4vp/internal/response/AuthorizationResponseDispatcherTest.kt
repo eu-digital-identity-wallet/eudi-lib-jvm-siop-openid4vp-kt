@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp
+package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.nimbusds.oauth2.sdk.id.State
-import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
@@ -129,14 +128,8 @@ class AuthorizationResponseDispatcherTest {
             }
 
             val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
-            when (
-                val response =
-                    DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
-            ) {
-                is AuthorizationResponse.DirectPost -> {
-                    dispatcher.dispatch(response)
-                }
-
+            when (val response = siopAuthRequestObject.responseWith(idTokenConsensus)) {
+                is AuthorizationResponse.DirectPost -> dispatcher.dispatch(response)
                 else -> fail("Not a direct post response")
             }
         }
@@ -209,10 +202,7 @@ class AuthorizationResponseDispatcherTest {
             }
 
             val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
-            when (
-                val response =
-                    DefaultAuthorizationResponseBuilder.build(openId4VPAuthRequestObject, vpTokenConsensus)
-            ) {
+            when (val response = openId4VPAuthRequestObject.responseWith(vpTokenConsensus)) {
                 is AuthorizationResponse.DirectPost -> {
                     dispatcher.dispatch(response)
                 }

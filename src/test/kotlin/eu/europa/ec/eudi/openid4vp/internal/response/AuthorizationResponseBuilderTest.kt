@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp
+package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
@@ -23,11 +23,11 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -110,7 +110,7 @@ class AuthorizationResponseBuilderTest {
             ),
         )
 
-        val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
+        val response = siopAuthRequestObject.responseWith(idTokenConsensus)
 
         when (response) {
             is AuthorizationResponse.DirectPost ->
@@ -163,7 +163,7 @@ class AuthorizationResponseBuilderTest {
             "dummy_vp_token",
             PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
         )
-        val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
+        val response = resolvedRequest.responseWith(vpTokenConsensus)
 
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
         assertIs<AuthorizationResponse.DirectPostJwt>(response)

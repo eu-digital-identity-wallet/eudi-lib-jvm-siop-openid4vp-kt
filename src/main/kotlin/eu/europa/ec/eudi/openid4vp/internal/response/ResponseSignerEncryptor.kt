@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp.internal.dispatch
+package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.nimbusds.jose.*
 import com.nimbusds.jose.JWEAlgorithm.Family

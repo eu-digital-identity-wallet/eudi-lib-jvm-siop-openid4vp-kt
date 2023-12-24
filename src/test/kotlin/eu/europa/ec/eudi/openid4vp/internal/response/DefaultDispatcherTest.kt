@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp.internal.dispatch
+package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.eygraber.uri.Uri
 import com.eygraber.uri.toUri
@@ -34,7 +34,6 @@ import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -159,7 +158,7 @@ class DefaultDispatcherTest {
                 "dummy_vp_token",
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
-            val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
+            val response = resolvedRequest.responseWith(vpTokenConsensus)
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
 
@@ -193,7 +192,7 @@ class DefaultDispatcherTest {
                 "dummy_vp_token",
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
-            val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
+            val response = resolvedRequest.responseWith(vpTokenConsensus)
 
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
@@ -246,8 +245,7 @@ class DefaultDispatcherTest {
                     "dummy_vp_token",
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
-                val response = DefaultAuthorizationResponseBuilder
-                    .build(resolvedRequest, vpTokenConsensus)
+                val response = resolvedRequest.responseWith(vpTokenConsensus)
 
                 val mockEngine = MockEngine { request ->
                     assertEquals(HttpMethod.Post, request.method)
@@ -297,7 +295,7 @@ class DefaultDispatcherTest {
                 "dummy_vp_token",
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
-            val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
+            val response = resolvedRequest.responseWith(vpTokenConsensus)
 
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)

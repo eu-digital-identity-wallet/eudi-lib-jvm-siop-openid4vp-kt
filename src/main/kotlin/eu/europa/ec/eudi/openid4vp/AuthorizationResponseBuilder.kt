@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.JWSSigner
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
+import eu.europa.ec.eudi.openid4vp.internal.response.authorizationResponse
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import java.io.Serializable
 import java.net.URI
@@ -105,62 +105,6 @@ sealed interface AuthorizationResponsePayload : Serializable {
     ) : Failed
 }
 
-/**
- * Representation of holder's consensus to
- * a [ResolvedRequestObject]
- */
-sealed interface Consensus : Serializable {
-
-    /**
-     * No consensus. Holder decided to reject
-     * the request
-     */
-    data object NegativeConsensus : Consensus {
-        private fun readResolve(): Any = NegativeConsensus
-    }
-
-    /**
-     * Positive consensus. Holder decided to
-     *  respond to the request
-     */
-    sealed interface PositiveConsensus : Consensus {
-        /**
-         * In response to a [SiopAuthentication]
-         * Holder/Wallet provides a [idToken] JWT
-         *
-         * @param idToken The id_token produced by the wallet
-         */
-        data class IdTokenConsensus(
-            val idToken: Jwt,
-        ) : PositiveConsensus
-
-        /**
-         * In response to a [OpenId4VPAuthorization] where the
-         * wallet has claims that fulfill Verifier's presentation definition
-         * and holder has chosen the claims to include
-         * @param vpToken the vp_token to be included in the authorization response
-         * @param presentationSubmission the presentation submission to be included in the authorization response
-         */
-        data class VPTokenConsensus(
-            val vpToken: VpToken,
-            val presentationSubmission: PresentationSubmission,
-        ) : PositiveConsensus
-
-        /**
-         * In response to a [SiopOpenId4VPAuthentication]
-         *
-         * @param idToken The id_token produced by the wallet
-         * @param vpToken the vp_token to be included in the authorization response
-         * @param presentationSubmission the presentation submission to be included in the authorization response
-         */
-        data class IdAndVPTokenConsensus(
-            val idToken: Jwt,
-            val vpToken: VpToken,
-            val presentationSubmission: PresentationSubmission,
-        ) : PositiveConsensus
-    }
-}
-
 interface AuthorizationResponseSigner : JWSSigner {
     fun getKeyId(): String
 }
@@ -244,15 +188,12 @@ sealed interface AuthorizationResponse : Serializable {
 }
 
 /**
- * An interface for building the [AuthorizationResponse]
+ * Creates an [AuthorizationResponse] given a request and a consensus.
+ *
+ * @receiver the authorization request for which the response will be created
+ * @param consensus the consensus of the wallet
+ *
+ * @return the [AuthorizationResponse]
  */
-fun interface AuthorizationResponseBuilder {
-
-    /**
-     * Creates an [AuthorizationResponse] given a request and a consensus.
-     *
-     * @param requestObject the authorization request for which the response will be created
-     * @param consensus the consensus of the wallet
-     */
-    suspend fun build(requestObject: ResolvedRequestObject, consensus: Consensus): AuthorizationResponse
-}
+fun ResolvedRequestObject.responseWith(consensus: Consensus): AuthorizationResponse =
+    authorizationResponse(this, consensus)

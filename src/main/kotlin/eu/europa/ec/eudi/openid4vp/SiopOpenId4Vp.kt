@@ -15,9 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import eu.europa.ec.eudi.openid4vp.internal.dispatch.DefaultDispatcher
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
+import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcher
 
 /**
  * An interface providing support for handling
@@ -27,14 +26,12 @@ import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationRespons
  *
  * The support is grouped into three groups:
  * [validate & resolve][AuthorizationRequestResolver]
- * [build response][AuthorizationResponseBuilder]
  * [dispatch response][Dispatcher]
  *
  * @see AuthorizationRequestResolver
- * @see AuthorizationResponseBuilder
  * @see Dispatcher
  */
-interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBuilder, Dispatcher {
+interface SiopOpenId4Vp : AuthorizationRequestResolver, Dispatcher {
 
     companion object {
 
@@ -74,8 +71,8 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, AuthorizationResponseBui
                     httpClientFactory,
                     siopOpenId4VPConfig,
                 ),
-                AuthorizationResponseBuilder by DefaultAuthorizationResponseBuilder,
-                Dispatcher by DefaultDispatcher(httpClientFactory, holderId, signer) {}
+                Dispatcher by DefaultDispatcher(httpClientFactory, holderId, signer) {
+            }
         }
     }
 }

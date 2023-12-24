@@ -27,7 +27,6 @@ import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultAuthorizationResponseBuilder
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -110,7 +109,7 @@ class AuthorizationResponseBuilderTest {
             ),
         )
 
-        val response = DefaultAuthorizationResponseBuilder.build(siopAuthRequestObject, idTokenConsensus)
+        val response = siopAuthRequestObject.responseWith(idTokenConsensus)
 
         when (response) {
             is AuthorizationResponse.DirectPost ->
@@ -163,7 +162,7 @@ class AuthorizationResponseBuilderTest {
             "dummy_vp_token",
             PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
         )
-        val response = DefaultAuthorizationResponseBuilder.build(resolvedRequest, vpTokenConsensus)
+        val response = resolvedRequest.responseWith(vpTokenConsensus)
 
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
         assertIs<AuthorizationResponse.DirectPostJwt>(response)

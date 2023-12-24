@@ -79,26 +79,26 @@ internal object DefaultAuthorizationResponseBuilder : AuthorizationResponseBuild
         requestObject: ResolvedRequestObject,
         responseData: AuthorizationResponsePayload,
     ): AuthorizationResponse {
-        fun requiredJarmOption() = checkNotNull(requestObject.jarmOption)
+        fun jarmOption() = checkNotNull(requestObject.jarmOption)
 
         return when (val responseMode = requestObject.responseMode) {
             is ResponseMode.DirectPost ->
                 AuthorizationResponse.DirectPost(responseMode.responseURI, responseData)
 
             is ResponseMode.DirectPostJwt ->
-                AuthorizationResponse.DirectPostJwt(responseMode.responseURI, requiredJarmOption(), responseData)
+                AuthorizationResponse.DirectPostJwt(responseMode.responseURI, responseData, jarmOption())
 
             is ResponseMode.Fragment ->
                 AuthorizationResponse.Fragment(responseMode.redirectUri, responseData)
 
             is ResponseMode.FragmentJwt ->
-                AuthorizationResponse.FragmentJwt(responseMode.redirectUri, requiredJarmOption(), responseData)
+                AuthorizationResponse.FragmentJwt(responseMode.redirectUri, responseData, jarmOption())
 
             is ResponseMode.Query ->
                 AuthorizationResponse.Query(responseMode.redirectUri, responseData)
 
             is ResponseMode.QueryJwt ->
-                AuthorizationResponse.QueryJwt(responseMode.redirectUri, requiredJarmOption(), responseData)
+                AuthorizationResponse.QueryJwt(responseMode.redirectUri, responseData, jarmOption())
         }
     }
 }

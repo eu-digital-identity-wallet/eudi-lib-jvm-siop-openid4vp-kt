@@ -433,7 +433,7 @@ class DefaultDispatcherTest {
 
         private fun testQueryResponse(
             data: AuthorizationResponsePayload,
-            response: AuthorizationResponse.RedirectResponse,
+            response: AuthorizationResponse,
             assertions: Uri.() -> Unit,
         ) = runTest {
             val dispatchOutcome = dispatcher.dispatch(response)
@@ -511,7 +511,7 @@ class DefaultDispatcherTest {
 
         private fun testFragmentResponse(
             data: AuthorizationResponsePayload,
-            response: AuthorizationResponse.RedirectResponse,
+            response: AuthorizationResponse,
             assertions: (Map<String, String>) -> Unit,
         ) = runTest {
             val dispatchOutcome = dispatcher.dispatch(response)

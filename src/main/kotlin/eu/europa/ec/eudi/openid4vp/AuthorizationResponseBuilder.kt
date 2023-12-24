@@ -169,57 +169,78 @@ interface AuthorizationResponseSigner : JWSSigner {
  * An OAUTH2 authorization response
  */
 sealed interface AuthorizationResponse : Serializable {
-    /**
-     * An authorization response to be communicated via either
-     * direct_post or direct_pst.jwt
-     */
-    sealed interface DirectPostResponse : AuthorizationResponse {
-        val responseUri: URL
-    }
 
     /**
      * An authorization response to be communicated to verifier/RP via direct_post method
      *
      * @param responseUri the verifier/RP URI where the response will be posted
-     * @param data the contents of the authorization request
+     * @param data the contents of the authorization response
      */
-    data class DirectPost(override val responseUri: URL, val data: AuthorizationResponsePayload) : DirectPostResponse
+    data class DirectPost(
+        val responseUri: URL,
+        val data: AuthorizationResponsePayload,
+    ) : AuthorizationResponse
 
     /**
      * An authorization response to be communicated to verifier/RP via direct_post.jwt method
      *
      * @param responseUri the verifier/RP URI where the response will be posted
-     * @param data the contents of the authorization request
-     * @param jarmSpec
+     * @param data the contents of the authorization response
+     * @param jarmOption the verifier/RP's requirements for JARM
      */
     data class DirectPostJwt(
-        override val responseUri: URL,
-        val jarmOption: JarmOption,
+        val responseUri: URL,
         val data: AuthorizationResponsePayload,
-    ) : DirectPostResponse
+        val jarmOption: JarmOption,
+    ) : AuthorizationResponse
 
     /**
-     * An authorization response to be communicated via
-     * a redirect to verifier's (RP) URI
+     * An authorization response to be communicated to verifier/RP via redirect using
+     * query parameters
+     * @param redirectUri the verifier/RP URI where the response will be redirected to
+     * @param data the contents of the authorization request
      */
-    sealed interface RedirectResponse : AuthorizationResponse {
-        val redirectUri: URI
-    }
+    data class Query(
+        val redirectUri: URI,
+        val data: AuthorizationResponsePayload,
+    ) : AuthorizationResponse
 
-    data class Query(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
+    /**
+     * An authorization response to be communicated to verifier/RP via redirect using
+     * query parameters and JARM
+     * @param redirectUri the verifier/RP URI where the response will be redirected to
+     * @param data the contents of the authorization request
+     * @param jarmOption the verifier/RP's requirements for JARM
+     */
     data class QueryJwt(
-        override val redirectUri: URI,
-        val jarmOption: JarmOption,
+        val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-    ) :
-        RedirectResponse
+        val jarmOption: JarmOption,
+    ) : AuthorizationResponse
 
-    data class Fragment(override val redirectUri: URI, val data: AuthorizationResponsePayload) : RedirectResponse
-    data class FragmentJwt(
-        override val redirectUri: URI,
-        val jarmOption: JarmOption,
+    /**
+     * An authorization response to be communicated to verifier/RP via redirect using
+     * fragment
+     * @param redirectUri the verifier/RP URI where the response will be redirected to
+     * @param data the contents of the authorization request
+     */
+    data class Fragment(
+        val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-    ) : RedirectResponse
+    ) : AuthorizationResponse
+
+    /**
+     * An authorization response to be communicated to verifier/RP via redirect using
+     * fragment and JARM
+     * @param redirectUri the verifier/RP URI where the response will be redirected to
+     * @param data the contents of the authorization request
+     * @param jarmOption the verifier/RP's requirements for JARM
+     */
+    data class FragmentJwt(
+        val redirectUri: URI,
+        val data: AuthorizationResponsePayload,
+        val jarmOption: JarmOption,
+    ) : AuthorizationResponse
 }
 
 /**

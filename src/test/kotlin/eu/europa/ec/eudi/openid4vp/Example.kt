@@ -277,8 +277,7 @@ private class Wallet(
             is Resolution.Success -> {
                 val requestObject = resolution.requestObject
                 val consensus = holderConsensus(requestObject)
-                val authorizationResponse = requestObject.responseWith(consensus)
-                dispatch(authorizationResponse)
+                dispatch(requestObject, consensus)
             }
         }
 

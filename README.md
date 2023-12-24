@@ -60,7 +60,7 @@ An instance of the interface can be obtained with the following code
 ```kotlin
 import eu.europa.ec.eudi.openid4vp.*
 
-val walletConfig: WalletOpenId4VPConfig // Provided by wallet
+val walletConfig: SiopOpenId4VPConfig // Provided by wallet
 val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)
 ```
 
@@ -73,7 +73,7 @@ Wallet receives an OAUTH2 Authorization request, formed by the Verifier, that ma
 - or a combined [SIOP & OpenID4VP request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-combining-this-specificatio)
 
 In the same device  scenario the aforementioned authorization request reaches the wallet in terms of
-a deep link. Similarly, in the cross device scenario, the request would be obtained via scanning a QR Code.
+a deep link. Similarly, in the cross-device scenario, the request would be obtained via scanning a QR Code.
 
 Regardless of the scenario, wallet must take the URI (of the deep link or the QR Code) that represents the
 authorization request and ask the SDK to validate the URI (that is to make sure that it represents one of the supported
@@ -97,34 +97,20 @@ val requestObject = when (resolution) {
 ```
 ### Holder's consensus, Handling of a valid authorization request
 
-After receiving a valid authorization wallet has to process it. Depending on the type of request this means
+After receiving a valid authorization, the wallet has to process it. Depending on the type of request this means
 
 * For a SIOPv2 authentication request, wallet must get holder's consensus and provide an `id_token`
-* For a OpenID4VP authorization request,
+* For an OpenID4VP authorization request,
   * wallet should check whether holder has claims that can fulfill verifier's requirements
   * let the holder choose which claims will be presented to the verifier and form a `vp_token`
 * For a combined SIOP & OpenID4VP request, wallet should perform both actions described above.
 
 This functionality is a wallet concern, and it is not supported directly by the library
 
-### Build an authorization response
-
-After collecting holder's consensus, wallet can use the library to form an appropriate response.
-The interface that captures the aforementioned functionality is
-[AuthorizationResponseBuilder](src/main/kotlin/eu/europa/ec/eudi/openid4vp/AuthorizationResponseBuilder.kt)
-
-```kotlin
-import eu.europa.ec.eudi.openid4vp.*
-// Example assumes that requestObject is SiopAuthentication & holder's agreed to the issuance of id_token
-val requestObject // calculated in previous step
-val idToken : Jwt // provided by wallet
-val consensus =  Consensus.PositiveConsensus.IdTokenConsensus(idToken)
-val authorizationResponse = siopOpenId4Vp.build(requestObject, consensus)
-```
-
 ### Dispatch authorization response to verifier / RP
 
-The final step, of processing an authorization request, is to dispatch to the verifier the authorization response.
+After collecting holder's consensus, wallet can use the library to form an appropriate response and then dispatch it
+to the verifier.
 Depending on the `response_mode` that the verifier included in his authorization request, this is done via 
 * either a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`), or
 * by forming an appropriate `redirect_uri` (when response mode is `fragment`, `fragment.jwt`, `query` or `query.jwt`)
@@ -132,7 +118,10 @@ Depending on the `response_mode` that the verifier included in his authorization
 The library tackles this dispatching via [Dispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Dispatcher.kt)
 
 ```kotlin
-val authorizationResponse // from previous step
+val requestObject // calculated in previous step
+val idToken : Jwt // provided by wallet
+val consensus =  Consensus.PositiveConsensus.IdTokenConsensus(idToken)
+val authorizationResponse = siopOpenId4Vp.build(requestObject, consensus)
 val dispatchOutcome = siopOpenId4Vp.dispatch(authorizationResponse)
 ```
 ### Example

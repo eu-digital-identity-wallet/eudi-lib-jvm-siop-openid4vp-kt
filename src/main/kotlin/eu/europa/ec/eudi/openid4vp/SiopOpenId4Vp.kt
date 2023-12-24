@@ -15,8 +15,13 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.JWSSigner
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcher
+
+interface AuthorizationResponseSigner : JWSSigner {
+    fun getKeyId(): String
+}
 
 /**
  * An interface providing support for handling

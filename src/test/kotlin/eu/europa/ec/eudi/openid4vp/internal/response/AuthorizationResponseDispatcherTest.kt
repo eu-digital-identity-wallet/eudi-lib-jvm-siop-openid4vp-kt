@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp
+package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
-import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcher
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*

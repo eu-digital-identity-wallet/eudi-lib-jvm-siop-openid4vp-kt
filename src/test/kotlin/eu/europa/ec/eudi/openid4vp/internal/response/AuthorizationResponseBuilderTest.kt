@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp
+package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
@@ -23,6 +23,7 @@ import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL

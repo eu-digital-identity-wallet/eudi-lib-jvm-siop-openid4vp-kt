@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp
+package eu.europa.ec.eudi.openid4vp.internal.response
 
-import com.nimbusds.jose.JWSSigner
-import eu.europa.ec.eudi.openid4vp.internal.response.authorizationResponse
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import java.io.Serializable
 import java.net.URI
@@ -25,7 +24,7 @@ import java.net.URL
 /**
  * The payload of an [AuthorizationResponse]
  */
-sealed interface AuthorizationResponsePayload : Serializable {
+internal sealed interface AuthorizationResponsePayload : Serializable {
 
     val state: String
     val clientId: String
@@ -105,14 +104,10 @@ sealed interface AuthorizationResponsePayload : Serializable {
     ) : Failed
 }
 
-interface AuthorizationResponseSigner : JWSSigner {
-    fun getKeyId(): String
-}
-
 /**
  * An OAUTH2 authorization response
  */
-sealed interface AuthorizationResponse : Serializable {
+internal sealed interface AuthorizationResponse : Serializable {
 
     /**
      * An authorization response to be communicated to verifier/RP via direct_post method
@@ -187,13 +182,61 @@ sealed interface AuthorizationResponse : Serializable {
     ) : AuthorizationResponse
 }
 
-/**
- * Creates an [AuthorizationResponse] given a request and a consensus.
- *
- * @receiver the authorization request for which the response will be created
- * @param consensus the consensus of the wallet
- *
- * @return the [AuthorizationResponse]
- */
-fun ResolvedRequestObject.responseWith(consensus: Consensus): AuthorizationResponse =
-    authorizationResponse(this, consensus)
+internal fun ResolvedRequestObject.responseWith(
+    consensus: Consensus,
+): AuthorizationResponse {
+    val payload = responsePayload(consensus)
+    return responseWith(payload)
+}
+
+private fun ResolvedRequestObject.responsePayload(
+    consensus: Consensus,
+): AuthorizationResponsePayload = when (consensus) {
+    is Consensus.NegativeConsensus -> AuthorizationResponsePayload.NoConsensusResponseData(state, clientId)
+    is Consensus.PositiveConsensus -> when (this) {
+        is ResolvedRequestObject.SiopAuthentication -> {
+            require(consensus is Consensus.PositiveConsensus.IdTokenConsensus) { "IdTokenConsensus expected" }
+            AuthorizationResponsePayload.SiopAuthentication(
+                consensus.idToken,
+                state,
+                clientId,
+            )
+        }
+
+        is ResolvedRequestObject.OpenId4VPAuthorization -> {
+            require(consensus is Consensus.PositiveConsensus.VPTokenConsensus) { "VPTokenConsensus expected" }
+            AuthorizationResponsePayload.OpenId4VPAuthorization(
+                consensus.vpToken,
+                consensus.presentationSubmission,
+                state,
+                clientId,
+            )
+        }
+
+        is ResolvedRequestObject.SiopOpenId4VPAuthentication -> {
+            require(consensus is Consensus.PositiveConsensus.IdAndVPTokenConsensus) { "IdAndVPTokenConsensus expected" }
+            AuthorizationResponsePayload.SiopOpenId4VPAuthentication(
+                consensus.idToken,
+                consensus.vpToken,
+                consensus.presentationSubmission,
+                state,
+                clientId,
+            )
+        }
+    }
+}
+
+private fun ResolvedRequestObject.responseWith(
+    data: AuthorizationResponsePayload,
+): AuthorizationResponse {
+    fun jarmOption() = checkNotNull(jarmOption)
+
+    return when (val mode = responseMode) {
+        is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(mode.responseURI, data)
+        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(mode.responseURI, data, jarmOption())
+        is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
+        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(mode.redirectUri, data, jarmOption())
+        is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, jarmOption())
+    }
+}

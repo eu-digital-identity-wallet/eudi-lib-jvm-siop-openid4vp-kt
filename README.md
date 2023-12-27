@@ -61,7 +61,6 @@ An instance of the interface can be obtained with the following code
 import eu.europa.ec.eudi.openid4vp.*
 
 val walletConfig: SiopOpenId4VPConfig = SiopOpenId4VPConfig(
-    
 )
 
 val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)

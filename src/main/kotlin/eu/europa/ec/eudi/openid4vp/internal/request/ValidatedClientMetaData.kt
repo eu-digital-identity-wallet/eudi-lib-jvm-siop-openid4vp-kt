@@ -51,8 +51,11 @@ internal data class ValidatedClientMetaData(
 )
 
 @Throws(AuthorizationRequestException::class)
-internal fun ValidatedClientMetaData.jarmOption(cfg: SiopOpenId4VPConfig): JarmOption? {
-    val jarmConfig = cfg.jarmConfiguration
+internal fun ValidatedClientMetaData.jarmOption(siopOpenId4VPConfig: SiopOpenId4VPConfig): JarmOption? =
+    jarmOption(siopOpenId4VPConfig.jarmConfiguration)
+
+@Throws(AuthorizationRequestException::class)
+internal fun ValidatedClientMetaData.jarmOption(jarmConfig: JarmConfiguration): JarmOption? {
     val signedResponse = authorizationSignedResponseAlg?.let { alg ->
         ensure(alg in jarmConfig.supportedSigningAlgorithms()) {
             UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()

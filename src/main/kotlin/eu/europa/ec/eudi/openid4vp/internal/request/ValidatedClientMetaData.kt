@@ -51,8 +51,11 @@ internal data class ValidatedClientMetaData(
 )
 
 @Throws(AuthorizationRequestException::class)
-internal fun ValidatedClientMetaData.jarmOption(cfg: SiopOpenId4VPConfig): JarmOption? {
-    val jarmConfig = cfg.jarmConfiguration
+internal fun ValidatedClientMetaData.jarmOption(siopOpenId4VPConfig: SiopOpenId4VPConfig): JarmOption? =
+    jarmOption(siopOpenId4VPConfig.jarmConfiguration)
+
+@Throws(AuthorizationRequestException::class)
+internal fun ValidatedClientMetaData.jarmOption(jarmConfig: JarmConfiguration): JarmOption? {
     val signedResponse = authorizationSignedResponseAlg?.let { alg ->
         ensure(alg in jarmConfig.supportedSigningAlgorithms()) {
             UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
@@ -80,4 +83,25 @@ internal fun ValidatedClientMetaData.jarmOption(cfg: SiopOpenId4VPConfig): JarmO
         false to true -> requiredEncryptedResponse()
         else -> null
     }
+}
+
+private fun JarmConfiguration.supportedSigningAlgorithms(): List<JWSAlgorithm> = when (this) {
+    is JarmConfiguration.Encryption -> emptyList()
+    JarmConfiguration.NotSupported -> emptyList()
+    is JarmConfiguration.Signing -> supportedAlgorithms
+    is JarmConfiguration.SigningAndEncryption -> signing.supportedAlgorithms
+}
+
+private fun JarmConfiguration.supportedEncryptionAlgorithms(): List<JWEAlgorithm> = when (this) {
+    is JarmConfiguration.Encryption -> supportedAlgorithms
+    JarmConfiguration.NotSupported -> emptyList()
+    is JarmConfiguration.Signing -> emptyList()
+    is JarmConfiguration.SigningAndEncryption -> encryption.supportedAlgorithms
+}
+
+private fun JarmConfiguration.supportedEncryptionMethods(): List<EncryptionMethod> = when (this) {
+    is JarmConfiguration.Encryption -> supportedEncryptionMethods
+    JarmConfiguration.NotSupported -> emptyList()
+    is JarmConfiguration.Signing -> emptyList()
+    is JarmConfiguration.SigningAndEncryption -> encryption.supportedEncryptionMethods
 }

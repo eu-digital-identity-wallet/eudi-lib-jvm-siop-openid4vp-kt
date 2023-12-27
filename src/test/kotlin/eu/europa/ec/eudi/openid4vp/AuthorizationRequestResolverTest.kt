@@ -84,28 +84,19 @@ class AuthorizationRequestResolverTest {
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(
             SupportedClientIdScheme.Preregistered(
-                mapOf(
-                    "Verifier" to
-                        PreregisteredClient(
-                            clientId = "Verifier",
-                            jarSigningAlg = "RS256",
-                            jwkSetSource = JwkSetSource.ByValue(
-                                Json.parseToJsonElement(
-                                    JWKSet(signingKey).toPublicJWKSet().toString(),
-                                ).jsonObject,
-                            ),
-                        ),
+                PreregisteredClient(
+                    clientId = "Verifier",
+                    jarConfig = JWSAlgorithm.RS256 to JwkSetSource.ByValue(
+                        Json.parseToJsonElement(
+                            JWKSet(signingKey).toPublicJWKSet().toString(),
+                        ).jsonObject,
+                    ),
                 ),
             ),
             SupportedClientIdScheme.X509SanDns(::validateChain),
             SupportedClientIdScheme.X509SanUri(::validateChain),
             SupportedClientIdScheme.RedirectUri,
         ),
-        vpConfiguration = VPConfiguration(
-            presentationDefinitionUriSupported = true,
-            vpFormatsSupported = emptyList(),
-        ),
-        jarmConfiguration = JarmConfiguration.NotSupported,
     )
 
     private val resolver = DefaultAuthorizationRequestResolver.make(DefaultHttpClientFactory, walletConfig)

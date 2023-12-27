@@ -39,7 +39,6 @@ sealed interface ResolvedRequestObject : Serializable {
     data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
-
         override val clientId: String,
         val nonce: String,
         override val responseMode: ResponseMode,

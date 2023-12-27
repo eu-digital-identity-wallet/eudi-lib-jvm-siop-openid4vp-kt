@@ -110,10 +110,8 @@ sealed interface DispatchOutcome : Serializable {
 /**
  * This interface assembles an appropriate authorization response given a [request][ResolvedRequestObject]
  * and holder's [consensus][Consensus] and then dispatches it to the verifier
- *
- *
  */
-fun interface Dispatcher {
+interface Dispatcher {
 
     /**
      * Assembles an appropriate authorization response given a [request][request]
@@ -132,5 +130,43 @@ fun interface Dispatcher {
      * @param consensus Holder's consensus (positive or negative) to this request
      * @return the dispatch outcome as described above
      */
-    suspend fun dispatch(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome
+    suspend fun dispatch(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome =
+        when (request.responseMode) {
+            is ResponseMode.DirectPost -> post(request, consensus)
+            is ResponseMode.DirectPostJwt -> post(request, consensus)
+            is ResponseMode.Query -> encodeRedirectURI(request, consensus)
+            is ResponseMode.QueryJwt -> encodeRedirectURI(request, consensus)
+            is ResponseMode.Fragment -> encodeRedirectURI(request, consensus)
+            is ResponseMode.FragmentJwt -> encodeRedirectURI(request, consensus)
+        }
+
+    /**
+     * Method forms a suitable authorization response, based on the [request] and the provided [consensus], then
+     * post it to the Verifier's end-point and returns his response.
+     *
+     * This method is applicable when the [request] contains a [ResolvedRequestObject.responseMode] which is either
+     * [ResponseMode.DirectPost] or [ResponseMode.DirectPostJwt].
+     *
+     * @param request The request to reply to. It must contain a [ResolvedRequestObject.responseMode] which is either
+     * [ResponseMode.DirectPost] or [ResponseMode.DirectPostJwt]
+     * @param consensus Holder's consensus (positive or negative) to this request
+     * @return the verifier's response after receiving the authorization response.
+     */
+    suspend fun post(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.VerifierResponse
+
+    /**
+     * Method forms a suitable authorization response, based on the [request] and the provided [consensus], and then
+     * encodes this response to a URI.
+     * To this URI, the wallet (caller) must redirect its authorization response
+     *
+     * This method is applicable when [request] contains a [ResolvedRequestObject.responseMode] which is one of
+     * [ResponseMode.Query], [ResponseMode.QueryJwt], [ResponseMode.Fragment] or [ResponseMode.FragmentJwt]
+     *
+     * @param request The request to reply to. It must contain a [ResolvedRequestObject.responseMode] which is one of
+     * [ResponseMode.Query], [ResponseMode.QueryJwt], [ResponseMode.Fragment] or [ResponseMode.FragmentJwt]
+     * @param consensus Holder's consensus (positive or negative) to this request
+     * @return a URI pointing to the verifier to which the wallet(caller) must redirect its response. This URI carries
+     * the authorization response
+     */
+    suspend fun encodeRedirectURI(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.RedirectURI
 }

@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.jwk.source.JWKSource
@@ -29,6 +28,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.sanOfDNSName
 import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
 import io.ktor.client.*
@@ -143,28 +143,30 @@ internal class JarJwtSignatureValidator(
         null, SupportedClientIdScheme.RedirectUri -> throw RequestValidationError.UnsupportedClientIdScheme.asException()
     }
 
+    @Throws(AuthorizationRequestException::class)
     private suspend fun getPreRegisteredClientJwsSelector(
         clientId: String,
         preregistered: Preregistered,
     ): JWSVerificationKeySelector<SecurityContext> {
         val trustedClient = preregistered.clients[clientId]
-            ?: throw invalidJarJwt("$clientId is not pre-registered")
-
+        ensure(trustedClient != null) { invalidJarJwt("Verifier with $clientId is not pre-registered") }
+        val jarConfig = trustedClient.jarConfig
+        ensure(jarConfig != null) { invalidJarJwt("Verifier with $clientId has not been configured for JAR") }
+        val (jarSigningAlg, jwkSetSource) = jarConfig
         suspend fun getJWKSource(): JWKSource<SecurityContext> {
-            val jwkSet = when (val source = trustedClient.jwkSetSource) {
-                is JwkSetSource.ByValue -> JWKSet.parse(source.jwks.toString())
+            val jwkSet = when (jwkSetSource) {
+                is JwkSetSource.ByValue -> JWKSet.parse(jwkSetSource.jwks.toString())
                 is JwkSetSource.ByReference ->
                     httpClientFactory().use { client ->
-                        val unparsed = client.get(source.jwksUri.toURL()).body<String>()
+                        val unparsed = client.get(jwkSetSource.jwksUri.toURL()).body<String>()
                         JWKSet.parse(unparsed)
                     }
             }
             return ImmutableJWKSet(jwkSet)
         }
 
-        val alg = JWSAlgorithm.parse(trustedClient.jarSigningAlg)
         val jwkSource = getJWKSource()
-        return JWSVerificationKeySelector(alg, jwkSource)
+        return JWSVerificationKeySelector(jarSigningAlg, jwkSource)
     }
 }
 

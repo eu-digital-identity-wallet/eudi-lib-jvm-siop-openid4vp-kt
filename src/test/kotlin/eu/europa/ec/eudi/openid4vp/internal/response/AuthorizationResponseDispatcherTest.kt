@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.fail
 
 class AuthorizationResponseDispatcherTest {
@@ -128,10 +129,8 @@ class AuthorizationResponseDispatcherTest {
             }
 
             val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
-            when (val response = siopAuthRequestObject.responseWith(idTokenConsensus)) {
-                is AuthorizationResponse.DirectPost -> dispatcher.dispatch(response)
-                else -> fail("Not a direct post response")
-            }
+            val outcome = dispatcher.dispatch(siopAuthRequestObject, idTokenConsensus)
+            assertIs<DispatchOutcome.VerifierResponse>(outcome)
         }
     }
 
@@ -202,13 +201,8 @@ class AuthorizationResponseDispatcherTest {
             }
 
             val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
-            when (val response = openId4VPAuthRequestObject.responseWith(vpTokenConsensus)) {
-                is AuthorizationResponse.DirectPost -> {
-                    dispatcher.dispatch(response)
-                }
-
-                else -> fail("Not a direct post response")
-            }
+            val outcome = dispatcher.dispatch(openId4VPAuthRequestObject, vpTokenConsensus)
+            assertIs<DispatchOutcome.VerifierResponse>(outcome)
         }
     }
 

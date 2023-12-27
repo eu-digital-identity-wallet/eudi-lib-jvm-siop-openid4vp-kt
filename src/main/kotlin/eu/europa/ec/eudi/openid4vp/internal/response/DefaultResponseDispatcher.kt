@@ -19,6 +19,7 @@ import com.eygraber.uri.UriCodec
 import com.eygraber.uri.toURI
 import com.eygraber.uri.toUri
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.*
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
 import io.ktor.client.request.forms.*
@@ -27,6 +28,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.URI
 import java.net.URL
 
 /**
@@ -40,20 +42,11 @@ internal class DefaultDispatcher(
     private val signer: AuthorizationResponseSigner?,
 ) : Dispatcher {
 
-    override suspend fun dispatch(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome {
-        val response = request.responseWith(consensus)
-        return dispatch(response)
-    }
-    suspend fun dispatch(
-        response: AuthorizationResponse,
-    ): DispatchOutcome =
-        when (response) {
-            is AuthorizationResponse.DirectPost -> directPost(response)
-            is AuthorizationResponse.DirectPostJwt -> directPostJwt(response)
-            is AuthorizationResponse.Fragment -> fragment(response)
-            is AuthorizationResponse.FragmentJwt -> fragmentJwt(response)
-            is AuthorizationResponse.Query -> query(response)
-            is AuthorizationResponse.QueryJwt -> queryJwt(response)
+    override suspend fun post(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.VerifierResponse =
+        when (val response = request.responseWith(consensus)) {
+            is DirectPost -> directPost(response)
+            is DirectPostJwt -> directPostJwt(response)
+            else -> error("Unexpected response $response")
         }
 
     /**
@@ -62,7 +55,7 @@ internal class DefaultDispatcher(
      * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
      * @see DirectPostForm on how the given [response] is encoded into form data
      */
-    private suspend fun directPost(response: AuthorizationResponse.DirectPost): DispatchOutcome.VerifierResponse =
+    private suspend fun directPost(response: DirectPost): DispatchOutcome.VerifierResponse =
         coroutineScope {
             val parameters = DirectPostForm.of(response.data)
                 .let { form ->
@@ -101,7 +94,7 @@ internal class DefaultDispatcher(
      * for details about direct_post.jwt response type
      */
     private suspend fun directPostJwt(
-        response: AuthorizationResponse.DirectPostJwt,
+        response: DirectPostJwt,
     ): DispatchOutcome.VerifierResponse =
         coroutineScope {
             val joseResponse = signEncryptResponse(
@@ -125,51 +118,67 @@ internal class DefaultDispatcher(
             }
         }
 
-    private fun fragment(response: AuthorizationResponse.Fragment): DispatchOutcome.RedirectURI =
-        with(response.redirectUri.toUri().buildUpon()) {
-            val encodedFragment = DirectPostForm.of(response.data).map { (key, value) ->
+    override suspend fun encodeRedirectURI(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+    ): DispatchOutcome.RedirectURI {
+        val uri = when (val response = request.responseWith(consensus)) {
+            is Fragment -> response.encodeRedirectURI()
+            is FragmentJwt -> response.encodeRedirectURI(checkNotNull(holderId), signer)
+            is Query -> response.encodeRedirectURI()
+            is QueryJwt -> response.encodeRedirectURI(checkNotNull(holderId), signer)
+            else -> error("Unexpected response $response")
+        }
+        return DispatchOutcome.RedirectURI(uri)
+    }
+}
+
+internal fun Query.encodeRedirectURI(): URI =
+    with(redirectUri.toUri().buildUpon()) {
+        DirectPostForm.of(data).forEach { (key, value) -> appendQueryParameter(key, value) }
+        build()
+    }.toURI()
+
+internal fun QueryJwt.encodeRedirectURI(
+    holderId: String,
+    signer: AuthorizationResponseSigner?,
+): URI =
+    with(redirectUri.toUri().buildUpon()) {
+        val joseResponse = signEncryptResponse(holderId, signer, jarmOption, data)
+        appendQueryParameter("response", joseResponse)
+        appendQueryParameter("state", data.state)
+        build()
+    }.toURI()
+
+internal fun Fragment.encodeRedirectURI(): URI =
+    with(redirectUri.toUri().buildUpon()) {
+        val encodedFragment = DirectPostForm.of(data).map { (key, value) ->
+            val encodedKey = UriCodec.encode(key, null)
+            val encodedValue = UriCodec.encodeOrNull(value, null)
+            "$encodedKey=$encodedValue"
+        }.joinToString(separator = "&")
+        encodedFragment(encodedFragment)
+        build()
+    }.toURI()
+
+internal fun FragmentJwt.encodeRedirectURI(
+    holderId: String,
+    signer: AuthorizationResponseSigner?,
+): URI =
+    with(redirectUri.toUri().buildUpon()) {
+        val joseResponse = signEncryptResponse(holderId, signer, jarmOption, data)
+        val encodedFragment =
+            mapOf(
+                "response" to joseResponse,
+                "state" to data.state,
+            ).map { (key, value) ->
                 val encodedKey = UriCodec.encode(key, null)
                 val encodedValue = UriCodec.encodeOrNull(value, null)
                 "$encodedKey=$encodedValue"
             }.joinToString(separator = "&")
-            encodedFragment(encodedFragment)
-            DispatchOutcome.RedirectURI(build().toURI())
-        }
-
-    private fun fragmentJwt(
-        response: AuthorizationResponse.FragmentJwt,
-    ): DispatchOutcome.RedirectURI =
-        with(response.redirectUri.toUri().buildUpon()) {
-            val joseResponse = signEncryptResponse(checkNotNull(holderId), signer, response.jarmOption, response.data)
-            val encodedFragment =
-                mapOf(
-                    "response" to joseResponse,
-                    "state" to response.data.state,
-                ).map { (key, value) ->
-                    val encodedKey = UriCodec.encode(key, null)
-                    val encodedValue = UriCodec.encodeOrNull(value, null)
-                    "$encodedKey=$encodedValue"
-                }.joinToString(separator = "&")
-            encodedFragment(encodedFragment)
-            DispatchOutcome.RedirectURI(build().toURI())
-        }
-
-    private fun query(response: AuthorizationResponse.Query): DispatchOutcome.RedirectURI =
-        with(response.redirectUri.toUri().buildUpon()) {
-            DirectPostForm.of(response.data).forEach { (key, value) -> appendQueryParameter(key, value) }
-            DispatchOutcome.RedirectURI(build().toURI())
-        }
-
-    private fun queryJwt(
-        response: AuthorizationResponse.QueryJwt,
-    ): DispatchOutcome.RedirectURI =
-        with(response.redirectUri.toUri().buildUpon()) {
-            val joseResponse = signEncryptResponse(checkNotNull(holderId), signer, response.jarmOption, response.data)
-            appendQueryParameter("response", joseResponse)
-            appendQueryParameter("state", response.data.state)
-            DispatchOutcome.RedirectURI(build().toURI())
-        }
-}
+        encodedFragment(encodedFragment)
+        build()
+    }.toURI()
 
 /**
  * An object responsible for encoding a [AuthorizationResponsePayload] into

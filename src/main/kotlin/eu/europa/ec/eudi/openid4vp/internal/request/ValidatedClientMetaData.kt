@@ -81,3 +81,24 @@ internal fun ValidatedClientMetaData.jarmOption(cfg: SiopOpenId4VPConfig): JarmO
         else -> null
     }
 }
+
+private fun JarmConfiguration.supportedSigningAlgorithms(): List<JWSAlgorithm> = when (this) {
+    is JarmConfiguration.Encryption -> emptyList()
+    JarmConfiguration.NotSupported -> emptyList()
+    is JarmConfiguration.Signing -> supportedAlgorithms
+    is JarmConfiguration.SigningAndEncryption -> signing.supportedAlgorithms
+}
+
+private fun JarmConfiguration.supportedEncryptionAlgorithms(): List<JWEAlgorithm> = when (this) {
+    is JarmConfiguration.Encryption -> supportedAlgorithms
+    JarmConfiguration.NotSupported -> emptyList()
+    is JarmConfiguration.Signing -> emptyList()
+    is JarmConfiguration.SigningAndEncryption -> encryption.supportedAlgorithms
+}
+
+private fun JarmConfiguration.supportedEncryptionMethods(): List<EncryptionMethod> = when (this) {
+    is JarmConfiguration.Encryption -> supportedEncryptionMethods
+    JarmConfiguration.NotSupported -> emptyList()
+    is JarmConfiguration.Signing -> emptyList()
+    is JarmConfiguration.SigningAndEncryption -> encryption.supportedEncryptionMethods
+}

@@ -32,14 +32,14 @@ included in ISO 23220-4 and ISO-18013-7
 ## Disclaimer
 
 The released software is a initial development release version: 
--  The initial development release is an early endeavor reflecting the efforts of a short timeboxed period, and by no means can be considered as the final product.  
+-  The initial development release is an early endeavor reflecting the efforts of a short time-boxed period, and by no means can be considered as the final product.  
 -  The initial development release may be changed substantially over time, might introduce new features but also may change or remove existing ones, potentially breaking compatibility with your existing code.
 -  The initial development release is limited in functional scope.
 -  The initial development release may contain errors or design flaws and other problems that could cause system or other failures and data loss.
 -  The initial development release has reduced security, privacy, availability, and reliability standards relative to future releases. This could make the software slower, less reliable, or more vulnerable to attacks than mature software.
 -  The initial development release is not yet comprehensively documented. 
--  Users of the software must perform sufficient engineering and additional testing in order to properly evaluate their application and determine whether any of the open-sourced components is suitable for use in that application.
--  We strongly recommend to not put this version of the software into production use.
+-  Users of the software must perform sufficient engineering and additional testing to properly evaluate their application and determine whether any of the open-sourced components is suitable for use in that application.
+-  We strongly recommend not putting this version of the software into production use.
 -  Only the latest version of the software will be supported
 
 ## How to use
@@ -66,11 +66,11 @@ val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)
 
 ### Resolve an authorization request URI
 
-Wallet receives an OAUTH2 Authorization request, formed by the Verifier, that may represent either
+Wallet receives an OAUTH2 Authorization request, formed by the Verifier, that may represent 
 
 - a [SIOPv2 authentication request](https://openid.bitbucket.io/connect/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-a), or
-- a [OpenID4VP authorization request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request),
-- or a combined [SIOP & OpenID4VP request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-combining-this-specificatio)
+- a [OpenID4VP authorization request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request) or,
+- a combined [SIOP & OpenID4VP request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-combining-this-specificatio)
 
 In the same device  scenario the aforementioned authorization request reaches the wallet in terms of
 a deep link. Similarly, in the cross-device scenario, the request would be obtained via scanning a QR Code.
@@ -86,7 +86,7 @@ The interface that captures the aforementioned functionality is
 ```kotlin
 import eu.europa.ec.eudi.openid4vp.*
 
-val authorizationRequestUri : String // obtained via deep link or scanning a QR code
+val authorizationRequestUri : String // obtained via a deep link or scanning a QR code
 
 val resolution = siopOpenId4Vp.resolveRequestUri(authorizationRequestUri)
 val requestObject = when (resolution) {

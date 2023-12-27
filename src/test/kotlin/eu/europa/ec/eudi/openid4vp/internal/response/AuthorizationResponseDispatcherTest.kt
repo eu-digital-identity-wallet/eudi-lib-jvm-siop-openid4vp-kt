@@ -33,12 +33,11 @@ import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.fail
 
 class AuthorizationResponseDispatcherTest {
 
@@ -46,11 +45,7 @@ class AuthorizationResponseDispatcherTest {
 
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-        vpConfiguration = VPConfiguration(
-            presentationDefinitionUriSupported = true,
-            vpFormatsSupported = emptyList(),
-        ),
-        jarmConfiguration = JarmConfiguration.NotSupported,
+
     )
 
     private val clientMetadataStr =
@@ -64,7 +59,7 @@ class AuthorizationResponseDispatcherTest {
     }
 
     @Test
-    fun `dispatch direct post response`(): Unit = runTest {
+    fun `dispatch direct post response`() = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
             ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
@@ -135,7 +130,7 @@ class AuthorizationResponseDispatcherTest {
     }
 
     @Test
-    fun `dispatch vp_token with direct post`(): Unit = runTest {
+    fun `dispatch vp_token with direct post`() = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
             ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)

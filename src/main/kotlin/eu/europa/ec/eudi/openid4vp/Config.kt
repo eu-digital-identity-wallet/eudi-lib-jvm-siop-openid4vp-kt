@@ -19,9 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
-import eu.europa.ec.eudi.prex.ClaimFormat
 import eu.europa.ec.eudi.prex.PresentationDefinition
-import eu.europa.ec.eudi.prex.SupportedClaimFormat
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.net.URI
@@ -93,17 +91,19 @@ sealed interface SupportedClientIdScheme {
 /**
  * Configurations options for OpenId4VP
  *
- * @param vpFormatsSupported the credential formats supported
  * @param presentationDefinitionUriSupported indicates whether wallet should fetch a presentation definition
  * which is communicated by the verifier by reference using `presentation_definition_uri`.
  * @param knownPresentationDefinitionsPerScope a set of presentation definitions that a verifier may request via
  * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
  */
 data class VPConfiguration(
-    val vpFormatsSupported: List<SupportedClaimFormat<in ClaimFormat>>,
     val presentationDefinitionUriSupported: Boolean = true,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
-)
+) {
+    companion object {
+        val Default = VPConfiguration(true, emptyMap())
+    }
+}
 
 /**
  * Configurations options for JARM.
@@ -191,7 +191,7 @@ sealed interface JarmConfiguration : Serializable {
  */
 data class SiopOpenId4VPConfig(
     val jarmConfiguration: JarmConfiguration = NotSupported,
-    val vpConfiguration: VPConfiguration = VPConfiguration(emptyList(), false, emptyMap()),
+    val vpConfiguration: VPConfiguration = VPConfiguration.Default,
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
 ) {
     init {
@@ -200,7 +200,7 @@ data class SiopOpenId4VPConfig(
 
     constructor(
         jarmConfiguration: JarmConfiguration = NotSupported,
-        vpConfiguration: VPConfiguration = VPConfiguration(emptyList(), false, emptyMap()),
+        vpConfiguration: VPConfiguration = VPConfiguration.Default,
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
     ) : this(jarmConfiguration, vpConfiguration, supportedClientIdSchemes.toList())
 }

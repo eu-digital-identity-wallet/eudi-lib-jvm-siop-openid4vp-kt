@@ -370,14 +370,10 @@ object SslSettings {
 private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
         supportedClientIdSchemes = supportedClientIdScheme.toList(),
-        vpConfiguration = VPConfiguration(
-            presentationDefinitionUriSupported = true,
-            vpFormatsSupported = emptyList(),
-        ),
         jarmConfiguration = JarmConfiguration.Encryption(
             holderId = "DID:example:12341512#$",
-            supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
-            supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
+            supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
+            supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
         ),
     )
 

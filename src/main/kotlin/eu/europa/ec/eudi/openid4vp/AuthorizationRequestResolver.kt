@@ -28,22 +28,28 @@ import java.io.Serializable
  */
 sealed interface ResolvedRequestObject : Serializable {
 
-    val responseMode: ResponseMode
-    val jarmOption: JarmOption?
-    val state: String
     val clientId: String
+    val responseMode: ResponseMode
+    val state: String
+    val nonce: String
+
+    /**
+     * The verifier's requirements, if any, for encrypting and/or signing the authorization
+     * response using JARM.
+     */
+    val jarmRequirement: JarmRequirement?
 
     /**
      * SIOPv2 Authentication request for issuing an id_token
      */
     data class SiopAuthentication(
+        override val clientId: String,
+        override val responseMode: ResponseMode,
+        override val state: String,
+        override val nonce: String,
+        override val jarmRequirement: JarmRequirement?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
-        override val clientId: String,
-        val nonce: String,
-        override val responseMode: ResponseMode,
-        override val jarmOption: JarmOption?,
-        override val state: String,
         val scope: Scope,
     ) : ResolvedRequestObject
 
@@ -51,27 +57,27 @@ sealed interface ResolvedRequestObject : Serializable {
      * OpenId4VP Authorization request for presenting a vp_token
      */
     data class OpenId4VPAuthorization(
-        val presentationDefinition: PresentationDefinition,
         override val clientId: String,
-        val nonce: String,
         override val responseMode: ResponseMode,
-        override val jarmOption: JarmOption?,
         override val state: String,
+        override val nonce: String,
+        override val jarmRequirement: JarmRequirement?,
+        val presentationDefinition: PresentationDefinition,
     ) : ResolvedRequestObject
 
     /**
      * OpenId4VP combined with SIOPv2 request for presenting an id_token & vp_token
      */
     data class SiopOpenId4VPAuthentication(
+        override val clientId: String,
+        override val responseMode: ResponseMode,
+        override val state: String,
+        override val nonce: String,
+        override val jarmRequirement: JarmRequirement?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
-        val presentationDefinition: PresentationDefinition,
-        override val clientId: String,
-        val nonce: String,
-        override val responseMode: ResponseMode,
-        override val jarmOption: JarmOption?,
-        override val state: String,
         val scope: Scope,
+        val presentationDefinition: PresentationDefinition,
     ) : ResolvedRequestObject
 }
 

@@ -15,23 +15,16 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.JWSSigner
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcher
 
-interface AuthorizationResponseSigner : JWSSigner {
-    fun getKeyId(): String
-}
-
 /**
- * An interface providing support for handling
- * an OAUTH2 authorization request that represents
- * either an SIOP authentication request, or an OpenId4VP authorization request or
- * a combined SIOP & OpenId4VP request
+ * An interface providing support for handling an OAUTH2 request that represents
+ * either an SIOP authentication request,
+ * or an OpenId4VP authorization request
+ * or a combined SIOP & OpenId4VP request.
  *
- * The support is grouped into three groups:
- * [validate & resolve][AuthorizationRequestResolver]
- * [dispatch response][Dispatcher]
+ * To obtain an instance of [SiopOpenId4Vp], method [invoke] can be used.
  *
  * @see AuthorizationRequestResolver
  * @see Dispatcher
@@ -44,40 +37,22 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, Dispatcher {
          * Factory method to create a [SiopOpenId4Vp].
          *
          * @param siopOpenId4VPConfig wallet's configuration
-         * @param httpClientFactory a factory to obtain a Ktor http client
-         * @param signer will be used to sign the response in case the client requires a signed JARM response.
-         * If provided, the signer needs to be aligned with [SiopOpenId4VPConfig.jarmConfiguration].
-         *
+         * @param httpClientFactory a factory to obtain a Ktor http client. This can be used to configure ktor
+         * to use a specific engine. If a factory is not provided, the [DefaultHttpClientFactory] will be used,
+         * which peeks the actual engine from whatever is available in the classpath.
          *
          * @return a [SiopOpenId4Vp]
          */
         operator fun invoke(
             siopOpenId4VPConfig: SiopOpenId4VPConfig,
-            signer: AuthorizationResponseSigner?,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): SiopOpenId4Vp {
-            fun JarmConfiguration.Signing.requiredSigner() {
-                checkNotNull(signer) { "Configuration requires signer." }
-                require(supportedAlgorithms.all { alg -> alg in signer.supportedJWSAlgorithms() }) {
-                    "Given signer doesn't not aligned with configuration."
-                }
-            }
-            when (val jarmCfg = siopOpenId4VPConfig.jarmConfiguration) {
-                is JarmConfiguration.Encryption -> Unit
-                JarmConfiguration.NotSupported -> Unit
-                is JarmConfiguration.Signing -> jarmCfg.requiredSigner()
-                is JarmConfiguration.SigningAndEncryption -> jarmCfg.signing.requiredSigner()
-            }
-
-            val holderId = siopOpenId4VPConfig.holderId()
+            val requestResolver = DefaultAuthorizationRequestResolver(siopOpenId4VPConfig, httpClientFactory)
+            val dispatcher = DefaultDispatcher(siopOpenId4VPConfig, httpClientFactory)
             return object :
-                SiopOpenId4Vp,
-                AuthorizationRequestResolver by DefaultAuthorizationRequestResolver.make(
-                    httpClientFactory,
-                    siopOpenId4VPConfig,
-                ),
-                Dispatcher by DefaultDispatcher(httpClientFactory, holderId, signer) {
-            }
+                AuthorizationRequestResolver by requestResolver,
+                Dispatcher by dispatcher,
+                SiopOpenId4Vp {}
         }
     }
 }

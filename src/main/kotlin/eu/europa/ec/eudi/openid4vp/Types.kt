@@ -112,7 +112,7 @@ typealias VpToken = String
 
 /**
  * The type of the `id_token`
- * the client (verifier/relying party) requested
+ * the client (verifier party) requested
  */
 enum class IdTokenType {
     SubjectSigned,
@@ -120,36 +120,31 @@ enum class IdTokenType {
 }
 
 /**
- * The client's (verifier/relying party) requirement to
+ * The client's (verifier) requirement to
  * reply to an authorization request with JARM
  */
-sealed interface JarmOption : Serializable {
+sealed interface JarmRequirement : Serializable {
     /**
      * Client requires JARM signed response using the [responseSigningAlg]
      * signing algorithm
      */
-    data class SignedResponse(
-        val responseSigningAlg: JWSAlgorithm,
-    ) : JarmOption
+    data class Signed(val responseSigningAlg: JWSAlgorithm) : JarmRequirement
 
     /**
      * Client requires JARM encrypted response using the
      * provided [algorithm][responseEncryptionAlg], [encoding method][responseEncryptionEnc]
      * and [encryption key][encryptionKeySet]
      */
-    data class EncryptedResponse(
+    data class Encrypted(
         val responseEncryptionAlg: JWEAlgorithm,
         val responseEncryptionEnc: EncryptionMethod,
         val encryptionKeySet: JWKSet,
-    ) : JarmOption
+    ) : JarmRequirement
 
     /**
      * Client requires JARM signed and (then) encrypted
-     * using the provided [signing][signedResponse] and [encryption][encryptResponse]
+     * using the provided [signing][signed] and [encryption][encryptResponse]
      * specifications
      */
-    data class SignedAndEncryptedResponse(
-        val signedResponse: SignedResponse,
-        val encryptResponse: EncryptedResponse,
-    ) : JarmOption
+    data class SignedAndEncrypted(val signed: Signed, val encryptResponse: Encrypted) : JarmRequirement
 }

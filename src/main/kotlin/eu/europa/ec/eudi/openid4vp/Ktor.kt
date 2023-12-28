@@ -26,6 +26,7 @@ typealias KtorHttpClientFactory = () -> HttpClient
 
 /**
  * Factory which produces a [Ktor Http client][HttpClient]
+ *
  * The actual engine will be peeked up by whatever
  * it is available in classpath
  *

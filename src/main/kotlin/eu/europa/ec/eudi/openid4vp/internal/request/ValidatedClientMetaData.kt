@@ -51,57 +51,53 @@ internal data class ValidatedClientMetaData(
 )
 
 @Throws(AuthorizationRequestException::class)
-internal fun ValidatedClientMetaData.jarmOption(siopOpenId4VPConfig: SiopOpenId4VPConfig): JarmOption? =
-    jarmOption(siopOpenId4VPConfig.jarmConfiguration)
+internal fun SiopOpenId4VPConfig.jarmRequirement(metaData: ValidatedClientMetaData): JarmRequirement? =
+    jarmConfiguration.jarmRequirement(metaData)
 
+/**
+ * Method checks whether verifier requested from wallet to reply using JARM, via his [metaData].
+ * If there are such requirements, it makes sure that the wallet can fulfill those requirements.
+ *
+ * @param metaData verifier's client medata
+ * @receiver the wallet's [JarmConfiguration] which be used to validate verifier's JARM requirements
+ *
+ * @return <em>null</em> value means that the verifier requires a plain response.
+ * [JarmRequirement.Signed] means that the verifier has requested a sign response, and wallet has a suitable
+ * signer ([JarmConfiguration.Signing] or [JarmConfiguration.SigningAndEncryption]) configured.
+ * [JarmRequirement.Encrypted] means that the verifier has requested an encrypted response, and wallet has a
+ * suitable option ([JarmConfiguration.Encryption] or [JarmConfiguration.SigningAndEncryption]) configured.
+ * [JarmRequirement.SignedAndEncrypted] means that the verifier has requested a signed & encrypted response and
+ * wallet has a suitable [JarmConfiguration.SigningAndEncryption] option configured.
+ */
 @Throws(AuthorizationRequestException::class)
-internal fun ValidatedClientMetaData.jarmOption(jarmConfig: JarmConfiguration): JarmOption? {
-    val signedResponse = authorizationSignedResponseAlg?.let { alg ->
-        ensure(alg in jarmConfig.supportedSigningAlgorithms()) {
+internal fun JarmConfiguration.jarmRequirement(metaData: ValidatedClientMetaData): JarmRequirement? {
+    val signed = metaData.authorizationSignedResponseAlg?.let { alg ->
+        val signingCfg = signingConfig()
+        ensure(signingCfg != null) {
+            UnsupportedClientMetaData("Wallet doesn't support signed JARM").asException()
+        }
+        ensure(alg in signingCfg.signer.supportedJWSAlgorithms()) {
             UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
         }
-        JarmOption.SignedResponse(alg)
+        JarmRequirement.Signed(alg)
     }
-    val encryptedResponse = authorizationEncryptedResponseAlg?.let { alg ->
-        ensure(alg in jarmConfig.supportedEncryptionAlgorithms()) {
+    val encrypted = metaData.authorizationEncryptedResponseAlg?.let { alg ->
+        val encryptionCfg = encryptionConfig()
+        ensure(encryptionCfg != null) { UnsupportedClientMetaData("Wallet doesn't support encrypted JARM").asException() }
+        ensure(alg in encryptionCfg.supportedAlgorithms) {
             UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
         }
-        authorizationEncryptedResponseEnc?.let { enc ->
-            ensure(enc in jarmConfig.supportedEncryptionMethods()) {
+        metaData.authorizationEncryptedResponseEnc?.let { enc ->
+            ensure(enc in encryptionCfg.supportedMethods) {
                 UnsupportedClientMetaData("Wallet doesn't support $enc ").asException()
             }
-            jwkSet?.let { set -> JarmOption.EncryptedResponse(alg, enc, set) }
+            metaData.jwkSet?.let { set -> JarmRequirement.Encrypted(alg, enc, set) }
         }
     }
-
-    fun requiredSignedResponse() = checkNotNull(signedResponse)
-    fun requiredEncryptedResponse() = checkNotNull(encryptedResponse)
-
-    return when ((signedResponse != null) to (encryptedResponse != null)) {
-        true to true -> JarmOption.SignedAndEncryptedResponse(requiredSignedResponse(), requiredEncryptedResponse())
-        true to false -> requiredSignedResponse()
-        false to true -> requiredEncryptedResponse()
+    return when {
+        signed != null && encrypted != null -> JarmRequirement.SignedAndEncrypted(signed, encrypted)
+        signed != null && encrypted == null -> signed
+        signed == null && encrypted != null -> encrypted
         else -> null
     }
-}
-
-private fun JarmConfiguration.supportedSigningAlgorithms(): List<JWSAlgorithm> = when (this) {
-    is JarmConfiguration.Encryption -> emptyList()
-    JarmConfiguration.NotSupported -> emptyList()
-    is JarmConfiguration.Signing -> supportedAlgorithms
-    is JarmConfiguration.SigningAndEncryption -> signing.supportedAlgorithms
-}
-
-private fun JarmConfiguration.supportedEncryptionAlgorithms(): List<JWEAlgorithm> = when (this) {
-    is JarmConfiguration.Encryption -> supportedAlgorithms
-    JarmConfiguration.NotSupported -> emptyList()
-    is JarmConfiguration.Signing -> emptyList()
-    is JarmConfiguration.SigningAndEncryption -> encryption.supportedAlgorithms
-}
-
-private fun JarmConfiguration.supportedEncryptionMethods(): List<EncryptionMethod> = when (this) {
-    is JarmConfiguration.Encryption -> supportedEncryptionMethods
-    JarmConfiguration.NotSupported -> emptyList()
-    is JarmConfiguration.Signing -> emptyList()
-    is JarmConfiguration.SigningAndEncryption -> encryption.supportedEncryptionMethods
 }

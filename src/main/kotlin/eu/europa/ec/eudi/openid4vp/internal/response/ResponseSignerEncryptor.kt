@@ -26,75 +26,78 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vp.AuthorizationResponseSigner
-import eu.europa.ec.eudi.openid4vp.JarmOption
+import eu.europa.ec.eudi.openid4vp.JarmConfiguration
+import eu.europa.ec.eudi.openid4vp.JarmRequirement
+import eu.europa.ec.eudi.openid4vp.encryptionConfig
+import eu.europa.ec.eudi.openid4vp.signingConfig
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.time.Instant
 
 /**
- * Signs the [response to be sent to the verifier][data] according ot the [jarmOption]
- *
+ * Creates the [response to be sent to the verifier][data] according ot the [jarmRequirement]
  *
  * @param data the response to be sent to the verifier, that needs to be signed
  *
- * @return a JWT containing the [data] which depending on the [jarmOption] it could be
+ * @return a JWT containing the [data] which depending on the [jarmRequirement] it could be
  * - a signed JWT
  * - an encrypted JWT
  * - an encrypted JWT containing a signed JWT
  */
-internal fun signEncryptResponse(
-    holderId: String,
-    signer: AuthorizationResponseSigner?,
-    jarmOption: JarmOption,
+internal fun jarmJwt(
+    jarmConfig: JarmConfiguration,
+    jarmRequirement: JarmRequirement,
     data: AuthorizationResponsePayload,
-): String {
-    fun requiredSigner() = checkNotNull(signer) { "Signer was not provided for $jarmOption" }
-    return when (jarmOption) {
-        is JarmOption.SignedResponse -> sign(holderId, requiredSigner(), jarmOption, data).serialize()
-        is JarmOption.EncryptedResponse -> encrypt(holderId, jarmOption, data).serialize()
-        is JarmOption.SignedAndEncryptedResponse -> signAndEncrypt(
-            holderId,
-            requiredSigner(),
-            jarmOption,
-            data,
-        ).serialize()
+): String = when (jarmRequirement) {
+    is JarmRequirement.Signed -> {
+        val signingCfg = jarmConfig.signingConfig()
+        checkNotNull(signingCfg) { "Wallet doesn't support signing JARM" }
+        sign(signingCfg, jarmRequirement, data)
     }
-}
+
+    is JarmRequirement.Encrypted -> {
+        val encryptionCfg = jarmConfig.encryptionConfig()
+        checkNotNull(encryptionCfg) { "Wallet doesn't support encrypted JARM" }
+        encrypt(jarmRequirement, data)
+    }
+    is JarmRequirement.SignedAndEncrypted -> {
+        check(jarmConfig is JarmConfiguration.SigningAndEncryption) {
+            "Wallet doesn't signing & encrypting JARM"
+        }
+        signAndEncrypt(jarmConfig, jarmRequirement, data)
+    }
+}.serialize()
 
 private fun sign(
-    holderId: String,
-    signer: AuthorizationResponseSigner,
-    option: JarmOption.SignedResponse,
+    cfg: JarmConfiguration.Signing,
+    option: JarmRequirement.Signed,
     data: AuthorizationResponsePayload,
 ): SignedJWT {
     val signingAlg = option.responseSigningAlg
     val header = JWSHeader.Builder(signingAlg)
-        .keyID(signer.getKeyId())
+        .keyID(cfg.signer.getKeyId())
         .build()
-    val dataAsJWT = JwtPayloadFactory.create(data, holderId, Instant.now())
-    return SignedJWT(header, dataAsJWT).apply { sign(signer) }
+    val dataAsJWT = JwtPayloadFactory.create(data, cfg.holderId, Instant.now())
+    return SignedJWT(header, dataAsJWT).apply { sign(cfg.signer) }
 }
 
 private fun encrypt(
-    holderId: String,
-    option: JarmOption.EncryptedResponse,
+    option: JarmRequirement.Encrypted,
     data: AuthorizationResponsePayload,
 ): EncryptedJWT {
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = option
     val (_, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
     val jweHeader = JWEHeader(jweAlgorithm, encryptionMethod)
-    val dataAsJWT = JwtPayloadFactory.create(data, holderId, Instant.now())
+    val dataAsJWT = JwtPayloadFactory.create(data, null, Instant.now())
     return EncryptedJWT(jweHeader, dataAsJWT).apply { encrypt(jweEncrypter) }
 }
 
 private fun signAndEncrypt(
-    holderId: String,
-    signer: AuthorizationResponseSigner,
-    option: JarmOption.SignedAndEncryptedResponse,
+    cfg: JarmConfiguration.SigningAndEncryption,
+    option: JarmRequirement.SignedAndEncrypted,
     data: AuthorizationResponsePayload,
 ): JWEObject {
-    val signedJwt = sign(holderId, signer, option.signedResponse, data)
+    val signedJwt = sign(cfg.signing, option.signed, data)
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = option.encryptResponse
     val (_, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
     return JWEObject(
@@ -120,9 +123,9 @@ private object JwtPayloadFactory {
     private const val ID_TOKEN_CLAIM = "id_token"
     private const val ERROR_CLAIM = "error"
     private const val ERROR_DESCRIPTION_CLAIM = "error_description"
-    fun create(data: AuthorizationResponsePayload, holderId: String, issuedAt: Instant): JWTClaimsSet =
+    fun create(data: AuthorizationResponsePayload, holderId: String?, issuedAt: Instant): JWTClaimsSet =
         buildJsonObject {
-            put("iss", holderId)
+            holderId?.let { put("iss", it) }
             put("iat", issuedAt.epochSecond)
             put("aud", data.clientId)
             put(STATE_CLAIM, data.state)

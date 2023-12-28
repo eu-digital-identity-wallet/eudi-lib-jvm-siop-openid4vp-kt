@@ -29,7 +29,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
+import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -47,9 +47,8 @@ class AuthorizationResponseBuilderTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
             jarmConfiguration = JarmConfiguration.Encryption(
-                holderId = "DID:example:12341512#$",
                 supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
-                supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
+                supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
         )
 
@@ -97,7 +96,7 @@ class AuthorizationResponseBuilderTest {
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
                 subjectSyntaxTypesSupported = verifierMetaData.subjectSyntaxTypesSupported,
-                jarmOption = verifierMetaData.jarmOption(Wallet.config),
+                jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
@@ -138,7 +137,7 @@ class AuthorizationResponseBuilderTest {
                     id = Id("pdId"),
                     inputDescriptors = emptyList(),
                 ),
-                jarmOption = verifierMetaData.jarmOption(Wallet.config),
+                jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -153,8 +152,8 @@ class AuthorizationResponseBuilderTest {
 
         assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
         assertIs<AuthorizationResponse.DirectPostJwt>(response)
-        val jarmOption = response.jarmOption
+        val jarmOption = response.jarmRequirement
         assertNotNull(jarmOption)
-        assertIs<JarmOption.EncryptedResponse>(jarmOption)
+        assertIs<JarmRequirement.Encrypted>(jarmOption)
     }
 }

@@ -31,3 +31,12 @@ internal inline fun ensure(value: Boolean, ex: () -> Throwable) {
     }
     if (!value) throw ex()
 }
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun <T : Any> ensureNotNull(value: T?, ex: () -> Throwable): T {
+    contract {
+        returns() implies (value != null)
+    }
+    if (value == null) throw ex()
+    return value
+}

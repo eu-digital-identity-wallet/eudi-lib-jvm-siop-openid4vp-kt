@@ -99,7 +99,7 @@ class AuthorizationRequestResolverTest {
         ),
     )
 
-    private val resolver = DefaultAuthorizationRequestResolver.make(DefaultHttpClientFactory, walletConfig)
+    private val resolver = DefaultAuthorizationRequestResolver(walletConfig, DefaultHttpClientFactory)
 
     private val clientMetadataJwksInline =
         """ {

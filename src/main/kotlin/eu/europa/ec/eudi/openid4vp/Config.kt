@@ -18,6 +18,11 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.crypto.ECDSASigner
+import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.RSAKey
 import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
@@ -97,11 +102,30 @@ sealed interface SupportedClientIdScheme {
  * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
  */
 data class VPConfiguration(
-    val presentationDefinitionUriSupported: Boolean = true,
-    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+    val presentationDefinitionUriSupported: Boolean,
+    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition>,
 ) {
     companion object {
+        /**
+         * A default [VPConfiguration] which enables fetching presentation definitions by reference and
+         * doesn't contain any [VPConfiguration.knownPresentationDefinitionsPerScope]
+         */
         val Default = VPConfiguration(true, emptyMap())
+    }
+}
+
+interface AuthorizationResponseSigner : JWSSigner {
+    fun getKeyId(): String
+
+    companion object {
+        operator fun invoke(rsaKey: RSAKey): AuthorizationResponseSigner =
+            object : AuthorizationResponseSigner, JWSSigner by RSASSASigner(rsaKey) {
+                override fun getKeyId(): String = rsaKey.keyID
+            }
+        operator fun invoke(rsaKey: ECKey): AuthorizationResponseSigner =
+            object : AuthorizationResponseSigner, JWSSigner by ECDSASigner(rsaKey) {
+                override fun getKeyId(): String = rsaKey.keyID
+            }
     }
 }
 
@@ -123,31 +147,31 @@ sealed interface JarmConfiguration : Serializable {
     /**
      * The wallet supports only signed authorization responses
      *
-     * @param supportedAlgorithms the JWS algorithms that the wallet can use when signing a JARM response
+     * @param holderId the contents of the `iss` claim
+     * @param signer the JWS algorithms that the wallet can use when signing a JARM response
      */
     data class Signing(
         val holderId: String,
-        val supportedAlgorithms: List<JWSAlgorithm>,
+        val signer: AuthorizationResponseSigner,
     ) : JarmConfiguration {
         init {
-            require(supportedAlgorithms.isNotEmpty()) { "At least a algorithm must be provided" }
+            require(signer.supportedJWSAlgorithms().isNotEmpty()) { "At least a algorithm must be provided" }
         }
     }
 
     /**
      * The wallet supports only encrypted authorization responses
      * @param supportedAlgorithms the JWE algorithms that the wallet can use when encrypting a JARM response
-     * @param supportedEncryptionMethods the JWE encryption methods that the wallet can use when encrypting a JARM
+     * @param supportedMethods the JWE encryption methods that the wallet can use when encrypting a JARM
      * response
      */
     data class Encryption(
-        val holderId: String,
         val supportedAlgorithms: List<JWEAlgorithm>,
-        val supportedEncryptionMethods: List<EncryptionMethod>,
+        val supportedMethods: List<EncryptionMethod>,
     ) : JarmConfiguration {
         init {
             require(supportedAlgorithms.isNotEmpty()) { "At least an encryption algorithm must be provided" }
-            require(supportedEncryptionMethods.isNotEmpty()) { "At least an encryption method must be provided" }
+            require(supportedMethods.isNotEmpty()) { "At least an encryption method must be provided" }
         }
     }
 
@@ -161,17 +185,13 @@ sealed interface JarmConfiguration : Serializable {
 
         constructor(
             holderId: String,
-            supportedSigningAlgorithms: List<JWSAlgorithm>,
+            signer: AuthorizationResponseSigner,
             supportedEncryptionAlgorithms: List<JWEAlgorithm>,
             supportedEncryptionMethods: List<EncryptionMethod>,
         ) : this(
-            Signing(holderId, supportedSigningAlgorithms),
-            Encryption(holderId, supportedEncryptionAlgorithms, supportedEncryptionMethods),
+            Signing(holderId, signer),
+            Encryption(supportedEncryptionAlgorithms, supportedEncryptionMethods),
         )
-
-        init {
-            require(signing.holderId == encryption.holderId)
-        }
     }
 
     /**
@@ -182,11 +202,28 @@ sealed interface JarmConfiguration : Serializable {
     }
 }
 
+fun JarmConfiguration.signingConfig(): Signing? = when (this) {
+    is Signing -> this
+    is Encryption -> null
+    is SigningAndEncryption -> signing
+    NotSupported -> null
+}
+
+fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
+    is Signing -> null
+    is Encryption -> this
+    is SigningAndEncryption -> encryption
+    NotSupported -> null
+}
+
 /**
- * Wallet configuration options for SIOP & OpenId4VP protocols
+ * Wallet configuration options for SIOP & OpenId4VP protocols.
  *
- * @param jarmConfiguration whether wallet supports JARM
- * @param vpConfiguration options about OpenId4VP
+ * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
+ *
+ * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
+ * [JarmConfiguration.NotSupported].
+ * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
  */
 data class SiopOpenId4VPConfig(
@@ -214,11 +251,4 @@ internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme)
     }
 
     return supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }
-}
-
-internal fun SiopOpenId4VPConfig.holderId(): String? = when (val cfg = jarmConfiguration) {
-    is Signing -> cfg.holderId
-    is Encryption -> cfg.holderId
-    is SigningAndEncryption -> cfg.signing.holderId
-    NotSupported -> null
 }

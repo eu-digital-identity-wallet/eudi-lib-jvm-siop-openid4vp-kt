@@ -255,7 +255,7 @@ private class Wallet(
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp(walletConfig, null) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig) { createHttpClient() }
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {
@@ -371,9 +371,8 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
     SiopOpenId4VPConfig(
         supportedClientIdSchemes = supportedClientIdScheme.toList(),
         jarmConfiguration = JarmConfiguration.Encryption(
-            holderId = "DID:example:12341512#$",
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
-            supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
+            supportedMethods = listOf(EncryptionMethod.A256GCM),
         ),
     )
 

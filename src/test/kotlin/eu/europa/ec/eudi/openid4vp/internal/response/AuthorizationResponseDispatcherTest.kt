@@ -20,7 +20,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
+import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
@@ -71,7 +71,7 @@ class AuthorizationResponseDispatcherTest {
             ResolvedRequestObject.SiopAuthentication(
                 idTokenType = listOf(IdTokenType.AttesterSigned),
                 subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
-                jarmOption = validated.jarmOption(walletConfig),
+                jarmRequirement = walletConfig.jarmRequirement(validated),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -123,7 +123,7 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
+            val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
             val outcome = dispatcher.dispatch(siopAuthRequestObject, idTokenConsensus)
             assertIs<DispatchOutcome.VerifierResponse>(outcome)
         }
@@ -147,7 +147,7 @@ class AuthorizationResponseDispatcherTest {
 
         val openId4VPAuthRequestObject =
             ResolvedRequestObject.OpenId4VPAuthorization(
-                jarmOption = validated.jarmOption(walletConfig),
+                jarmRequirement = walletConfig.jarmRequirement(validated),
                 clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -195,7 +195,7 @@ class AuthorizationResponseDispatcherTest {
                 }
             }
 
-            val dispatcher = DefaultDispatcher(httpClientFactory = { managedHttpClient }, null, null)
+            val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
             val outcome = dispatcher.dispatch(openId4VPAuthRequestObject, vpTokenConsensus)
             assertIs<DispatchOutcome.VerifierResponse>(outcome)
         }

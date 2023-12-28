@@ -25,6 +25,7 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
+import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
@@ -48,6 +49,10 @@ data class PreregisteredClient(
     val jarConfig: Pair<JWSAlgorithm, JwkSetSource>? = null,
 )
 
+fun interface X509CertificateTrust {
+    fun isTrusted(chain: List<X509Certificate>): Boolean
+}
+
 /**
  * The Client identifier scheme supported (or trusted) by the wallet.
  */
@@ -67,10 +72,10 @@ sealed interface SupportedClientIdScheme {
      *
      * In this scheme, Verifier must always sign his request (JAR)
      *
-     * @param validator a function that accepts a chain of certificates (contents of `x5c` claim) and
+     * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
      * indicates whether is trusted or not
      */
-    data class X509SanUri(val validator: (List<X509Certificate>) -> Boolean) : SupportedClientIdScheme
+    data class X509SanUri(val trust: X509CertificateTrust) : SupportedClientIdScheme
 
     /**
      * Wallet trusts verifiers that are able to present a Client Identifier which is a DNS name and
@@ -79,10 +84,10 @@ sealed interface SupportedClientIdScheme {
      *
      * In this scheme, Verifier must always sign his request (JAR)
      *
-     * @param validator a function that accepts a chain of certificates (contents of `x5c` claim) and
+     * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
      * indicates whether is trusted or not
      */
-    data class X509SanDns(val validator: (List<X509Certificate>) -> Boolean) : SupportedClientIdScheme
+    data class X509SanDns(val trust: X509CertificateTrust) : SupportedClientIdScheme
 
     /**
      * Wallet trusts verifiers that present an authorization request having a redirect URI

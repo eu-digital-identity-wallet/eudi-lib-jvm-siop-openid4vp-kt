@@ -63,8 +63,6 @@ fun main(): Unit = runTest {
         walletConfig = walletConfig(
             Preregistered(Verifier.asPreregisteredClient(verifierApi)),
             X509SanDns(TrustAnyX509),
-            X509SanUri(TrustAnyX509),
-            RedirectUri,
         ),
     )
 
@@ -369,11 +367,11 @@ object SslSettings {
 
 private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
-        supportedClientIdSchemes = supportedClientIdScheme.toList(),
         jarmConfiguration = JarmConfiguration.Encryption(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
             supportedMethods = listOf(EncryptionMethod.A256GCM),
         ),
+        supportedClientIdSchemes = supportedClientIdScheme,
     )
 
 val PidPresentationDefinition = """

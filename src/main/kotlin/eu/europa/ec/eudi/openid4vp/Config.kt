@@ -26,7 +26,6 @@ import com.nimbusds.jose.jwk.RSAKey
 import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
-import java.io.Serializable
 import java.net.URI
 import java.security.cert.X509Certificate
 
@@ -114,35 +113,35 @@ data class VPConfiguration(
     }
 }
 
-interface AuthorizationResponseSigner : JWSSigner {
+interface JarmSigner : JWSSigner {
     fun getKeyId(): String
 
     companion object {
-        operator fun invoke(rsaKey: RSAKey): AuthorizationResponseSigner =
-            object : AuthorizationResponseSigner, JWSSigner by RSASSASigner(rsaKey) {
+        operator fun invoke(rsaKey: RSAKey): JarmSigner =
+            object : JarmSigner, JWSSigner by RSASSASigner(rsaKey) {
                 override fun getKeyId(): String = rsaKey.keyID
             }
-        operator fun invoke(rsaKey: ECKey): AuthorizationResponseSigner =
-            object : AuthorizationResponseSigner, JWSSigner by ECDSASigner(rsaKey) {
+        operator fun invoke(rsaKey: ECKey): JarmSigner =
+            object : JarmSigner, JWSSigner by ECDSASigner(rsaKey) {
                 override fun getKeyId(): String = rsaKey.keyID
             }
     }
 }
 
 /**
- * Configurations options for JARM.
+ * Configurations options for encrypting and/or signing an authorization response via JARM,
+ * if requested by the verifier.
  *
  * The library can be configured to:
  *
- * - Support only [signing][Signing]
- * - Support only [encrypting][Encryption]
- * - Support both singing and encryption[SigningAndEncryption]
+ * - Support only [signing][Signing] the authorization response
+ * - Support only [encrypting][Encryption] the authorization response
+ * - Support both singing and encrypting [SigningAndEncryption] the authorization response
  * - Not support JARM
  *
- * These options are taken into account only if a verifier requests from
- * wallet to reply with a JARM response.
+ * OpenId4VP recommends supporting [encrypting][Encryption] the authorization response
  */
-sealed interface JarmConfiguration : Serializable {
+sealed interface JarmConfiguration {
 
     /**
      * The wallet supports only signed authorization responses
@@ -152,7 +151,7 @@ sealed interface JarmConfiguration : Serializable {
      */
     data class Signing(
         val holderId: String,
-        val signer: AuthorizationResponseSigner,
+        val signer: JarmSigner,
     ) : JarmConfiguration {
         init {
             require(signer.supportedJWSAlgorithms().isNotEmpty()) { "At least a algorithm must be provided" }
@@ -185,7 +184,7 @@ sealed interface JarmConfiguration : Serializable {
 
         constructor(
             holderId: String,
-            signer: AuthorizationResponseSigner,
+            signer: JarmSigner,
             supportedEncryptionAlgorithms: List<JWEAlgorithm>,
             supportedEncryptionMethods: List<EncryptionMethod>,
         ) : this(
@@ -197,9 +196,7 @@ sealed interface JarmConfiguration : Serializable {
     /**
      * Wallet doesn't support replying using JARM
      */
-    data object NotSupported : JarmConfiguration {
-        private fun readResolve(): Any = NotSupported
-    }
+    data object NotSupported : JarmConfiguration
 }
 
 fun JarmConfiguration.signingConfig(): Signing? = when (this) {

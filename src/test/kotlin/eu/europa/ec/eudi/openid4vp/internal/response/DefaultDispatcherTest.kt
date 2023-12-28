@@ -113,7 +113,7 @@ class DefaultDispatcherTest {
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
             jarmConfiguration = JarmConfiguration.SigningAndEncryption(
                 holderId = "DID:example:12341512#$",
-                signer = AuthorizationResponseSigner(jarmSigningKeyPair),
+                signer = JarmSigner(jarmSigningKeyPair),
                 supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
             ),

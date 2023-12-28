@@ -37,14 +37,9 @@ import java.net.URL
  * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
-    private val jarmConfiguration: JarmConfiguration,
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
 ) : Dispatcher {
-
-    constructor(
-        siopOpenId4VPConfig: SiopOpenId4VPConfig,
-        httpClientFactory: KtorHttpClientFactory,
-    ) : this(siopOpenId4VPConfig.jarmConfiguration, httpClientFactory)
 
     override suspend fun post(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.VerifierResponse =
         when (val response = request.responseWith(consensus)) {
@@ -100,11 +95,7 @@ internal class DefaultDispatcher(
     private suspend fun directPostJwt(
         response: DirectPostJwt,
     ): DispatchOutcome.VerifierResponse = coroutineScope {
-        val jarmJwt = jarmJwt(
-            jarmConfig = jarmConfiguration,
-            jarmRequirement = response.jarmRequirement,
-            data = response.data,
-        )
+        val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
         val parameters = Parameters.build {
             append("response", jarmJwt)
             append("state", response.data.state)
@@ -126,9 +117,9 @@ internal class DefaultDispatcher(
     ): DispatchOutcome.RedirectURI {
         val uri = when (val response = request.responseWith(consensus)) {
             is Fragment -> response.encodeRedirectURI()
-            is FragmentJwt -> response.encodeRedirectURI(jarmConfiguration)
+            is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             is Query -> response.encodeRedirectURI()
-            is QueryJwt -> response.encodeRedirectURI(jarmConfiguration)
+            is QueryJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             else -> error("Unexpected response $response")
         }
         return DispatchOutcome.RedirectURI(uri)
@@ -141,9 +132,9 @@ internal fun Query.encodeRedirectURI(): URI =
         build()
     }.toURI()
 
-internal fun QueryJwt.encodeRedirectURI(jarmConfiguration: JarmConfiguration): URI =
+internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
     with(redirectUri.toUri().buildUpon()) {
-        val jarmJwt = jarmJwt(jarmConfiguration, jarmRequirement, data)
+        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
         appendQueryParameter("response", jarmJwt)
         appendQueryParameter("state", data.state)
         build()
@@ -160,9 +151,9 @@ internal fun Fragment.encodeRedirectURI(): URI =
         build()
     }.toURI()
 
-internal fun FragmentJwt.encodeRedirectURI(jarmConfiguration: JarmConfiguration): URI =
+internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
     with(redirectUri.toUri().buildUpon()) {
-        val jarmJwt = jarmJwt(jarmConfiguration, jarmRequirement, data)
+        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
         val encodedFragment =
             mapOf(
                 "response" to jarmJwt,

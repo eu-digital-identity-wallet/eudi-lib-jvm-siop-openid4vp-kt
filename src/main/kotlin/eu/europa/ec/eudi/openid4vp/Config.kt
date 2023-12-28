@@ -23,6 +23,7 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
@@ -146,11 +147,9 @@ sealed interface JarmConfiguration {
     /**
      * The wallet supports only signed authorization responses
      *
-     * @param holderId the contents of the `iss` claim
      * @param signer the JWS algorithms that the wallet can use when signing a JARM response
      */
     data class Signing(
-        val holderId: String,
         val signer: JarmSigner,
     ) : JarmConfiguration {
         init {
@@ -183,12 +182,11 @@ sealed interface JarmConfiguration {
     data class SigningAndEncryption(val signing: Signing, val encryption: Encryption) : JarmConfiguration {
 
         constructor(
-            holderId: String,
             signer: JarmSigner,
             supportedEncryptionAlgorithms: List<JWEAlgorithm>,
             supportedEncryptionMethods: List<EncryptionMethod>,
         ) : this(
-            Signing(holderId, signer),
+            Signing(signer),
             Encryption(supportedEncryptionAlgorithms, supportedEncryptionMethods),
         )
     }
@@ -224,6 +222,7 @@ fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
  */
 data class SiopOpenId4VPConfig(
+    val issuer: Issuer? = SelfIssued,
     val jarmConfiguration: JarmConfiguration = NotSupported,
     val vpConfiguration: VPConfiguration = VPConfiguration.Default,
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
@@ -233,10 +232,15 @@ data class SiopOpenId4VPConfig(
     }
 
     constructor(
+        issuer: Issuer = SelfIssued,
         jarmConfiguration: JarmConfiguration = NotSupported,
         vpConfiguration: VPConfiguration = VPConfiguration.Default,
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
-    ) : this(jarmConfiguration, vpConfiguration, supportedClientIdSchemes.toList())
+    ) : this(issuer, jarmConfiguration, vpConfiguration, supportedClientIdSchemes.toList())
+
+    companion object {
+        val SelfIssued = Issuer(URI.create("https://self-issued.me/v2"))
+    }
 }
 
 internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? {

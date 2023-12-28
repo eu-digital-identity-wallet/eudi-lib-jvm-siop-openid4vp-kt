@@ -112,7 +112,6 @@ class DefaultDispatcherTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
             jarmConfiguration = JarmConfiguration.SigningAndEncryption(
-                holderId = "DID:example:12341512#$",
                 signer = JarmSigner(jarmSigningKeyPair),
                 supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
@@ -208,7 +207,7 @@ class DefaultDispatcherTest {
             val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
                 val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                 val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
-                assertEquals(jwtClaimsSet.issuer, Wallet.config.holderId())
+                assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                 assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                 assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
             }
@@ -234,7 +233,7 @@ class DefaultDispatcherTest {
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
-                    assertEquals(Wallet.config.holderId(), jwtClaimsSet.issuer)
+                    assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                     assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
 
@@ -259,7 +258,7 @@ class DefaultDispatcherTest {
 
             val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
                 val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
-                assertEquals(Wallet.config.holderId(), jwtClaimsSet.issuer)
+                assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                 assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                 assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
             }
@@ -339,7 +338,7 @@ class DefaultDispatcherTest {
                 data,
                 JarmRequirement.Signed(JWSAlgorithm.RS256),
             )
-            val redirectURI = response.encodeRedirectURI(Wallet.config.jarmConfiguration)
+            val redirectURI = response.encodeRedirectURI(Wallet.config)
 
             redirectURI.assertQueryURIContainsStateAnd(data.state) {
                 val responseParameter = getQueryParameter("response")
@@ -405,7 +404,7 @@ class DefaultDispatcherTest {
                     data = data,
                     jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
                 )
-            response.encodeRedirectURI(Wallet.config.jarmConfiguration)
+            response.encodeRedirectURI(Wallet.config)
                 .assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
                     assertEquals(data.state, fragmentData["state"])
                     val responseParameter = fragmentData["response"]
@@ -427,13 +426,6 @@ class DefaultDispatcherTest {
             assertEquals(expectedState, map["state"])
         }
     }
-}
-
-private fun SiopOpenId4VPConfig.holderId(): String? = when (val cfg = jarmConfiguration) {
-    is JarmConfiguration.Signing -> cfg.holderId
-    is JarmConfiguration.Encryption -> null
-    is JarmConfiguration.SigningAndEncryption -> cfg.signing.holderId
-    JarmConfiguration.NotSupported -> null
 }
 
 private fun genState(): String = State().value

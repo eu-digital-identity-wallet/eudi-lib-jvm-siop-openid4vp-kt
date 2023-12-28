@@ -62,13 +62,37 @@ enum class ClientIdScheme {
      */
     RedirectUri,
 
+    /**
+     * This value indicates that the Client Identifier is an Entity Identifier
+     * defined in OpenID Federation.
+     */
     EntityId,
 
+    /**
+     * This value indicates that the Client Identifier is a DID
+     */
     DID,
 
+    /**
+     * When the Client Identifier Scheme is x509_san_uri, the Client Identifier
+     * MUST be a URI and match a uniformResourceIdentifier Subject Alternative Name (SAN) RFC5280
+     * entry in the leaf certificate passed with the request
+     */
     X509_SAN_URI,
 
+    /**
+     * When the Client Identifier Scheme is x509_san_dns, the Client Identifier
+     * MUST be a DNS name and match a dNSName Subject Alternative Name (SAN) RFC5280
+     * entry in the leaf certificate passed with the request
+     */
     X509_SAN_DNS,
+
+    /**
+     * This Client Identifier Scheme allows the Verifier
+     * to authenticate using a JWT that is bound to a certain public key
+     */
+    VERIFIER_ATTESTATION,
+
     ;
 
     companion object {
@@ -80,6 +104,7 @@ enum class ClientIdScheme {
             "did" -> DID
             "x509_san_uri" -> X509_SAN_URI
             "x509_san_dns" -> X509_SAN_DNS
+            "verifier_attestation" -> VERIFIER_ATTESTATION
             else -> null
         }
     }

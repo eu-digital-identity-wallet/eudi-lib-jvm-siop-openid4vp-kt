@@ -122,6 +122,7 @@ interface JarmSigner : JWSSigner {
             object : JarmSigner, JWSSigner by RSASSASigner(rsaKey) {
                 override fun getKeyId(): String = rsaKey.keyID
             }
+
         operator fun invoke(rsaKey: ECKey): JarmSigner =
             object : JarmSigner, JWSSigner by ECDSASigner(rsaKey) {
                 override fun getKeyId(): String = rsaKey.keyID
@@ -216,6 +217,7 @@ fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
  *
  * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
  *
+ * @param issuer an optional id for the wallet. If not provided defaults to [SelfIssued].
  * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
  * [JarmConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
@@ -232,13 +234,16 @@ data class SiopOpenId4VPConfig(
     }
 
     constructor(
-        issuer: Issuer = SelfIssued,
+        issuer: Issuer? = SelfIssued,
         jarmConfiguration: JarmConfiguration = NotSupported,
         vpConfiguration: VPConfiguration = VPConfiguration.Default,
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
     ) : this(issuer, jarmConfiguration, vpConfiguration, supportedClientIdSchemes.toList())
 
     companion object {
+        /**
+         * Identifies the wallet as `https://self-issued.me/v2`
+         */
         val SelfIssued = Issuer(URI.create("https://self-issued.me/v2"))
     }
 }

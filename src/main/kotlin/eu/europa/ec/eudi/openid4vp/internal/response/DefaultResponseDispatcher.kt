@@ -34,6 +34,7 @@ import java.net.URL
 /**
  * Default implementation of [Dispatcher]
  *
+ * @param siopOpenId4VPConfig the wallet configuration
  * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(

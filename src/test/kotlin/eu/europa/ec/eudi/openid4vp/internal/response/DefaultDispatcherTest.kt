@@ -34,7 +34,7 @@ import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingNonce
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.jarmOption
+import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier.assertIsJwtEncryptedWithVerifiersPubKey
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Wallet.assertIsJwtSignedByWallet
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Wallet.assertIsSignedByWallet
@@ -109,15 +109,10 @@ class DefaultDispatcherTest {
                 .generate()
         }
 
-        val jarmSigner: AuthorizationResponseSigner by lazy {
-            DelegatingResponseSigner(jarmSigningKeyPair, JWSAlgorithm.RS256)
-        }
-
         val config = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
             jarmConfiguration = JarmConfiguration.SigningAndEncryption(
-                holderId = "DID:example:12341512#$",
-                supportedSigningAlgorithms = jarmSigner.supportedJWSAlgorithms().toList(),
+                signer = JarmSigner(jarmSigningKeyPair),
                 supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
             ),
@@ -141,11 +136,7 @@ class DefaultDispatcherTest {
                 responseParameterAssertions(responseParameter)
                 respondOk()
             }
-            return DefaultDispatcher(
-                httpClientFactory = { HttpClient(mockEngine) },
-                holderId = config.holderId(),
-                signer = jarmSigner,
-            )
+            return DefaultDispatcher(config) { HttpClient(mockEngine) }
         }
 
         val clientMetaDataValidator = ClientMetaDataValidator(DefaultHttpClientFactory)
@@ -174,7 +165,7 @@ class DefaultDispatcherTest {
             )
 
             val exception = assertThrows<AuthorizationRequestException> {
-                clientMetaData.jarmOption(JarmConfiguration.NotSupported)
+                JarmConfiguration.NotSupported.jarmRequirement(clientMetaData)
             }
             assertIs<RequestValidationError.UnsupportedClientMetaData>(exception.error)
         }
@@ -216,7 +207,7 @@ class DefaultDispatcherTest {
             val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
                 val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                 val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
-                assertEquals(jwtClaimsSet.issuer, Wallet.config.holderId())
+                assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                 assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                 assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
             }
@@ -242,7 +233,7 @@ class DefaultDispatcherTest {
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
-                    assertEquals(Wallet.config.holderId(), jwtClaimsSet.issuer)
+                    assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                     assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
 
@@ -267,7 +258,7 @@ class DefaultDispatcherTest {
 
             val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
                 val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
-                assertEquals(Wallet.config.holderId(), jwtClaimsSet.issuer)
+                assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                 assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                 assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
             }
@@ -289,7 +280,7 @@ class DefaultDispatcherTest {
                     id = Id("pdId"),
                     inputDescriptors = emptyList(),
                 ),
-                jarmOption = clientMetadataValidated.jarmOption(Wallet.config),
+                jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
                 clientId = Verifier.CLIENT_ID,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -345,9 +336,9 @@ class DefaultDispatcherTest {
             val response = AuthorizationResponse.QueryJwt(
                 redirectUriBase,
                 data,
-                JarmOption.SignedResponse(JWSAlgorithm.RS256),
+                JarmRequirement.Signed(JWSAlgorithm.RS256),
             )
-            val redirectURI = response.encodeRedirectURI(Wallet.config.holderId()!!, Wallet.jarmSigner)
+            val redirectURI = response.encodeRedirectURI(Wallet.config)
 
             redirectURI.assertQueryURIContainsStateAnd(data.state) {
                 val responseParameter = getQueryParameter("response")
@@ -411,9 +402,9 @@ class DefaultDispatcherTest {
                 AuthorizationResponse.FragmentJwt(
                     redirectUri = redirectUriBase,
                     data = data,
-                    jarmOption = JarmOption.SignedResponse(JWSAlgorithm.RS256),
+                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
                 )
-            response.encodeRedirectURI(Wallet.config.holderId()!!, Wallet.jarmSigner)
+            response.encodeRedirectURI(Wallet.config)
                 .assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
                     assertEquals(data.state, fragmentData["state"])
                     val responseParameter = fragmentData["response"]

@@ -34,12 +34,12 @@ import java.net.URL
 /**
  * Default implementation of [Dispatcher]
  *
+ * @param siopOpenId4VPConfig the wallet configuration
  * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
-    private val holderId: String?,
-    private val signer: AuthorizationResponseSigner?,
 ) : Dispatcher {
 
     override suspend fun post(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.VerifierResponse =
@@ -95,28 +95,22 @@ internal class DefaultDispatcher(
      */
     private suspend fun directPostJwt(
         response: DirectPostJwt,
-    ): DispatchOutcome.VerifierResponse =
-        coroutineScope {
-            val joseResponse = signEncryptResponse(
-                holderId = checkNotNull(holderId),
-                signer = signer,
-                jarmOption = response.jarmOption,
-                data = response.data,
-            )
-            val parameters = Parameters.build {
-                append("response", joseResponse)
-                append("state", response.data.state)
-            }
-
-            val verifierResponse = submitForm(
-                response.responseUri,
-                parameters,
-            )
-            when (verifierResponse.status) {
-                HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
-                else -> DispatchOutcome.VerifierResponse.Rejected
-            }
+    ): DispatchOutcome.VerifierResponse = coroutineScope {
+        val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
+        val parameters = Parameters.build {
+            append("response", jarmJwt)
+            append("state", response.data.state)
         }
+
+        val verifierResponse = submitForm(
+            response.responseUri,
+            parameters,
+        )
+        when (verifierResponse.status) {
+            HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
+            else -> DispatchOutcome.VerifierResponse.Rejected
+        }
+    }
 
     override suspend fun encodeRedirectURI(
         request: ResolvedRequestObject,
@@ -124,9 +118,9 @@ internal class DefaultDispatcher(
     ): DispatchOutcome.RedirectURI {
         val uri = when (val response = request.responseWith(consensus)) {
             is Fragment -> response.encodeRedirectURI()
-            is FragmentJwt -> response.encodeRedirectURI(checkNotNull(holderId), signer)
+            is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             is Query -> response.encodeRedirectURI()
-            is QueryJwt -> response.encodeRedirectURI(checkNotNull(holderId), signer)
+            is QueryJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             else -> error("Unexpected response $response")
         }
         return DispatchOutcome.RedirectURI(uri)
@@ -139,13 +133,10 @@ internal fun Query.encodeRedirectURI(): URI =
         build()
     }.toURI()
 
-internal fun QueryJwt.encodeRedirectURI(
-    holderId: String,
-    signer: AuthorizationResponseSigner?,
-): URI =
+internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
     with(redirectUri.toUri().buildUpon()) {
-        val joseResponse = signEncryptResponse(holderId, signer, jarmOption, data)
-        appendQueryParameter("response", joseResponse)
+        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
+        appendQueryParameter("response", jarmJwt)
         appendQueryParameter("state", data.state)
         build()
     }.toURI()
@@ -161,15 +152,12 @@ internal fun Fragment.encodeRedirectURI(): URI =
         build()
     }.toURI()
 
-internal fun FragmentJwt.encodeRedirectURI(
-    holderId: String,
-    signer: AuthorizationResponseSigner?,
-): URI =
+internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
     with(redirectUri.toUri().buildUpon()) {
-        val joseResponse = signEncryptResponse(holderId, signer, jarmOption, data)
+        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
         val encodedFragment =
             mapOf(
-                "response" to joseResponse,
+                "response" to jarmJwt,
                 "state" to data.state,
             ).map { (key, value) ->
                 val encodedKey = UriCodec.encode(key, null)

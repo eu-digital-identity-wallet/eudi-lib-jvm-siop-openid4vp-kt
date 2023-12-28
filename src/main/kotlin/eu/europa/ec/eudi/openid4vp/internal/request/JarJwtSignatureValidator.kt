@@ -126,7 +126,7 @@ internal class JarJwtSignatureValidator(
         is Preregistered -> getPreRegisteredClientJwsSelector(clientId, supportedClientIdScheme)
         is SupportedClientIdScheme.X509SanUri ->
             x509SanJwsSelector(
-                supportedClientIdScheme.validator,
+                supportedClientIdScheme.trust,
                 clientId,
                 signedJwt,
                 X509Certificate::sanOfUniformResourceIdentifier,
@@ -134,7 +134,7 @@ internal class JarJwtSignatureValidator(
 
         is SupportedClientIdScheme.X509SanDns ->
             x509SanJwsSelector(
-                supportedClientIdScheme.validator,
+                supportedClientIdScheme.trust,
                 clientId,
                 signedJwt,
                 X509Certificate::sanOfDNSName,
@@ -172,7 +172,7 @@ internal class JarJwtSignatureValidator(
 
 @Throws(AuthorizationRequestException::class)
 private fun x509SanJwsSelector(
-    trustChainValidator: (List<X509Certificate>) -> Boolean,
+    trust: X509CertificateTrust,
     clientId: String,
     signedJwt: SignedJWT,
     subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
@@ -187,7 +187,7 @@ private fun x509SanJwsSelector(
         throw invalidJarJwt("x5c misses Subject Alternative Names of type UniformResourceIdentifier")
     }
     if (!sans.contains(clientId)) throw invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
-    if (!trustChainValidator(pubCertChain)) throw invalidJarJwt("Untrusted x5c")
+    if (!trust.isTrusted(pubCertChain)) throw invalidJarJwt("Untrusted x5c")
 
     return JWSKeySelector<SecurityContext> { _, _ -> listOf(cert.publicKey) }
 }

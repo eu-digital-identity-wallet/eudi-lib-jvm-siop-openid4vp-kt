@@ -125,12 +125,12 @@ internal sealed interface AuthorizationResponse : Serializable {
      *
      * @param responseUri the verifier/RP URI where the response will be posted
      * @param data the contents of the authorization response
-     * @param jarmOption the verifier/RP's requirements for JARM
+     * @param jarmRequirement the verifier/RP's requirements for JARM
      */
     data class DirectPostJwt(
         val responseUri: URL,
         val data: AuthorizationResponsePayload,
-        val jarmOption: JarmOption,
+        val jarmRequirement: JarmRequirement,
     ) : AuthorizationResponse
 
     /**
@@ -149,12 +149,12 @@ internal sealed interface AuthorizationResponse : Serializable {
      * query parameters and JARM
      * @param redirectUri the verifier/RP URI where the response will be redirected to
      * @param data the contents of the authorization request
-     * @param jarmOption the verifier/RP's requirements for JARM
+     * @param jarmRequirement the verifier/RP's requirements for JARM
      */
     data class QueryJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val jarmOption: JarmOption,
+        val jarmRequirement: JarmRequirement,
     ) : AuthorizationResponse
 
     /**
@@ -173,12 +173,12 @@ internal sealed interface AuthorizationResponse : Serializable {
      * fragment and JARM
      * @param redirectUri the verifier/RP URI where the response will be redirected to
      * @param data the contents of the authorization request
-     * @param jarmOption the verifier/RP's requirements for JARM
+     * @param jarmRequirement the verifier/RP's requirements for JARM
      */
     data class FragmentJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val jarmOption: JarmOption,
+        val jarmRequirement: JarmRequirement,
     ) : AuthorizationResponse
 }
 
@@ -229,7 +229,7 @@ private fun ResolvedRequestObject.responsePayload(
 private fun ResolvedRequestObject.responseWith(
     data: AuthorizationResponsePayload,
 ): AuthorizationResponse {
-    fun jarmOption() = checkNotNull(jarmOption)
+    fun jarmOption() = checkNotNull(jarmRequirement)
 
     return when (val mode = responseMode) {
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(mode.responseURI, data)

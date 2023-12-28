@@ -63,8 +63,6 @@ fun main(): Unit = runTest {
         walletConfig = walletConfig(
             Preregistered(Verifier.asPreregisteredClient(verifierApi)),
             X509SanDns(TrustAnyX509),
-            X509SanUri(TrustAnyX509),
-            RedirectUri,
         ),
     )
 
@@ -255,7 +253,7 @@ private class Wallet(
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp(walletConfig, null) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig) { createHttpClient() }
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {
@@ -369,16 +367,11 @@ object SslSettings {
 
 private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
-        supportedClientIdSchemes = supportedClientIdScheme.toList(),
-        vpConfiguration = VPConfiguration(
-            presentationDefinitionUriSupported = true,
-            vpFormatsSupported = emptyList(),
-        ),
         jarmConfiguration = JarmConfiguration.Encryption(
-            holderId = "DID:example:12341512#$",
-            supportedAlgorithms = listOf(JWEAlgorithm.parse("ECDH-ES")),
-            supportedEncryptionMethods = listOf(EncryptionMethod.parse("A256GCM")),
+            supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
+            supportedMethods = listOf(EncryptionMethod.A256GCM),
         ),
+        supportedClientIdSchemes = supportedClientIdScheme,
     )
 
 val PidPresentationDefinition = """

@@ -145,6 +145,21 @@ internal class DefaultAuthorizationRequestResolver(
     private val requestObjectResolver: RequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
+    /**
+     * Factory method for creating a [DefaultAuthorizationRequestResolver]
+     */
+    constructor(
+        siopOpenId4VPConfig: SiopOpenId4VPConfig,
+        httpClientFactory: KtorHttpClientFactory,
+    ) : this(
+        siopOpenId4VPConfig,
+        httpClientFactory,
+        RequestObjectResolver(
+            presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
+            clientMetadataValidator = ClientMetaDataValidator(httpClientFactory),
+        ),
+    )
+
     private val jarJwtValidator = JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory)
 
     override suspend fun resolveRequestUri(uri: String): Resolution =
@@ -167,7 +182,7 @@ internal class DefaultAuthorizationRequestResolver(
             val validatedRequestObject =
                 RequestObjectValidator.validate(supportedClientIdScheme, requestObject)
             val resolved =
-                requestObjectResolver.resolve(validatedRequestObject, siopOpenId4VPConfig)
+                requestObjectResolver.resolve(siopOpenId4VPConfig, validatedRequestObject)
             Resolution.Success(resolved)
         } catch (t: AuthorizationRequestException) {
             Resolution.Invalid(t.error)
@@ -227,24 +242,6 @@ internal class DefaultAuthorizationRequestResolver(
         clientId: String,
         jwt: Jwt,
     ): Pair<SupportedClientIdScheme, RequestObject> = jarJwtValidator.validate(clientId, jwt)
-
-    companion object {
-
-        /**
-         * Factory method for creating a [DefaultAuthorizationRequestResolver]
-         */
-        internal fun make(
-            httpClientFactory: KtorHttpClientFactory,
-            siopOpenId4VPConfig: SiopOpenId4VPConfig,
-        ): DefaultAuthorizationRequestResolver = DefaultAuthorizationRequestResolver(
-            siopOpenId4VPConfig,
-            httpClientFactory,
-            RequestObjectResolver(
-                presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
-                clientMetadataValidator = ClientMetaDataValidator(httpClientFactory),
-            ),
-        )
-    }
 }
 
 private val OnlyNonJar = listOf(ClientIdScheme.RedirectUri)

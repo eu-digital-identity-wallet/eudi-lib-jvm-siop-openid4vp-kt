@@ -34,11 +34,72 @@ import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.security.cert.X509Certificate
 import java.text.ParseException
+
+internal data class AuthenticatedRequestObject(
+    val clientIdScheme: SupportedClientIdScheme,
+    val requestObject: UnvalidatedRequestObject,
+)
+
+internal class RequestAuthenticator(
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    private val httpClientFactory: KtorHttpClientFactory,
+) {
+
+    private val jarJwtValidator = JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory)
+
+    suspend fun fetchAndAuthenticate(request: UnvalidatedRequest): AuthenticatedRequestObject =
+        when (request) {
+            is UnvalidatedRequest.Plain -> authenticate(request)
+            is UnvalidatedRequest.JwtSecured -> authenticate(request)
+        }
+    private fun authenticate(request: UnvalidatedRequest.Plain): AuthenticatedRequestObject {
+        val requestObject = request.requestObject
+        fun invalidScheme() = RequestValidationError.InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty()).asException()
+        val clientIdScheme = requestObject.clientIdScheme?.let {
+            ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
+        } ?: throw invalidScheme()
+
+        fun knownClient(s: SupportedClientIdScheme) =
+            if (s !is Preregistered) true
+            else s.clients.containsKey(requestObject.clientId)
+
+        val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
+        val auth = supportedClientIdScheme
+            ?.takeIf(::knownClient)
+            ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
+        return AuthenticatedRequestObject(auth, requestObject)
+    }
+
+    private suspend fun authenticate(request: UnvalidatedRequest.JwtSecured): AuthenticatedRequestObject {
+        suspend fun fetchJwt(request: UnvalidatedRequest.JwtSecured.PassByReference): Jwt =
+            httpClientFactory().use { client ->
+                client.get(request.jwtURI) {
+                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                }.body<String>()
+            }
+
+        val unvalidatedJwt: Jwt = when (request) {
+            is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt
+            is UnvalidatedRequest.JwtSecured.PassByReference -> fetchJwt(request)
+        }
+
+        val (clientIdScheme, requestObject) = jarJwtValidator.validate(request.clientId, unvalidatedJwt)
+        return AuthenticatedRequestObject(clientIdScheme, requestObject)
+    }
+}
+
+private val OnlyNonJar = listOf(ClientIdScheme.RedirectUri)
+private val OnlyJar = listOf(ClientIdScheme.X509_SAN_DNS, ClientIdScheme.X509_SAN_URI, ClientIdScheme.DID)
+private val EitherJarOrNoJar = listOf(ClientIdScheme.PreRegistered, ClientIdScheme.EntityId)
+
+private fun ClientIdScheme.supportsNonJar() = this in OnlyNonJar || this in EitherJarOrNoJar
+private fun ClientIdScheme.supportsJar() = this in OnlyJar || this in EitherJarOrNoJar
 
 /**
  * Validates a JWT that represents an Authorization Request according to RFC9101
@@ -46,7 +107,7 @@ import java.text.ParseException
  * @param siopOpenId4VPConfig wallet's configuration
  * @param httpClientFactory a factory to obtain a Ktor http client
  */
-internal class JarJwtSignatureValidator(
+private class JarJwtSignatureValidator(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
 ) {

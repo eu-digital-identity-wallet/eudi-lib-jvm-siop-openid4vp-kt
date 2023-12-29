@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.eygraber.uri.Uri
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.RequestValidationError.InvalidClientIdScheme
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
@@ -62,7 +61,7 @@ internal data class UnvalidatedRequestObject(
  *
  * This is merely a data carrier structure that doesn't enforce any rules.
  */
-private sealed interface UnvalidatedRequest {
+internal sealed interface UnvalidatedRequest {
 
     data class Plain(val requestObject: UnvalidatedRequestObject) : UnvalidatedRequest
 
@@ -138,14 +137,9 @@ private sealed interface UnvalidatedRequest {
     }
 }
 
-internal data class AuthenticatedRequestObject(
-    val clientIdScheme: SupportedClientIdScheme,
-    val requestObject: UnvalidatedRequestObject,
-)
-
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val requestAuthenticator: RequestAuthenticator,
     private val requestObjectResolver: RequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
@@ -157,14 +151,12 @@ internal class DefaultAuthorizationRequestResolver(
         httpClientFactory: KtorHttpClientFactory,
     ) : this(
         siopOpenId4VPConfig,
-        httpClientFactory,
+        RequestAuthenticator(siopOpenId4VPConfig, httpClientFactory),
         RequestObjectResolver(
             presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
             clientMetadataValidator = ClientMetaDataValidator(httpClientFactory),
         ),
     )
-
-    private val jarJwtValidator = JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory)
 
     override suspend fun resolveRequestUri(uri: String): Resolution = try {
         val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
@@ -176,54 +168,8 @@ internal class DefaultAuthorizationRequestResolver(
         Resolution.Invalid(e.error)
     }
 
-    private suspend fun fetchAndAuthenticate(request: UnvalidatedRequest): AuthenticatedRequestObject =
-        when (request) {
-            is Plain -> authenticate(request)
-            is JwtSecured -> authenticate(request)
-        }
-
+    private suspend fun fetchAndAuthenticate(r: UnvalidatedRequest): AuthenticatedRequestObject =
+        requestAuthenticator.fetchAndAuthenticate(r)
     private suspend fun fetchReferences(r: ValidatedRequestObject): ResolvedRequestObject =
         requestObjectResolver.resolve(siopOpenId4VPConfig, r)
-
-    private fun authenticate(request: Plain): AuthenticatedRequestObject {
-        val requestObject = request.requestObject
-        fun invalidScheme() = InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty()).asException()
-        val clientIdScheme = requestObject.clientIdScheme?.let {
-            ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
-        } ?: throw invalidScheme()
-
-        fun knownClient(s: SupportedClientIdScheme) =
-            if (s !is SupportedClientIdScheme.Preregistered) true
-            else s.clients.containsKey(requestObject.clientId)
-
-        val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
-        val auth = supportedClientIdScheme
-            ?.takeIf(::knownClient)
-            ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
-        return AuthenticatedRequestObject(auth, requestObject)
-    }
-
-    private suspend fun authenticate(request: JwtSecured): AuthenticatedRequestObject {
-        suspend fun fetchJwt(request: PassByReference): Jwt =
-            httpClientFactory().use { client ->
-                client.get(request.jwtURI) {
-                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                }.body<String>()
-            }
-
-        val unvalidatedJwt: Jwt = when (request) {
-            is PassByValue -> request.jwt
-            is PassByReference -> fetchJwt(request)
-        }
-
-        val (clientIdScheme, requestObject) = jarJwtValidator.validate(request.clientId, unvalidatedJwt)
-        return AuthenticatedRequestObject(clientIdScheme, requestObject)
-    }
 }
-
-private val OnlyNonJar = listOf(ClientIdScheme.RedirectUri)
-private val OnlyJar = listOf(ClientIdScheme.X509_SAN_DNS, ClientIdScheme.X509_SAN_URI, ClientIdScheme.DID)
-private val EitherJarOrNoJar = listOf(ClientIdScheme.PreRegistered, ClientIdScheme.EntityId)
-
-internal fun ClientIdScheme.supportsNonJar() = this in OnlyNonJar || this in EitherJarOrNoJar
-internal fun ClientIdScheme.supportsJar() = this in OnlyJar || this in EitherJarOrNoJar

@@ -16,6 +16,9 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
+import eu.europa.ec.eudi.openid4vp.internal.ensure
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
@@ -51,15 +54,14 @@ internal sealed interface PresentationDefinitionSource {
 }
 
 /**
- * Represents a [RequestObject] that has been validated to
+ * Represents a request object that has been validated to
  * represent one of the supported requests.
- * Valid in this context, means that the [AuthorizationRequest] had the necessary
+ * Valid in this context, means that the authorization request had the necessary
  * information to represent either
  * - a [SiopAuthentication], or
  * - a [OpenId4VPAuthorization], or
  * - a [SiopOpenId4VPAuthentication]
  *
- * @see RequestObjectValidator for the validation rules implemented
  */
 internal sealed interface ValidatedRequestObject {
 
@@ -109,258 +111,260 @@ internal sealed interface ValidatedRequestObject {
     ) : ValidatedRequestObject
 }
 
-internal object RequestObjectValidator {
+private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
 
-    private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
+/**
+ * Validates that the given [request] represents a valid and supported [ValidatedRequestObject]
+ *
+ * @param request The request to validate
+ * @return if given [request] is valid returns an appropriate [ValidatedRequestObject]. Otherwise,
+ * returns a [failure][Result.Failure]. Validation rules violations are reported using [AuthorizationRequestError]
+ * wrapped inside a [specific exception][AuthorizationRequestException]
+ */
+internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequestObject {
+    val (client, requestObject) = request
+    fun scope() = requiredScope(requestObject)
+    val state = requiredState(requestObject)
+    val nonce = requiredNonce(requestObject)
+    val responseType = requiredResponseType(requestObject)
+    val responseMode = requiredResponseMode(client, requestObject)
+    val clientId = when (client) {
+        is AuthenticatedClient.Preregistered -> client.preregisteredClient.clientId
+        is AuthenticatedClient.RedirectUri -> client.clientId.toString()
+        is AuthenticatedClient.X509SanDns -> client.clientId
+        is AuthenticatedClient.X509SanUri -> client.clientId.toString()
+    }
+    val presentationDefinitionSource =
+        optionalPresentationDefinitionSource(requestObject, responseType) { scope().getOrNull() }
+    val clientMetaDataSource = optionalClientMetaDataSource(requestObject)
+    val idTokenType = optionalIdTokenType(requestObject)
 
-    /**
-     * Validates that the given [authorizationRequest] represents a valid and supported [ValidatedRequestObject]
-     *
-     * @param authorizationRequest The request to validate
-     * @return if given [authorizationRequest] is valid returns an appropriate [ValidatedRequestObject]. Otherwise,
-     * returns a [failure][Result.Failure]. Validation rules violations are reported using [AuthorizationRequestError]
-     * wrapped inside a [specific exception][AuthorizationRequestException]
-     */
-    fun validate(
-        supportedClientIdScheme: SupportedClientIdScheme,
-        authorizationRequest: RequestObject,
-    ): ValidatedRequestObject {
-        fun scope() = requiredScope(authorizationRequest)
-        val state = requiredState(authorizationRequest)
-        val nonce = requiredNonce(authorizationRequest)
-        val responseType = requiredResponseType(authorizationRequest)
-        val responseMode = requiredResponseMode(supportedClientIdScheme, authorizationRequest)
-        val clientId = validClientId(supportedClientIdScheme, authorizationRequest, responseMode)
-        val presentationDefinitionSource =
-            optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
-        val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest)
-        val idTokenType = optionalIdTokenType(authorizationRequest)
+    fun idAndVpToken() = SiopOpenId4VPAuthentication(
+        idTokenType,
+        checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
+        clientMetaDataSource,
+        clientId,
+        nonce,
+        scope().getOrThrow(),
+        responseMode,
+        state,
+    )
 
-        fun idAndVpToken() = SiopOpenId4VPAuthentication(
-            idTokenType,
-            checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
-            clientMetaDataSource,
-            clientId,
-            nonce,
-            scope().getOrThrow(),
-            responseMode,
-            state,
-        )
+    fun idToken() = SiopAuthentication(
+        idTokenType,
+        clientMetaDataSource,
+        clientId,
+        nonce,
+        scope().getOrThrow(),
+        responseMode,
+        state,
+    )
 
-        fun idToken() = SiopAuthentication(
-            idTokenType,
-            clientMetaDataSource,
-            clientId,
-            nonce,
-            scope().getOrThrow(),
-            responseMode,
-            state,
-        )
+    fun vpToken() = OpenId4VPAuthorization(
+        checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
+        clientMetaDataSource,
+        clientId,
+        nonce,
+        responseMode,
+        state,
+    )
 
-        fun vpToken() = OpenId4VPAuthorization(
-            checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
-            clientMetaDataSource,
-            clientId,
-            nonce,
-            responseMode,
-            state,
-        )
+    return when (responseType) {
+        ResponseType.VpAndIdToken -> idAndVpToken()
+        ResponseType.IdToken -> idToken()
+        ResponseType.VpToken ->
+            // If scope is defined and its value is "openid" then id token must also be returned
+            if (scope().getOrNull()?.value == "openid") idAndVpToken()
+            else vpToken()
+    }
+}
 
-        return when (responseType) {
-            ResponseType.VpAndIdToken -> idAndVpToken()
-            ResponseType.IdToken -> idToken()
-            ResponseType.VpToken ->
-                // If scope is defined and its value is "openid" then id token must also be returned
-                if (scope().getOrNull()?.value == "openid") idAndVpToken()
-                else vpToken()
+private fun optionalPresentationDefinitionSource(
+    authorizationRequest: UnvalidatedRequestObject,
+    responseType: ResponseType,
+    scopeProvider: () -> Scope?,
+): PresentationDefinitionSource? = when (responseType) {
+    ResponseType.VpToken, ResponseType.VpAndIdToken ->
+        parsePresentationDefinitionSource(authorizationRequest, scopeProvider())
+
+    ResponseType.IdToken -> null
+}
+
+private fun optionalIdTokenType(unvalidated: UnvalidatedRequestObject): List<IdTokenType> =
+    unvalidated.idTokenType
+        ?.trim()
+        ?.split(" ")
+        ?.map { type ->
+            when (type) {
+                "subject_signed_id_token" -> IdTokenType.SubjectSigned
+                "attester_signed_id_token" -> IdTokenType.AttesterSigned
+                else -> error("Invalid id_token_type $type")
+            }
         }
-    }
+        ?: emptyList()
 
-    private fun optionalPresentationDefinitionSource(
-        authorizationRequest: RequestObject,
-        responseType: ResponseType,
-        scopeProvider: () -> Scope?,
-    ): PresentationDefinitionSource? = when (responseType) {
-        ResponseType.VpToken, ResponseType.VpAndIdToken ->
-            parsePresentationDefinitionSource(authorizationRequest, scopeProvider())
-
-        ResponseType.IdToken -> null
-    }
-
-    private fun optionalIdTokenType(unvalidated: RequestObject): List<IdTokenType> =
-        unvalidated.idTokenType
-            ?.trim()
-            ?.split(" ")
-            ?.map { type ->
-                when (type) {
-                    "subject_signed_id_token" -> IdTokenType.SubjectSigned
-                    "attester_signed_id_token" -> IdTokenType.AttesterSigned
-                    else -> error("Invalid id_token_type $type")
+private fun requiredResponseMode(
+    client: AuthenticatedClient,
+    unvalidated: UnvalidatedRequestObject,
+): ResponseMode {
+    fun requiredRedirectUriAndNotProvidedResponseUri(): URI {
+        ensure(unvalidated.responseUri == null) { ResponseUriMustNotBeProvided.asException() }
+        // Redirect URI can be omitted in case of RedirectURI
+        // and use clientId instead
+        val redirectUri = unvalidated.redirectUri?.asURI { InvalidRedirectUri.asException() }?.getOrThrow()
+        return when (client) {
+            is AuthenticatedClient.RedirectUri -> {
+                ensure(redirectUri == null || client.clientId == redirectUri) {
+                    InvalidRedirectUri.asException()
                 }
-            }
-            ?: emptyList()
-
-    private fun requiredResponseMode(
-        supportedClientIdScheme: SupportedClientIdScheme,
-        unvalidated: RequestObject,
-    ): ResponseMode {
-        fun requiredRedirectUriAndNotProvidedResponseUri(): URI =
-            if (unvalidated.responseUri != null) throw RequestValidationError.ResponseUriMustNotBeProvided.asException()
-            else {
-                // Redirect URI can be omitted in case of RedirectURI
-                // and use clientId instead
-                val uri = unvalidated.redirectUri
-                    ?: if (supportedClientIdScheme is SupportedClientIdScheme.RedirectUri) unvalidated.clientId else null
-                when (uri) {
-                    null -> throw RequestValidationError.MissingRedirectUri.asException()
-                    else -> uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }.getOrThrow()
-                }
+                client.clientId
             }
 
-        fun requiredResponseUriAndNotProvidedRedirectUri(): URL =
-            if (unvalidated.redirectUri != null) throw RequestValidationError.RedirectUriMustNotBeProvided.asException()
-            else when (val uri = unvalidated.responseUri) {
-                null -> throw RequestValidationError.MissingResponseUri.asException()
-                else -> uri.asURL { RequestValidationError.InvalidResponseUri.asException() }.getOrThrow()
-            }
-
-        return when (unvalidated.responseMode) {
-            "direct_post" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPost(it) }
-            "direct_post.jwt" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPostJwt(it) }
-            "query" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Query(it) }
-            "query.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.QueryJwt(it) }
-            null, "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
-            "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
-            else -> throw RequestValidationError.UnsupportedResponseMode(unvalidated.responseMode).asException()
+            else -> ensureNotNull(redirectUri) { MissingRedirectUri.asException() }
         }
     }
 
-    /**
-     * Makes sure that [unvalidated] contains a not-null/not-blank state value
-     *
-     * @param unvalidated the request to validate
-     * @return the state or [RequestValidationError.MissingState]
-     */
-    private fun requiredState(unvalidated: RequestObject): String =
-        if (!unvalidated.state.isNullOrBlank()) unvalidated.state
-        else throw RequestValidationError.MissingState.asException()
-
-    /**
-     * Makes sure that [unvalidated] contains a not-null scope
-     *
-     * @param unvalidated the request to validate
-     * @return the scope or [RequestValidationError.MissingScope]
-     */
-    private fun requiredScope(unvalidated: RequestObject): Result<Scope> {
-        val scope = unvalidated.scope?.let { Scope.make(it) }
-        return if (scope != null) Result.success(scope)
-        else RequestValidationError.MissingScope.asFailure()
+    fun requiredResponseUriAndNotProvidedRedirectUri(): URL {
+        ensure(unvalidated.redirectUri == null) { RedirectUriMustNotBeProvided.asException() }
+        val uri = unvalidated.responseUri
+        ensureNotNull(uri) { MissingResponseUri.asException() }
+        return uri.asURL { InvalidResponseUri.asException() }.getOrThrow()
     }
 
-    /**
-     * Makes sure that [unvalidated] contains a not-null nonce
-     *
-     * @param unvalidated the request to validate
-     * @return the nonce or [RequestValidationError.MissingNonce]
-     */
-    private fun requiredNonce(unvalidated: RequestObject): String =
-        unvalidated.nonce ?: throw RequestValidationError.MissingNonce.asException()
-
-    /**
-     * Makes sure that [unvalidated] contains a supported [ResponseType].
-     * Function check [RequestObject.responseType]
-     *
-     * @param unvalidated the request to validate
-     * @return the supported [ResponseType], or [RequestValidationError.MissingResponseType] if the response type is not provided
-     * or [RequestValidationError.UnsupportedResponseType] if the response type is not supported
-     */
-    private fun requiredResponseType(unvalidated: RequestObject): ResponseType =
-        when (val rt = unvalidated.responseType?.trim()) {
-            "vp_token" -> ResponseType.VpToken
-            "vp_token id_token", "id_token vp_token" -> ResponseType.VpAndIdToken
-            "id_token" -> ResponseType.IdToken
-            null -> throw RequestValidationError.MissingResponseType.asException()
-            else -> throw RequestValidationError.UnsupportedResponseType(rt).asException()
-        }
-
-    /**
-     * Makes sure that [unvalidated] contains a supported [PresentationDefinitionSource].
-     *
-     * @param unvalidated the request to validate
-     */
-    private fun parsePresentationDefinitionSource(
-        unvalidated: RequestObject,
-        scope: Scope?,
-    ): PresentationDefinitionSource {
-        val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
-        val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
-        val hasScope = null != scope
-
-        fun requiredPd() = try {
-            checkNotNull(unvalidated.presentationDefinition)
-            val pd = jsonSupport.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
-            PresentationDefinitionSource.ByValue(pd)
-        } catch (t: SerializationException) {
-            throw RequestValidationError.InvalidPresentationDefinition(t).asException()
-        }
-
-        fun requiredPdUri() = try {
-            checkNotNull(unvalidated.presentationDefinitionUri)
-            val pdUri = unvalidated.presentationDefinitionUri.asURL().getOrThrow()
-            PresentationDefinitionSource.ByReference(pdUri)
-        } catch (t: MalformedURLException) {
-            throw RequestValidationError.InvalidPresentationDefinitionUri.asException()
-        }
-
-        fun requiredScope() = PresentationDefinitionSource.Implied(scope!!)
-
-        return when {
-            hasPd && !hasPdUri -> requiredPd()
-            !hasPd && hasPdUri -> requiredPdUri()
-            hasScope -> requiredScope()
-            else -> throw RequestValidationError.MissingPresentationDefinition.asException()
-        }
+    val responseMode = when (unvalidated.responseMode) {
+        "direct_post" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPost(it) }
+        "direct_post.jwt" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPostJwt(it) }
+        "query" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Query(it) }
+        "query.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.QueryJwt(it) }
+        null, "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
+        "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
+        else -> throw UnsupportedResponseMode(unvalidated.responseMode).asException()
     }
 
-    private fun validClientId(
-        supportedClientIdScheme: SupportedClientIdScheme,
-        unvalidated: RequestObject,
-        responseMode: ResponseMode,
-    ): String {
-        val clientId = unvalidated.clientId ?: throw RequestValidationError.MissingClientId.asException()
-        val uri = responseMode.uri()
-        fun checkWithScheme() = when (supportedClientIdScheme) {
-            is SupportedClientIdScheme.Preregistered -> true
-            is SupportedClientIdScheme.X509SanDns -> clientId == uri.host
-            is SupportedClientIdScheme.X509SanUri, SupportedClientIdScheme.RedirectUri -> clientId == uri.toString()
+    val uri = responseMode.uri()
+    when (client) {
+        is AuthenticatedClient.Preregistered -> Unit
+        is AuthenticatedClient.X509SanDns -> ensure(client.clientId == uri.host) {
+            UnsupportedResponseMode("$responseMode host doesn't match ${client.clientId}").asException()
         }
-        return if (checkWithScheme()) clientId
-        else throw RequestValidationError.InvalidClientId.asException()
+        is AuthenticatedClient.X509SanUri -> ensure(client.clientId == uri) {
+            UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
+        }
+        is AuthenticatedClient.RedirectUri -> ensure(client.clientId == uri) {
+            UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
+        }
+    }
+    return responseMode
+}
+
+/**
+ * Makes sure that [unvalidated] contains a not-null/not-blank state value
+ *
+ * @param unvalidated the request to validate
+ * @return the state or [RequestValidationError.MissingState]
+ */
+private fun requiredState(unvalidated: UnvalidatedRequestObject): String =
+    ensureNotNull(unvalidated.state) { MissingState.asException() }
+
+/**
+ * Makes sure that [unvalidated] contains a not-null scope
+ *
+ * @param unvalidated the request to validate
+ * @return the scope or [RequestValidationError.MissingScope]
+ */
+private fun requiredScope(unvalidated: UnvalidatedRequestObject): Result<Scope> {
+    val scope = unvalidated.scope?.let { Scope.make(it) }
+    return if (scope != null) Result.success(scope)
+    else MissingScope.asFailure()
+}
+
+/**
+ * Makes sure that [unvalidated] contains a not-null nonce
+ *
+ * @param unvalidated the request to validate
+ * @return the nonce or [RequestValidationError.MissingNonce]
+ */
+private fun requiredNonce(unvalidated: UnvalidatedRequestObject): String =
+    ensureNotNull(unvalidated.nonce) { MissingNonce.asException() }
+
+/**
+ * Makes sure that [unvalidated] contains a supported [ResponseType].
+ * Function check [UnvalidatedRequestObject.responseType]
+ *
+ * @param unvalidated the request to validate
+ * @return the supported [ResponseType], or [RequestValidationError.MissingResponseType] if the response type is not provided
+ * or [RequestValidationError.UnsupportedResponseType] if the response type is not supported
+ */
+private fun requiredResponseType(unvalidated: UnvalidatedRequestObject): ResponseType =
+    when (val rt = unvalidated.responseType?.trim()) {
+        "vp_token" -> ResponseType.VpToken
+        "vp_token id_token", "id_token vp_token" -> ResponseType.VpAndIdToken
+        "id_token" -> ResponseType.IdToken
+        null -> throw MissingResponseType.asException()
+        else -> throw UnsupportedResponseType(rt).asException()
     }
 
-    private fun optionalClientMetaDataSource(unvalidated: RequestObject): ClientMetaDataSource? {
-        val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
-        val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
+/**
+ * Makes sure that [unvalidated] contains a supported [PresentationDefinitionSource].
+ *
+ * @param unvalidated the request to validate
+ */
+private fun parsePresentationDefinitionSource(
+    unvalidated: UnvalidatedRequestObject,
+    scope: Scope?,
+): PresentationDefinitionSource {
+    val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
+    val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
+    val hasScope = null != scope
 
-        fun requiredClientMetaData(): ClientMetaDataSource.ByValue {
-            checkNotNull(unvalidated.clientMetaData)
-            return ClientMetaDataSource.ByValue(jsonSupport.decodeFromJsonElement(unvalidated.clientMetaData))
-        }
+    fun requiredPd() = try {
+        checkNotNull(unvalidated.presentationDefinition)
+        val pd = jsonSupport.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
+        PresentationDefinitionSource.ByValue(pd)
+    } catch (t: SerializationException) {
+        throw InvalidPresentationDefinition(t).asException()
+    }
 
-        fun requiredClientMetaDataUri(): ClientMetaDataSource.ByReference {
-            checkNotNull(unvalidated.clientMetadataUri)
-            val uri = unvalidated.clientMetadataUri
-                .asURL { RequestValidationError.InvalidClientMetaDataUri.asException() }
-                .getOrThrow()
-            return ClientMetaDataSource.ByReference(uri)
-        }
+    fun requiredPdUri() = try {
+        checkNotNull(unvalidated.presentationDefinitionUri)
+        val pdUri = unvalidated.presentationDefinitionUri.asURL().getOrThrow()
+        PresentationDefinitionSource.ByReference(pdUri)
+    } catch (t: MalformedURLException) {
+        throw InvalidPresentationDefinitionUri.asException()
+    }
 
-        return when {
-            hasCMD && !hasCMDUri -> requiredClientMetaData()
-            !hasCMD && hasCMDUri -> requiredClientMetaDataUri()
-            hasCMD && hasCMDUri -> throw RequestValidationError.OneOfClientMedataOrUri.asException()
-            else -> null
-        }
+    fun requiredScope() = PresentationDefinitionSource.Implied(scope!!)
+
+    return when {
+        hasPd && !hasPdUri -> requiredPd()
+        !hasPd && hasPdUri -> requiredPdUri()
+        hasScope -> requiredScope()
+        else -> throw MissingPresentationDefinition.asException()
+    }
+}
+
+private fun optionalClientMetaDataSource(unvalidated: UnvalidatedRequestObject): ClientMetaDataSource? {
+    val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
+    val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
+
+    fun requiredClientMetaData(): ClientMetaDataSource.ByValue {
+        checkNotNull(unvalidated.clientMetaData)
+        return ClientMetaDataSource.ByValue(jsonSupport.decodeFromJsonElement(unvalidated.clientMetaData))
+    }
+
+    fun requiredClientMetaDataUri(): ClientMetaDataSource.ByReference {
+        checkNotNull(unvalidated.clientMetadataUri)
+        val uri = unvalidated.clientMetadataUri
+            .asURL { InvalidClientMetaDataUri.asException() }
+            .getOrThrow()
+        return ClientMetaDataSource.ByReference(uri)
+    }
+
+    return when {
+        hasCMD && !hasCMDUri -> requiredClientMetaData()
+        !hasCMD && hasCMDUri -> requiredClientMetaDataUri()
+        hasCMD && hasCMDUri -> throw OneOfClientMedataOrUri.asException()
+        else -> null
     }
 }
 

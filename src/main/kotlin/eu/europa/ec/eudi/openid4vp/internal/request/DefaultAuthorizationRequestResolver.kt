@@ -16,16 +16,10 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.eygraber.uri.Uri
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.RequestValidationError.InvalidClientIdScheme
-import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured
-import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByReference
-import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.JwtSecured.PassByValue
-import eu.europa.ec.eudi.openid4vp.internal.request.AuthorizationRequest.NotSecured
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -40,7 +34,7 @@ import java.net.URL
  * without any validation and regardless of the way they sent to the wallet
  */
 @Serializable
-internal data class RequestObject(
+internal data class UnvalidatedRequestObject(
     @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
     @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
     @SerialName("client_id_scheme") val clientIdScheme: String? = null,
@@ -56,23 +50,23 @@ internal data class RequestObject(
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
     val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
     @SerialName("id_token_type") val idTokenType: String? = null,
-) : java.io.Serializable
+)
 
 /**
  * OAUTH2 authorization request
  *
  * This is merely a data carrier structure that doesn't enforce any rules.
  */
-private sealed interface AuthorizationRequest : java.io.Serializable {
+internal sealed interface UnvalidatedRequest {
 
-    data class NotSecured(val requestObject: RequestObject) : AuthorizationRequest
+    data class Plain(val requestObject: UnvalidatedRequestObject) : UnvalidatedRequest
 
     /**
      * JWT Secured authorization request (JAR)
      */
-    sealed interface JwtSecured : AuthorizationRequest {
+    sealed interface JwtSecured : UnvalidatedRequest {
         /**
-         * The <em>client_id</em> of the relying party (verifier)
+         * The <em>client_id</em> of the verifier
          */
         val clientId: String
 
@@ -92,7 +86,7 @@ private sealed interface AuthorizationRequest : java.io.Serializable {
         /**
          * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
          */
-        fun make(uriStr: String): Result<AuthorizationRequest> = runCatching {
+        fun make(uriStr: String): Result<UnvalidatedRequest> = runCatching {
             val uri = Uri.parse(uriStr)
             fun clientId(): String =
                 uri.getQueryParameter("client_id")
@@ -113,14 +107,14 @@ private sealed interface AuthorizationRequest : java.io.Serializable {
         }
 
         /**
-         * Populates a [NotSecured] from the query parameters of the given [uri]
+         * Populates a [Plain] from the query parameters of the given [uri]
          */
-        private fun notSecured(uri: Uri): NotSecured {
+        private fun notSecured(uri: Uri): Plain {
             fun jsonObject(p: String): JsonObject? =
                 uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
 
-            return NotSecured(
-                RequestObject(
+            return Plain(
+                UnvalidatedRequestObject(
                     responseType = uri.getQueryParameter("response_type"),
                     presentationDefinition = jsonObject("presentation_definition"),
                     presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
@@ -139,9 +133,14 @@ private sealed interface AuthorizationRequest : java.io.Serializable {
     }
 }
 
-internal class DefaultAuthorizationRequestResolver(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory,
+internal sealed interface FetchedRequest {
+    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest
+    data class JwtSecured(val clientId: String, val jwt: SignedJWT) : FetchedRequest
+}
+
+internal class DefaultAuthorizationRequestResolver private constructor(
+    private val requestFetcher: RequestFetcher,
+    private val requestAuthenticator: RequestAuthenticator,
     private val requestObjectResolver: RequestObjectResolver,
 ) : AuthorizationRequestResolver {
 
@@ -152,101 +151,19 @@ internal class DefaultAuthorizationRequestResolver(
         siopOpenId4VPConfig: SiopOpenId4VPConfig,
         httpClientFactory: KtorHttpClientFactory,
     ) : this(
-        siopOpenId4VPConfig,
-        httpClientFactory,
-        RequestObjectResolver(
-            presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
-            clientMetadataValidator = ClientMetaDataValidator(httpClientFactory),
-        ),
+        RequestFetcher(httpClientFactory),
+        RequestAuthenticator(siopOpenId4VPConfig, httpClientFactory),
+        RequestObjectResolver(siopOpenId4VPConfig, httpClientFactory),
     )
 
-    private val jarJwtValidator = JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory)
-
-    override suspend fun resolveRequestUri(uri: String): Resolution =
-        AuthorizationRequest.make(
-            uri,
-        ).fold(
-            onSuccess = { request -> resolveRequest(request) },
-            onFailure = { throwable ->
-                if (throwable is AuthorizationRequestException) {
-                    Resolution.Invalid(throwable.error)
-                } else {
-                    throw throwable
-                }
-            },
-        )
-
-    private suspend fun resolveRequest(request: AuthorizationRequest): Resolution =
-        try {
-            val (supportedClientIdScheme, requestObject) = requestObjectOf(request)
-            val validatedRequestObject =
-                RequestObjectValidator.validate(supportedClientIdScheme, requestObject)
-            val resolved =
-                requestObjectResolver.resolve(siopOpenId4VPConfig, validatedRequestObject)
-            Resolution.Success(resolved)
-        } catch (t: AuthorizationRequestException) {
-            Resolution.Invalid(t.error)
-        }
-
-    /**
-     * Extracts the [request object][RequestObject] of an [AuthorizationRequest]
-     */
-    private suspend fun requestObjectOf(request: AuthorizationRequest): Pair<SupportedClientIdScheme, RequestObject> {
-        suspend fun fetchJwt(request: PassByReference): Jwt =
-            httpClientFactory().use { client ->
-                client.get(request.jwtURI) {
-                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                }.body<String>()
-            }
-
-        return when (request) {
-            is NotSecured -> supportedClientIdSchemeFor(request) to request.requestObject
-            is JwtSecured -> {
-                val jwt: Jwt = when (request) {
-                    is PassByValue -> request.jwt
-                    is PassByReference -> fetchJwt(request)
-                }
-                val clientId = request.clientId
-                requestObjectFromJwt(clientId, jwt)
-            }
-        }
+    override suspend fun resolveRequestUri(uri: String): Resolution = try {
+        val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
+        val fetchedRequest = requestFetcher.fetch(unvalidatedRequest)
+        val authenticatedRequest = requestAuthenticator.authenticate(fetchedRequest)
+        val validatedRequestObject = validateRequestObject(authenticatedRequest)
+        val resolved = requestObjectResolver.resolve(validatedRequestObject)
+        Resolution.Success(resolved)
+    } catch (e: AuthorizationRequestException) {
+        Resolution.Invalid(e.error)
     }
-
-    private fun supportedClientIdSchemeFor(request: NotSecured): SupportedClientIdScheme {
-        val requestObject = request.requestObject
-        fun invalidScheme() = InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty()).asException()
-        val clientIdScheme = requestObject.clientIdScheme?.let {
-            ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
-        } ?: throw invalidScheme()
-
-        fun knownClient(s: SupportedClientIdScheme) =
-            if (s !is SupportedClientIdScheme.Preregistered) true
-            else s.clients.containsKey(requestObject.clientId)
-
-        val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
-        return supportedClientIdScheme
-            ?.takeIf(::knownClient)
-            ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
-    }
-
-    /**
-     * Extracts the request object from a [jwt]
-     *
-     * @param jwt The JWT to be validated.
-     * It is assumed that represents, in its payload,
-     * a [RequestObject]
-     * @param clientId The client that placed request
-     */
-    @Throws(AuthorizationRequestException::class)
-    private suspend fun requestObjectFromJwt(
-        clientId: String,
-        jwt: Jwt,
-    ): Pair<SupportedClientIdScheme, RequestObject> = jarJwtValidator.validate(clientId, jwt)
 }
-
-private val OnlyNonJar = listOf(ClientIdScheme.RedirectUri)
-private val OnlyJar = listOf(ClientIdScheme.X509_SAN_DNS, ClientIdScheme.X509_SAN_URI, ClientIdScheme.DID)
-private val EitherJarOrNoJar = listOf(ClientIdScheme.PreRegistered, ClientIdScheme.EntityId)
-
-internal fun ClientIdScheme.supportsNonJar() = this in OnlyNonJar || this in EitherJarOrNoJar
-internal fun ClientIdScheme.supportsJar() = this in OnlyJar || this in EitherJarOrNoJar

@@ -15,18 +15,28 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import eu.europa.ec.eudi.openid4vp.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 
-internal class RequestObjectResolver(
+internal class RequestObjectResolver private constructor(
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val presentationDefinitionResolver: PresentationDefinitionResolver,
     private val clientMetadataValidator: ClientMetaDataValidator,
 ) {
 
-    suspend fun resolve(
+    constructor(
         siopOpenId4VPConfig: SiopOpenId4VPConfig,
+        httpClientFactory: KtorHttpClientFactory,
+    ) : this(
+        siopOpenId4VPConfig,
+        PresentationDefinitionResolver(httpClientFactory),
+        ClientMetaDataValidator(httpClientFactory),
+    )
+
+    suspend fun resolve(
         validated: ValidatedRequestObject,
     ): ResolvedRequestObject {
         val clientMetaData = resolveClientMetaData(validated)

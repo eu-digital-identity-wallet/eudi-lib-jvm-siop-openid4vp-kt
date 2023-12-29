@@ -65,7 +65,7 @@ internal sealed interface UnvalidatedRequest {
      */
     sealed interface JwtSecured : UnvalidatedRequest {
         /**
-         * The <em>client_id</em> of the relying party (verifier)
+         * The <em>client_id</em> of the verifier
          */
         val clientId: String
 
@@ -138,7 +138,6 @@ internal sealed interface FetchedRequest {
 }
 
 internal class DefaultAuthorizationRequestResolver private constructor(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val requestFetcher: RequestFetcher,
     private val requestAuthenticator: RequestAuthenticator,
     private val requestObjectResolver: RequestObjectResolver,
@@ -151,7 +150,6 @@ internal class DefaultAuthorizationRequestResolver private constructor(
         siopOpenId4VPConfig: SiopOpenId4VPConfig,
         httpClientFactory: KtorHttpClientFactory,
     ) : this(
-        siopOpenId4VPConfig,
         RequestFetcher(httpClientFactory),
         RequestAuthenticator(siopOpenId4VPConfig, httpClientFactory),
         RequestObjectResolver(siopOpenId4VPConfig, httpClientFactory),

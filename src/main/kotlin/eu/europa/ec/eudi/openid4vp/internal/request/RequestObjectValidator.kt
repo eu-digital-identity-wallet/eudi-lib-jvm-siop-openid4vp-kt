@@ -121,7 +121,7 @@ private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
  * returns a [failure][Result.Failure]. Validation rules violations are reported using [AuthorizationRequestError]
  * wrapped inside a [specific exception][AuthorizationRequestException]
  */
-internal fun validateRequestObject(request: AuthenticatedRequestObject): ValidatedRequestObject {
+internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequestObject {
     val (client, requestObject) = request
     fun scope() = requiredScope(requestObject)
     val state = requiredState(requestObject)

@@ -21,9 +21,12 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 
+/**
+ * Fetches the authorization request, if needed
+ */
 internal class RequestFetcher(private val httpClientFactory: KtorHttpClientFactory) {
 
-    suspend fun fetch(request: UnvalidatedRequest): FetchedRequest = when (request) {
+    suspend fun fetch(request: UnvalidatedRequest): FetchedRequest<Jwt> = when (request) {
         is UnvalidatedRequest.Plain -> FetchedRequest.Plain(request.requestObject)
         is UnvalidatedRequest.JwtSecured.PassByValue -> FetchedRequest.JwtSecured(request.clientId, request.jwt)
         is UnvalidatedRequest.JwtSecured.PassByReference -> FetchedRequest.JwtSecured(request.clientId, request.jwt())

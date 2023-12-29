@@ -50,49 +50,87 @@ internal sealed interface AuthenticatedClient {
     data class X509SanUri(val clientId: URI, val chain: List<X509Certificate>) : AuthenticatedClient
 }
 
-internal data class AuthenticatedRequestObject(
+internal data class AuthenticatedRequest(
     val client: AuthenticatedClient,
     val requestObject: UnvalidatedRequestObject,
 )
 
 internal class RequestAuthenticator private constructor(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    private val clientAuthenticator: ClientAuthenticator,
     private val jarJwtValidator: JarJwtSignatureValidator,
 ) {
 
     constructor(
         siopOpenId4VPConfig: SiopOpenId4VPConfig,
         httpClientFactory: KtorHttpClientFactory,
-    ) : this(siopOpenId4VPConfig, JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory))
+    ) : this(
+        ClientAuthenticator(siopOpenId4VPConfig),
+        JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory),
+    )
 
-    suspend fun fetchAndAuthenticate(request: FetchedRequest): AuthenticatedRequestObject =
-        when (request) {
-            is FetchedRequest.Plain -> authenticate(request)
-            is FetchedRequest.JwtSecured -> authenticate(request)
+    suspend fun authenticate(request: FetchedRequest<Jwt>): AuthenticatedRequest = when (request) {
+        is FetchedRequest.Plain -> authenticatePlain(request)
+        is FetchedRequest.JwtSecured -> authenticateJwtSecured(request)
+    }
+
+    private fun authenticatePlain(request: FetchedRequest.Plain): AuthenticatedRequest {
+        val client = clientAuthenticator.authenticateClient(request)
+        return AuthenticatedRequest(client, request.requestObject)
+    }
+    private suspend fun authenticateJwtSecured(request: FetchedRequest.JwtSecured<Jwt>): AuthenticatedRequest {
+        val signedJwt = request.jwt.parseJwt()
+        val client = clientAuthenticator.authenticateClient(FetchedRequest.JwtSecured(request.clientId, signedJwt))
+        val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
+        ensure(request.clientId == requestObject.clientId) {
+            invalidJarJwt("ClientId mismatch. JAR request ${request.clientId}, jwt ${request.clientId}")
+        }
+        jarJwtValidator.validate(client, signedJwt)
+        return AuthenticatedRequest(client, requestObject)
+    }
+}
+
+private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
+    fun authenticateClient(request: FetchedRequest<SignedJWT>): AuthenticatedClient {
+        val requestObject = when (request) {
+            is FetchedRequest.JwtSecured -> request.jwt.jwtClaimsSet.toType { requestObject(it) }
+            is FetchedRequest.Plain -> request.requestObject
         }
 
-    private fun authenticate(request: FetchedRequest.Plain): AuthenticatedRequestObject {
-        val requestObject = request.requestObject
-        val (clientId, clientIdScheme) = clientAndScheme(requestObject)
-        val client = when (clientIdScheme) {
+        val (clientId, clientIdScheme) = clientIdAndScheme(requestObject)
+        return when (clientIdScheme) {
             is Preregistered -> {
                 val registeredClient = clientIdScheme.clients[clientId]
                 ensureNotNull(registeredClient) { RequestValidationError.InvalidClientId.asException() }
+                if (request is FetchedRequest.JwtSecured) {
+                    ensureNotNull(registeredClient.jarConfig) {
+                        invalidScheme("$registeredClient cannot place signed request")
+                    }
+                }
                 AuthenticatedClient.Preregistered(registeredClient)
             }
 
             SupportedClientIdScheme.RedirectUri -> {
+                ensure(request is FetchedRequest.Plain) { invalidScheme("$clientIdScheme cannot be used in signed request") }
                 val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.RedirectUri(clientIdUri)
             }
 
-            else -> throw invalidScheme("$clientIdScheme cannot be used in unsigned request")
-        }
+            is SupportedClientIdScheme.X509SanDns -> {
+                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                val chain = x5c(request, clientIdScheme.trust, X509Certificate::sanOfDNSName)
+                AuthenticatedClient.X509SanDns(request.clientId, chain)
+            }
 
-        return AuthenticatedRequestObject(client, requestObject)
+            is SupportedClientIdScheme.X509SanUri -> {
+                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                val chain = x5c(request, clientIdScheme.trust, X509Certificate::sanOfUniformResourceIdentifier)
+                val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
+                AuthenticatedClient.X509SanUri(clientIdUri, chain)
+            }
+        }
     }
 
-    private fun clientAndScheme(requestObject: UnvalidatedRequestObject): Pair<String, SupportedClientIdScheme> {
+    private fun clientIdAndScheme(requestObject: UnvalidatedRequestObject): Pair<String, SupportedClientIdScheme> {
         val clientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
         val clientIdScheme = requestObject.clientIdScheme?.let { ClientIdScheme.make(it) }
         ensureNotNull(clientIdScheme) { invalidScheme("Missing or invalid client_id_scheme") }
@@ -101,65 +139,23 @@ internal class RequestAuthenticator private constructor(
         return clientId to supportedClientIdScheme
     }
 
-    private fun authenticateJarClient(
-        clientId: String,
-        clientIdScheme: SupportedClientIdScheme,
-        signedJwt: SignedJWT,
-    ): AuthenticatedClient {
-        fun x5c(
-            trust: X509CertificateTrust,
-            subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
-        ): List<X509Certificate> {
-            val pubCertChain = signedJwt.header
-                ?.x509CertChain
-                ?.mapNotNull { X509CertUtils.parse(it.decode()) }
-            ensureNotNull(pubCertChain) { invalidJarJwt("Missing or invalid x5c") }
+    private fun x5c(
+        request: FetchedRequest.JwtSecured<SignedJWT>,
+        trust: X509CertificateTrust,
+        subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
+    ): List<X509Certificate> {
+        val pubCertChain = request.jwt.header
+            ?.x509CertChain
+            ?.mapNotNull { X509CertUtils.parse(it.decode()) }
+        ensureNotNull(pubCertChain) { invalidJarJwt("Missing or invalid x5c") }
 
-            val cert = pubCertChain[0]
-            val sans = cert.subjectAlternativeNames().getOrElse {
-                throw invalidJarJwt("x5c misses Subject Alternative Names of type UniformResourceIdentifier")
-            }
-            if (!sans.contains(clientId)) throw invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
-            if (!trust.isTrusted(pubCertChain)) throw invalidJarJwt("Untrusted x5c")
-            return pubCertChain
+        val cert = pubCertChain[0]
+        val sans = cert.subjectAlternativeNames().getOrElse {
+            throw invalidJarJwt("x5c misses Subject Alternative Names of type UniformResourceIdentifier")
         }
-        return when (clientIdScheme) {
-            SupportedClientIdScheme.RedirectUri -> throw invalidScheme("$clientIdScheme cannot be used in signed request")
-            is Preregistered -> {
-                val registeredClient = clientIdScheme.clients[clientId]
-                ensureNotNull(registeredClient) { RequestValidationError.InvalidClientId.asException() }
-                ensureNotNull(registeredClient.jarConfig) { RequestValidationError.InvalidClientId.asException() }
-                AuthenticatedClient.Preregistered(registeredClient)
-            }
-
-            is SupportedClientIdScheme.X509SanDns -> {
-                val chain = x5c(clientIdScheme.trust, X509Certificate::sanOfDNSName)
-                AuthenticatedClient.X509SanDns(clientId, chain)
-            }
-
-            is SupportedClientIdScheme.X509SanUri -> {
-                val chain = x5c(clientIdScheme.trust, X509Certificate::sanOfUniformResourceIdentifier)
-                val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
-                AuthenticatedClient.X509SanUri(clientIdUri, chain)
-            }
-        }
-    }
-
-    private suspend fun authenticate(request: FetchedRequest.JwtSecured): AuthenticatedRequestObject {
-        val signedJwt = try {
-            SignedJWT.parse(request.jwt)
-        } catch (pe: ParseException) {
-            throw invalidJarJwt("JAR JWT parse error")
-        }
-        val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
-        val (clientId, clientIdScheme) = clientAndScheme(requestObject)
-        ensure(request.clientId == clientId) {
-            invalidJarJwt("ClientId mismatch. JAR request ${request.clientId}, jwt $clientId")
-        }
-
-        val client = authenticateJarClient(clientId, clientIdScheme, signedJwt)
-        jarJwtValidator.validate(client, signedJwt)
-        return AuthenticatedRequestObject(client, requestObject)
+        if (!sans.contains(request.clientId)) throw invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
+        if (!trust.isTrusted(pubCertChain)) throw invalidJarJwt("Untrusted x5c")
+        return pubCertChain
     }
 }
 
@@ -230,6 +226,12 @@ private fun invalidScheme(cause: String): AuthorizationRequestException =
 
 private fun invalidJarJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()
+
+private fun String.parseJwt(): SignedJWT = try {
+    SignedJWT.parse(this)
+} catch (pe: ParseException) {
+    throw invalidJarJwt("JAR JWT parse error")
+}
 
 private fun requestObject(cs: JWTClaimsSet): UnvalidatedRequestObject {
     fun Map<String, Any?>.asJsonObject(): JsonObject {

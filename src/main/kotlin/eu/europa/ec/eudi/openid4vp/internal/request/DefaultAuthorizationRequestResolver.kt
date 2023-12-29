@@ -132,9 +132,9 @@ internal sealed interface UnvalidatedRequest {
     }
 }
 
-internal sealed interface FetchedRequest {
-    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest
-    data class JwtSecured(val clientId: String, val jwt: Jwt) : FetchedRequest
+internal sealed interface FetchedRequest<out JWT> {
+    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest<Nothing>
+    data class JwtSecured<JWT>(val clientId: String, val jwt: JWT) : FetchedRequest<JWT>
 }
 
 internal class DefaultAuthorizationRequestResolver private constructor(
@@ -158,7 +158,7 @@ internal class DefaultAuthorizationRequestResolver private constructor(
     override suspend fun resolveRequestUri(uri: String): Resolution = try {
         val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
         val fetchedRequest = requestFetcher.fetch(unvalidatedRequest)
-        val authenticatedRequest = requestAuthenticator.fetchAndAuthenticate(fetchedRequest)
+        val authenticatedRequest = requestAuthenticator.authenticate(fetchedRequest)
         val validatedRequestObject = validateRequestObject(authenticatedRequest)
         val resolved = requestObjectResolver.resolve(validatedRequestObject)
         Resolution.Success(resolved)

@@ -17,13 +17,8 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.eygraber.uri.Uri
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
-import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.Plain
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -137,8 +132,14 @@ internal sealed interface UnvalidatedRequest {
     }
 }
 
-internal class DefaultAuthorizationRequestResolver(
+internal sealed interface FetchedRequest {
+    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest
+    data class JwtSecured(val clientId: String, val jwt: Jwt) : FetchedRequest
+}
+
+internal class DefaultAuthorizationRequestResolver private constructor(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    private val requestFetcher: RequestFetcher,
     private val requestAuthenticator: RequestAuthenticator,
     private val requestObjectResolver: RequestObjectResolver,
 ) : AuthorizationRequestResolver {
@@ -151,25 +152,19 @@ internal class DefaultAuthorizationRequestResolver(
         httpClientFactory: KtorHttpClientFactory,
     ) : this(
         siopOpenId4VPConfig,
+        RequestFetcher(httpClientFactory),
         RequestAuthenticator(siopOpenId4VPConfig, httpClientFactory),
-        RequestObjectResolver(
-            presentationDefinitionResolver = PresentationDefinitionResolver(httpClientFactory),
-            clientMetadataValidator = ClientMetaDataValidator(httpClientFactory),
-        ),
+        RequestObjectResolver(siopOpenId4VPConfig, httpClientFactory),
     )
 
     override suspend fun resolveRequestUri(uri: String): Resolution = try {
         val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
-        val authenticatedRequestObject = fetchAndAuthenticate(unvalidatedRequest)
-        val validatedRequestObject = validateRequestObject(authenticatedRequestObject)
-        val resolved = fetchReferences(validatedRequestObject)
+        val fetchedRequest = requestFetcher.fetch(unvalidatedRequest)
+        val authenticatedRequest = requestAuthenticator.fetchAndAuthenticate(fetchedRequest)
+        val validatedRequestObject = validateRequestObject(authenticatedRequest)
+        val resolved = requestObjectResolver.resolve(validatedRequestObject)
         Resolution.Success(resolved)
     } catch (e: AuthorizationRequestException) {
         Resolution.Invalid(e.error)
     }
-
-    private suspend fun fetchAndAuthenticate(r: UnvalidatedRequest): AuthenticatedRequestObject =
-        requestAuthenticator.fetchAndAuthenticate(r)
-    private suspend fun fetchReferences(r: ValidatedRequestObject): ResolvedRequestObject =
-        requestObjectResolver.resolve(siopOpenId4VPConfig, r)
 }

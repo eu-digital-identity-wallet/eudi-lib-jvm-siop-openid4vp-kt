@@ -53,14 +53,17 @@ internal class RequestAuthenticator(
 
     private val jarJwtValidator = JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory)
 
-    suspend fun fetchAndAuthenticate(request: UnvalidatedRequest): AuthenticatedRequestObject =
+    suspend fun fetchAndAuthenticate(request: FetchedRequest): AuthenticatedRequestObject =
         when (request) {
-            is UnvalidatedRequest.Plain -> authenticate(request)
-            is UnvalidatedRequest.JwtSecured -> authenticate(request)
+            is FetchedRequest.Plain -> authenticate(request)
+            is FetchedRequest.JwtSecured -> authenticate(request)
         }
-    private fun authenticate(request: UnvalidatedRequest.Plain): AuthenticatedRequestObject {
+
+    private fun authenticate(request: FetchedRequest.Plain): AuthenticatedRequestObject {
         val requestObject = request.requestObject
-        fun invalidScheme() = RequestValidationError.InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty()).asException()
+        fun invalidScheme() =
+            RequestValidationError.InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty()).asException()
+
         val clientIdScheme = requestObject.clientIdScheme?.let {
             ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
         } ?: throw invalidScheme()
@@ -76,20 +79,8 @@ internal class RequestAuthenticator(
         return AuthenticatedRequestObject(auth, requestObject)
     }
 
-    private suspend fun authenticate(request: UnvalidatedRequest.JwtSecured): AuthenticatedRequestObject {
-        suspend fun fetchJwt(request: UnvalidatedRequest.JwtSecured.PassByReference): Jwt =
-            httpClientFactory().use { client ->
-                client.get(request.jwtURI) {
-                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                }.body<String>()
-            }
-
-        val unvalidatedJwt: Jwt = when (request) {
-            is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt
-            is UnvalidatedRequest.JwtSecured.PassByReference -> fetchJwt(request)
-        }
-
-        val (clientIdScheme, requestObject) = jarJwtValidator.validate(request.clientId, unvalidatedJwt)
+    private suspend fun authenticate(request: FetchedRequest.JwtSecured): AuthenticatedRequestObject {
+        val (clientIdScheme, requestObject) = jarJwtValidator.validate(request.clientId, request.jwt)
         return AuthenticatedRequestObject(clientIdScheme, requestObject)
     }
 }
@@ -113,7 +104,10 @@ private class JarJwtSignatureValidator(
 ) {
 
     @Throws(AuthorizationRequestException::class)
-    suspend fun validate(clientId: String, unverifiedJwt: Jwt): Pair<SupportedClientIdScheme, UnvalidatedRequestObject> {
+    suspend fun validate(
+        clientId: String,
+        unverifiedJwt: Jwt,
+    ): Pair<SupportedClientIdScheme, UnvalidatedRequestObject> {
         val signedJwt = parse(unverifiedJwt)
         val supportedClientIdScheme = validateSignatureForClientIdScheme(clientId, signedJwt)
         val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }

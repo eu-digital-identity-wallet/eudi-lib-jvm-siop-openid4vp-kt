@@ -29,6 +29,7 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.ensure
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.sanOfDNSName
 import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
 import io.ktor.client.*
@@ -38,20 +39,31 @@ import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import java.net.URI
 import java.security.cert.X509Certificate
 import java.text.ParseException
 
+internal sealed interface AuthenticatedClient {
+    data class Preregistered(val preregisteredClient: PreregisteredClient) : AuthenticatedClient
+    data class RedirectUri(val clientId: URI) : AuthenticatedClient
+    data class X509SanDns(val clientId: String, val chain: List<X509Certificate>) : AuthenticatedClient
+    data class X509SanUri(val clientId: URI, val chain: List<X509Certificate>) : AuthenticatedClient
+}
+
 internal data class AuthenticatedRequestObject(
-    val clientIdScheme: SupportedClientIdScheme,
+    val client: AuthenticatedClient,
     val requestObject: UnvalidatedRequestObject,
 )
 
-internal class RequestAuthenticator(
+internal class RequestAuthenticator private constructor(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val jarJwtValidator: JarJwtSignatureValidator,
 ) {
 
-    private val jarJwtValidator = JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory)
+    constructor(
+        siopOpenId4VPConfig: SiopOpenId4VPConfig,
+        httpClientFactory: KtorHttpClientFactory,
+    ) : this(siopOpenId4VPConfig, JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory))
 
     suspend fun fetchAndAuthenticate(request: FetchedRequest): AuthenticatedRequestObject =
         when (request) {
@@ -61,36 +73,95 @@ internal class RequestAuthenticator(
 
     private fun authenticate(request: FetchedRequest.Plain): AuthenticatedRequestObject {
         val requestObject = request.requestObject
-        fun invalidScheme() =
-            RequestValidationError.InvalidClientIdScheme(requestObject.clientIdScheme.orEmpty()).asException()
+        val (clientId, clientIdScheme) = clientAndScheme(requestObject)
+        val client = when (clientIdScheme) {
+            is Preregistered -> {
+                val registeredClient = clientIdScheme.clients[clientId]
+                ensureNotNull(registeredClient) { RequestValidationError.InvalidClientId.asException() }
+                AuthenticatedClient.Preregistered(registeredClient)
+            }
 
-        val clientIdScheme = requestObject.clientIdScheme?.let {
-            ClientIdScheme.make(it)?.takeIf(ClientIdScheme::supportsNonJar)
-        } ?: throw invalidScheme()
+            SupportedClientIdScheme.RedirectUri -> {
+                val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
+                AuthenticatedClient.RedirectUri(clientIdUri)
+            }
 
-        fun knownClient(s: SupportedClientIdScheme) =
-            if (s !is Preregistered) true
-            else s.clients.containsKey(requestObject.clientId)
+            else -> throw invalidScheme("$clientIdScheme cannot be used in unsigned request")
+        }
 
+        return AuthenticatedRequestObject(client, requestObject)
+    }
+
+    private fun clientAndScheme(requestObject: UnvalidatedRequestObject): Pair<String, SupportedClientIdScheme> {
+        val clientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
+        val clientIdScheme = requestObject.clientIdScheme?.let { ClientIdScheme.make(it) }
+        ensureNotNull(clientIdScheme) { invalidScheme("Missing or invalid client_id_scheme") }
         val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
-        val auth = supportedClientIdScheme
-            ?.takeIf(::knownClient)
-            ?: throw RequestValidationError.UnsupportedClientIdScheme.asException()
-        return AuthenticatedRequestObject(auth, requestObject)
+        ensureNotNull(supportedClientIdScheme) { RequestValidationError.UnsupportedClientIdScheme.asException() }
+        return clientId to supportedClientIdScheme
+    }
+
+    private fun authenticateJarClient(
+        clientId: String,
+        clientIdScheme: SupportedClientIdScheme,
+        signedJwt: SignedJWT,
+    ): AuthenticatedClient {
+        fun x5c(
+            trust: X509CertificateTrust,
+            subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
+        ): List<X509Certificate> {
+            val pubCertChain = signedJwt.header
+                ?.x509CertChain
+                ?.mapNotNull { X509CertUtils.parse(it.decode()) }
+            ensureNotNull(pubCertChain) { invalidJarJwt("Missing or invalid x5c") }
+
+            val cert = pubCertChain[0]
+            val sans = cert.subjectAlternativeNames().getOrElse {
+                throw invalidJarJwt("x5c misses Subject Alternative Names of type UniformResourceIdentifier")
+            }
+            if (!sans.contains(clientId)) throw invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
+            if (!trust.isTrusted(pubCertChain)) throw invalidJarJwt("Untrusted x5c")
+            return pubCertChain
+        }
+        return when (clientIdScheme) {
+            SupportedClientIdScheme.RedirectUri -> throw invalidScheme("$clientIdScheme cannot be used in signed request")
+            is Preregistered -> {
+                val registeredClient = clientIdScheme.clients[clientId]
+                ensureNotNull(registeredClient) { RequestValidationError.InvalidClientId.asException() }
+                ensureNotNull(registeredClient.jarConfig) { RequestValidationError.InvalidClientId.asException() }
+                AuthenticatedClient.Preregistered(registeredClient)
+            }
+
+            is SupportedClientIdScheme.X509SanDns -> {
+                val chain = x5c(clientIdScheme.trust, X509Certificate::sanOfDNSName)
+                AuthenticatedClient.X509SanDns(clientId, chain)
+            }
+
+            is SupportedClientIdScheme.X509SanUri -> {
+                val chain = x5c(clientIdScheme.trust, X509Certificate::sanOfUniformResourceIdentifier)
+                val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
+                AuthenticatedClient.X509SanUri(clientIdUri, chain)
+            }
+        }
     }
 
     private suspend fun authenticate(request: FetchedRequest.JwtSecured): AuthenticatedRequestObject {
-        val (clientIdScheme, requestObject) = jarJwtValidator.validate(request.clientId, request.jwt)
-        return AuthenticatedRequestObject(clientIdScheme, requestObject)
+        val signedJwt = try {
+            SignedJWT.parse(request.jwt)
+        } catch (pe: ParseException) {
+            throw invalidJarJwt("JAR JWT parse error")
+        }
+        val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
+        val (clientId, clientIdScheme) = clientAndScheme(requestObject)
+        ensure(request.clientId == clientId) {
+            invalidJarJwt("ClientId mismatch. JAR request ${request.clientId}, jwt $clientId")
+        }
+
+        val client = authenticateJarClient(clientId, clientIdScheme, signedJwt)
+        jarJwtValidator.validate(client, signedJwt)
+        return AuthenticatedRequestObject(client, requestObject)
     }
 }
-
-private val OnlyNonJar = listOf(ClientIdScheme.RedirectUri)
-private val OnlyJar = listOf(ClientIdScheme.X509_SAN_DNS, ClientIdScheme.X509_SAN_URI, ClientIdScheme.DID)
-private val EitherJarOrNoJar = listOf(ClientIdScheme.PreRegistered, ClientIdScheme.EntityId)
-
-private fun ClientIdScheme.supportsNonJar() = this in OnlyNonJar || this in EitherJarOrNoJar
-private fun ClientIdScheme.supportsJar() = this in OnlyJar || this in EitherJarOrNoJar
 
 /**
  * Validates a JWT that represents an Authorization Request according to RFC9101
@@ -104,67 +175,13 @@ private class JarJwtSignatureValidator(
 ) {
 
     @Throws(AuthorizationRequestException::class)
-    suspend fun validate(
-        clientId: String,
-        unverifiedJwt: Jwt,
-    ): Pair<SupportedClientIdScheme, UnvalidatedRequestObject> {
-        val signedJwt = parse(unverifiedJwt)
-        val supportedClientIdScheme = validateSignatureForClientIdScheme(clientId, signedJwt)
-        val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
-        return supportedClientIdScheme to requestObject
-    }
-
-    /**
-     * Parses the given [unverifiedJwt] to verify that has the form
-     * of a [SignedJWT]. It doesn't perform signature validation
-     *
-     * @param unverifiedJwt The JWT to parse
-     * @return the parsed JWT
-     * @throws AuthorizationRequestException in case the [unverifiedJwt] is not compliant with the JWT format
-     */
-    @Throws(AuthorizationRequestException::class)
-    private fun parse(unverifiedJwt: Jwt): SignedJWT =
-        try {
-            SignedJWT.parse(unverifiedJwt)
-        } catch (pe: ParseException) {
-            throw invalidJarJwt("JAR JWT parse error")
-        }
-
-    @Throws(AuthorizationRequestException::class)
-    private suspend fun validateSignatureForClientIdScheme(
-        clientId: String,
-        signedJwt: SignedJWT,
-    ): SupportedClientIdScheme {
-        val untrustedClaimSet = signedJwt.jwtClaimsSet
-        val jwtClientId = untrustedClaimSet.getStringClaim("client_id")
-        val supportedClientIdScheme =
-            untrustedClaimSet.getStringClaim("client_id_scheme")
-                ?.let { ClientIdScheme.make(it)?.takeIf { x -> x.supportsJar() } }
-                ?.let { siopOpenId4VPConfig.supportedClientIdScheme(it) }
-
-        fun clientIdMismatch() = invalidJarJwt("ClientId mismatch. JAR request $clientId, jwt $jwtClientId")
-
-        return when {
-            null == jwtClientId -> throw RequestValidationError.MissingClientId.asException()
-            clientId != jwtClientId -> throw clientIdMismatch()
-            else -> {
-                val keySelector = jwsKeySelector(clientId, supportedClientIdScheme, signedJwt)
-                signedJwt.verifySignature { keySelector }
-                checkNotNull(supportedClientIdScheme)
-            }
-        }
-    }
-
-    @Throws(AuthorizationRequestException::class)
-    private suspend fun SignedJWT.verifySignature(
-        jwsKetSelector: suspend () -> JWSKeySelector<SecurityContext>,
-    ) {
+    suspend fun validate(client: AuthenticatedClient, signedJwt: SignedJWT) {
         try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType("oauth-authz-req+jwt"))
-                jwsKeySelector = jwsKetSelector()
+                jwsKeySelector = jwsKeySelector(client)
             }
-            jwtProcessor.process(this, null)
+            jwtProcessor.process(signedJwt, null)
         } catch (e: JOSEException) {
             throw RuntimeException(e)
         } catch (e: BadJOSEException) {
@@ -173,40 +190,23 @@ private class JarJwtSignatureValidator(
     }
 
     @Throws(AuthorizationRequestException::class)
-    private suspend fun jwsKeySelector(
-        clientId: String,
-        supportedClientIdScheme: SupportedClientIdScheme?,
-        signedJwt: SignedJWT,
-    ): JWSKeySelector<SecurityContext> = when (supportedClientIdScheme) {
-        is Preregistered -> getPreRegisteredClientJwsSelector(clientId, supportedClientIdScheme)
-        is SupportedClientIdScheme.X509SanUri ->
-            x509SanJwsSelector(
-                supportedClientIdScheme.trust,
-                clientId,
-                signedJwt,
-                X509Certificate::sanOfUniformResourceIdentifier,
-            )
+    private suspend fun jwsKeySelector(client: AuthenticatedClient): JWSKeySelector<SecurityContext> =
+        when (client) {
+            is AuthenticatedClient.Preregistered -> getPreRegisteredClientJwsSelector(client)
+            is AuthenticatedClient.X509SanUri -> JWSKeySelector<SecurityContext> { _, _ -> listOf(client.chain[0].publicKey) }
+            is AuthenticatedClient.X509SanDns ->
+                JWSKeySelector<SecurityContext> { _, _ -> listOf(client.chain[0].publicKey) }
 
-        is SupportedClientIdScheme.X509SanDns ->
-            x509SanJwsSelector(
-                supportedClientIdScheme.trust,
-                clientId,
-                signedJwt,
-                X509Certificate::sanOfDNSName,
-            )
-
-        null, SupportedClientIdScheme.RedirectUri -> throw RequestValidationError.UnsupportedClientIdScheme.asException()
-    }
+            is AuthenticatedClient.RedirectUri -> throw RequestValidationError.UnsupportedClientIdScheme.asException()
+        }
 
     @Throws(AuthorizationRequestException::class)
     private suspend fun getPreRegisteredClientJwsSelector(
-        clientId: String,
-        preregistered: Preregistered,
+        preregistered: AuthenticatedClient.Preregistered,
     ): JWSVerificationKeySelector<SecurityContext> {
-        val trustedClient = preregistered.clients[clientId]
-        ensure(trustedClient != null) { invalidJarJwt("Verifier with $clientId is not pre-registered") }
-        val jarConfig = trustedClient.jarConfig
-        ensure(jarConfig != null) { invalidJarJwt("Verifier with $clientId has not been configured for JAR") }
+        val trustedClient = preregistered.preregisteredClient
+        val jarConfig = checkNotNull(trustedClient.jarConfig)
+
         val (jarSigningAlg, jwkSetSource) = jarConfig
         suspend fun getJWKSource(): JWKSource<SecurityContext> {
             val jwkSet = when (jwkSetSource) {
@@ -225,27 +225,8 @@ private class JarJwtSignatureValidator(
     }
 }
 
-@Throws(AuthorizationRequestException::class)
-private fun x509SanJwsSelector(
-    trust: X509CertificateTrust,
-    clientId: String,
-    signedJwt: SignedJWT,
-    subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
-): JWSKeySelector<SecurityContext> {
-    val pubCertChain = signedJwt.header
-        ?.x509CertChain
-        ?.mapNotNull { X509CertUtils.parse(it.decode()) }
-        ?: throw invalidJarJwt("Missing or invalid x5c")
-
-    val cert = pubCertChain[0]
-    val sans = cert.subjectAlternativeNames().getOrElse {
-        throw invalidJarJwt("x5c misses Subject Alternative Names of type UniformResourceIdentifier")
-    }
-    if (!sans.contains(clientId)) throw invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
-    if (!trust.isTrusted(pubCertChain)) throw invalidJarJwt("Untrusted x5c")
-
-    return JWSKeySelector<SecurityContext> { _, _ -> listOf(cert.publicKey) }
-}
+private fun invalidScheme(cause: String): AuthorizationRequestException =
+    RequestValidationError.InvalidClientIdScheme(cause).asException()
 
 private fun invalidJarJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()

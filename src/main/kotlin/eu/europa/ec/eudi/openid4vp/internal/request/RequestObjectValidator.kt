@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
@@ -121,13 +122,18 @@ private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
  * wrapped inside a [specific exception][AuthorizationRequestException]
  */
 internal fun validateRequestObject(request: AuthenticatedRequestObject): ValidatedRequestObject {
-    val (clientIdScheme, requestObject) = request
+    val (client, requestObject) = request
     fun scope() = requiredScope(requestObject)
     val state = requiredState(requestObject)
     val nonce = requiredNonce(requestObject)
     val responseType = requiredResponseType(requestObject)
-    val responseMode = requiredResponseMode(clientIdScheme, requestObject)
-    val clientId = validClientId(clientIdScheme, requestObject, responseMode)
+    val responseMode = requiredResponseMode(client, requestObject)
+    val clientId = when (client) {
+        is AuthenticatedClient.Preregistered -> client.preregisteredClient.clientId
+        is AuthenticatedClient.RedirectUri -> client.clientId.toString()
+        is AuthenticatedClient.X509SanDns -> client.clientId
+        is AuthenticatedClient.X509SanUri -> client.clientId.toString()
+    }
     val presentationDefinitionSource =
         optionalPresentationDefinitionSource(requestObject, responseType) { scope().getOrNull() }
     val clientMetaDataSource = optionalClientMetaDataSource(requestObject)
@@ -198,35 +204,57 @@ private fun optionalIdTokenType(unvalidated: UnvalidatedRequestObject): List<IdT
         ?: emptyList()
 
 private fun requiredResponseMode(
-    clientIdScheme: SupportedClientIdScheme,
+    client: AuthenticatedClient,
     unvalidated: UnvalidatedRequestObject,
 ): ResponseMode {
     fun requiredRedirectUriAndNotProvidedResponseUri(): URI {
-        ensure(unvalidated.responseUri == null) { RequestValidationError.ResponseUriMustNotBeProvided.asException() }
+        ensure(unvalidated.responseUri == null) { ResponseUriMustNotBeProvided.asException() }
         // Redirect URI can be omitted in case of RedirectURI
         // and use clientId instead
-        val uri = unvalidated.redirectUri
-            ?: if (clientIdScheme is SupportedClientIdScheme.RedirectUri) unvalidated.clientId else null
-        ensureNotNull(uri) { RequestValidationError.MissingRedirectUri.asException() }
-        return uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }.getOrThrow()
+        val redirectUri = unvalidated.redirectUri?.asURI { InvalidRedirectUri.asException() }?.getOrThrow()
+        return when (client) {
+            is AuthenticatedClient.RedirectUri -> {
+                ensure(redirectUri == null || client.clientId == redirectUri) {
+                    InvalidRedirectUri.asException()
+                }
+                client.clientId
+            }
+
+            else -> ensureNotNull(redirectUri) { MissingRedirectUri.asException() }
+        }
     }
 
     fun requiredResponseUriAndNotProvidedRedirectUri(): URL {
-        ensure(unvalidated.redirectUri == null) { RequestValidationError.RedirectUriMustNotBeProvided.asException() }
+        ensure(unvalidated.redirectUri == null) { RedirectUriMustNotBeProvided.asException() }
         val uri = unvalidated.responseUri
-        ensureNotNull(uri) { RequestValidationError.MissingResponseUri.asException() }
-        return uri.asURL { RequestValidationError.InvalidResponseUri.asException() }.getOrThrow()
+        ensureNotNull(uri) { MissingResponseUri.asException() }
+        return uri.asURL { InvalidResponseUri.asException() }.getOrThrow()
     }
 
-    return when (unvalidated.responseMode) {
+    val responseMode = when (unvalidated.responseMode) {
         "direct_post" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPost(it) }
         "direct_post.jwt" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPostJwt(it) }
         "query" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Query(it) }
         "query.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.QueryJwt(it) }
         null, "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
         "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
-        else -> throw RequestValidationError.UnsupportedResponseMode(unvalidated.responseMode).asException()
+        else -> throw UnsupportedResponseMode(unvalidated.responseMode).asException()
     }
+
+    val uri = responseMode.uri()
+    when (client) {
+        is AuthenticatedClient.Preregistered -> Unit
+        is AuthenticatedClient.X509SanDns -> ensure(client.clientId == uri.host) {
+            UnsupportedResponseMode("$responseMode host doesn't match ${client.clientId}").asException()
+        }
+        is AuthenticatedClient.X509SanUri -> ensure(client.clientId == uri) {
+            UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
+        }
+        is AuthenticatedClient.RedirectUri -> ensure(client.clientId == uri) {
+            UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
+        }
+    }
+    return responseMode
 }
 
 /**
@@ -236,7 +264,7 @@ private fun requiredResponseMode(
  * @return the state or [RequestValidationError.MissingState]
  */
 private fun requiredState(unvalidated: UnvalidatedRequestObject): String =
-    ensureNotNull(unvalidated.state) { RequestValidationError.MissingState.asException() }
+    ensureNotNull(unvalidated.state) { MissingState.asException() }
 
 /**
  * Makes sure that [unvalidated] contains a not-null scope
@@ -247,7 +275,7 @@ private fun requiredState(unvalidated: UnvalidatedRequestObject): String =
 private fun requiredScope(unvalidated: UnvalidatedRequestObject): Result<Scope> {
     val scope = unvalidated.scope?.let { Scope.make(it) }
     return if (scope != null) Result.success(scope)
-    else RequestValidationError.MissingScope.asFailure()
+    else MissingScope.asFailure()
 }
 
 /**
@@ -257,7 +285,7 @@ private fun requiredScope(unvalidated: UnvalidatedRequestObject): Result<Scope> 
  * @return the nonce or [RequestValidationError.MissingNonce]
  */
 private fun requiredNonce(unvalidated: UnvalidatedRequestObject): String =
-    ensureNotNull(unvalidated.nonce) { RequestValidationError.MissingNonce.asException() }
+    ensureNotNull(unvalidated.nonce) { MissingNonce.asException() }
 
 /**
  * Makes sure that [unvalidated] contains a supported [ResponseType].
@@ -272,8 +300,8 @@ private fun requiredResponseType(unvalidated: UnvalidatedRequestObject): Respons
         "vp_token" -> ResponseType.VpToken
         "vp_token id_token", "id_token vp_token" -> ResponseType.VpAndIdToken
         "id_token" -> ResponseType.IdToken
-        null -> throw RequestValidationError.MissingResponseType.asException()
-        else -> throw RequestValidationError.UnsupportedResponseType(rt).asException()
+        null -> throw MissingResponseType.asException()
+        else -> throw UnsupportedResponseType(rt).asException()
     }
 
 /**
@@ -294,7 +322,7 @@ private fun parsePresentationDefinitionSource(
         val pd = jsonSupport.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
         PresentationDefinitionSource.ByValue(pd)
     } catch (t: SerializationException) {
-        throw RequestValidationError.InvalidPresentationDefinition(t).asException()
+        throw InvalidPresentationDefinition(t).asException()
     }
 
     fun requiredPdUri() = try {
@@ -302,7 +330,7 @@ private fun parsePresentationDefinitionSource(
         val pdUri = unvalidated.presentationDefinitionUri.asURL().getOrThrow()
         PresentationDefinitionSource.ByReference(pdUri)
     } catch (t: MalformedURLException) {
-        throw RequestValidationError.InvalidPresentationDefinitionUri.asException()
+        throw InvalidPresentationDefinitionUri.asException()
     }
 
     fun requiredScope() = PresentationDefinitionSource.Implied(scope!!)
@@ -311,25 +339,8 @@ private fun parsePresentationDefinitionSource(
         hasPd && !hasPdUri -> requiredPd()
         !hasPd && hasPdUri -> requiredPdUri()
         hasScope -> requiredScope()
-        else -> throw RequestValidationError.MissingPresentationDefinition.asException()
+        else -> throw MissingPresentationDefinition.asException()
     }
-}
-
-private fun validClientId(
-    clientIdScheme: SupportedClientIdScheme,
-    unvalidated: UnvalidatedRequestObject,
-    responseMode: ResponseMode,
-): String {
-    val clientId = ensureNotNull(unvalidated.clientId) { RequestValidationError.MissingClientId.asException() }
-    val uri = responseMode.uri()
-    fun checkWithScheme() = when (clientIdScheme) {
-        is SupportedClientIdScheme.Preregistered -> true
-        is SupportedClientIdScheme.X509SanDns -> clientId == uri.host
-        is SupportedClientIdScheme.X509SanUri, SupportedClientIdScheme.RedirectUri -> clientId == uri.toString()
-    }
-
-    return if (checkWithScheme()) clientId
-    else throw RequestValidationError.InvalidClientId.asException()
 }
 
 private fun optionalClientMetaDataSource(unvalidated: UnvalidatedRequestObject): ClientMetaDataSource? {
@@ -344,7 +355,7 @@ private fun optionalClientMetaDataSource(unvalidated: UnvalidatedRequestObject):
     fun requiredClientMetaDataUri(): ClientMetaDataSource.ByReference {
         checkNotNull(unvalidated.clientMetadataUri)
         val uri = unvalidated.clientMetadataUri
-            .asURL { RequestValidationError.InvalidClientMetaDataUri.asException() }
+            .asURL { InvalidClientMetaDataUri.asException() }
             .getOrThrow()
         return ClientMetaDataSource.ByReference(uri)
     }
@@ -352,7 +363,7 @@ private fun optionalClientMetaDataSource(unvalidated: UnvalidatedRequestObject):
     return when {
         hasCMD && !hasCMDUri -> requiredClientMetaData()
         !hasCMD && hasCMDUri -> requiredClientMetaDataUri()
-        hasCMD && hasCMDUri -> throw RequestValidationError.OneOfClientMedataOrUri.asException()
+        hasCMD && hasCMDUri -> throw OneOfClientMedataOrUri.asException()
         else -> null
     }
 }

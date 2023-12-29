@@ -420,7 +420,7 @@ class UnvalidatedRequestResolverTest {
                 this.requestObject is T
             }
 
-            else -> fail("Invalid resolution found while expected success")
+            is Resolution.Invalid -> fail("Invalid resolution found while expected success\n$error")
         }
     }
 

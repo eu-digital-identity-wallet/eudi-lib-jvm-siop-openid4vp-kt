@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
@@ -110,31 +111,26 @@ internal sealed interface ValidatedRequestObject {
 
 private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
 
-internal fun validateRequestObject(r: AuthenticatedRequestObject): ValidatedRequestObject =
-    validateRequestObject(r.clientIdScheme, r.requestObject)
-
 /**
- * Validates that the given [authorizationRequest] represents a valid and supported [ValidatedRequestObject]
+ * Validates that the given [request] represents a valid and supported [ValidatedRequestObject]
  *
- * @param authorizationRequest The request to validate
- * @return if given [authorizationRequest] is valid returns an appropriate [ValidatedRequestObject]. Otherwise,
+ * @param request The request to validate
+ * @return if given [request] is valid returns an appropriate [ValidatedRequestObject]. Otherwise,
  * returns a [failure][Result.Failure]. Validation rules violations are reported using [AuthorizationRequestError]
  * wrapped inside a [specific exception][AuthorizationRequestException]
  */
-private fun validateRequestObject(
-    supportedClientIdScheme: SupportedClientIdScheme,
-    authorizationRequest: UnvalidatedRequestObject,
-): ValidatedRequestObject {
-    fun scope() = requiredScope(authorizationRequest)
-    val state = requiredState(authorizationRequest)
-    val nonce = requiredNonce(authorizationRequest)
-    val responseType = requiredResponseType(authorizationRequest)
-    val responseMode = requiredResponseMode(supportedClientIdScheme, authorizationRequest)
-    val clientId = validClientId(supportedClientIdScheme, authorizationRequest, responseMode)
+internal fun validateRequestObject(request: AuthenticatedRequestObject): ValidatedRequestObject {
+    val (clientIdScheme, requestObject) = request
+    fun scope() = requiredScope(requestObject)
+    val state = requiredState(requestObject)
+    val nonce = requiredNonce(requestObject)
+    val responseType = requiredResponseType(requestObject)
+    val responseMode = requiredResponseMode(clientIdScheme, requestObject)
+    val clientId = validClientId(clientIdScheme, requestObject, responseMode)
     val presentationDefinitionSource =
-        optionalPresentationDefinitionSource(authorizationRequest, responseType) { scope().getOrNull() }
-    val clientMetaDataSource = optionalClientMetaDataSource(authorizationRequest)
-    val idTokenType = optionalIdTokenType(authorizationRequest)
+        optionalPresentationDefinitionSource(requestObject, responseType) { scope().getOrNull() }
+    val clientMetaDataSource = optionalClientMetaDataSource(requestObject)
+    val idTokenType = optionalIdTokenType(requestObject)
 
     fun idAndVpToken() = SiopOpenId4VPAuthentication(
         idTokenType,
@@ -201,7 +197,7 @@ private fun optionalIdTokenType(unvalidated: UnvalidatedRequestObject): List<IdT
         ?: emptyList()
 
 private fun requiredResponseMode(
-    supportedClientIdScheme: SupportedClientIdScheme,
+    clientIdScheme: SupportedClientIdScheme,
     unvalidated: UnvalidatedRequestObject,
 ): ResponseMode {
     fun requiredRedirectUriAndNotProvidedResponseUri(): URI =
@@ -210,7 +206,7 @@ private fun requiredResponseMode(
             // Redirect URI can be omitted in case of RedirectURI
             // and use clientId instead
             val uri = unvalidated.redirectUri
-                ?: if (supportedClientIdScheme is SupportedClientIdScheme.RedirectUri) unvalidated.clientId else null
+                ?: if (clientIdScheme is SupportedClientIdScheme.RedirectUri) unvalidated.clientId else null
             when (uri) {
                 null -> throw RequestValidationError.MissingRedirectUri.asException()
                 else -> uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }.getOrThrow()
@@ -242,8 +238,7 @@ private fun requiredResponseMode(
  * @return the state or [RequestValidationError.MissingState]
  */
 private fun requiredState(unvalidated: UnvalidatedRequestObject): String =
-    if (!unvalidated.state.isNullOrBlank()) unvalidated.state
-    else throw RequestValidationError.MissingState.asException()
+    ensureNotNull(unvalidated.state) { RequestValidationError.MissingState.asException() }
 
 /**
  * Makes sure that [unvalidated] contains a not-null scope
@@ -264,7 +259,7 @@ private fun requiredScope(unvalidated: UnvalidatedRequestObject): Result<Scope> 
  * @return the nonce or [RequestValidationError.MissingNonce]
  */
 private fun requiredNonce(unvalidated: UnvalidatedRequestObject): String =
-    unvalidated.nonce ?: throw RequestValidationError.MissingNonce.asException()
+    ensureNotNull(unvalidated.nonce) { RequestValidationError.MissingNonce.asException() }
 
 /**
  * Makes sure that [unvalidated] contains a supported [ResponseType].
@@ -323,13 +318,13 @@ private fun parsePresentationDefinitionSource(
 }
 
 private fun validClientId(
-    supportedClientIdScheme: SupportedClientIdScheme,
+    clientIdScheme: SupportedClientIdScheme,
     unvalidated: UnvalidatedRequestObject,
     responseMode: ResponseMode,
 ): String {
     val clientId = unvalidated.clientId ?: throw RequestValidationError.MissingClientId.asException()
     val uri = responseMode.uri()
-    fun checkWithScheme() = when (supportedClientIdScheme) {
+    fun checkWithScheme() = when (clientIdScheme) {
         is SupportedClientIdScheme.Preregistered -> true
         is SupportedClientIdScheme.X509SanDns -> clientId == uri.host
         is SupportedClientIdScheme.X509SanUri, SupportedClientIdScheme.RedirectUri -> clientId == uri.toString()

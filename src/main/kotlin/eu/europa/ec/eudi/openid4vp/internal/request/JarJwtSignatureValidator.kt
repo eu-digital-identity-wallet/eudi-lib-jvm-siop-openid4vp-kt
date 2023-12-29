@@ -52,7 +52,7 @@ internal class JarJwtSignatureValidator(
 ) {
 
     @Throws(AuthorizationRequestException::class)
-    suspend fun validate(clientId: String, unverifiedJwt: Jwt): Pair<SupportedClientIdScheme, RequestObject> {
+    suspend fun validate(clientId: String, unverifiedJwt: Jwt): Pair<SupportedClientIdScheme, UnvalidatedRequestObject> {
         val signedJwt = parse(unverifiedJwt)
         val supportedClientIdScheme = validateSignatureForClientIdScheme(clientId, signedJwt)
         val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
@@ -195,14 +195,14 @@ private fun x509SanJwsSelector(
 private fun invalidJarJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()
 
-private fun requestObject(cs: JWTClaimsSet): RequestObject {
+private fun requestObject(cs: JWTClaimsSet): UnvalidatedRequestObject {
     fun Map<String, Any?>.asJsonObject(): JsonObject {
         val jsonStr = Gson().toJson(this)
         return Json.parseToJsonElement(jsonStr).jsonObject
     }
 
     return with(cs) {
-        RequestObject(
+        UnvalidatedRequestObject(
             responseType = getStringClaim("response_type"),
             presentationDefinition = getJSONObjectClaim("presentation_definition")?.asJsonObject(),
             presentationDefinitionUri = getStringClaim("presentation_definition_uri"),

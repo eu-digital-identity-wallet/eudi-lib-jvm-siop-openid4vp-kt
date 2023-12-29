@@ -50,7 +50,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-class AuthorizationRequestResolverTest {
+class UnvalidatedRequestResolverTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
 
@@ -412,7 +412,7 @@ class AuthorizationRequestResolverTest {
     }
 
     private fun load(f: String): InputStream =
-        AuthorizationRequestResolverTest::class.java.classLoader.getResourceAsStream(f) ?: error("File $f not found")
+        UnvalidatedRequestResolverTest::class.java.classLoader.getResourceAsStream(f) ?: error("File $f not found")
 
     private inline fun <reified T : ResolvedRequestObject> Resolution.validateSuccess() {
         when (this) {

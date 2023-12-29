@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
@@ -200,25 +201,22 @@ private fun requiredResponseMode(
     clientIdScheme: SupportedClientIdScheme,
     unvalidated: UnvalidatedRequestObject,
 ): ResponseMode {
-    fun requiredRedirectUriAndNotProvidedResponseUri(): URI =
-        if (unvalidated.responseUri != null) throw RequestValidationError.ResponseUriMustNotBeProvided.asException()
-        else {
-            // Redirect URI can be omitted in case of RedirectURI
-            // and use clientId instead
-            val uri = unvalidated.redirectUri
-                ?: if (clientIdScheme is SupportedClientIdScheme.RedirectUri) unvalidated.clientId else null
-            when (uri) {
-                null -> throw RequestValidationError.MissingRedirectUri.asException()
-                else -> uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }.getOrThrow()
-            }
-        }
+    fun requiredRedirectUriAndNotProvidedResponseUri(): URI {
+        ensure(unvalidated.responseUri == null) { RequestValidationError.ResponseUriMustNotBeProvided.asException() }
+        // Redirect URI can be omitted in case of RedirectURI
+        // and use clientId instead
+        val uri = unvalidated.redirectUri
+            ?: if (clientIdScheme is SupportedClientIdScheme.RedirectUri) unvalidated.clientId else null
+        ensureNotNull(uri) { RequestValidationError.MissingRedirectUri.asException() }
+        return uri.asURI { RequestValidationError.InvalidRedirectUri.asException() }.getOrThrow()
+    }
 
-    fun requiredResponseUriAndNotProvidedRedirectUri(): URL =
-        if (unvalidated.redirectUri != null) throw RequestValidationError.RedirectUriMustNotBeProvided.asException()
-        else when (val uri = unvalidated.responseUri) {
-            null -> throw RequestValidationError.MissingResponseUri.asException()
-            else -> uri.asURL { RequestValidationError.InvalidResponseUri.asException() }.getOrThrow()
-        }
+    fun requiredResponseUriAndNotProvidedRedirectUri(): URL {
+        ensure(unvalidated.redirectUri == null) { RequestValidationError.RedirectUriMustNotBeProvided.asException() }
+        val uri = unvalidated.responseUri
+        ensureNotNull(uri) { RequestValidationError.MissingResponseUri.asException() }
+        return uri.asURL { RequestValidationError.InvalidResponseUri.asException() }.getOrThrow()
+    }
 
     return when (unvalidated.responseMode) {
         "direct_post" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPost(it) }
@@ -322,13 +320,14 @@ private fun validClientId(
     unvalidated: UnvalidatedRequestObject,
     responseMode: ResponseMode,
 ): String {
-    val clientId = unvalidated.clientId ?: throw RequestValidationError.MissingClientId.asException()
+    val clientId = ensureNotNull(unvalidated.clientId) { RequestValidationError.MissingClientId.asException() }
     val uri = responseMode.uri()
     fun checkWithScheme() = when (clientIdScheme) {
         is SupportedClientIdScheme.Preregistered -> true
         is SupportedClientIdScheme.X509SanDns -> clientId == uri.host
         is SupportedClientIdScheme.X509SanUri, SupportedClientIdScheme.RedirectUri -> clientId == uri.toString()
     }
+
     return if (checkWithScheme()) clientId
     else throw RequestValidationError.InvalidClientId.asException()
 }

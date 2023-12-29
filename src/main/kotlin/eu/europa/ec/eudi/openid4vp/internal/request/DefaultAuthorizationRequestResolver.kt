@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.eygraber.uri.Uri
+import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
@@ -132,9 +133,9 @@ internal sealed interface UnvalidatedRequest {
     }
 }
 
-internal sealed interface FetchedRequest<out JWT> {
-    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest<Nothing>
-    data class JwtSecured<JWT>(val clientId: String, val jwt: JWT) : FetchedRequest<JWT>
+internal sealed interface FetchedRequest {
+    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest
+    data class JwtSecured(val clientId: String, val jwt: SignedJWT) : FetchedRequest
 }
 
 internal class DefaultAuthorizationRequestResolver private constructor(

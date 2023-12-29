@@ -15,21 +15,32 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import eu.europa.ec.eudi.openid4vp.Jwt
-import eu.europa.ec.eudi.openid4vp.KtorHttpClientFactory
+import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import java.text.ParseException
 
 /**
  * Fetches the authorization request, if needed
  */
 internal class RequestFetcher(private val httpClientFactory: KtorHttpClientFactory) {
 
-    suspend fun fetch(request: UnvalidatedRequest): FetchedRequest<Jwt> = when (request) {
+    suspend fun fetch(request: UnvalidatedRequest): FetchedRequest = when (request) {
         is UnvalidatedRequest.Plain -> FetchedRequest.Plain(request.requestObject)
-        is UnvalidatedRequest.JwtSecured.PassByValue -> FetchedRequest.JwtSecured(request.clientId, request.jwt)
-        is UnvalidatedRequest.JwtSecured.PassByReference -> FetchedRequest.JwtSecured(request.clientId, request.jwt())
+        is UnvalidatedRequest.JwtSecured -> {
+            val jwt = when (request) {
+                is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt
+                is UnvalidatedRequest.JwtSecured.PassByReference -> request.jwt()
+            }
+            val signedJwt = jwt.parseJwt()
+            ensure(request.clientId == signedJwt.jwtClaimsSet.getStringClaim("client_id")) {
+                invalidJwt("ClientId mismatch. JAR request ${request.clientId}, jwt ${request.clientId}")
+            }
+            FetchedRequest.JwtSecured(request.clientId, signedJwt)
+        }
     }
 
     private suspend fun UnvalidatedRequest.JwtSecured.PassByReference.jwt(): Jwt {
@@ -40,3 +51,12 @@ internal class RequestFetcher(private val httpClientFactory: KtorHttpClientFacto
         }
     }
 }
+
+private fun String.parseJwt(): SignedJWT = try {
+    SignedJWT.parse(this)
+} catch (pe: ParseException) {
+    throw invalidJwt("JAR JWT parse error")
+}
+
+private fun invalidJwt(cause: String): AuthorizationRequestException =
+    RequestValidationError.InvalidJarJwt(cause).asException()

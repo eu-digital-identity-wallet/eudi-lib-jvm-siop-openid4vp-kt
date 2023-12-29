@@ -23,7 +23,6 @@ import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.*
 import com.nimbusds.jose.shaded.gson.Gson
 import com.nimbusds.jose.util.X509CertUtils
-import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vp.*
@@ -41,7 +40,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.net.URI
 import java.security.cert.X509Certificate
-import java.text.ParseException
 
 internal sealed interface AuthenticatedClient {
     data class Preregistered(val preregisteredClient: PreregisteredClient) : AuthenticatedClient
@@ -57,7 +55,7 @@ internal data class AuthenticatedRequest(
 
 internal class RequestAuthenticator private constructor(
     private val clientAuthenticator: ClientAuthenticator,
-    private val jarJwtValidator: JarJwtSignatureValidator,
+    private val signatureVerifier: JarJwtSignatureVerifier,
 ) {
 
     constructor(
@@ -65,34 +63,27 @@ internal class RequestAuthenticator private constructor(
         httpClientFactory: KtorHttpClientFactory,
     ) : this(
         ClientAuthenticator(siopOpenId4VPConfig),
-        JarJwtSignatureValidator(siopOpenId4VPConfig, httpClientFactory),
+        JarJwtSignatureVerifier(siopOpenId4VPConfig, httpClientFactory),
     )
 
-    suspend fun authenticate(request: FetchedRequest<Jwt>): AuthenticatedRequest = when (request) {
-        is FetchedRequest.Plain -> authenticatePlain(request)
-        is FetchedRequest.JwtSecured -> authenticateJwtSecured(request)
-    }
-
-    private fun authenticatePlain(request: FetchedRequest.Plain): AuthenticatedRequest {
+    suspend fun authenticate(request: FetchedRequest): AuthenticatedRequest {
         val client = clientAuthenticator.authenticateClient(request)
-        return AuthenticatedRequest(client, request.requestObject)
-    }
-    private suspend fun authenticateJwtSecured(request: FetchedRequest.JwtSecured<Jwt>): AuthenticatedRequest {
-        val signedJwt = request.jwt.parseJwt()
-        val client = clientAuthenticator.authenticateClient(FetchedRequest.JwtSecured(request.clientId, signedJwt))
-        val requestObject = signedJwt.jwtClaimsSet.toType { requestObject(it) }
-        ensure(request.clientId == requestObject.clientId) {
-            invalidJarJwt("ClientId mismatch. JAR request ${request.clientId}, jwt ${request.clientId}")
+        return when (request) {
+            is FetchedRequest.Plain -> {
+                AuthenticatedRequest(client, request.requestObject)
+            }
+            is FetchedRequest.JwtSecured -> {
+                signatureVerifier.verifySignature(client, request.jwt)
+                AuthenticatedRequest(client, request.jwt.requestObject())
+            }
         }
-        jarJwtValidator.validate(client, signedJwt)
-        return AuthenticatedRequest(client, requestObject)
     }
 }
 
 private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
-    fun authenticateClient(request: FetchedRequest<SignedJWT>): AuthenticatedClient {
+    fun authenticateClient(request: FetchedRequest): AuthenticatedClient {
         val requestObject = when (request) {
-            is FetchedRequest.JwtSecured -> request.jwt.jwtClaimsSet.toType { requestObject(it) }
+            is FetchedRequest.JwtSecured -> request.jwt.requestObject()
             is FetchedRequest.Plain -> request.requestObject
         }
 
@@ -117,13 +108,19 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
 
             is SupportedClientIdScheme.X509SanDns -> {
                 ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
-                val chain = x5c(request, clientIdScheme.trust, X509Certificate::sanOfDNSName)
+                val chain = x5c(request, clientIdScheme.trust) {
+                    val dnsNames = sanOfDNSName().getOrNull()
+                    ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses DNS names") }
+                }
                 AuthenticatedClient.X509SanDns(request.clientId, chain)
             }
 
             is SupportedClientIdScheme.X509SanUri -> {
                 ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
-                val chain = x5c(request, clientIdScheme.trust, X509Certificate::sanOfUniformResourceIdentifier)
+                val chain = x5c(request, clientIdScheme.trust) {
+                    val dnsNames = sanOfUniformResourceIdentifier().getOrNull()
+                    ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses URI names") }
+                }
                 val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.X509SanUri(clientIdUri, chain)
             }
@@ -140,21 +137,20 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
     }
 
     private fun x5c(
-        request: FetchedRequest.JwtSecured<SignedJWT>,
+        request: FetchedRequest.JwtSecured,
         trust: X509CertificateTrust,
-        subjectAlternativeNames: X509Certificate.() -> Result<List<String>>,
+        subjectAlternativeNames: X509Certificate.() -> List<String>,
     ): List<X509Certificate> {
-        val pubCertChain = request.jwt.header
-            ?.x509CertChain
-            ?.mapNotNull { X509CertUtils.parse(it.decode()) }
-        ensureNotNull(pubCertChain) { invalidJarJwt("Missing or invalid x5c") }
+        val x5c = request.jwt.header?.x509CertChain
+        ensureNotNull(x5c) { invalidJarJwt("Missing x5c") }
+        val pubCertChain = x5c.mapNotNull { runCatching { X509CertUtils.parse(it.decode()) }.getOrNull() }
+        ensure(pubCertChain.isNotEmpty()) { invalidJarJwt("Invalid x5c") }
 
-        val cert = pubCertChain[0]
-        val sans = cert.subjectAlternativeNames().getOrElse {
-            throw invalidJarJwt("x5c misses Subject Alternative Names of type UniformResourceIdentifier")
+        val alternativeNames = pubCertChain[0].subjectAlternativeNames()
+        ensure(request.clientId in alternativeNames) {
+            invalidJarJwt("ClientId not found in certificate's subject alternative names")
         }
-        if (!sans.contains(request.clientId)) throw invalidJarJwt("ClientId not found in x5c Subject Alternative Names")
-        if (!trust.isTrusted(pubCertChain)) throw invalidJarJwt("Untrusted x5c")
+        ensure(trust.isTrusted(pubCertChain)) { invalidJarJwt("Untrusted x5c") }
         return pubCertChain
     }
 }
@@ -165,13 +161,13 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
  * @param siopOpenId4VPConfig wallet's configuration
  * @param httpClientFactory a factory to obtain a Ktor http client
  */
-private class JarJwtSignatureValidator(
+private class JarJwtSignatureVerifier(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
 ) {
 
     @Throws(AuthorizationRequestException::class)
-    suspend fun validate(client: AuthenticatedClient, signedJwt: SignedJWT) {
+    suspend fun verifySignature(client: AuthenticatedClient, signedJwt: SignedJWT) {
         try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType("oauth-authz-req+jwt"))
@@ -227,19 +223,13 @@ private fun invalidScheme(cause: String): AuthorizationRequestException =
 private fun invalidJarJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()
 
-private fun String.parseJwt(): SignedJWT = try {
-    SignedJWT.parse(this)
-} catch (pe: ParseException) {
-    throw invalidJarJwt("JAR JWT parse error")
-}
-
-private fun requestObject(cs: JWTClaimsSet): UnvalidatedRequestObject {
+private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
     fun Map<String, Any?>.asJsonObject(): JsonObject {
         val jsonStr = Gson().toJson(this)
         return Json.parseToJsonElement(jsonStr).jsonObject
     }
 
-    return with(cs) {
+    return with(jwtClaimsSet) {
         UnvalidatedRequestObject(
             responseType = getStringClaim("response_type"),
             presentationDefinition = getJSONObjectClaim("presentation_definition")?.asJsonObject(),

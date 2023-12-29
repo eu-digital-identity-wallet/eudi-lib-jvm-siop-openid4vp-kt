@@ -25,18 +25,15 @@ internal class RequestFetcher(private val httpClientFactory: KtorHttpClientFacto
 
     suspend fun fetch(request: UnvalidatedRequest): FetchedRequest = when (request) {
         is UnvalidatedRequest.Plain -> FetchedRequest.Plain(request.requestObject)
-        is UnvalidatedRequest.JwtSecured -> {
-            suspend fun fetchJwt(request: UnvalidatedRequest.JwtSecured.PassByReference): Jwt =
-                httpClientFactory().use { client ->
-                    client.get(request.jwtURI) {
-                        accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                    }.body<String>()
-                }
-            val unvalidatedJwt: Jwt = when (request) {
-                is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt
-                is UnvalidatedRequest.JwtSecured.PassByReference -> fetchJwt(request)
-            }
-            FetchedRequest.JwtSecured(request.clientId, unvalidatedJwt)
+        is UnvalidatedRequest.JwtSecured.PassByValue -> FetchedRequest.JwtSecured(request.clientId, request.jwt)
+        is UnvalidatedRequest.JwtSecured.PassByReference -> FetchedRequest.JwtSecured(request.clientId, request.jwt())
+    }
+
+    private suspend fun UnvalidatedRequest.JwtSecured.PassByReference.jwt(): Jwt {
+        return httpClientFactory().use { client ->
+            client.get(jwtURI) {
+                accept(ContentType.parse("application/oauth-authz-req+jwt"))
+            }.body<String>()
         }
     }
 }

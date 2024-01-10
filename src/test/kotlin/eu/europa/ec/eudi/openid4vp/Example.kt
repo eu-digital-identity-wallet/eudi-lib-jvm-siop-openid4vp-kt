@@ -30,11 +30,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -54,7 +50,7 @@ import javax.net.ssl.X509TrustManager
  * Examples assume that you have cloned and running
  * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
  */
-fun main(): Unit = runTest {
+fun main(): Unit = runBlocking {
     val verifierApi = URL("http://localhost:8080")
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
@@ -164,7 +160,8 @@ class Verifier private constructor(
                         "nonce": "$nonce",
                         "id_token_type": "subject_signed_id_token",
                         "response_mode": "direct_post.jwt",
-                        "jar_mode": "by_reference"    
+                        "jar_mode": "by_reference",
+                        "wallet_response_redirect_uri_template":"https://foo#{RESPONSE_CODE}"    
                     }
                 """.trimIndent()
             return initTransaction(client, verifierApi, request)
@@ -185,7 +182,8 @@ class Verifier private constructor(
                         "presentation_definition": $presentationDefinition,
                         "response_mode": "direct_post.jwt" ,
                         "presentation_definition_mode": "by_reference"
-                        "jar_mode": "by_value"       
+                        "jar_mode": "by_reference",
+                        "wallet_response_redirect_uri_template":"https://foo#{RESPONSE_CODE}"       
                     }
                 """.trimIndent()
             return initTransaction(client, verifierApi, request)

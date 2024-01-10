@@ -184,12 +184,14 @@ private class JarJwtSignatureVerifier(
     @Throws(AuthorizationRequestException::class)
     private suspend fun jwsKeySelector(client: AuthenticatedClient): JWSKeySelector<SecurityContext> =
         when (client) {
-            is AuthenticatedClient.Preregistered -> getPreRegisteredClientJwsSelector(client)
-            is AuthenticatedClient.X509SanUri -> JWSKeySelector<SecurityContext> { _, _ -> listOf(client.chain[0].publicKey) }
+            is AuthenticatedClient.Preregistered ->
+                getPreRegisteredClientJwsSelector(client)
+            is AuthenticatedClient.X509SanUri ->
+                JWSKeySelector<SecurityContext> { _, _ -> listOf(client.chain[0].publicKey) }
             is AuthenticatedClient.X509SanDns ->
                 JWSKeySelector<SecurityContext> { _, _ -> listOf(client.chain[0].publicKey) }
-
-            is AuthenticatedClient.RedirectUri -> throw RequestValidationError.UnsupportedClientIdScheme.asException()
+            is AuthenticatedClient.RedirectUri ->
+                throw RequestValidationError.UnsupportedClientIdScheme.asException()
         }
 
     @Throws(AuthorizationRequestException::class)

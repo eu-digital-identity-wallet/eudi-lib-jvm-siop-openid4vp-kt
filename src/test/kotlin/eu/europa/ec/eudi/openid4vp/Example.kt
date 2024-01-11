@@ -69,8 +69,12 @@ fun main(): Unit = runBlocking {
             walletPublicKey = wallet.pubKey,
             transaction = transaction,
         )
-        wallet.handle(verifier.authorizationRequestUri)
-        verifier.getWalletResponse()
+
+        when (val dispatchOutcome = wallet.handle(verifier.authorizationRequestUri)) {
+            is DispatchOutcome.RedirectURI -> error("Unexpected")
+            is DispatchOutcome.VerifierResponse.Accepted -> verifier.getWalletResponse(dispatchOutcome)
+            DispatchOutcome.VerifierResponse.Rejected -> error("Unexpected failure")
+        }
     }
 
     runUseCase(Transaction.SIOP)
@@ -95,16 +99,18 @@ class Verifier private constructor(
     private val verifierApi: URL,
     private val walletPublicKey: RSAKey,
     private val presentationId: String,
-    private val nonce: String,
     val authorizationRequestUri: URI,
 ) {
 
     override fun toString(): String =
         "Verifier presentationId=$presentationId, authorizationRequestUri=$authorizationRequestUri"
 
-    suspend fun getWalletResponse(): WalletResponse {
+    suspend fun getWalletResponse(dispatchOutcome: DispatchOutcome.VerifierResponse.Accepted): WalletResponse {
+        val responseCode = Url(checkNotNull(dispatchOutcome.redirectURI)).parameters["response_code"]
+        checkNotNull(responseCode) { "Failed to extract response_code" }
+
         val walletResponse = createHttpClient().use {
-            it.get("$verifierApi/ui/presentations/$presentationId?nonce=$nonce") {
+            it.get("$verifierApi/ui/presentations/$presentationId?response_code=$responseCode") {
                 accept(ContentType.Application.Json)
             }
         }.body<WalletResponse>()
@@ -144,7 +150,7 @@ class Verifier private constructor(
                         )
                         val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
                         val uri = formatAuthorizationRequest(initTransactionResponse)
-                        Verifier(verifierApi, walletPublicKey, presentationId, nonce, uri).also {
+                        Verifier(verifierApi, walletPublicKey, presentationId, uri).also {
                             verifierPrintln("Initialized $it")
                         }
                     }
@@ -161,7 +167,7 @@ class Verifier private constructor(
                         "id_token_type": "subject_signed_id_token",
                         "response_mode": "direct_post.jwt",
                         "jar_mode": "by_reference",
-                        "wallet_response_redirect_uri_template":"https://foo#{RESPONSE_CODE}"    
+                        "wallet_response_redirect_uri_template":"https://foo?response_code={RESPONSE_CODE}"    
                     }
                 """.trimIndent()
             return initTransaction(client, verifierApi, request)
@@ -183,7 +189,7 @@ class Verifier private constructor(
                         "response_mode": "direct_post.jwt" ,
                         "presentation_definition_mode": "by_reference"
                         "jar_mode": "by_reference",
-                        "wallet_response_redirect_uri_template":"https://foo#{RESPONSE_CODE}"       
+                        "wallet_response_redirect_uri_template":"https://foo?response_code={RESPONSE_CODE}"       
                     }
                 """.trimIndent()
             return initTransaction(client, verifierApi, request)
@@ -367,7 +373,7 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
     SiopOpenId4VPConfig(
         jarmConfiguration = JarmConfiguration.Encryption(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
-            supportedMethods = listOf(EncryptionMethod.A256GCM),
+            supportedMethods = listOf(EncryptionMethod.A128CBC_HS256),
         ),
         supportedClientIdSchemes = supportedClientIdScheme,
     )

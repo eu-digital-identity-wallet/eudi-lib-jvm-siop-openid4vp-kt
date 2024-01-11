@@ -24,6 +24,7 @@ import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -33,6 +34,8 @@ import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
 import kotlin.test.Test
@@ -112,7 +115,7 @@ class AuthorizationResponseDispatcherTest {
                             assertEquals(stateVal, state)
                             assertEquals(idToken, idTokenTxt)
 
-                            call.respondText("ok")
+                            call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
                         }
                     }
                 }
@@ -184,7 +187,7 @@ class AuthorizationResponseDispatcherTest {
                                 Json.encodeToString<PresentationSubmission>(presentationSubmission),
                             )
 
-                            call.respondText("ok")
+                            call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
                         }
                     }
                 }

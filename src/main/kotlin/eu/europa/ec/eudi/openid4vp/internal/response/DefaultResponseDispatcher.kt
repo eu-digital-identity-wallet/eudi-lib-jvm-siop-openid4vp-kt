@@ -22,12 +22,13 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.*
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
 
@@ -55,29 +56,37 @@ internal class DefaultDispatcher(
      * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
      * @see DirectPostForm on how the given [response] is encoded into form data
      */
-    private suspend fun directPost(response: DirectPost): DispatchOutcome.VerifierResponse =
-        coroutineScope {
-            val parameters = DirectPostForm.of(response.data)
-                .let { form ->
-                    Parameters.build {
-                        form.entries.forEach { append(it.key, it.value) }
-                    }
+    private suspend fun directPost(response: DirectPost): DispatchOutcome.VerifierResponse = coroutineScope {
+        val parameters = DirectPostForm.of(response.data)
+            .let { form ->
+                Parameters.build {
+                    form.entries.forEach { append(it.key, it.value) }
                 }
-
-            val verifierResponse = submitForm(response.responseUri, parameters)
-            when (verifierResponse.status) {
-                HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
-                else -> DispatchOutcome.VerifierResponse.Rejected
             }
-        }
+
+        submitForm(response.responseUri, parameters)
+    }
 
     /**
      * Submits an HTTP Form to [url] with the provided [parameters].
      */
-    private suspend fun submitForm(url: URL, parameters: Parameters): HttpResponse =
-        httpClientFactory().use { client ->
-            client.submitForm(url.toExternalForm(), parameters)
+    private suspend fun submitForm(url: URL, parameters: Parameters): DispatchOutcome.VerifierResponse {
+        suspend fun HttpResponse.toVerifierResponse(): DispatchOutcome.VerifierResponse = when (status) {
+            HttpStatusCode.OK -> {
+                val redirectUri = body<JsonObject?>()
+                    ?.get("redirect_uri")
+                    ?.takeIf { it is JsonPrimitive }
+                    ?.jsonPrimitive?.contentOrNull
+                    ?.let { URI.create(it) }
+                DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+            }
+
+            else -> DispatchOutcome.VerifierResponse.Rejected
         }
+        return httpClientFactory().use { client ->
+            client.submitForm(url.toExternalForm(), parameters).toVerifierResponse()
+        }
+    }
 
     /**
      * Implements the direct_post.jwt method by performing a form-encoded HTTP post.
@@ -102,14 +111,7 @@ internal class DefaultDispatcher(
             append("state", response.data.state)
         }
 
-        val verifierResponse = submitForm(
-            response.responseUri,
-            parameters,
-        )
-        when (verifierResponse.status) {
-            HttpStatusCode.OK -> DispatchOutcome.VerifierResponse.Accepted(null)
-            else -> DispatchOutcome.VerifierResponse.Rejected
-        }
+        submitForm(response.responseUri, parameters)
     }
 
     override suspend fun encodeRedirectURI(

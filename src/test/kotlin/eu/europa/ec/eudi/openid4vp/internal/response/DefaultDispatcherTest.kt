@@ -43,13 +43,13 @@ import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -125,18 +125,39 @@ class DefaultDispatcherTest {
          * The verifier asserts that it receives an HTTP Post, which contains [FormDataContent], having
          * a parameter named `response`
          *
+         * @param responseBodyRedirectUri redirect uri to be included in the generate response body
          * @param responseParameterAssertions assertions applicable to the content of the form parameter
          * `response`
          */
-        fun createDispatcherWithVerifierAsserting(responseParameterAssertions: (String) -> Unit): Dispatcher {
+        fun createDispatcherWithVerifierAsserting(
+            responseBodyRedirectUri: URI? = null,
+            responseParameterAssertions: (String) -> Unit,
+        ): Dispatcher {
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
                 val body = assertIs<FormDataContent>(request.body)
                 val responseParameter = body.formData["response"] as String
                 responseParameterAssertions(responseParameter)
-                respondOk()
+
+                val response = buildJsonObject {
+                    responseBodyRedirectUri?.let { put("redirect_uri", JsonPrimitive(it.toString())) }
+                }.toString()
+
+                respond(
+                    response,
+                    HttpStatusCode.OK,
+                    headers { append(HttpHeaders.ContentType, ContentType.Application.Json) },
+                )
             }
-            return DefaultDispatcher(config) { HttpClient(mockEngine) }
+
+            val httpClient = HttpClient(mockEngine) {
+                expectSuccess = true
+                install(ContentNegotiation) {
+                    json()
+                }
+            }
+
+            return DefaultDispatcher(config) { httpClient }
         }
 
         val clientMetaDataValidator = ClientMetaDataValidator(DefaultHttpClientFactory)
@@ -172,54 +193,34 @@ class DefaultDispatcherTest {
 
         @Test
         fun `if response type direct_post jwt, JWE should be returned if only encryption info specified`() = runTest {
-            val verifierRequest = createOpenId4VPRequest(
-                Verifier.metaDataRequestingEncryptedResponse,
-                ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
-            )
-            val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                "dummy_vp_token",
-                PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
-            )
+            suspend fun test(redirectUri: URI? = null) {
+                val verifierRequest = createOpenId4VPRequest(
+                    Verifier.metaDataRequestingEncryptedResponse,
+                    ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
+                )
+                val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+                    "dummy_vp_token",
+                    PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                )
 
-            val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
-                val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
-                val jwtClaimSet = encryptedJwt.jwtClaimsSet
-                assertEquals(vpTokenConsensus.vpToken, jwtClaimSet.getClaim("vp_token"))
+                val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
+                    val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
+                    val jwtClaimSet = encryptedJwt.jwtClaimsSet
+                    assertEquals(vpTokenConsensus.vpToken, jwtClaimSet.getClaim("vp_token"))
+                }
+
+                val outcome = dispatcher.dispatch(verifierRequest, vpTokenConsensus)
+                val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+                assertEquals(expectedOutcome, outcome)
             }
 
-            val outcome = dispatcher.dispatch(verifierRequest, vpTokenConsensus)
-            val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(null)
-            assertEquals(expectedOutcome, outcome)
+            test()
+            test(URI.create("https://redirect.here"))
         }
 
         @Test
         fun `if response type direct_post jwt, JWT should be returned if only signing alg specified`(): Unit = runTest {
-            val verifiersRequest = createOpenId4VPRequest(
-                Verifier.metaDataRequestingSignedAndEncryptedResponse,
-                ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
-            )
-
-            val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                "dummy_vp_token",
-                PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
-            )
-
-            val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
-                val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
-                val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
-                assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
-                assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
-            }
-            val outcome = dispatcher.dispatch(verifiersRequest, vpTokenConsensus)
-            val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(null)
-            assertEquals(expectedOutcome, outcome)
-        }
-
-        @Test
-        @Suppress("ktlint")
-        fun `if response type direct_post jwt, JWT should be returned if only signing alg, encryption alg and encryption method are specified and supported by wallet`(): Unit =
-            runTest {
+            suspend fun test(redirectUri: URI? = null) {
                 val verifiersRequest = createOpenId4VPRequest(
                     Verifier.metaDataRequestingSignedAndEncryptedResponse,
                     ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
@@ -230,42 +231,82 @@ class DefaultDispatcherTest {
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
 
-                val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
+                val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                     assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
-
                 }
                 val outcome = dispatcher.dispatch(verifiersRequest, vpTokenConsensus)
-                val expected = DispatchOutcome.VerifierResponse.Accepted(null)
-                assertEquals(expected, outcome)
+                val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+                assertEquals(expectedOutcome, outcome)
+            }
+
+            test()
+            test(URI.create("https://redirect.here"))
+        }
+
+        @Test
+        @Suppress("ktlint")
+        fun `if response type direct_post jwt, JWT should be returned if only signing alg, encryption alg and encryption method are specified and supported by wallet`(): Unit =
+            runTest {
+                suspend fun test(redirectUri: URI? = null) {
+                    val verifiersRequest = createOpenId4VPRequest(
+                        Verifier.metaDataRequestingSignedAndEncryptedResponse,
+                        ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
+                    )
+
+                    val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+                        "dummy_vp_token",
+                        PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                    )
+
+                    val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
+                        val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
+                        val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
+                        assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
+                        assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
+                        assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
+
+                    }
+                    val outcome = dispatcher.dispatch(verifiersRequest, vpTokenConsensus)
+                    val expected = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+                    assertEquals(expected, outcome)
+                }
+
+                test()
+                test(URI.create("https://redirect.here"))
             }
 
         @Test
         fun `if verifier requires signed response, JARM signed JWT should be posted`() = runTest {
-            val verifierMetaData = UnvalidatedClientMetaData(
-                authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
-            )
-            val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
+            suspend fun test(redirectUri: URI? = null) {
+                val verifierMetaData = UnvalidatedClientMetaData(
+                    authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
+                )
+                val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
 
-            val resolvedRequest = createOpenId4VPRequest(verifierMetaData, responseMode)
-            val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                vpToken = "dummy_vp_token",
-                presentationSubmission = PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
-            )
+                val resolvedRequest = createOpenId4VPRequest(verifierMetaData, responseMode)
+                val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+                    vpToken = "dummy_vp_token",
+                    presentationSubmission = PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                )
 
-            val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
-                val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
-                assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
-                assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
+                val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
+                    val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
+                    assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
+                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
+                    assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
+                }
+
+                val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+                val outcome = dispatcher.dispatch(resolvedRequest, vpTokenConsensus)
+                assertEquals(expectedOutcome, outcome)
             }
 
-            val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(null)
-            val outcome = dispatcher.dispatch(resolvedRequest, vpTokenConsensus)
-            assertEquals(expectedOutcome, outcome)
+            test()
+            test(URI.create("https://redirect.here"))
         }
 
         private suspend fun createOpenId4VPRequest(

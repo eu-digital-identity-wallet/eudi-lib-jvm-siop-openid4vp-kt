@@ -24,9 +24,7 @@ import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.net.URI
@@ -43,10 +41,53 @@ internal class DefaultDispatcher(
     private val httpClientFactory: KtorHttpClientFactory,
 ) : Dispatcher {
 
-    override suspend fun post(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.VerifierResponse =
-        httpClientFactory().use { httpClient ->
-            httpClient.post(siopOpenId4VPConfig, request, consensus)
+    override suspend fun post(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+    ): DispatchOutcome.VerifierResponse {
+        val (responseUri, parameters) = formParameters(request, consensus)
+        return httpClientFactory().use { httpClient ->
+            submitForm(httpClient, responseUri, parameters)
         }
+    }
+
+    private fun formParameters(request: ResolvedRequestObject, consensus: Consensus) =
+        when (val response = request.responseWith(consensus)) {
+            is DirectPost -> {
+                val parameters = DirectPostForm.parametersOf(response.data)
+                response.responseUri to parameters
+            }
+            is DirectPostJwt -> {
+                val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
+                val parameters = DirectPostJwtForm.parametersOf(jarmJwt, response.data.state)
+                response.responseUri to parameters
+            }
+
+            else -> error("Unexpected response $response")
+        }
+
+    /**
+     * Submits an HTTP Form to [url] with the provided [parameters].
+     */
+    private suspend fun submitForm(
+        httpClient: HttpClient,
+        url: URL,
+        parameters: Parameters,
+    ): DispatchOutcome.VerifierResponse {
+        val response = httpClient.submitForm(url.toExternalForm(), parameters)
+        return when (response.status) {
+            HttpStatusCode.OK -> {
+                val redirectUri = response.body<JsonObject?>()
+                    ?.get("redirect_uri")
+                    ?.takeIf { it is JsonPrimitive }
+                    ?.jsonPrimitive?.contentOrNull
+                    ?.let { URI.create(it) }
+                DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+            }
+
+            else -> DispatchOutcome.VerifierResponse.Rejected
+        }
+    }
 
     override suspend fun encodeRedirectURI(
         request: ResolvedRequestObject,
@@ -61,78 +102,6 @@ internal class DefaultDispatcher(
         }
         return DispatchOutcome.RedirectURI(uri)
     }
-}
-
-private suspend fun HttpClient.post(
-    siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    request: ResolvedRequestObject,
-    consensus: Consensus,
-): DispatchOutcome.VerifierResponse = when (val response = request.responseWith(consensus)) {
-    is DirectPost -> directPost(response)
-    is DirectPostJwt -> directPostJwt(siopOpenId4VPConfig, response)
-    else -> error("Unexpected response $response")
-}
-
-/**
- * Implements the direct_post method by performing a form-encoded HTTP post
- * @param response the response to be communicated via direct_post
- * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
- * @see DirectPostForm on how the given [response] is encoded into form data
- */
-private suspend fun HttpClient.directPost(response: DirectPost): DispatchOutcome.VerifierResponse {
-    val parameters = DirectPostForm.of(response.data)
-        .let { form ->
-            Parameters.build {
-                form.entries.forEach { append(it.key, it.value) }
-            }
-        }
-    return submitForm(response.responseUri, parameters)
-}
-
-/**
- * Implements the direct_post.jwt method by performing a form-encoded HTTP post.
- * The posted form's payload is:
- * <ul>
- *     <li>'response' form param: Response data signed and/or encrypted as per [JARM][https://openid.net/specs/openid-financial-api-jarm.html] spec.</li>
- *     <li>'sate' form param: The state attribute as specified in authorization request</li>
- * </ul>
- * @param response the response to be communicated via direct_post.jwt
- * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
- * **See Also:** [JARM](https://openid.net/specs/openid-financial-api-jarm.html) specification for details regarding
- * response signing/encryption
- * **See Also:** [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-signed-and-encrypted-respon)
- * for details about direct_post.jwt response type
- */
-private suspend fun HttpClient.directPostJwt(
-    siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    response: DirectPostJwt,
-): DispatchOutcome.VerifierResponse = coroutineScope {
-    val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
-    val parameters = Parameters.build {
-        append("response", jarmJwt)
-        append("state", response.data.state)
-    }
-    submitForm(response.responseUri, parameters)
-}
-
-/**
- * Submits an HTTP Form to [url] with the provided [parameters].
- */
-private suspend fun HttpClient.submitForm(url: URL, parameters: Parameters): DispatchOutcome.VerifierResponse {
-    suspend fun HttpResponse.toVerifierResponse(): DispatchOutcome.VerifierResponse = when (status) {
-        HttpStatusCode.OK -> {
-            val redirectUri = body<JsonObject?>()
-                ?.get("redirect_uri")
-                ?.takeIf { it is JsonPrimitive }
-                ?.jsonPrimitive?.contentOrNull
-                ?.let { URI.create(it) }
-            DispatchOutcome.VerifierResponse.Accepted(redirectUri)
-        }
-
-        else -> DispatchOutcome.VerifierResponse.Rejected
-    }
-
-    return submitForm(url.toExternalForm(), parameters).toVerifierResponse()
 }
 
 internal fun Query.encodeRedirectURI(): URI =
@@ -189,6 +158,13 @@ internal object DirectPostForm {
     private const val ERROR_FORM_PARAM = "error"
     private const val ERROR_DESCRIPTION_FORM_PARAM = "error_description"
 
+    fun parametersOf(p: AuthorizationResponsePayload): Parameters =
+        of(p).let { form ->
+            Parameters.build {
+                form.entries.forEach { (name, value) -> append(name, value) }
+            }
+        }
+
     fun of(p: AuthorizationResponsePayload): Map<String, String> {
         fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
 
@@ -223,4 +199,12 @@ internal object DirectPostForm {
             )
         }
     }
+}
+
+internal object DirectPostJwtForm {
+    fun parametersOf(jarmJwt: Jwt, state: String): Parameters =
+        Parameters.build {
+            append("response", jarmJwt)
+            append("state", state)
+        }
 }

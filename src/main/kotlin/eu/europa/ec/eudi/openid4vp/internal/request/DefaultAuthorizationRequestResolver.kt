@@ -139,14 +139,30 @@ internal sealed interface FetchedRequest {
     data class JwtSecured(val clientId: String, val jwt: SignedJWT) : FetchedRequest
 }
 
-internal suspend fun HttpClient.resolveRequestUri(siopOpenId4VPConfig: SiopOpenId4VPConfig, uri: String): Resolution =
-    try {
-        val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
-        val fetchedRequest = fetchRequest(unvalidatedRequest)
-        val authenticatedRequest = authenticate(siopOpenId4VPConfig, fetchedRequest)
-        val validatedRequestObject = validateRequestObject(authenticatedRequest)
-        val resolved = resolveRequestObject(siopOpenId4VPConfig, validatedRequestObject)
-        Resolution.Success(resolved)
-    } catch (e: AuthorizationRequestException) {
-        Resolution.Invalid(e.error)
+internal class DefaultAuthorizationRequestResolver(
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    private val httpKtorHttpClientFactory: KtorHttpClientFactory,
+) : AuthorizationRequestResolver {
+
+    override suspend fun resolveRequestUri(uri: String): Resolution =
+        httpKtorHttpClientFactory().use { httpClient ->
+            resolveRequestUri(httpClient, uri)
+        }
+
+    private suspend fun resolveRequestUri(httpClient: HttpClient, uri: String): Resolution {
+        val requestFetcher = RequestFetcher(httpClient)
+        val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, httpClient)
+        val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, httpClient)
+
+        return try {
+            val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
+            val fetchedRequest = requestFetcher.fetchRequest(unvalidatedRequest)
+            val authenticatedRequest = requestAuthenticator.authenticate(fetchedRequest)
+            val validatedRequestObject = validateRequestObject(authenticatedRequest)
+            val resolved = requestObjectResolver.resolveRequestObject(validatedRequestObject)
+            Resolution.Success(resolved)
+        } catch (e: AuthorizationRequestException) {
+            Resolution.Invalid(e.error)
+        }
     }
+}

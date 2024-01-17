@@ -31,7 +31,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingNonce
-import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.*
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
@@ -160,7 +160,7 @@ class DefaultDispatcherTest {
             return DefaultDispatcher(config) { httpClient }
         }
 
-        val clientMetaDataValidator = ClientMetaDataValidator(DefaultHttpClientFactory)
+        val clientMetaDataValidator = ManagedClientMetaValidator(DefaultHttpClientFactory)
 
         fun String.assertIsJwtSignedByWallet(): JWTClaimsSet {
             val signedJWT = SignedJWT.parse(this)

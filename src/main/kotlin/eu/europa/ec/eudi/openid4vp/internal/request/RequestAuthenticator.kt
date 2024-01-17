@@ -35,6 +35,7 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -53,26 +54,15 @@ internal data class AuthenticatedRequest(
     val requestObject: UnvalidatedRequestObject,
 )
 
-internal class RequestAuthenticator(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory,
-) {
-
-    suspend fun authenticate(request: FetchedRequest): AuthenticatedRequest =
-        httpClientFactory().use { httpClient ->
-            httpClient.authenticate(siopOpenId4VPConfig, request)
-        }
-}
-
 internal suspend fun HttpClient.authenticate(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     request: FetchedRequest,
-): AuthenticatedRequest {
+): AuthenticatedRequest = coroutineScope {
     val clientAuthenticator = ClientAuthenticator(siopOpenId4VPConfig)
     val signatureVerifier = JarJwtSignatureVerifier(siopOpenId4VPConfig)
     val client = clientAuthenticator.authenticateClient(request)
 
-    return when (request) {
+    when (request) {
         is FetchedRequest.Plain -> {
             AuthenticatedRequest(client, request.requestObject)
         }
@@ -169,7 +159,7 @@ private class JarJwtSignatureVerifier(
 ) {
 
     @Throws(AuthorizationRequestException::class)
-    suspend fun HttpClient.verifySignature(client: AuthenticatedClient, signedJwt: SignedJWT) {
+    suspend fun HttpClient.verifySignature(client: AuthenticatedClient, signedJwt: SignedJWT): Unit = coroutineScope {
         try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType("oauth-authz-req+jwt"))
@@ -184,7 +174,9 @@ private class JarJwtSignatureVerifier(
     }
 
     @Throws(AuthorizationRequestException::class)
-    private suspend fun HttpClient.jwsKeySelector(client: AuthenticatedClient): JWSKeySelector<SecurityContext> =
+    private suspend fun HttpClient.jwsKeySelector(
+        client: AuthenticatedClient,
+    ): JWSKeySelector<SecurityContext> = coroutineScope {
         when (client) {
             is AuthenticatedClient.Preregistered ->
                 getPreRegisteredClientJwsSelector(client)
@@ -198,11 +190,12 @@ private class JarJwtSignatureVerifier(
             is AuthenticatedClient.RedirectUri ->
                 throw RequestValidationError.UnsupportedClientIdScheme.asException()
         }
+    }
 
     @Throws(AuthorizationRequestException::class)
     private suspend fun HttpClient.getPreRegisteredClientJwsSelector(
         preregistered: AuthenticatedClient.Preregistered,
-    ): JWSVerificationKeySelector<SecurityContext> {
+    ): JWSVerificationKeySelector<SecurityContext> = coroutineScope {
         val trustedClient = preregistered.preregisteredClient
         val jarConfig = checkNotNull(trustedClient.jarConfig)
 
@@ -219,7 +212,7 @@ private class JarJwtSignatureVerifier(
         }
 
         val jwkSource = getJWKSource()
-        return JWSVerificationKeySelector(jarSigningAlg, jwkSource)
+        JWSVerificationKeySelector(jarSigningAlg, jwkSource)
     }
 }
 

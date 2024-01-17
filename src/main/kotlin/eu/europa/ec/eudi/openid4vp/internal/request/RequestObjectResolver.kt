@@ -20,13 +20,14 @@ import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import io.ktor.client.*
+import kotlinx.coroutines.coroutineScope
 
 internal suspend fun HttpClient.resolveRequestObject(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     validated: ValidatedRequestObject,
-): ResolvedRequestObject {
+): ResolvedRequestObject = coroutineScope {
     val clientMetaData = resolveClientMetaData(validated)
-    return when (validated) {
+    when (validated) {
         is SiopAuthentication -> resolveIdTokenRequest(siopOpenId4VPConfig, validated, clientMetaData)
         is OpenId4VPAuthorization -> resolveVpTokenRequest(siopOpenId4VPConfig, validated, clientMetaData)
         is SiopOpenId4VPAuthentication -> resolveIdAndVpTokenRequest(siopOpenId4VPConfig, validated, clientMetaData)
@@ -37,9 +38,9 @@ private suspend fun HttpClient.resolveIdAndVpTokenRequest(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     request: SiopOpenId4VPAuthentication,
     clientMetaData: ValidatedClientMetaData,
-): ResolvedRequestObject {
+): ResolvedRequestObject = coroutineScope {
     val presentationDefinition = presentationDefinition(siopOpenId4VPConfig, request.presentationDefinitionSource)
-    return ResolvedRequestObject.SiopOpenId4VPAuthentication(
+    ResolvedRequestObject.SiopOpenId4VPAuthentication(
         clientId = request.clientId,
         responseMode = request.responseMode,
         state = request.state,
@@ -56,12 +57,12 @@ private suspend fun HttpClient.resolveVpTokenRequest(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     authorization: OpenId4VPAuthorization,
     clientMetaData: ValidatedClientMetaData,
-): ResolvedRequestObject {
+): ResolvedRequestObject = coroutineScope {
     val presentationDefinition = presentationDefinition(
         siopOpenId4VPConfig,
         authorization.presentationDefinitionSource,
     )
-    return ResolvedRequestObject.OpenId4VPAuthorization(
+    ResolvedRequestObject.OpenId4VPAuthorization(
         clientId = authorization.clientId,
         responseMode = authorization.responseMode,
         state = authorization.state,

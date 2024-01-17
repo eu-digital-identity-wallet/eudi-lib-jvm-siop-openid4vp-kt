@@ -21,6 +21,7 @@ import eu.europa.ec.eudi.prex.PresentationDefinition
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import kotlinx.coroutines.coroutineScope
 import java.net.URL
 
 /**
@@ -42,13 +43,15 @@ import java.net.URL
 internal suspend fun HttpClient.resolvePresentationDefinition(
     source: PresentationDefinitionSource,
     config: SiopOpenId4VPConfig,
-): PresentationDefinition = when (source) {
-    is ByValue -> source.presentationDefinition
-    is ByReference ->
-        if (config.vpConfiguration.presentationDefinitionUriSupported) fetchPresentationDefinition(source.url)
-        else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
+): PresentationDefinition = coroutineScope {
+    when (source) {
+        is ByValue -> source.presentationDefinition
+        is ByReference ->
+            if (config.vpConfiguration.presentationDefinitionUriSupported) fetchPresentationDefinition(source.url)
+            else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
 
-    is Implied -> lookupKnownPresentationDefinitions(source.scope, config)
+        is Implied -> lookupKnownPresentationDefinitions(source.scope, config)
+    }
 }
 
 private fun lookupKnownPresentationDefinitions(

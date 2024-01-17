@@ -54,22 +54,21 @@ internal data class AuthenticatedRequest(
     val requestObject: UnvalidatedRequestObject,
 )
 
-internal suspend fun HttpClient.authenticate(
-    siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    request: FetchedRequest,
-): AuthenticatedRequest = coroutineScope {
-    val clientAuthenticator = ClientAuthenticator(siopOpenId4VPConfig)
-    val signatureVerifier = JarJwtSignatureVerifier(siopOpenId4VPConfig)
-    val client = clientAuthenticator.authenticateClient(request)
+internal class RequestAuthenticator(siopOpenId4VPConfig: SiopOpenId4VPConfig, httpClient: HttpClient) {
+    private val clientAuthenticator = ClientAuthenticator(siopOpenId4VPConfig)
+    private val signatureVerifier = JarJwtSignatureVerifier(siopOpenId4VPConfig, httpClient)
 
-    when (request) {
-        is FetchedRequest.Plain -> {
-            AuthenticatedRequest(client, request.requestObject)
-        }
+    suspend fun authenticate(request: FetchedRequest): AuthenticatedRequest = coroutineScope {
+        val client = clientAuthenticator.authenticateClient(request)
+        when (request) {
+            is FetchedRequest.Plain -> {
+                AuthenticatedRequest(client, request.requestObject)
+            }
 
-        is FetchedRequest.JwtSecured -> {
-            with(signatureVerifier) { verifySignature(client, request.jwt) }
-            AuthenticatedRequest(client, request.jwt.requestObject())
+            is FetchedRequest.JwtSecured -> {
+                with(signatureVerifier) { verifySignature(client, request.jwt) }
+                AuthenticatedRequest(client, request.jwt.requestObject())
+            }
         }
     }
 }
@@ -156,10 +155,11 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
  */
 private class JarJwtSignatureVerifier(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    private val httpClient: HttpClient,
 ) {
 
     @Throws(AuthorizationRequestException::class)
-    suspend fun HttpClient.verifySignature(client: AuthenticatedClient, signedJwt: SignedJWT): Unit = coroutineScope {
+    suspend fun verifySignature(client: AuthenticatedClient, signedJwt: SignedJWT) {
         try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
                 jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType("oauth-authz-req+jwt"))
@@ -174,9 +174,7 @@ private class JarJwtSignatureVerifier(
     }
 
     @Throws(AuthorizationRequestException::class)
-    private suspend fun HttpClient.jwsKeySelector(
-        client: AuthenticatedClient,
-    ): JWSKeySelector<SecurityContext> = coroutineScope {
+    private suspend fun jwsKeySelector(client: AuthenticatedClient): JWSKeySelector<SecurityContext> =
         when (client) {
             is AuthenticatedClient.Preregistered ->
                 getPreRegisteredClientJwsSelector(client)
@@ -190,12 +188,11 @@ private class JarJwtSignatureVerifier(
             is AuthenticatedClient.RedirectUri ->
                 throw RequestValidationError.UnsupportedClientIdScheme.asException()
         }
-    }
 
     @Throws(AuthorizationRequestException::class)
-    private suspend fun HttpClient.getPreRegisteredClientJwsSelector(
+    private suspend fun getPreRegisteredClientJwsSelector(
         preregistered: AuthenticatedClient.Preregistered,
-    ): JWSVerificationKeySelector<SecurityContext> = coroutineScope {
+    ): JWSVerificationKeySelector<SecurityContext> {
         val trustedClient = preregistered.preregisteredClient
         val jarConfig = checkNotNull(trustedClient.jarConfig)
 
@@ -204,7 +201,7 @@ private class JarJwtSignatureVerifier(
             val jwkSet = when (jwkSetSource) {
                 is JwkSetSource.ByValue -> JWKSet.parse(jwkSetSource.jwks.toString())
                 is JwkSetSource.ByReference -> {
-                    val unparsed = get(jwkSetSource.jwksUri.toURL()).body<String>()
+                    val unparsed = httpClient.get(jwkSetSource.jwksUri.toURL()).body<String>()
                     JWKSet.parse(unparsed)
                 }
             }
@@ -212,7 +209,7 @@ private class JarJwtSignatureVerifier(
         }
 
         val jwkSource = getJWKSource()
-        JWSVerificationKeySelector(jarSigningAlg, jwkSource)
+        return JWSVerificationKeySelector(jarSigningAlg, jwkSource)
     }
 }
 

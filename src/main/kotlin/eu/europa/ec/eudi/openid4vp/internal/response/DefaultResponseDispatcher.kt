@@ -67,10 +67,12 @@ private suspend fun HttpClient.post(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     request: ResolvedRequestObject,
     consensus: Consensus,
-): DispatchOutcome.VerifierResponse = when (val response = request.responseWith(consensus)) {
-    is DirectPost -> directPost(response)
-    is DirectPostJwt -> directPostJwt(siopOpenId4VPConfig, response)
-    else -> error("Unexpected response $response")
+): DispatchOutcome.VerifierResponse = coroutineScope {
+    when (val response = request.responseWith(consensus)) {
+        is DirectPost -> directPost(response)
+        is DirectPostJwt -> directPostJwt(siopOpenId4VPConfig, response)
+        else -> error("Unexpected response $response")
+    }
 }
 
 /**
@@ -79,14 +81,14 @@ private suspend fun HttpClient.post(
  * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
  * @see DirectPostForm on how the given [response] is encoded into form data
  */
-private suspend fun HttpClient.directPost(response: DirectPost): DispatchOutcome.VerifierResponse {
+private suspend fun HttpClient.directPost(response: DirectPost): DispatchOutcome.VerifierResponse = coroutineScope {
     val parameters = DirectPostForm.of(response.data)
         .let { form ->
             Parameters.build {
                 form.entries.forEach { append(it.key, it.value) }
             }
         }
-    return submitForm(response.responseUri, parameters)
+    submitForm(response.responseUri, parameters)
 }
 
 /**
@@ -118,22 +120,25 @@ private suspend fun HttpClient.directPostJwt(
 /**
  * Submits an HTTP Form to [url] with the provided [parameters].
  */
-private suspend fun HttpClient.submitForm(url: URL, parameters: Parameters): DispatchOutcome.VerifierResponse {
-    suspend fun HttpResponse.toVerifierResponse(): DispatchOutcome.VerifierResponse = when (status) {
-        HttpStatusCode.OK -> {
-            val redirectUri = body<JsonObject?>()
-                ?.get("redirect_uri")
-                ?.takeIf { it is JsonPrimitive }
-                ?.jsonPrimitive?.contentOrNull
-                ?.let { URI.create(it) }
-            DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+private suspend fun HttpClient.submitForm(url: URL, parameters: Parameters): DispatchOutcome.VerifierResponse =
+    coroutineScope {
+        suspend fun HttpResponse.toVerifierResponse(): DispatchOutcome.VerifierResponse = coroutineScope {
+            when (status) {
+                HttpStatusCode.OK -> {
+                    val redirectUri = body<JsonObject?>()
+                        ?.get("redirect_uri")
+                        ?.takeIf { it is JsonPrimitive }
+                        ?.jsonPrimitive?.contentOrNull
+                        ?.let { URI.create(it) }
+                    DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+                }
+
+                else -> DispatchOutcome.VerifierResponse.Rejected
+            }
         }
 
-        else -> DispatchOutcome.VerifierResponse.Rejected
+        submitForm(url.toExternalForm(), parameters).toVerifierResponse()
     }
-
-    return submitForm(url.toExternalForm(), parameters).toVerifierResponse()
-}
 
 internal fun Query.encodeRedirectURI(): URI =
     with(redirectUri.toUri().buildUpon()) {

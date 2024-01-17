@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
-import eu.europa.ec.eudi.openid4vp.internal.request.resolveRequestUri
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import java.io.Serializable
 
@@ -282,14 +281,4 @@ fun interface AuthorizationRequestResolver {
      * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
     suspend fun resolveRequestUri(uri: String): Resolution
-
-    companion object {
-        operator fun invoke(
-            siopOpenId4VPConfig: SiopOpenId4VPConfig,
-            httpClientFactory: KtorHttpClientFactory,
-        ): AuthorizationRequestResolver =
-            AuthorizationRequestResolver { uri ->
-                httpClientFactory().use { httpClient -> httpClient.resolveRequestUri(siopOpenId4VPConfig, uri) }
-            }
-    }
 }

@@ -29,6 +29,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationExchange
@@ -98,7 +99,7 @@ class UnvalidatedRequestResolverTest {
         ),
     )
 
-    private val resolver = AuthorizationRequestResolver(walletConfig, DefaultHttpClientFactory)
+    private val resolver = DefaultAuthorizationRequestResolver(walletConfig, DefaultHttpClientFactory)
 
     private val clientMetadataJwksInline =
         """ {

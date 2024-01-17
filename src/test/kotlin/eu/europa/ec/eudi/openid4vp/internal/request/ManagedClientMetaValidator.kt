@@ -15,14 +15,18 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequestException
 import eu.europa.ec.eudi.openid4vp.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vp.ResponseMode
 
-internal class ClientMetaDataValidator(private val httpClientFactory: KtorHttpClientFactory) {
+internal class ManagedClientMetaValidator(
+    private val httpClientFactory: KtorHttpClientFactory,
+) {
 
-    @Throws(AuthorizationRequestException::class)
-    suspend fun validate(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): ValidatedClientMetaData {
-        return httpClientFactory().use { httpClient -> httpClient.validate(unvalidated, responseMode) }
-    }
+    suspend fun validate(
+        unvalidated: UnvalidatedClientMetaData,
+        responseMode: ResponseMode,
+    ): ValidatedClientMetaData =
+        httpClientFactory().use {
+            ClientMetaDataValidator(it).validate(unvalidated, responseMode)
+        }
 }

@@ -17,7 +17,7 @@ package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
@@ -64,7 +64,7 @@ class AuthorizationResponseDispatcherTest {
     fun `dispatch direct post response`() = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
 
         val stateVal = genState()
@@ -135,7 +135,7 @@ class AuthorizationResponseDispatcherTest {
     fun `dispatch vp_token with direct post`() = runTest {
         val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
         val validated = assertDoesNotThrow {
-            ClientMetaDataValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
         }
         val stateVal = genState()
 

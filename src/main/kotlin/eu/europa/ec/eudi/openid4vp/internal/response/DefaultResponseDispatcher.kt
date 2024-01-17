@@ -43,10 +43,88 @@ internal class DefaultDispatcher(
     private val httpClientFactory: KtorHttpClientFactory,
 ) : Dispatcher {
 
-    override suspend fun post(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.VerifierResponse =
+    override suspend fun post(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+    ): DispatchOutcome.VerifierResponse =
         httpClientFactory().use { httpClient ->
-            httpClient.post(siopOpenId4VPConfig, request, consensus)
+            when (val response = request.responseWith(consensus)) {
+                is DirectPost -> directPost(httpClient, response)
+                is DirectPostJwt -> directPostJwt(httpClient, response)
+                else -> error("Unexpected response $response")
+            }
         }
+
+    /**
+     * Implements the direct_post method by performing a form-encoded HTTP post
+     * @param response the response to be communicated via direct_post
+     * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
+     * @see DirectPostForm on how the given [response] is encoded into form data
+     */
+    private suspend fun directPost(
+        httpClient: HttpClient,
+        response: DirectPost,
+    ): DispatchOutcome.VerifierResponse {
+        val parameters = DirectPostForm.of(response.data)
+            .let { form ->
+                Parameters.build {
+                    form.entries.forEach { append(it.key, it.value) }
+                }
+            }
+        return submitForm(httpClient, response.responseUri, parameters)
+    }
+
+    /**
+     * Implements the direct_post.jwt method by performing a form-encoded HTTP post.
+     * The posted form's payload is:
+     * <ul>
+     *     <li>'response' form param: Response data signed and/or encrypted as per [JARM][https://openid.net/specs/openid-financial-api-jarm.html] spec.</li>
+     *     <li>'sate' form param: The state attribute as specified in authorization request</li>
+     * </ul>
+     * @param response the response to be communicated via direct_post.jwt
+     * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
+     * **See Also:** [JARM](https://openid.net/specs/openid-financial-api-jarm.html) specification for details regarding
+     * response signing/encryption
+     * **See Also:** [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-signed-and-encrypted-respon)
+     * for details about direct_post.jwt response type
+     */
+    private suspend fun directPostJwt(
+        httpClient: HttpClient,
+        response: DirectPostJwt,
+    ): DispatchOutcome.VerifierResponse = coroutineScope {
+        val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
+        val parameters = Parameters.build {
+            append("response", jarmJwt)
+            append("state", response.data.state)
+        }
+        submitForm(httpClient, response.responseUri, parameters)
+    }
+
+    /**
+     * Submits an HTTP Form to [url] with the provided [parameters].
+     */
+    private suspend fun submitForm(
+        httpClient: HttpClient,
+        url: URL,
+        parameters: Parameters,
+    ): DispatchOutcome.VerifierResponse {
+        suspend fun HttpResponse.toVerifierResponse(): DispatchOutcome.VerifierResponse {
+            return when (status) {
+                HttpStatusCode.OK -> {
+                    val redirectUri = body<JsonObject?>()
+                        ?.get("redirect_uri")
+                        ?.takeIf { it is JsonPrimitive }
+                        ?.jsonPrimitive?.contentOrNull
+                        ?.let { URI.create(it) }
+                    DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+                }
+
+                else -> DispatchOutcome.VerifierResponse.Rejected
+            }
+        }
+
+        return httpClient.submitForm(url.toExternalForm(), parameters).toVerifierResponse()
+    }
 
     override suspend fun encodeRedirectURI(
         request: ResolvedRequestObject,
@@ -62,83 +140,6 @@ internal class DefaultDispatcher(
         return DispatchOutcome.RedirectURI(uri)
     }
 }
-
-private suspend fun HttpClient.post(
-    siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    request: ResolvedRequestObject,
-    consensus: Consensus,
-): DispatchOutcome.VerifierResponse = coroutineScope {
-    when (val response = request.responseWith(consensus)) {
-        is DirectPost -> directPost(response)
-        is DirectPostJwt -> directPostJwt(siopOpenId4VPConfig, response)
-        else -> error("Unexpected response $response")
-    }
-}
-
-/**
- * Implements the direct_post method by performing a form-encoded HTTP post
- * @param response the response to be communicated via direct_post
- * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
- * @see DirectPostForm on how the given [response] is encoded into form data
- */
-private suspend fun HttpClient.directPost(response: DirectPost): DispatchOutcome.VerifierResponse = coroutineScope {
-    val parameters = DirectPostForm.of(response.data)
-        .let { form ->
-            Parameters.build {
-                form.entries.forEach { append(it.key, it.value) }
-            }
-        }
-    submitForm(response.responseUri, parameters)
-}
-
-/**
- * Implements the direct_post.jwt method by performing a form-encoded HTTP post.
- * The posted form's payload is:
- * <ul>
- *     <li>'response' form param: Response data signed and/or encrypted as per [JARM][https://openid.net/specs/openid-financial-api-jarm.html] spec.</li>
- *     <li>'sate' form param: The state attribute as specified in authorization request</li>
- * </ul>
- * @param response the response to be communicated via direct_post.jwt
- * @return the [response][DispatchOutcome.VerifierResponse] from the verifier
- * **See Also:** [JARM](https://openid.net/specs/openid-financial-api-jarm.html) specification for details regarding
- * response signing/encryption
- * **See Also:** [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-signed-and-encrypted-respon)
- * for details about direct_post.jwt response type
- */
-private suspend fun HttpClient.directPostJwt(
-    siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    response: DirectPostJwt,
-): DispatchOutcome.VerifierResponse = coroutineScope {
-    val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
-    val parameters = Parameters.build {
-        append("response", jarmJwt)
-        append("state", response.data.state)
-    }
-    submitForm(response.responseUri, parameters)
-}
-
-/**
- * Submits an HTTP Form to [url] with the provided [parameters].
- */
-private suspend fun HttpClient.submitForm(url: URL, parameters: Parameters): DispatchOutcome.VerifierResponse =
-    coroutineScope {
-        suspend fun HttpResponse.toVerifierResponse(): DispatchOutcome.VerifierResponse = coroutineScope {
-            when (status) {
-                HttpStatusCode.OK -> {
-                    val redirectUri = body<JsonObject?>()
-                        ?.get("redirect_uri")
-                        ?.takeIf { it is JsonPrimitive }
-                        ?.jsonPrimitive?.contentOrNull
-                        ?.let { URI.create(it) }
-                    DispatchOutcome.VerifierResponse.Accepted(redirectUri)
-                }
-
-                else -> DispatchOutcome.VerifierResponse.Rejected
-            }
-        }
-
-        submitForm(url.toExternalForm(), parameters).toVerifierResponse()
-    }
 
 internal fun Query.encodeRedirectURI(): URI =
     with(redirectUri.toUri().buildUpon()) {

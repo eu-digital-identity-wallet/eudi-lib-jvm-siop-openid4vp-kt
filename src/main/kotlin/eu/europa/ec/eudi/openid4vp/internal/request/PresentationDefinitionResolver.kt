@@ -18,58 +18,50 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.PresentationDefinitionSource.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import java.net.URL
 
 /**
  * Resolves a [PresentationDefinitionSource] into a [PresentationDefinition]
+ * If the [source] is
+ * - [PresentationDefinitionSource.ByValue] method returns [PresentationDefinitionSource.ByValue.presentationDefinition]
+ * - [PresentationDefinitionSource.ByReference] methods fetches presentation definition from verifier's [end-point][PresentationDefinitionSource.ByReference.url]
+ * - [PresentationDefinitionSource.Implied] method checks [config] to find a pre-agreed presentation definition
+ *
+ * Depending on the source the following [errors][ResolutionError] can be raised as [AuthorizationRequestException]
+ * - [ResolutionError.UnableToFetchPresentationDefinition]
+ * - [ResolutionError.FetchingPresentationDefinitionNotSupported]
+ * - [ResolutionError.PresentationDefinitionNotFoundForScope]
+ *
+ * @param source the source of presentation definition to be resolved
+ * @return the presentation definition or a [ResolutionError] wrapped within a [AuthorizationRequestException]
+ *
  */
-internal class PresentationDefinitionResolver(
-    private val httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
-) {
+internal suspend fun HttpClient.resolvePresentationDefinition(
+    source: PresentationDefinitionSource,
+    config: SiopOpenId4VPConfig,
+): PresentationDefinition = when (source) {
+    is ByValue -> source.presentationDefinition
+    is ByReference ->
+        if (config.vpConfiguration.presentationDefinitionUriSupported) fetchPresentationDefinition(source.url)
+        else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
 
-    /**
-     * Resolves a [PresentationDefinitionSource] into a [PresentationDefinition]
-     * If the [source] is
-     * - [PresentationDefinitionSource.ByValue] method returns [PresentationDefinitionSource.ByValue.presentationDefinition]
-     * - [PresentationDefinitionSource.ByReference] methods fetches presentation definition from verifier's [end-point][PresentationDefinitionSource.ByReference.url]
-     * - [PresentationDefinitionSource.Implied] method checks [config] to find a pre-agreed presentation definition
-     *
-     * Depending on the source the following [errors][ResolutionError] can be raised as [AuthorizationRequestException]
-     * - [ResolutionError.UnableToFetchPresentationDefinition]
-     * - [ResolutionError.FetchingPresentationDefinitionNotSupported]
-     * - [ResolutionError.PresentationDefinitionNotFoundForScope]
-     *
-     * @param source the source of presentation definition to be resolved
-     * @return the presentation definition or a [ResolutionError] wrapped within a [AuthorizationRequestException]
-     *
-     */
-    suspend fun resolve(
-        source: PresentationDefinitionSource,
-        config: SiopOpenId4VPConfig,
-    ): PresentationDefinition = when (source) {
-        is ByValue -> source.presentationDefinition
-        is ByReference ->
-            if (config.vpConfiguration.presentationDefinitionUriSupported) fetchPresentationDefinition(source.url)
-            else throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
-        is Implied -> lookupKnownPresentationDefinitions(source.scope, config)
-    }
-
-    private fun lookupKnownPresentationDefinitions(
-        scope: Scope,
-        config: SiopOpenId4VPConfig,
-    ): PresentationDefinition =
-        scope.items()
-            .firstNotNullOfOrNull { config.vpConfiguration.knownPresentationDefinitionsPerScope[it] }
-            ?: throw ResolutionError.PresentationDefinitionNotFoundForScope(scope).asException()
-
-    private suspend fun fetchPresentationDefinition(url: URL): PresentationDefinition =
-        httpClientFactory().use { client ->
-            try {
-                client.get(url).body()
-            } catch (t: Throwable) {
-                throw ResolutionError.UnableToFetchPresentationDefinition(t).asException()
-            }
-        }
+    is Implied -> lookupKnownPresentationDefinitions(source.scope, config)
 }
+
+private fun lookupKnownPresentationDefinitions(
+    scope: Scope,
+    config: SiopOpenId4VPConfig,
+): PresentationDefinition =
+    scope.items()
+        .firstNotNullOfOrNull { config.vpConfiguration.knownPresentationDefinitionsPerScope[it] }
+        ?: throw ResolutionError.PresentationDefinitionNotFoundForScope(scope).asException()
+
+private suspend fun HttpClient.fetchPresentationDefinition(url: URL): PresentationDefinition =
+    try {
+        get(url).body()
+    } catch (t: Throwable) {
+        throw ResolutionError.UnableToFetchPresentationDefinition(t).asException()
+    }

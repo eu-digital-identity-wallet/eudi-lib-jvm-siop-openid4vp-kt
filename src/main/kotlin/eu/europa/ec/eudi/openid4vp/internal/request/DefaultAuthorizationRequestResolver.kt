@@ -20,6 +20,7 @@ import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
+import io.ktor.client.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -138,32 +139,14 @@ internal sealed interface FetchedRequest {
     data class JwtSecured(val clientId: String, val jwt: SignedJWT) : FetchedRequest
 }
 
-internal class DefaultAuthorizationRequestResolver private constructor(
-    private val requestFetcher: RequestFetcher,
-    private val requestAuthenticator: RequestAuthenticator,
-    private val requestObjectResolver: RequestObjectResolver,
-) : AuthorizationRequestResolver {
-
-    /**
-     * Factory method for creating a [DefaultAuthorizationRequestResolver]
-     */
-    constructor(
-        siopOpenId4VPConfig: SiopOpenId4VPConfig,
-        httpClientFactory: KtorHttpClientFactory,
-    ) : this(
-        RequestFetcher(httpClientFactory),
-        RequestAuthenticator(siopOpenId4VPConfig, httpClientFactory),
-        RequestObjectResolver(siopOpenId4VPConfig, httpClientFactory),
-    )
-
-    override suspend fun resolveRequestUri(uri: String): Resolution = try {
+internal suspend fun HttpClient.resolveRequestUri(siopOpenId4VPConfig: SiopOpenId4VPConfig, uri: String): Resolution =
+    try {
         val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
-        val fetchedRequest = requestFetcher.fetch(unvalidatedRequest)
-        val authenticatedRequest = requestAuthenticator.authenticate(fetchedRequest)
+        val fetchedRequest = fetchRequest(unvalidatedRequest)
+        val authenticatedRequest = authenticate(siopOpenId4VPConfig, fetchedRequest)
         val validatedRequestObject = validateRequestObject(authenticatedRequest)
-        val resolved = requestObjectResolver.resolve(validatedRequestObject)
+        val resolved = resolveRequestObject(siopOpenId4VPConfig, validatedRequestObject)
         Resolution.Success(resolved)
     } catch (e: AuthorizationRequestException) {
         Resolution.Invalid(e.error)
     }
-}

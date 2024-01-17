@@ -15,95 +15,86 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import eu.europa.ec.eudi.openid4vp.KtorHttpClientFactory
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import io.ktor.client.*
 
-internal class RequestObjectResolver private constructor(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    private val presentationDefinitionResolver: PresentationDefinitionResolver,
-    private val clientMetadataValidator: ClientMetaDataValidator,
-) {
+internal suspend fun HttpClient.resolveRequestObject(
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    validated: ValidatedRequestObject,
+): ResolvedRequestObject {
+    val clientMetaData = resolveClientMetaData(validated)
+    return when (validated) {
+        is SiopAuthentication -> resolveIdTokenRequest(siopOpenId4VPConfig, validated, clientMetaData)
+        is OpenId4VPAuthorization -> resolveVpTokenRequest(siopOpenId4VPConfig, validated, clientMetaData)
+        is SiopOpenId4VPAuthentication -> resolveIdAndVpTokenRequest(siopOpenId4VPConfig, validated, clientMetaData)
+    }
+}
 
-    constructor(
-        siopOpenId4VPConfig: SiopOpenId4VPConfig,
-        httpClientFactory: KtorHttpClientFactory,
-    ) : this(
-        siopOpenId4VPConfig,
-        PresentationDefinitionResolver(httpClientFactory),
-        ClientMetaDataValidator(httpClientFactory),
+private suspend fun HttpClient.resolveIdAndVpTokenRequest(
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    request: SiopOpenId4VPAuthentication,
+    clientMetaData: ValidatedClientMetaData,
+): ResolvedRequestObject {
+    val presentationDefinition = presentationDefinition(siopOpenId4VPConfig, request.presentationDefinitionSource)
+    return ResolvedRequestObject.SiopOpenId4VPAuthentication(
+        clientId = request.clientId,
+        responseMode = request.responseMode,
+        state = request.state,
+        nonce = request.nonce,
+        jarmRequirement = siopOpenId4VPConfig.jarmRequirement(clientMetaData),
+        idTokenType = request.idTokenType,
+        subjectSyntaxTypesSupported = clientMetaData.subjectSyntaxTypesSupported,
+        scope = request.scope,
+        presentationDefinition = presentationDefinition,
     )
+}
 
-    suspend fun resolve(
-        validated: ValidatedRequestObject,
-    ): ResolvedRequestObject {
-        val clientMetaData = resolveClientMetaData(validated)
-        return with(siopOpenId4VPConfig) {
-            when (validated) {
-                is SiopAuthentication -> resolveIdTokenRequest(validated, clientMetaData)
-                is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, clientMetaData)
-                is SiopOpenId4VPAuthentication -> resolveIdAndVpTokenRequest(validated, clientMetaData)
-            }
-        }
-    }
+private suspend fun HttpClient.resolveVpTokenRequest(
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    authorization: OpenId4VPAuthorization,
+    clientMetaData: ValidatedClientMetaData,
+): ResolvedRequestObject {
+    val presentationDefinition = presentationDefinition(
+        siopOpenId4VPConfig,
+        authorization.presentationDefinitionSource,
+    )
+    return ResolvedRequestObject.OpenId4VPAuthorization(
+        clientId = authorization.clientId,
+        responseMode = authorization.responseMode,
+        state = authorization.state,
+        nonce = authorization.nonce,
+        jarmRequirement = siopOpenId4VPConfig.jarmRequirement(clientMetaData),
+        presentationDefinition = presentationDefinition,
+    )
+}
 
-    private suspend fun SiopOpenId4VPConfig.resolveIdAndVpTokenRequest(
-        request: SiopOpenId4VPAuthentication,
-        clientMetaData: ValidatedClientMetaData,
-    ): ResolvedRequestObject {
-        val presentationDefinition = presentationDefinition(request.presentationDefinitionSource)
-        return ResolvedRequestObject.SiopOpenId4VPAuthentication(
-            clientId = request.clientId,
-            responseMode = request.responseMode,
-            state = request.state,
-            nonce = request.nonce,
-            jarmRequirement = jarmRequirement(clientMetaData),
-            idTokenType = request.idTokenType,
-            subjectSyntaxTypesSupported = clientMetaData.subjectSyntaxTypesSupported,
-            scope = request.scope,
-            presentationDefinition = presentationDefinition,
-        )
-    }
+private fun resolveIdTokenRequest(
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    authentication: SiopAuthentication,
+    clientMetaData: ValidatedClientMetaData,
+): ResolvedRequestObject {
+    return ResolvedRequestObject.SiopAuthentication(
+        clientId = authentication.clientId,
+        responseMode = authentication.responseMode,
+        state = authentication.state,
+        nonce = authentication.nonce,
+        jarmRequirement = siopOpenId4VPConfig.jarmRequirement(clientMetaData),
+        idTokenType = authentication.idTokenType,
+        subjectSyntaxTypesSupported = clientMetaData.subjectSyntaxTypesSupported,
+        scope = authentication.scope,
+    )
+}
 
-    private suspend fun SiopOpenId4VPConfig.resolveVpTokenRequest(
-        authorization: OpenId4VPAuthorization,
-        clientMetaData: ValidatedClientMetaData,
-    ): ResolvedRequestObject {
-        val presentationDefinition = presentationDefinition(authorization.presentationDefinitionSource)
-        return ResolvedRequestObject.OpenId4VPAuthorization(
-            clientId = authorization.clientId,
-            responseMode = authorization.responseMode,
-            state = authorization.state,
-            nonce = authorization.nonce,
-            jarmRequirement = jarmRequirement(clientMetaData),
-            presentationDefinition = presentationDefinition,
-        )
-    }
+private suspend fun HttpClient.presentationDefinition(
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    presentationDefinitionSource: PresentationDefinitionSource,
+): PresentationDefinition =
+    resolvePresentationDefinition(presentationDefinitionSource, siopOpenId4VPConfig)
 
-    private fun SiopOpenId4VPConfig.resolveIdTokenRequest(
-        authentication: SiopAuthentication,
-        clientMetaData: ValidatedClientMetaData,
-    ): ResolvedRequestObject {
-        return ResolvedRequestObject.SiopAuthentication(
-            clientId = authentication.clientId,
-            responseMode = authentication.responseMode,
-            state = authentication.state,
-            nonce = authentication.nonce,
-            jarmRequirement = jarmRequirement(clientMetaData),
-            idTokenType = authentication.idTokenType,
-            subjectSyntaxTypesSupported = clientMetaData.subjectSyntaxTypesSupported,
-            scope = authentication.scope,
-        )
-    }
-
-    private suspend fun SiopOpenId4VPConfig.presentationDefinition(
-        presentationDefinitionSource: PresentationDefinitionSource,
-    ): PresentationDefinition = presentationDefinitionResolver.resolve(presentationDefinitionSource, this)
-
-    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData {
-        val source = checkNotNull(validated.clientMetaDataSource) { "Missing or invalid client metadata" }
-        return clientMetadataValidator.validate(source, validated.responseMode)
-    }
+private suspend fun HttpClient.resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData {
+    val source = checkNotNull(validated.clientMetaDataSource) { "Missing or invalid client metadata" }
+    return validateClientMetaData(source, validated.responseMode)
 }

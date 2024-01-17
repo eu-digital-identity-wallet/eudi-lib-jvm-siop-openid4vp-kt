@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcher
 
 /**
@@ -47,7 +46,7 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, Dispatcher {
             siopOpenId4VPConfig: SiopOpenId4VPConfig,
             httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
         ): SiopOpenId4Vp {
-            val requestResolver = DefaultAuthorizationRequestResolver(siopOpenId4VPConfig, httpClientFactory)
+            val requestResolver = AuthorizationRequestResolver(siopOpenId4VPConfig, httpClientFactory)
             val dispatcher = DefaultDispatcher(siopOpenId4VPConfig, httpClientFactory)
             return object :
                 AuthorizationRequestResolver by requestResolver,

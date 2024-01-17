@@ -24,7 +24,6 @@ import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*

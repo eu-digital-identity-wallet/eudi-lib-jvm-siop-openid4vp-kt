@@ -24,6 +24,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.ResolutionError.ClientMetadataJwkResolutionFailed
 import eu.europa.ec.eudi.openid4vp.ResolutionError.UnableToFetchClientMetadata
 import eu.europa.ec.eudi.openid4vp.internal.ensure
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.SerializationException
@@ -33,86 +34,79 @@ import java.net.URL
 import java.text.ParseException
 
 /**
- * Resolves the client meta-data and validates them
+ * Gets the meta-data from the [clientMetaDataSource] and then validates them
+ * @param clientMetaDataSource the source to obtain the meta-data
+ * @param responseMode the response mode under which the meta-data should be validated
+ * @throws AuthorizationRequestException in case of a problem
  */
-internal class ClientMetaDataValidator(private val httpClientFactory: KtorHttpClientFactory) {
+@Throws(AuthorizationRequestException::class)
+internal suspend fun HttpClient.validateClientMetaData(
+    clientMetaDataSource: ClientMetaDataSource,
+    responseMode: ResponseMode,
+): ValidatedClientMetaData {
+    val unvalidatedClientMetaData = resolveClientMetaData(clientMetaDataSource)
+    return validate(unvalidatedClientMetaData, responseMode)
+}
 
-    /**
-     * Gets the meta-data from the [clientMetaDataSource] and then validates them
-     * @param clientMetaDataSource the source to obtain the meta-data
-     * @param responseMode the response mode under which the meta-data should be validated
-     * @throws AuthorizationRequestException in case of a problem
-     */
-    @Throws(AuthorizationRequestException::class)
-    suspend fun validate(
-        clientMetaDataSource: ClientMetaDataSource,
-        responseMode: ResponseMode,
-    ): ValidatedClientMetaData {
-        val unvalidatedClientMetaData = resolve(clientMetaDataSource)
-        return validate(unvalidatedClientMetaData, responseMode)
+private suspend fun HttpClient.resolveClientMetaData(clientMetaDataSource: ClientMetaDataSource): UnvalidatedClientMetaData =
+    when (clientMetaDataSource) {
+        is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
+        is ClientMetaDataSource.ByReference -> try {
+            get(clientMetaDataSource.url).body<UnvalidatedClientMetaData>()
+        } catch (t: IOException) {
+            throw UnableToFetchClientMetadata(t).asException()
+        } catch (t: SerializationException) {
+            throw UnableToFetchClientMetadata(t).asException()
+        }
     }
 
-    private suspend fun resolve(clientMetaDataSource: ClientMetaDataSource): UnvalidatedClientMetaData =
-        when (clientMetaDataSource) {
-            is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
-            is ClientMetaDataSource.ByReference -> httpClientFactory().use { client ->
-                try {
-                    client.get(clientMetaDataSource.url).body<UnvalidatedClientMetaData>()
-                } catch (t: IOException) {
-                    throw UnableToFetchClientMetadata(t).asException()
-                } catch (t: SerializationException) {
-                    throw UnableToFetchClientMetadata(t).asException()
-                }
-            }
-        }
-
-    @Throws(AuthorizationRequestException::class)
-    suspend fun validate(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): ValidatedClientMetaData {
-        val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
-        val authSgnRespAlg = authSgnRespAlg(unvalidated, responseMode)
-        val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated, responseMode)
-        val requiresEncryption = responseMode.isJarm() && null != authEncRespAlg && authEncRespEnc != null
-        val jwkSets = if (requiresEncryption) jwkSet(unvalidated) else null
-        ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
-            RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
-        }
-
-        return ValidatedClientMetaData(
-            jwkSet = jwkSets,
-            subjectSyntaxTypesSupported = types,
-            authorizationSignedResponseAlg = authSgnRespAlg,
-            authorizationEncryptedResponseAlg = authEncRespAlg,
-            authorizationEncryptedResponseEnc = authEncRespEnc,
-        )
+@Throws(AuthorizationRequestException::class)
+internal suspend fun HttpClient.validate(
+    unvalidated: UnvalidatedClientMetaData,
+    responseMode: ResponseMode,
+): ValidatedClientMetaData {
+    val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
+    val authSgnRespAlg = authSgnRespAlg(unvalidated, responseMode)
+    val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated, responseMode)
+    val requiresEncryption = responseMode.isJarm() && null != authEncRespAlg && authEncRespEnc != null
+    val jwkSets = if (requiresEncryption) jwkSet(unvalidated) else null
+    ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
+        RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
     }
 
-    private suspend fun jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet {
-        val jwks = clientMetadata.jwks
-        val jwksUri = clientMetadata.jwksUri
+    return ValidatedClientMetaData(
+        jwkSet = jwkSets,
+        subjectSyntaxTypesSupported = types,
+        authorizationSignedResponseAlg = authSgnRespAlg,
+        authorizationEncryptedResponseAlg = authEncRespAlg,
+        authorizationEncryptedResponseEnc = authEncRespEnc,
+    )
+}
 
-        fun JsonObject.asJWKSet(): JWKSet = try {
-            JWKSet.parse(this.toString())
-        } catch (ex: ParseException) {
-            throw ResolutionError.ClientMetadataJwkUriUnparsable(ex).asException()
-        }
+private suspend fun HttpClient.jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet {
+    val jwks = clientMetadata.jwks
+    val jwksUri = clientMetadata.jwksUri
 
-        suspend fun requiredJwksUri() = httpClientFactory().use { client ->
-            try {
-                val unparsed = client.get(URL(jwksUri)).body<String>()
-                JWKSet.parse(unparsed)
-            } catch (ex: IOException) {
-                throw ClientMetadataJwkResolutionFailed(ex).asException()
-            } catch (ex: ParseException) {
-                throw ClientMetadataJwkResolutionFailed(ex).asException()
-            }
-        }
+    fun JsonObject.asJWKSet(): JWKSet = try {
+        JWKSet.parse(this.toString())
+    } catch (ex: ParseException) {
+        throw ResolutionError.ClientMetadataJwkUriUnparsable(ex).asException()
+    }
 
-        return when (!jwks.isNullOrEmpty() to !jwksUri.isNullOrEmpty()) {
-            false to false -> throw RequestValidationError.MissingClientMetadataJwksSource.asException()
-            true to true -> throw RequestValidationError.BothJwkUriAndInlineJwks.asException()
-            true to false -> checkNotNull(jwks).asJWKSet()
-            else -> requiredJwksUri()
-        }
+    suspend fun requiredJwksUri() = try {
+        val unparsed = get(URL(jwksUri)).body<String>()
+        JWKSet.parse(unparsed)
+    } catch (ex: IOException) {
+        throw ClientMetadataJwkResolutionFailed(ex).asException()
+    } catch (ex: ParseException) {
+        throw ClientMetadataJwkResolutionFailed(ex).asException()
+    }
+
+    return when (!jwks.isNullOrEmpty() to !jwksUri.isNullOrEmpty()) {
+        false to false -> throw RequestValidationError.MissingClientMetadataJwksSource.asException()
+        true to true -> throw RequestValidationError.BothJwkUriAndInlineJwks.asException()
+        true to false -> checkNotNull(jwks).asJWKSet()
+        else -> requiredJwksUri()
     }
 }
 

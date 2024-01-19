@@ -57,6 +57,7 @@ internal class DefaultDispatcher(
                 val parameters = DirectPostForm.parametersOf(response.data)
                 response.responseUri to parameters
             }
+
             is DirectPostJwt -> {
                 val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
                 val parameters = DirectPostJwtForm.parametersOf(jarmJwt, response.data.state)
@@ -77,11 +78,16 @@ internal class DefaultDispatcher(
         val response = httpClient.submitForm(url.toExternalForm(), parameters)
         return when (response.status) {
             HttpStatusCode.OK -> {
-                val redirectUri = response.body<JsonObject?>()
-                    ?.get("redirect_uri")
-                    ?.takeIf { it is JsonPrimitive }
-                    ?.jsonPrimitive?.contentOrNull
-                    ?.let { URI.create(it) }
+                val redirectUri =
+                    try {
+                        response.body<JsonObject?>()
+                            ?.get("redirect_uri")
+                            ?.takeIf { it is JsonPrimitive }
+                            ?.jsonPrimitive?.contentOrNull
+                            ?.let { URI.create(it) }
+                    } catch (t: NoTransformationFoundException) {
+                        null
+                    }
                 DispatchOutcome.VerifierResponse.Accepted(redirectUri)
             }
 

@@ -12,7 +12,7 @@ java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.10"
 maven-publish = "0.25.3"
-fasterxml-jackson = "2.15.2"
+fasterxml-jackson = "2.16.1"
 bouncyCastle = "1.77"
 
 [libraries]

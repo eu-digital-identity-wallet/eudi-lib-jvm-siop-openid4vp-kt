@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequestError
+import eu.europa.ec.eudi.openid4vp.HttpError
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
 import eu.europa.ec.eudi.openid4vp.ResolutionError.*
 
@@ -75,6 +76,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is UnsupportedResponseType,
                 is UnsupportedClientMetaData,
                 is InvalidIdTokenType,
+                is HttpError,
                 -> INVALID_REQUEST
 
                 BothJwkUriAndInlineJwks,

@@ -86,6 +86,8 @@ sealed interface ResolvedRequestObject : Serializable {
  */
 sealed interface AuthorizationRequestError : Serializable
 
+data class HttpError(val cause: Throwable) : AuthorizationRequestError
+
 /**
  * Validation errors that can occur while validating an authorization request
  */

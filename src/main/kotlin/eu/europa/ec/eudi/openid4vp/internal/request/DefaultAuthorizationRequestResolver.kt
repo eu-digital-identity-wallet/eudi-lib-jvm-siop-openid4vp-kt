@@ -21,6 +21,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
 import io.ktor.client.*
+import io.ktor.client.plugins.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -163,6 +164,8 @@ internal class DefaultAuthorizationRequestResolver(
             Resolution.Success(resolved)
         } catch (e: AuthorizationRequestException) {
             Resolution.Invalid(e.error)
+        } catch (e: ClientRequestException) {
+            Resolution.Invalid(HttpError(e))
         }
     }
 }

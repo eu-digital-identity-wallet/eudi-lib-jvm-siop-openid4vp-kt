@@ -26,6 +26,7 @@ import java.net.URL
  */
 internal sealed interface AuthorizationResponsePayload : Serializable {
 
+    val nonce: String
     val state: String
     val clientId: String
 
@@ -40,6 +41,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      */
     data class SiopAuthentication(
         val idToken: Jwt,
+        override val nonce: String,
         override val state: String,
         override val clientId: String,
     ) : Success
@@ -57,6 +59,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
     data class OpenId4VPAuthorization(
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
+        override val nonce: String,
         override val state: String,
         override val clientId: String,
     ) : Success
@@ -76,6 +79,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val idToken: Jwt,
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
+        override val nonce: String,
         override val state: String,
         override val clientId: String,
     ) : Success
@@ -89,6 +93,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      */
     data class InvalidRequest(
         val error: AuthorizationRequestError,
+        override val nonce: String,
         override val state: String,
         override val clientId: String,
     ) : Failed
@@ -99,6 +104,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * @param state the state of the [request][ResolvedRequestObject.state]
      */
     data class NoConsensusResponseData(
+        override val nonce: String,
         override val state: String,
         override val clientId: String,
     ) : Failed
@@ -192,12 +198,13 @@ internal fun ResolvedRequestObject.responseWith(
 private fun ResolvedRequestObject.responsePayload(
     consensus: Consensus,
 ): AuthorizationResponsePayload = when (consensus) {
-    is Consensus.NegativeConsensus -> AuthorizationResponsePayload.NoConsensusResponseData(state, clientId)
+    is Consensus.NegativeConsensus -> AuthorizationResponsePayload.NoConsensusResponseData(nonce, state, clientId)
     is Consensus.PositiveConsensus -> when (this) {
         is ResolvedRequestObject.SiopAuthentication -> {
             require(consensus is Consensus.PositiveConsensus.IdTokenConsensus) { "IdTokenConsensus expected" }
             AuthorizationResponsePayload.SiopAuthentication(
                 consensus.idToken,
+                nonce,
                 state,
                 clientId,
             )
@@ -208,6 +215,7 @@ private fun ResolvedRequestObject.responsePayload(
             AuthorizationResponsePayload.OpenId4VPAuthorization(
                 consensus.vpToken,
                 consensus.presentationSubmission,
+                nonce,
                 state,
                 clientId,
             )
@@ -219,6 +227,7 @@ private fun ResolvedRequestObject.responsePayload(
                 consensus.idToken,
                 consensus.vpToken,
                 consensus.presentationSubmission,
+                nonce,
                 state,
                 clientId,
             )

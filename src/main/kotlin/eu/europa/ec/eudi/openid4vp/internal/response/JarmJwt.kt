@@ -23,6 +23,7 @@ import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
@@ -81,7 +82,10 @@ private fun SiopOpenId4VPConfig.encrypt(
 
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = requirement
     val jweEncrypter = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
-    val jweHeader = JWEHeader(jweAlgorithm, encryptionMethod)
+    val jweHeader = JWEHeader.Builder(jweAlgorithm, encryptionMethod)
+        .agreementPartyVInfo(Base64URL(data.nonce))
+        .build()
+
     val claimSet = JwtPayloadFactory.create(data, issuer, Instant.now())
     return EncryptedJWT(jweHeader, claimSet).apply { encrypt(jweEncrypter) }
 }

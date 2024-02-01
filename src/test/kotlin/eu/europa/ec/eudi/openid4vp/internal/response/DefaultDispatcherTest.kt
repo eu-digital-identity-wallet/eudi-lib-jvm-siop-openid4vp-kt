@@ -338,7 +338,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() {
-            val data = AuthorizationResponsePayload.NoConsensusResponseData(State().value, "client_id")
+            val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), genState(), "client_id")
             val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
             response.encodeRedirectURI().assertQueryURIContainsStateAnd(data.state) {
                 assertEquals(
@@ -350,7 +350,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when invalid request, redirect_uri must contain an error query parameter`() {
-            val data = AuthorizationResponsePayload.InvalidRequest(MissingNonce, genState(), "client_id")
+            val data = AuthorizationResponsePayload.InvalidRequest(MissingNonce, generateNonce(), genState(), "client_id")
             val response = AuthorizationResponse.Query(redirectUriBase, data)
             val redirectURI = response.encodeRedirectURI()
 
@@ -362,7 +362,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when response for SIOPAuthentication, redirect_uri must contain an id_token query parameter`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", genState(), "client_id")
+            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
             val response = AuthorizationResponse.Query(redirectUriBase, data)
             val redirectURI = response.encodeRedirectURI()
 
@@ -373,7 +373,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", genState(), "client_id")
+            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
             val response = AuthorizationResponse.QueryJwt(
                 redirectUriBase,
                 data,
@@ -404,7 +404,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when no consensus, fragment must contain an error`() {
-            val data = AuthorizationResponsePayload.NoConsensusResponseData(genState(), "client_id")
+            val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), genState(), "client_id")
             val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 
             response.encodeRedirectURI().assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
@@ -416,6 +416,7 @@ class DefaultDispatcherTest {
         fun `when invalid request, fragment must contain an error`() {
             val data = AuthorizationResponsePayload.InvalidRequest(
                 MissingNonce,
+                generateNonce(),
                 genState(),
                 "client_id",
             )
@@ -429,7 +430,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when SIOPAuthentication, fragment must contain an id_token`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", genState(), "client_id")
+            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
             val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
             response.encodeRedirectURI().assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
                 assertEquals(data.idToken, fragmentData["id_token"])
@@ -438,7 +439,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", genState(), "client_id")
+            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
             val response =
                 AuthorizationResponse.FragmentJwt(
                     redirectUri = redirectUriBase,

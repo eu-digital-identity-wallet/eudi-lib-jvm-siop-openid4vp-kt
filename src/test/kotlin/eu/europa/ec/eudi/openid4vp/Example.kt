@@ -51,7 +51,7 @@ import javax.net.ssl.X509TrustManager
  * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
  */
 fun main(): Unit = runBlocking {
-    val verifierApi = URL("http://localhost:8080")
+    val verifierApi = URL("https://dev.verifier-backend.eudiw.dev")
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,

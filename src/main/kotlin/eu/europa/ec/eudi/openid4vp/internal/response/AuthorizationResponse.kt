@@ -27,7 +27,7 @@ import java.net.URL
 internal sealed interface AuthorizationResponsePayload : Serializable {
 
     val nonce: String
-    val state: String
+    val state: String?
     val clientId: String
 
     sealed interface Success : AuthorizationResponsePayload
@@ -42,7 +42,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
     data class SiopAuthentication(
         val idToken: Jwt,
         override val nonce: String,
-        override val state: String,
+        override val state: String?,
         override val clientId: String,
     ) : Success
 
@@ -60,7 +60,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
         override val nonce: String,
-        override val state: String,
+        override val state: String?,
         override val clientId: String,
     ) : Success
 
@@ -80,7 +80,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val vpToken: VpToken,
         val presentationSubmission: PresentationSubmission,
         override val nonce: String,
-        override val state: String,
+        override val state: String?,
         override val clientId: String,
     ) : Success
 
@@ -94,7 +94,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
     data class InvalidRequest(
         val error: AuthorizationRequestError,
         override val nonce: String,
-        override val state: String,
+        override val state: String?,
         override val clientId: String,
     ) : Failed
 
@@ -105,7 +105,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      */
     data class NoConsensusResponseData(
         override val nonce: String,
-        override val state: String,
+        override val state: String?,
         override val clientId: String,
     ) : Failed
 }

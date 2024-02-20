@@ -26,7 +26,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.request.*
+import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
@@ -38,7 +38,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.assertDoesNotThrow
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class AuthorizationResponseBuilderTest {
 
@@ -87,73 +90,83 @@ class AuthorizationResponseBuilderTest {
 
     @Test
     fun `id token request should produce a response with id token JWT`(): Unit = runTest {
-        val verifierMetaData = Wallet.clientMetaDataValidator.validate(
-            Verifier.metaDataRequestingNotEncryptedResponse,
-            ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
-        )
-
-        val siopAuthRequestObject =
-            ResolvedRequestObject.SiopAuthentication(
-                idTokenType = listOf(IdTokenType.AttesterSigned),
-                subjectSyntaxTypesSupported = verifierMetaData.subjectSyntaxTypesSupported,
-                jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
-                clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
-                nonce = "0S6_WzA2Mj",
-                responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
-                state = genState(),
-                scope = Scope.make("openid") ?: throw IllegalStateException(),
+        suspend fun test(state: String? = null) {
+            val verifierMetaData = Wallet.clientMetaDataValidator.validate(
+                Verifier.metaDataRequestingNotEncryptedResponse,
+                ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
             )
 
-        val rsaJWK = SiopIdTokenBuilder.randomKey()
+            val siopAuthRequestObject =
+                ResolvedRequestObject.SiopAuthentication(
+                    idTokenType = listOf(IdTokenType.AttesterSigned),
+                    subjectSyntaxTypesSupported = verifierMetaData.subjectSyntaxTypesSupported,
+                    jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
+                    clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
+                    nonce = "0S6_WzA2Mj",
+                    responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
+                    state = state,
+                    scope = Scope.make("openid") ?: throw IllegalStateException(),
+                )
 
-        val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
-            idToken = SiopIdTokenBuilder.build(
-                request = siopAuthRequestObject,
-                holderInfo = HolderInfo("foo@bar.com", "foo bar"),
-                rsaJWK = rsaJWK,
-            ),
-        )
+            val rsaJWK = SiopIdTokenBuilder.randomKey()
 
-        val response = siopAuthRequestObject.responseWith(idTokenConsensus)
-        assertIs<AuthorizationResponse.DirectPost>(response)
-        val data = response.data
-        assertIs<AuthorizationResponsePayload.SiopAuthentication>(data)
-        val idToken = data.idToken
-        assertTrue("Id Token signature could not be verified") {
-            SignedJWT.parse(idToken).verify(RSASSAVerifier(rsaJWK))
+            val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
+                idToken = SiopIdTokenBuilder.build(
+                    request = siopAuthRequestObject,
+                    holderInfo = HolderInfo("foo@bar.com", "foo bar"),
+                    rsaJWK = rsaJWK,
+                ),
+            )
+
+            val response = siopAuthRequestObject.responseWith(idTokenConsensus)
+            assertIs<AuthorizationResponse.DirectPost>(response)
+            val data = response.data
+            assertIs<AuthorizationResponsePayload.SiopAuthentication>(data)
+            val idToken = data.idToken
+            assertTrue("Id Token signature could not be verified") {
+                SignedJWT.parse(idToken).verify(RSASSAVerifier(rsaJWK))
+            }
         }
+
+        test(genState())
+        test()
     }
 
     @Test
     fun `when direct_post jwt, builder should return DirectPostJwt with JarmSpec of correct type`() = runTest {
-        val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
-        val verifierMetaData = assertDoesNotThrow {
-            Wallet.clientMetaDataValidator.validate(Verifier.metaDataRequestingEncryptedResponse, responseMode)
+        suspend fun test(state: String? = null) {
+            val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
+            val verifierMetaData = assertDoesNotThrow {
+                Wallet.clientMetaDataValidator.validate(Verifier.metaDataRequestingEncryptedResponse, responseMode)
+            }
+
+            val resolvedRequest =
+                ResolvedRequestObject.OpenId4VPAuthorization(
+                    presentationDefinition = PresentationDefinition(
+                        id = Id("pdId"),
+                        inputDescriptors = emptyList(),
+                    ),
+                    jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
+                    clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
+                    nonce = "0S6_WzA2Mj",
+                    responseMode = responseMode,
+                    state = state,
+                )
+
+            val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+                "dummy_vp_token",
+                PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+            )
+            val response = resolvedRequest.responseWith(vpTokenConsensus)
+
+            assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
+            assertIs<AuthorizationResponse.DirectPostJwt>(response)
+            val jarmOption = response.jarmRequirement
+            assertNotNull(jarmOption)
+            assertIs<JarmRequirement.Encrypted>(jarmOption)
         }
 
-        val resolvedRequest =
-            ResolvedRequestObject.OpenId4VPAuthorization(
-                presentationDefinition = PresentationDefinition(
-                    id = Id("pdId"),
-                    inputDescriptors = emptyList(),
-                ),
-                jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
-                clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
-                nonce = "0S6_WzA2Mj",
-                responseMode = responseMode,
-                state = genState(),
-            )
-
-        val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-            "dummy_vp_token",
-            PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
-        )
-        val response = resolvedRequest.responseWith(vpTokenConsensus)
-
-        assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
-        assertIs<AuthorizationResponse.DirectPostJwt>(response)
-        val jarmOption = response.jarmRequirement
-        assertNotNull(jarmOption)
-        assertIs<JarmRequirement.Encrypted>(jarmOption)
+        test(genState())
+        test()
     }
 }

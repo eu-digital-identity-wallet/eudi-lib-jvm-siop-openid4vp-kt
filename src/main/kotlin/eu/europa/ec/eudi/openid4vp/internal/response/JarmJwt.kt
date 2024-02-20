@@ -32,7 +32,6 @@ import eu.europa.ec.eudi.openid4vp.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.time.Instant
-import kotlin.jvm.Throws
 
 /**
  * Creates according to the [verifier's requirements][jarmRequirement], a JARM JWT which encapsulates
@@ -127,7 +126,9 @@ private object JwtPayloadFactory {
             issuer?.let { put("iss", it.value) }
             put("iat", issuedAt.epochSecond)
             put("aud", data.clientId)
-            put(STATE_CLAIM, data.state)
+            data.state?.let {
+                put(STATE_CLAIM, it)
+            }
 
             when (data) {
                 is AuthorizationResponsePayload.SiopAuthentication -> {

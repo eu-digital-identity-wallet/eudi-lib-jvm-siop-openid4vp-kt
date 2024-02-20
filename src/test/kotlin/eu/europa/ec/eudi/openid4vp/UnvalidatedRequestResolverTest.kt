@@ -124,57 +124,71 @@ class UnvalidatedRequestResolverTest {
 
     @Test
     fun `vp token auth request`() = runTest {
-        val authRequest =
-            "https://client.example.org/universal-link?" +
-                "response_type=vp_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&presentation_definition=$pd" +
-                "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=vp_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&presentation_definition=$pd" +
+                    "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
+            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
 
-        resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        test(genState())
+        test()
     }
 
     @Test
     fun `id token auth request`() = runTest {
-        val authRequest =
-            "https://client.example.org/universal-link?" +
-                "response_type=id_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&scope=openid" +
-                "&client_metadata=$clientMetadataJwksInline"
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=id_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&scope=openid" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
 
-        resolution.validateSuccess<ResolvedRequestObject.SiopAuthentication>()
+            resolution.validateSuccess<ResolvedRequestObject.SiopAuthentication>()
+        }
+
+        test(genState())
+        test()
     }
 
     @Test
     fun `id and vp token auth request`() = runTest {
-        val authRequest =
-            "https://client.example.org/universal-link?" +
-                "response_type=id_token vp_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&scope=openid" +
-                "&state=${genState()}" +
-                "&presentation_definition=$pd" +
-                "&client_metadata=$clientMetadataJwksInline"
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=id_token vp_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    "&scope=openid" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&presentation_definition=$pd" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
 
-        resolution.validateSuccess<ResolvedRequestObject.SiopOpenId4VPAuthentication>()
+            resolution.validateSuccess<ResolvedRequestObject.SiopOpenId4VPAuthentication>()
+        }
+
+        test(genState())
+        test()
     }
 
     @Test
@@ -332,68 +346,88 @@ class UnvalidatedRequestResolverTest {
 
     @Test
     fun `response type provided comma separated`() = runTest {
-        val authRequest =
-            "https://client.example.org/universal-link?" +
-                "response_type=id_token,vp_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&client_metadata=$clientMetadataJwksInline"
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=id_token,vp_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&client_metadata=$clientMetadataJwksInline"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
 
-        resolution.validateInvalid<RequestValidationError.UnsupportedResponseType>()
+            resolution.validateInvalid<RequestValidationError.UnsupportedResponseType>()
+        }
+
+        test(genState())
+        test()
     }
 
     @Test
     fun `response type provided is miss-spelled`() = runTest {
-        val authRequest =
-            "https://client.example.org/universal-link?" +
-                "response_type=id_tokens" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&client_metadata=$clientMetadataJwksInline"
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=id_tokens" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&client_metadata=$clientMetadataJwksInline"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
 
-        resolution.validateInvalid<RequestValidationError.UnsupportedResponseType>()
+            resolution.validateInvalid<RequestValidationError.UnsupportedResponseType>()
+        }
+
+        test(genState())
+        test()
     }
 
     @Test
     fun `nonce validation`() = runTest {
-        val authRequest =
-            "https://client.example.org/universal-link?" +
-                "response_type=id_token" +
-                "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_id_scheme=redirect_uri" +
-                "&state=${genState()}" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&client_metadata=$clientMetadataJwksInline"
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=id_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_metadata=$clientMetadataJwksInline"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
 
-        resolution.validateInvalid<RequestValidationError.MissingNonce>()
+            resolution.validateInvalid<RequestValidationError.MissingNonce>()
+        }
+
+        test(genState())
+        test()
     }
 
     @Test
     fun `if client_id is missing reject the request`() = runTest {
-        val authRequest =
-            "https://client.example.org/universal-link?" +
-                "response_type=id_token" +
-                "&client_id_scheme=redirect_uri" +
-                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                "&nonce=n-0S6_WzA2Mj" +
-                "&state=${genState()}" +
-                "&client_metadata=$clientMetadataJwksInline"
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=id_token" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&client_metadata=$clientMetadataJwksInline"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
 
-        resolution.validateInvalid<RequestValidationError.MissingClientId>()
+            resolution.validateInvalid<RequestValidationError.MissingClientId>()
+        }
+
+        test(genState())
+        test()
     }
 
     @OptIn(ExperimentalSerializationApi::class)

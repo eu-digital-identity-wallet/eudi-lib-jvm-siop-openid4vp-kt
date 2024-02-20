@@ -64,7 +64,6 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 MissingResponseType,
                 MissingResponseUri,
                 MissingScope,
-                MissingState,
                 OneOfClientMedataOrUri,
                 RedirectUriMustNotBeProvided,
                 ResponseUriMustNotBeProvided,

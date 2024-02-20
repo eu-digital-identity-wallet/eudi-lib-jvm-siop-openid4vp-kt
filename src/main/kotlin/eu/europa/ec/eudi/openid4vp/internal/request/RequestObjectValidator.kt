@@ -69,7 +69,7 @@ internal sealed interface ValidatedRequestObject {
     val clientMetaDataSource: ClientMetaDataSource?
     val nonce: String
     val responseMode: ResponseMode
-    val state: String
+    val state: String?
 
     /**
      * A valid SIOP authentication
@@ -81,7 +81,7 @@ internal sealed interface ValidatedRequestObject {
         override val nonce: String,
         val scope: Scope,
         override val responseMode: ResponseMode,
-        override val state: String,
+        override val state: String?,
     ) : ValidatedRequestObject
 
     /**
@@ -93,7 +93,7 @@ internal sealed interface ValidatedRequestObject {
         override val clientId: String,
         override val nonce: String,
         override val responseMode: ResponseMode,
-        override val state: String,
+        override val state: String?,
     ) : ValidatedRequestObject
 
     /**
@@ -107,7 +107,7 @@ internal sealed interface ValidatedRequestObject {
         override val nonce: String,
         val scope: Scope,
         override val responseMode: ResponseMode,
-        override val state: String,
+        override val state: String?,
     ) : ValidatedRequestObject
 }
 
@@ -124,7 +124,7 @@ private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
 internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequestObject {
     val (client, requestObject) = request
     fun scope() = requiredScope(requestObject)
-    val state = requiredState(requestObject)
+    val state = requestObject.state
     val nonce = requiredNonce(requestObject)
     val responseType = requiredResponseType(requestObject)
     val responseMode = requiredResponseMode(client, requestObject)
@@ -256,15 +256,6 @@ private fun requiredResponseMode(
     }
     return responseMode
 }
-
-/**
- * Makes sure that [unvalidated] contains a not-null/not-blank state value
- *
- * @param unvalidated the request to validate
- * @return the state or [RequestValidationError.MissingState]
- */
-private fun requiredState(unvalidated: UnvalidatedRequestObject): String =
-    ensureNotNull(unvalidated.state) { MissingState.asException() }
 
 /**
  * Makes sure that [unvalidated] contains a not-null scope

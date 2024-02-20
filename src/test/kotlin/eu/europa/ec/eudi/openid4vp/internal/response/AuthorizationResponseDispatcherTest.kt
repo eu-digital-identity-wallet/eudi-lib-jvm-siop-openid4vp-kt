@@ -62,145 +62,152 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`() = runTest {
-        val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
-        val validated = assertDoesNotThrow {
-            ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
-        }
+        suspend fun test(state: String? = null) {
+            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
+            val validated = assertDoesNotThrow {
+                ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            }
 
-        val stateVal = genState()
+            val siopAuthRequestObject =
+                ResolvedRequestObject.SiopAuthentication(
+                    idTokenType = listOf(IdTokenType.AttesterSigned),
+                    subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
+                    jarmRequirement = walletConfig.jarmRequirement(validated),
+                    clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
+                    nonce = "0S6_WzA2Mj",
+                    responseMode = responseMode,
+                    state = state,
+                    scope = Scope.make("openid") ?: throw IllegalStateException(),
+                )
 
-        val siopAuthRequestObject =
-            ResolvedRequestObject.SiopAuthentication(
-                idTokenType = listOf(IdTokenType.AttesterSigned),
-                subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
-                jarmRequirement = walletConfig.jarmRequirement(validated),
-                clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
-                nonce = "0S6_WzA2Mj",
-                responseMode = responseMode,
-                state = stateVal,
-                scope = Scope.make("openid") ?: throw IllegalStateException(),
+            val walletKeyPair = SiopIdTokenBuilder.randomKey()
+            val idToken = SiopIdTokenBuilder.build(
+                siopAuthRequestObject,
+                HolderInfo(
+                    email = "foo@bar.com",
+                    name = "Foo bar",
+                ),
+                walletKeyPair,
             )
 
-        val walletKeyPair = SiopIdTokenBuilder.randomKey()
-        val idToken = SiopIdTokenBuilder.build(
-            siopAuthRequestObject,
-            HolderInfo(
-                email = "foo@bar.com",
-                name = "Foo bar",
-            ),
-            walletKeyPair,
-        )
+            val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
+                idToken = idToken,
+            )
 
-        val idTokenConsensus = Consensus.PositiveConsensus.IdTokenConsensus(
-            idToken = idToken,
-        )
+            testApplication {
+                externalServices {
+                    hosts("https://respond.here") {
+                        install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
+                            json()
+                        }
+                        routing {
+                            post("/") {
+                                val formParameters = call.receiveParameters()
+                                val idTokenTxt = formParameters["id_token"].toString()
+                                val stateParam = formParameters["state"]
 
-        testApplication {
-            externalServices {
-                hosts("https://respond.here") {
-                    install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
-                        json()
-                    }
-                    routing {
-                        post("/") {
-                            val formParameters = call.receiveParameters()
-                            val idTokenTxt = formParameters["id_token"].toString()
-                            val state = formParameters["state"].toString()
+                                assertEquals(
+                                    "application/x-www-form-urlencoded; charset=UTF-8",
+                                    call.request.headers["Content-Type"],
+                                )
+                                assertEquals(state, stateParam)
+                                assertEquals(idToken, idTokenTxt)
 
-                            assertEquals(
-                                "application/x-www-form-urlencoded; charset=UTF-8",
-                                call.request.headers["Content-Type"],
-                            )
-                            assertEquals(stateVal, state)
-                            assertEquals(idToken, idTokenTxt)
-
-                            call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
+                                call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
+                            }
                         }
                     }
                 }
-            }
-            val managedHttpClient = createClient {
-                install(ContentNegotiation) {
-                    json()
+                val managedHttpClient = createClient {
+                    install(ContentNegotiation) {
+                        json()
+                    }
                 }
-            }
 
-            val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
-            val outcome = dispatcher.dispatch(siopAuthRequestObject, idTokenConsensus)
-            assertIs<DispatchOutcome.VerifierResponse>(outcome)
+                val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                val outcome = dispatcher.dispatch(siopAuthRequestObject, idTokenConsensus)
+                assertIs<DispatchOutcome.VerifierResponse>(outcome)
+            }
         }
+
+        test(genState())
+        test()
     }
 
     @Test
     fun `dispatch vp_token with direct post`() = runTest {
-        val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
-        val validated = assertDoesNotThrow {
-            ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
-        }
-        val stateVal = genState()
+        suspend fun test(state: String? = null) {
+            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
+            val validated = assertDoesNotThrow {
+                ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+            }
 
-        val presentationDefinition =
-            PresentationExchange.jsonParser.decodePresentationDefinition(load("presentation-definition/mDL-example.json")!!)
-                .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
+            val presentationDefinition =
+                PresentationExchange.jsonParser.decodePresentationDefinition(load("presentation-definition/mDL-example.json")!!)
+                    .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
 
-        val presentationSubmission =
-            PresentationExchange.jsonParser.decodePresentationSubmission(load("presentation-submission/example.json")!!)
-                .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
+            val presentationSubmission =
+                PresentationExchange.jsonParser.decodePresentationSubmission(load("presentation-submission/example.json")!!)
+                    .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
 
-        val openId4VPAuthRequestObject =
-            ResolvedRequestObject.OpenId4VPAuthorization(
-                jarmRequirement = walletConfig.jarmRequirement(validated),
-                clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
-                nonce = "0S6_WzA2Mj",
-                responseMode = responseMode,
-                state = stateVal,
-                presentationDefinition = presentationDefinition,
+            val openId4VPAuthRequestObject =
+                ResolvedRequestObject.OpenId4VPAuthorization(
+                    jarmRequirement = walletConfig.jarmRequirement(validated),
+                    clientId = "https%3A%2F%2Fclient.example.org%2Fcb",
+                    nonce = "0S6_WzA2Mj",
+                    responseMode = responseMode,
+                    state = state,
+                    presentationDefinition = presentationDefinition,
+                )
+
+            val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+                vpToken = "vp_token",
+                presentationSubmission = presentationSubmission,
             )
 
-        val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-            vpToken = "vp_token",
-            presentationSubmission = presentationSubmission,
-        )
+            testApplication {
+                externalServices {
+                    hosts("https://respond.here") {
+                        install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
+                            json()
+                        }
+                        routing {
+                            post("/") {
+                                val formParameters = call.receiveParameters()
+                                val vpTokenTxt = formParameters["vp_token"].toString()
+                                val presentationSubmissionStr = formParameters["presentation_submission"].toString()
+                                val stateParam = formParameters["state"]
 
-        testApplication {
-            externalServices {
-                hosts("https://respond.here") {
-                    install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
-                        json()
-                    }
-                    routing {
-                        post("/") {
-                            val formParameters = call.receiveParameters()
-                            val vpTokenTxt = formParameters["vp_token"].toString()
-                            val presentationSubmissionStr = formParameters["presentation_submission"].toString()
-                            val state = formParameters["state"].toString()
+                                assertEquals(
+                                    "application/x-www-form-urlencoded; charset=UTF-8",
+                                    call.request.headers["Content-Type"],
+                                )
+                                assertEquals(state, stateParam)
+                                assertEquals(vpTokenTxt, "vp_token")
+                                assertEquals(
+                                    presentationSubmissionStr,
+                                    Json.encodeToString<PresentationSubmission>(presentationSubmission),
+                                )
 
-                            assertEquals(
-                                "application/x-www-form-urlencoded; charset=UTF-8",
-                                call.request.headers["Content-Type"],
-                            )
-                            assertEquals(stateVal, state)
-                            assertEquals(vpTokenTxt, "vp_token")
-                            assertEquals(
-                                presentationSubmissionStr,
-                                Json.encodeToString<PresentationSubmission>(presentationSubmission),
-                            )
-
-                            call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
+                                call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
+                            }
                         }
                     }
                 }
-            }
-            val managedHttpClient = createClient {
-                install(ContentNegotiation) {
-                    json()
+                val managedHttpClient = createClient {
+                    install(ContentNegotiation) {
+                        json()
+                    }
                 }
-            }
 
-            val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
-            val outcome = dispatcher.dispatch(openId4VPAuthRequestObject, vpTokenConsensus)
-            assertIs<DispatchOutcome.VerifierResponse>(outcome)
+                val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                val outcome = dispatcher.dispatch(openId4VPAuthRequestObject, vpTokenConsensus)
+                assertIs<DispatchOutcome.VerifierResponse>(outcome)
+            }
         }
+
+        test(genState())
+        test()
     }
 
     private fun load(f: String): InputStream? =

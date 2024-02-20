@@ -179,95 +179,119 @@ class UnvalidatedRequestResolverTest {
 
     @Test
     fun `JAR auth request, request passed as JWT, verified with pre-registered client scheme`() = runTest {
-        val jwkSet = JWKSet(signingKey)
-        val unvalidatedClientMetaData = UnvalidatedClientMetaData(
-            jwks = Json.parseToJsonElement(jwkSet.toPublicJWKSet().toString()).jsonObject,
-            subjectSyntaxTypesSupported = listOf(
-                "urn:ietf:params:oauth:jwk-thumbprint",
-                "did:example",
-                "did:key",
-            ),
-        )
-        val jwtClaimsSet = jwtClaimsSet(
-            "Verifier",
-            "pre-registered",
-            "https://eudi.netcompany-intrasoft.com/wallet/direct_post",
-            unvalidatedClientMetaData,
-        )
+        suspend fun test(typ: JOSEObjectType? = null) {
+            val jwkSet = JWKSet(signingKey)
+            val unvalidatedClientMetaData = UnvalidatedClientMetaData(
+                jwks = Json.parseToJsonElement(jwkSet.toPublicJWKSet().toString()).jsonObject,
+                subjectSyntaxTypesSupported = listOf(
+                    "urn:ietf:params:oauth:jwk-thumbprint",
+                    "did:example",
+                    "did:key",
+                ),
+            )
+            val jwtClaimsSet = jwtClaimsSet(
+                "Verifier",
+                "pre-registered",
+                "https://eudi.netcompany-intrasoft.com/wallet/direct_post",
+                unvalidatedClientMetaData,
+            )
 
-        val signedJwt = createSignedRequestJwt(jwkSet, jwtClaimsSet)
-        val authRequest =
-            """
+            val signedJwt = createSignedRequestJwt(jwkSet, jwtClaimsSet, typ)
+            val authRequest =
+                """
              http://localhost:8080/public_url?client_id=Verifier&request=$signedJwt
-            """.trimIndent()
+                """.trimIndent()
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver.resolveRequestUri(authRequest)
 
-        resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        test()
+        test(JOSEObjectType("oauth-authz-req+jwt"))
+        test(JOSEObjectType("jwt"))
     }
 
     @Test
     fun `JAR auth request, request passed as JWT, verified with x509_san_dns scheme`() = runTest {
-        val keyStore = KeyStore.getInstance("JKS")
-        keyStore.load(
-            load("certificates/certificates.jks"),
-            "12345".toCharArray(),
-        )
-        val clientId = "verifier.example.gr"
-        val jwtClaimsSet = jwtClaimsSet(
-            clientId,
-            "x509_san_dns",
-            "https://verifier.example.gr/wallet/direct_post",
-            UnvalidatedClientMetaData(
-                jwks = Json.parseToJsonElement(JWKSet(signingKey).toPublicJWKSet().toString()).jsonObject,
-                subjectSyntaxTypesSupported = listOf(
-                    "urn:ietf:params:oauth:jwk-thumbprint",
-                    "did:example",
-                    "did:key",
+        suspend fun test(typ: JOSEObjectType? = null) {
+            val keyStore = KeyStore.getInstance("JKS")
+            keyStore.load(
+                load("certificates/certificates.jks"),
+                "12345".toCharArray(),
+            )
+            val clientId = "verifier.example.gr"
+            val jwtClaimsSet = jwtClaimsSet(
+                clientId,
+                "x509_san_dns",
+                "https://verifier.example.gr/wallet/direct_post",
+                UnvalidatedClientMetaData(
+                    jwks = Json.parseToJsonElement(JWKSet(signingKey).toPublicJWKSet().toString()).jsonObject,
+                    subjectSyntaxTypesSupported = listOf(
+                        "urn:ietf:params:oauth:jwk-thumbprint",
+                        "did:example",
+                        "did:key",
+                    ),
                 ),
-            ),
-        )
-        val signedJwt = createSignedRequestJwt(keyStore, jwtClaimsSet)
-        val authRequest = "http://localhost:8080/public_url?client_id=$clientId&request=$signedJwt"
+            )
+            val signedJwt = createSignedRequestJwt(keyStore, jwtClaimsSet, typ)
+            val authRequest = "http://localhost:8080/public_url?client_id=$clientId&request=$signedJwt"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
-        resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            val resolution = resolver.resolveRequestUri(authRequest)
+            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        test()
+        test(JOSEObjectType("oauth-authz-req+jwt"))
+        test(JOSEObjectType("jwt"))
     }
 
     @Test
     fun `JAR auth request, request passed as JWT, verified with x509_san_uri scheme`() = runTest {
-        val keyStore = KeyStore.getInstance("JKS")
-        keyStore.load(
-            load("certificates/certificates.jks"),
-            "12345".toCharArray(),
+        suspend fun test(typ: JOSEObjectType? = null) {
+            val keyStore = KeyStore.getInstance("JKS")
+            keyStore.load(
+                load("certificates/certificates.jks"),
+                "12345".toCharArray(),
 
-        )
-        val clientId: URI = URI.create("https://verifier.example.gr")
-        val clientIdEncoded = URLEncoder.encode(clientId.toString(), "UTF-8")
-        val jwtClaimsSet = jwtClaimsSet(
-            clientId.toString(),
-            "x509_san_uri",
-            "https://verifier.example.gr",
-            UnvalidatedClientMetaData(
-                jwks = Json.parseToJsonElement(JWKSet(signingKey).toPublicJWKSet().toString()).jsonObject,
-                subjectSyntaxTypesSupported = listOf(
-                    "urn:ietf:params:oauth:jwk-thumbprint",
-                    "did:example",
-                    "did:key",
+            )
+            val clientId: URI = URI.create("https://verifier.example.gr")
+            val clientIdEncoded = URLEncoder.encode(clientId.toString(), "UTF-8")
+            val jwtClaimsSet = jwtClaimsSet(
+                clientId.toString(),
+                "x509_san_uri",
+                "https://verifier.example.gr",
+                UnvalidatedClientMetaData(
+                    jwks = Json.parseToJsonElement(JWKSet(signingKey).toPublicJWKSet().toString()).jsonObject,
+                    subjectSyntaxTypesSupported = listOf(
+                        "urn:ietf:params:oauth:jwk-thumbprint",
+                        "did:example",
+                        "did:key",
+                    ),
                 ),
-            ),
-        )
-        val signedJwt = createSignedRequestJwt(keyStore, jwtClaimsSet)
-        val authRequest = "http://localhost:8080/public_url?client_id=$clientIdEncoded&request=$signedJwt"
+            )
+            val signedJwt = createSignedRequestJwt(keyStore, jwtClaimsSet, typ)
+            val authRequest = "http://localhost:8080/public_url?client_id=$clientIdEncoded&request=$signedJwt"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
-        resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            val resolution = resolver.resolveRequestUri(authRequest)
+            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        test()
+        test(JOSEObjectType("oauth-authz-req+jwt"))
+        test(JOSEObjectType("jwt"))
     }
 
-    private fun createSignedRequestJwt(jwkSet: JWKSet, jwtClaimsSet: JWTClaimsSet): String {
+    private fun createSignedRequestJwt(
+        jwkSet: JWKSet,
+        jwtClaimsSet: JWTClaimsSet,
+        typ: JOSEObjectType?,
+    ): String {
         val headerBuilder = JWSHeader.Builder(JWSAlgorithm.RS256)
         headerBuilder.keyID(jwkSet.keys[0].keyID)
-        headerBuilder.type(JOSEObjectType("oauth-authz-req+jwt"))
+        typ?.let {
+            headerBuilder.type(it)
+        }
 
         val signedJWT = SignedJWT(headerBuilder.build(), jwtClaimsSet)
 
@@ -277,14 +301,20 @@ class UnvalidatedRequestResolverTest {
         return signedJWT.serialize()
     }
 
-    private fun createSignedRequestJwt(keyStore: KeyStore, jwtClaimsSet: JWTClaimsSet): String {
+    private fun createSignedRequestJwt(
+        keyStore: KeyStore,
+        jwtClaimsSet: JWTClaimsSet,
+        typ: JOSEObjectType?,
+    ): String {
         val chain = keyStore.getCertificateChain("verifierexample")
         val base64EncodedChain = chain.map {
             com.nimbusds.jose.util.Base64.encode(it.encoded)
         }
         val headerBuilder = JWSHeader.Builder(JWSAlgorithm.RS256)
         headerBuilder.x509CertChain(base64EncodedChain.toMutableList())
-        headerBuilder.type(JOSEObjectType("oauth-authz-req+jwt"))
+        typ.let {
+            headerBuilder.type(it)
+        }
 
         val signedJWT = SignedJWT(headerBuilder.build(), jwtClaimsSet)
 

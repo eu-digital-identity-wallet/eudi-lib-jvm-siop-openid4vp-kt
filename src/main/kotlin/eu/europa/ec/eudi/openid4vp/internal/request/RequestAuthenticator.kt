@@ -162,7 +162,13 @@ private class JarJwtSignatureVerifier(
     suspend fun verifySignature(client: AuthenticatedClient, signedJwt: SignedJWT) {
         try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
-                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType("oauth-authz-req+jwt"))
+                // see also: DefaultJOSEObjectTypeVerifier.JWT
+                jwsTypeVerifier =
+                    DefaultJOSEObjectTypeVerifier(
+                        JOSEObjectType("oauth-authz-req+jwt"),
+                        JOSEObjectType.JWT,
+                        null,
+                    )
                 jwsKeySelector = jwsKeySelector(client)
             }
             jwtProcessor.process(signedJwt, null)

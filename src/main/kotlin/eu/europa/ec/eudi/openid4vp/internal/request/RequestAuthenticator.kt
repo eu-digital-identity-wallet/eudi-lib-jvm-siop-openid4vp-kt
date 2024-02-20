@@ -167,6 +167,7 @@ private class JarJwtSignatureVerifier(
                     DefaultJOSEObjectTypeVerifier(
                         JOSEObjectType("oauth-authz-req+jwt"),
                         JOSEObjectType.JWT,
+                        JOSEObjectType(""),
                         null,
                     )
                 jwsKeySelector = jwsKeySelector(client)

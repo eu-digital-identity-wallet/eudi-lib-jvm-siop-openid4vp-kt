@@ -208,6 +208,7 @@ class UnvalidatedRequestResolverTest {
         }
 
         test()
+        test(JOSEObjectType(""))
         test(JOSEObjectType("oauth-authz-req+jwt"))
         test(JOSEObjectType("jwt"))
     }
@@ -242,6 +243,7 @@ class UnvalidatedRequestResolverTest {
         }
 
         test()
+        test(JOSEObjectType(""))
         test(JOSEObjectType("oauth-authz-req+jwt"))
         test(JOSEObjectType("jwt"))
     }
@@ -278,6 +280,7 @@ class UnvalidatedRequestResolverTest {
         }
 
         test()
+        test(JOSEObjectType(""))
         test(JOSEObjectType("oauth-authz-req+jwt"))
         test(JOSEObjectType("jwt"))
     }

@@ -120,7 +120,9 @@ internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig
     with(redirectUri.toUri().buildUpon()) {
         val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
         appendQueryParameter("response", jarmJwt)
-        appendQueryParameter("state", data.state)
+        data.state?.let {
+            appendQueryParameter("state", it)
+        }
         build()
     }.toURI()
 
@@ -139,10 +141,12 @@ internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPCon
     with(redirectUri.toUri().buildUpon()) {
         val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
         val encodedFragment =
-            mapOf(
-                "response" to jarmJwt,
-                "state" to data.state,
-            ).map { (key, value) ->
+            buildMap {
+                put("response", jarmJwt)
+                data.state?.let {
+                    put("state", it)
+                }
+            }.map { (key, value) ->
                 val encodedKey = UriCodec.encode(key, null)
                 val encodedValue = UriCodec.encodeOrNull(value, null)
                 "$encodedKey=$encodedValue"
@@ -175,42 +179,54 @@ internal object DirectPostForm {
         fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
 
         return when (p) {
-            is AuthorizationResponsePayload.SiopAuthentication -> mapOf(
-                ID_TOKEN_FORM_PARAM to p.idToken,
-                STATE_FORM_PARAM to p.state,
-            )
+            is AuthorizationResponsePayload.SiopAuthentication -> buildMap {
+                put(ID_TOKEN_FORM_PARAM, p.idToken)
+                p.state?.let {
+                    put(STATE_FORM_PARAM, it)
+                }
+            }
 
-            is AuthorizationResponsePayload.OpenId4VPAuthorization -> mapOf(
-                VP_TOKEN_FORM_PARAM to p.vpToken,
-                PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
-                STATE_FORM_PARAM to p.state,
-            )
+            is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
+                put(VP_TOKEN_FORM_PARAM, p.vpToken)
+                put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
+                p.state?.let {
+                    put(STATE_FORM_PARAM, it)
+                }
+            }
 
-            is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> mapOf(
-                ID_TOKEN_FORM_PARAM to p.idToken,
-                VP_TOKEN_FORM_PARAM to p.vpToken,
-                PRESENTATION_SUBMISSION_FORM_PARAM to ps(p.presentationSubmission),
-                STATE_FORM_PARAM to p.state,
-            )
+            is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
+                put(ID_TOKEN_FORM_PARAM, p.idToken)
+                put(VP_TOKEN_FORM_PARAM, p.vpToken)
+                put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
+                p.state?.let {
+                    put(STATE_FORM_PARAM, it)
+                }
+            }
 
-            is AuthorizationResponsePayload.InvalidRequest -> mapOf(
-                ERROR_FORM_PARAM to AuthorizationRequestErrorCode.fromError(p.error).code,
-                ERROR_DESCRIPTION_FORM_PARAM to "${p.error}",
-                STATE_FORM_PARAM to p.state,
-            )
+            is AuthorizationResponsePayload.InvalidRequest -> buildMap {
+                put(ERROR_FORM_PARAM, AuthorizationRequestErrorCode.fromError(p.error).code)
+                put(ERROR_DESCRIPTION_FORM_PARAM, "${p.error}")
+                p.state?.let {
+                    put(STATE_FORM_PARAM, it)
+                }
+            }
 
-            is AuthorizationResponsePayload.NoConsensusResponseData -> mapOf(
-                ERROR_FORM_PARAM to AuthorizationRequestErrorCode.USER_CANCELLED.code,
-                STATE_FORM_PARAM to p.state,
-            )
+            is AuthorizationResponsePayload.NoConsensusResponseData -> buildMap {
+                put(ERROR_FORM_PARAM, AuthorizationRequestErrorCode.USER_CANCELLED.code)
+                p.state?.let {
+                    put(STATE_FORM_PARAM, it)
+                }
+            }
         }
     }
 }
 
 internal object DirectPostJwtForm {
-    fun parametersOf(jarmJwt: Jwt, state: String): Parameters =
+    fun parametersOf(jarmJwt: Jwt, state: String?): Parameters =
         Parameters.build {
             append("response", jarmJwt)
-            append("state", state)
+            state?.let {
+                append("state", it)
+            }
         }
 }

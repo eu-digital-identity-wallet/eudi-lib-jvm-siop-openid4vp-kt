@@ -31,7 +31,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingNonce
-import eu.europa.ec.eudi.openid4vp.internal.request.*
+import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
@@ -338,61 +338,93 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() {
-            val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), genState(), "client_id")
-            val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
-            response.encodeRedirectURI().assertQueryURIContainsStateAnd(data.state) {
-                assertEquals(
-                    AuthorizationRequestErrorCode.USER_CANCELLED.code,
-                    getQueryParameter("error"),
-                )
+            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+                val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), state, "client_id")
+                val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
+                response.encodeRedirectURI()
+                    .asserter {
+                        assertEquals(AuthorizationRequestErrorCode.USER_CANCELLED.code, getQueryParameter("error"))
+                    }
             }
+
+            genState().let { state -> test(state) { assertQueryURIContainsStateAnd(state, it) } }
+            test { assertQueryURIDoesNotContainStateAnd(it) }
         }
 
         @Test
         fun `when invalid request, redirect_uri must contain an error query parameter`() {
-            val data = AuthorizationResponsePayload.InvalidRequest(MissingNonce, generateNonce(), genState(), "client_id")
-            val response = AuthorizationResponse.Query(redirectUriBase, data)
-            val redirectURI = response.encodeRedirectURI()
+            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+                val data =
+                    AuthorizationResponsePayload.InvalidRequest(MissingNonce, generateNonce(), state, "client_id")
+                val response = AuthorizationResponse.Query(redirectUriBase, data)
+                val redirectURI = response.encodeRedirectURI()
 
-            redirectURI.assertQueryURIContainsStateAnd(data.state) {
-                val expectedErrorCode = AuthorizationRequestErrorCode.fromError(data.error)
-                assertEquals(expectedErrorCode.code, getQueryParameter("error"))
+                redirectURI.asserter {
+                    val expectedErrorCode = AuthorizationRequestErrorCode.fromError(data.error)
+                    assertEquals(expectedErrorCode.code, getQueryParameter("error"))
+                }
             }
+
+            genState().let { state -> test(state) { assertQueryURIContainsStateAnd(state, it) } }
+            test { assertQueryURIDoesNotContainStateAnd(it) }
         }
 
         @Test
         fun `when response for SIOPAuthentication, redirect_uri must contain an id_token query parameter`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
-            val response = AuthorizationResponse.Query(redirectUriBase, data)
-            val redirectURI = response.encodeRedirectURI()
+            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val response = AuthorizationResponse.Query(redirectUriBase, data)
+                val redirectURI = response.encodeRedirectURI()
 
-            redirectURI.assertQueryURIContainsStateAnd(data.state) {
-                assertEquals(data.idToken, getQueryParameter("id_token"))
+                redirectURI.asserter {
+                    assertEquals(data.idToken, getQueryParameter("id_token"))
+                }
             }
+
+            genState().let { state -> test(state) { assertQueryURIContainsStateAnd(state, it) } }
+            test { assertQueryURIDoesNotContainStateAnd(it) }
         }
 
         @Test
         fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
-            val response = AuthorizationResponse.QueryJwt(
-                redirectUriBase,
-                data,
-                JarmRequirement.Signed(JWSAlgorithm.RS256),
-            )
-            val redirectURI = response.encodeRedirectURI(Wallet.config)
+            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val response = AuthorizationResponse.QueryJwt(
+                    redirectUriBase,
+                    data,
+                    JarmRequirement.Signed(JWSAlgorithm.RS256),
+                )
+                val redirectURI = response.encodeRedirectURI(Wallet.config)
 
-            redirectURI.assertQueryURIContainsStateAnd(data.state) {
-                val responseParameter = getQueryParameter("response")
-                assertNotNull(responseParameter)
-                val jwtClaimsSet = responseParameter.assertIsJwtSignedByWallet()
-                assertEquals(data.state, jwtClaimsSet.getClaim("state"))
-                assertEquals(data.idToken, jwtClaimsSet.getClaim("id_token"))
+                redirectURI.asserter {
+                    val responseParameter = getQueryParameter("response")
+                    assertNotNull(responseParameter)
+                    val jwtClaimsSet = responseParameter.assertIsJwtSignedByWallet()
+                    assertEquals(data.state, jwtClaimsSet.getClaim("state"))
+                    assertEquals(data.idToken, jwtClaimsSet.getClaim("id_token"))
+                }
             }
+
+            genState().let { state -> test(state) { assertQueryURIContainsStateAnd(state, it) } }
+            test { assertQueryURIDoesNotContainStateAnd(it) }
         }
 
         private fun URI.assertQueryURIContainsStateAnd(expectedState: String, assertions: Uri.() -> Unit) {
-            val redirectUri = toUri().also(assertions)
-            assertEquals(expectedState, redirectUri.getQueryParameter("state"))
+            assertQueryURI {
+                assertions(this)
+                assertEquals(expectedState, getQueryParameter("state"))
+            }
+        }
+
+        private fun URI.assertQueryURIDoesNotContainStateAnd(assertions: Uri.() -> Unit) {
+            assertQueryURI {
+                assertions(this)
+                assertNull(getQueryParameter("state"))
+            }
+        }
+
+        private fun URI.assertQueryURI(assertions: Uri.() -> Unit) {
+            assertions(toUri())
         }
     }
 
@@ -404,68 +436,104 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when no consensus, fragment must contain an error`() {
-            val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), genState(), "client_id")
-            val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
+            fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
+                val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), state, "client_id")
+                val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 
-            response.encodeRedirectURI().assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
-                assertEquals(AuthorizationRequestErrorCode.USER_CANCELLED.code, fragmentData["error"])
+                response.encodeRedirectURI()
+                    .asserter { fragmentData ->
+                        assertEquals(AuthorizationRequestErrorCode.USER_CANCELLED.code, fragmentData["error"])
+                    }
             }
+
+            genState().let { state -> test(state) { assertFragmentURIContainsStateAnd(state, it) } }
+            test { assertFragmentURIDoesNotContainStateAnd(it) }
         }
 
         @Test
         fun `when invalid request, fragment must contain an error`() {
-            val data = AuthorizationResponsePayload.InvalidRequest(
-                MissingNonce,
-                generateNonce(),
-                genState(),
-                "client_id",
-            )
-            val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
+            fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
+                val data =
+                    AuthorizationResponsePayload.InvalidRequest(MissingNonce, generateNonce(), state, "client_id")
+                val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 
-            response.encodeRedirectURI().assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
-                val expectedErrorCode = AuthorizationRequestErrorCode.fromError(data.error)
-                assertEquals(expectedErrorCode.code, fragmentData["error"])
+                response.encodeRedirectURI()
+                    .asserter { fragmentData ->
+                        val expectedErrorCode = AuthorizationRequestErrorCode.fromError(data.error)
+                        assertEquals(expectedErrorCode.code, fragmentData["error"])
+                    }
             }
+
+            genState().let { state -> test(state) { assertFragmentURIContainsStateAnd(state, it) } }
+            test { assertFragmentURIDoesNotContainStateAnd(it) }
         }
 
         @Test
         fun `when SIOPAuthentication, fragment must contain an id_token`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
-            val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
-            response.encodeRedirectURI().assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
-                assertEquals(data.idToken, fragmentData["id_token"])
+            fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
+                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
+                response.encodeRedirectURI()
+                    .asserter { fragmentData ->
+                        assertEquals(data.idToken, fragmentData["id_token"])
+                    }
             }
+
+            genState().let { state -> test(state) { assertFragmentURIContainsStateAnd(state, it) } }
+            test { assertFragmentURIDoesNotContainStateAnd(it) }
         }
 
         @Test
         fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
-            val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), genState(), "client_id")
-            val response =
-                AuthorizationResponse.FragmentJwt(
-                    redirectUri = redirectUriBase,
-                    data = data,
-                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
-                )
-            response.encodeRedirectURI(Wallet.config)
-                .assertFragmentURIContainsStateAnd(data.state) { fragmentData ->
-                    assertEquals(data.state, fragmentData["state"])
-                    val responseParameter = fragmentData["response"]
-                    assertNotNull(responseParameter)
-                    val jwtClaimsSet = responseParameter.assertIsJwtSignedByWallet()
-                    assertEquals(data.state, jwtClaimsSet.getClaim("state"))
-                    assertEquals(data.idToken, jwtClaimsSet.getClaim("id_token"))
-                }
+            fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
+                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val response =
+                    AuthorizationResponse.FragmentJwt(
+                        redirectUri = redirectUriBase,
+                        data = data,
+                        jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
+                    )
+                response.encodeRedirectURI(Wallet.config)
+                    .asserter { fragmentData ->
+                        assertEquals(data.state, fragmentData["state"])
+                        val responseParameter = fragmentData["response"]
+                        assertNotNull(responseParameter)
+                        val jwtClaimsSet = responseParameter.assertIsJwtSignedByWallet()
+                        assertEquals(data.state, jwtClaimsSet.getClaim("state"))
+                        assertEquals(data.idToken, jwtClaimsSet.getClaim("id_token"))
+                    }
+            }
+
+            genState().let { state -> test(state) { assertFragmentURIContainsStateAnd(state, it) } }
+            test { assertFragmentURIDoesNotContainStateAnd(it) }
         }
 
         private fun URI.assertFragmentURIContainsStateAnd(
             expectedState: String,
             assertions: (Map<String, String>) -> Unit,
         ) {
+            assertFragmentURI {
+                assertions(it)
+                assertEquals(expectedState, it["state"])
+            }
+        }
+
+        private fun URI.assertFragmentURIDoesNotContainStateAnd(
+            assertions: (Map<String, String>) -> Unit,
+        ) {
+            assertFragmentURI {
+                assertions(it)
+                assertNull(it["state"])
+            }
+        }
+
+        private fun URI.assertFragmentURI(
+            assertions: (Map<String, String>) -> Unit,
+        ) {
             val redirectUri = toUri().also { println(it) }
             assertNotNull(redirectUri.fragment)
             val map = redirectUri.fragment!!.parseUrlEncodedParameters().toMap().mapValues { it.value.first() }
             map.also(assertions)
-            assertEquals(expectedState, map["state"])
         }
     }
 }

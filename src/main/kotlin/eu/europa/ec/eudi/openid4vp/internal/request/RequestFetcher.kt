@@ -49,6 +49,7 @@ internal class RequestFetcher(private val httpClient: HttpClient) {
     private suspend fun jwt(passByReference: UnvalidatedRequest.JwtSecured.PassByReference): Jwt =
         httpClient.get(passByReference.jwtURI) {
             accept(ContentType.parse("application/oauth-authz-req+jwt"))
+            accept(ContentType.parse("application/jwt"))
         }.body<String>()
 }
 

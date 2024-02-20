@@ -30,7 +30,7 @@ sealed interface ResolvedRequestObject : Serializable {
 
     val clientId: String
     val responseMode: ResponseMode
-    val state: String
+    val state: String?
     val nonce: String
 
     /**
@@ -45,7 +45,7 @@ sealed interface ResolvedRequestObject : Serializable {
     data class SiopAuthentication(
         override val clientId: String,
         override val responseMode: ResponseMode,
-        override val state: String,
+        override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
         val idTokenType: List<IdTokenType>,
@@ -59,7 +59,7 @@ sealed interface ResolvedRequestObject : Serializable {
     data class OpenId4VPAuthorization(
         override val clientId: String,
         override val responseMode: ResponseMode,
-        override val state: String,
+        override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
         val presentationDefinition: PresentationDefinition,
@@ -71,7 +71,7 @@ sealed interface ResolvedRequestObject : Serializable {
     data class SiopOpenId4VPAuthentication(
         override val clientId: String,
         override val responseMode: ResponseMode,
-        override val state: String,
+        override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
         val idTokenType: List<IdTokenType>,
@@ -148,10 +148,6 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data object RedirectUriMustNotBeProvided : RequestValidationError {
         private fun readResolve(): Any = RedirectUriMustNotBeProvided
-    }
-
-    data object MissingState : RequestValidationError {
-        private fun readResolve(): Any = MissingState
     }
 
     data object MissingNonce : RequestValidationError {

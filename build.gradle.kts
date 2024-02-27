@@ -131,4 +131,5 @@ val dependencyCheckExtension = extensions.findByType(DependencyCheckExtension::c
 dependencyCheckExtension?.apply {
     formats = mutableListOf("XML", "HTML")
     nvd.apiKey = nvdApiKey ?: ""
+
 }

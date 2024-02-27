@@ -31,7 +31,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
-import java.nio.charset.Charset
 
 /**
  * Default implementation of [Dispatcher]
@@ -239,22 +238,15 @@ internal object DirectPostJwtForm {
 }
 
 /**
- * [OutgoingContent] for `application/x-www-form-urlencoded` formatted requests that allows
- * explicitly setting the [Charset] to be used when encoding the request body.
+ * [OutgoingContent] for `application/x-www-form-urlencoded` formatted requests that use US-ASCII encoding.
  */
 internal class FormData(
     val formData: Parameters,
-    val charset: Charset = Charsets.US_ASCII,
 ) : OutgoingContent.ByteArrayContent() {
-    private val content = formData.formUrlEncode().toByteArray(charset)
+    private val content = formData.formUrlEncode().toByteArray(Charsets.US_ASCII)
 
     override val contentLength: Long = content.size.toLong()
-    override val contentType: ContentType =
-        if (charset == Charsets.US_ASCII) {
-            ContentType.Application.FormUrlEncoded
-        } else {
-            ContentType.Application.FormUrlEncoded.withCharset(charset)
-        }
+    override val contentType: ContentType = ContentType.Application.FormUrlEncoded
 
     override fun bytes(): ByteArray = content
 }

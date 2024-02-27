@@ -23,12 +23,15 @@ import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.*
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.request.forms.*
+import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.http.content.*
+import io.ktor.util.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
+import java.nio.charset.Charset
 
 /**
  * Default implementation of [Dispatcher]
@@ -70,12 +73,16 @@ internal class DefaultDispatcher(
     /**
      * Submits an HTTP Form to [url] with the provided [parameters].
      */
+    @OptIn(InternalAPI::class)
     private suspend fun submitForm(
         httpClient: HttpClient,
         url: URL,
         parameters: Parameters,
     ): DispatchOutcome.VerifierResponse {
-        val response = httpClient.submitForm(url.toExternalForm(), parameters)
+        val response = httpClient.post(url.toExternalForm()) {
+            body = FormData(parameters)
+        }
+
         return when (response.status) {
             HttpStatusCode.OK -> {
                 val redirectUri =
@@ -229,4 +236,25 @@ internal object DirectPostJwtForm {
                 append("state", it)
             }
         }
+}
+
+/**
+ * [OutgoingContent] for `application/x-www-form-urlencoded` formatted requests that allows
+ * explicitly setting the [Charset] to be used when encoding the request body.
+ */
+internal class FormData(
+    val formData: Parameters,
+    val charset: Charset = Charsets.US_ASCII,
+) : OutgoingContent.ByteArrayContent() {
+    private val content = formData.formUrlEncode().toByteArray(charset)
+
+    override val contentLength: Long = content.size.toLong()
+    override val contentType: ContentType =
+        if (charset == Charsets.US_ASCII) {
+            ContentType.Application.FormUrlEncoded
+        } else {
+            ContentType.Application.FormUrlEncoded.withCharset(charset)
+        }
+
+    override fun bytes(): ByteArray = content
 }

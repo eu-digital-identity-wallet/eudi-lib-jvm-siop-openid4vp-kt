@@ -107,7 +107,7 @@ class AuthorizationResponseDispatcherTest {
                                 val stateParam = formParameters["state"]
 
                                 assertEquals(
-                                    "application/x-www-form-urlencoded; charset=UTF-8",
+                                    "application/x-www-form-urlencoded",
                                     call.request.headers["Content-Type"],
                                 )
                                 assertEquals(state, stateParam)
@@ -179,7 +179,7 @@ class AuthorizationResponseDispatcherTest {
                                 val stateParam = formParameters["state"]
 
                                 assertEquals(
-                                    "application/x-www-form-urlencoded; charset=UTF-8",
+                                    "application/x-www-form-urlencoded",
                                     call.request.headers["Content-Type"],
                                 )
                                 assertEquals(state, stateParam)

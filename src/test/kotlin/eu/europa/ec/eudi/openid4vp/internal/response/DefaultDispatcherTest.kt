@@ -135,7 +135,13 @@ class DefaultDispatcherTest {
         ): Dispatcher {
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
-                val body = assertIs<FormDataContent>(request.body)
+                request.body.contentType?.let {
+                    assertEquals("application/x-www-form-urlencoded", it.toString())
+                }
+                request.headers[HttpHeaders.ContentType]?.let {
+                    assertEquals("application/x-www-form-urlencoded", it)
+                }
+                val body = assertIs<FormData>(request.body)
                 val responseParameter = body.formData["response"] as String
                 responseParameterAssertions(responseParameter)
 

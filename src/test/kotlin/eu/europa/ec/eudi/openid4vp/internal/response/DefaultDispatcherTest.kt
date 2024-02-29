@@ -55,6 +55,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import java.net.URI
+import java.time.Instant
 import java.util.*
 import kotlin.test.*
 
@@ -303,6 +304,12 @@ class DefaultDispatcherTest {
                     val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
+                    assertNotNull(jwtClaimsSet.expirationTime)
+                    assertTrue("Expiration date not set properly") {
+                        val ttl = Wallet.config.jarmConfiguration.signingConfig()!!.ttl
+                        val expiration = Instant.now().plusMillis(ttl!!.toMillis())
+                        jwtClaimsSet.expirationTime.before(Date.from(expiration))
+                    }
                     assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
                 }
 

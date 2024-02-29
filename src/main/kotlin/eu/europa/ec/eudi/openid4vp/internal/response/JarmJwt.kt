@@ -31,6 +31,7 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -68,7 +69,7 @@ private fun SiopOpenId4VPConfig.sign(
         .keyID(signingCfg.signer.getKeyId())
         .build()
 
-    val claimSet = JwtPayloadFactory.create(data, issuer, Instant.now())
+    val claimSet = JwtPayloadFactory.signedJwtClaimSet(data, issuer, Instant.now(), signingCfg.ttl)
     return SignedJWT(header, claimSet).apply { sign(signingCfg.signer) }
 }
 
@@ -85,7 +86,7 @@ private fun SiopOpenId4VPConfig.encrypt(
         .agreementPartyVInfo(Base64URL(data.nonce))
         .build()
 
-    val claimSet = JwtPayloadFactory.create(data, issuer, Instant.now())
+    val claimSet = JwtPayloadFactory.encryptedJwtClaimSet(data)
     return EncryptedJWT(jweHeader, claimSet).apply { encrypt(jweEncrypter) }
 }
 
@@ -94,7 +95,7 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
     data: AuthorizationResponsePayload,
 ): JWEObject {
     check(jarmConfiguration is JarmConfiguration.SigningAndEncryption) {
-        "Wallet doesn't signing & encrypting JARM"
+        "Wallet doesn't support signing & encrypting JARM"
     }
 
     val signedJwt = sign(requirement.signed, data)
@@ -121,41 +122,52 @@ private object JwtPayloadFactory {
     private const val ID_TOKEN_CLAIM = "id_token"
     private const val ERROR_CLAIM = "error"
     private const val ERROR_DESCRIPTION_CLAIM = "error_description"
-    fun create(data: AuthorizationResponsePayload, issuer: Issuer?, issuedAt: Instant): JWTClaimsSet =
+    fun encryptedJwtClaimSet(data: AuthorizationResponsePayload): JWTClaimsSet =
+        buildJsonObject {
+            payloadClaims(data)
+        }.asJWTClaimSet()
+
+    fun signedJwtClaimSet(data: AuthorizationResponsePayload, issuer: Issuer?, issuedAt: Instant, ttl: Duration?): JWTClaimsSet =
         buildJsonObject {
             issuer?.let { put("iss", it.value) }
-            put("iat", issuedAt.epochSecond)
             put("aud", data.clientId)
-            data.state?.let {
-                put(STATE_CLAIM, it)
+            ttl?.let {
+                val exp = issuedAt.plusMillis(ttl.toMillis()).epochSecond
+                put("exp", exp)
             }
-
-            when (data) {
-                is AuthorizationResponsePayload.SiopAuthentication -> {
-                    put(ID_TOKEN_CLAIM, data.idToken)
-                }
-
-                is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                    put(VP_TOKEN_CLAIM, data.vpToken)
-                    put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
-                }
-
-                is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
-                    put(ID_TOKEN_CLAIM, data.idToken)
-                    put(VP_TOKEN_CLAIM, data.vpToken)
-                    put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
-                }
-
-                is AuthorizationResponsePayload.InvalidRequest -> {
-                    put(ERROR_CLAIM, AuthorizationRequestErrorCode.fromError(data.error).code)
-                    put(ERROR_DESCRIPTION_CLAIM, "${data.error}")
-                }
-
-                is AuthorizationResponsePayload.NoConsensusResponseData -> {
-                    put(ERROR_CLAIM, AuthorizationRequestErrorCode.USER_CANCELLED.code)
-                }
-            }
+            payloadClaims(data)
         }.asJWTClaimSet()
+
+    private fun JsonObjectBuilder.payloadClaims(data: AuthorizationResponsePayload) {
+        data.state?.let {
+            put(STATE_CLAIM, it)
+        }
+        when (data) {
+            is AuthorizationResponsePayload.SiopAuthentication -> {
+                put(ID_TOKEN_CLAIM, data.idToken)
+            }
+
+            is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
+                put(VP_TOKEN_CLAIM, data.vpToken)
+                put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
+            }
+
+            is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
+                put(ID_TOKEN_CLAIM, data.idToken)
+                put(VP_TOKEN_CLAIM, data.vpToken)
+                put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
+            }
+
+            is AuthorizationResponsePayload.InvalidRequest -> {
+                put(ERROR_CLAIM, AuthorizationRequestErrorCode.fromError(data.error).code)
+                put(ERROR_DESCRIPTION_CLAIM, "${data.error}")
+            }
+
+            is AuthorizationResponsePayload.NoConsensusResponseData -> {
+                put(ERROR_CLAIM, AuthorizationRequestErrorCode.USER_CANCELLED.code)
+            }
+        }
+    }
 
     private fun JsonObject.asJWTClaimSet(): JWTClaimsSet {
         val jsonStr = Json.encodeToString(this)

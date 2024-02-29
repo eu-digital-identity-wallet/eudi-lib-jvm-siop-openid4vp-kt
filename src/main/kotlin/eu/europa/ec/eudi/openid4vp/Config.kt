@@ -30,6 +30,7 @@ import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.cert.X509Certificate
+import java.time.Duration
 
 sealed interface JwkSetSource {
     data class ByValue(val jwks: JsonObject) : JwkSetSource
@@ -154,9 +155,11 @@ sealed interface JarmConfiguration {
      * The wallet supports only signed authorization responses
      *
      * @param signer the JWS algorithms that the wallet can use when signing a JARM response
+     * @param ttl the time the signed authorization response can live
      */
     data class Signing(
         val signer: JarmSigner,
+        val ttl: Duration? = Duration.ofMinutes(10),
     ) : JarmConfiguration {
         init {
             require(signer.supportedJWSAlgorithms().isNotEmpty()) { "At least a algorithm must be provided" }

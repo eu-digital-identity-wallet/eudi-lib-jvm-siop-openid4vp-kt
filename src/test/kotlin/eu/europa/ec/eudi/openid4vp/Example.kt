@@ -373,7 +373,7 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
     SiopOpenId4VPConfig(
         jarmConfiguration = JarmConfiguration.Encryption(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
-            supportedMethods = listOf(EncryptionMethod.A128CBC_HS256),
+            supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),
         ),
         supportedClientIdSchemes = supportedClientIdScheme,
     )

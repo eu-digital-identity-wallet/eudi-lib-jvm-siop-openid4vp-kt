@@ -124,10 +124,6 @@ private object JwtPayloadFactory {
     private const val ERROR_DESCRIPTION_CLAIM = "error_description"
     fun encryptedJwtClaimSet(data: AuthorizationResponsePayload): JWTClaimsSet =
         buildJsonObject {
-            data.state?.let {
-                put(STATE_CLAIM, it)
-            }
-
             payloadClaims(data)
         }.asJWTClaimSet()
 
@@ -139,14 +135,13 @@ private object JwtPayloadFactory {
                 val exp = issuedAt.plusMillis(ttl.toMillis()).epochSecond
                 put("exp", exp)
             }
-            data.state?.let {
-                put(STATE_CLAIM, it)
-            }
-
             payloadClaims(data)
         }.asJWTClaimSet()
 
     private fun JsonObjectBuilder.payloadClaims(data: AuthorizationResponsePayload) {
+        data.state?.let {
+            put(STATE_CLAIM, it)
+        }
         when (data) {
             is AuthorizationResponsePayload.SiopAuthentication -> {
                 put(ID_TOKEN_CLAIM, data.idToken)

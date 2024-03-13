@@ -136,7 +136,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     }
     val presentationDefinitionSource =
         optionalPresentationDefinitionSource(requestObject, responseType) { scope().getOrNull() }
-    val clientMetaDataSource = optionalClientMetaDataSource(requestObject)
+    val clientMetaDataSource = optionalClientMetaDataSource(responseMode, requestObject)
     val idTokenType = optionalIdTokenType(requestObject)
 
     fun idAndVpToken() = SiopOpenId4VPAuthentication(
@@ -247,9 +247,11 @@ private fun requiredResponseMode(
         is AuthenticatedClient.X509SanDns -> ensure(client.clientId == uri.host) {
             UnsupportedResponseMode("$responseMode host doesn't match ${client.clientId}").asException()
         }
+
         is AuthenticatedClient.X509SanUri -> ensure(client.clientId == uri) {
             UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
         }
+
         is AuthenticatedClient.RedirectUri -> ensure(client.clientId == uri) {
             UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
         }
@@ -334,7 +336,10 @@ private fun parsePresentationDefinitionSource(
     }
 }
 
-private fun optionalClientMetaDataSource(unvalidated: UnvalidatedRequestObject): ClientMetaDataSource? {
+private fun optionalClientMetaDataSource(
+    responseMode: ResponseMode,
+    unvalidated: UnvalidatedRequestObject,
+): ClientMetaDataSource? {
     val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
     val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
 
@@ -351,11 +356,25 @@ private fun optionalClientMetaDataSource(unvalidated: UnvalidatedRequestObject):
         return ClientMetaDataSource.ByReference(uri)
     }
 
+    fun required() = when (responseMode) {
+        is ResponseMode.DirectPost -> false
+        is ResponseMode.DirectPostJwt -> true
+        is ResponseMode.Fragment -> false
+        is ResponseMode.FragmentJwt -> true
+        is ResponseMode.Query -> false
+        is ResponseMode.QueryJwt -> true
+    }
+
     return when {
         hasCMD && !hasCMDUri -> requiredClientMetaData()
         !hasCMD && hasCMDUri -> requiredClientMetaDataUri()
         hasCMD && hasCMDUri -> throw OneOfClientMedataOrUri.asException()
-        else -> null
+        else -> {
+            ensure(!required()) {
+                InvalidClientMetaData("Missing client metadata").asException()
+            }
+            null
+        }
     }
 }
 

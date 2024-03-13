@@ -192,6 +192,29 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
+    fun `if response_mode is not JARM related client_metadata are not mandatory to be provided`() = runTest {
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=vp_token" +
+                    "&response_mode=direct_post" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&response_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&presentation_definition=$pd"
+
+            val resolution = resolver.resolveRequestUri(authRequest)
+
+            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        test(genState())
+        test()
+    }
+
+    @Test
     fun `JAR auth request, request passed as JWT, verified with pre-registered client scheme`() = runTest {
         suspend fun test(typ: JOSEObjectType? = null) {
             val jwkSet = JWKSet(signingKey)

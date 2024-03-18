@@ -11,7 +11,7 @@ uri-kmp = "0.0.16"
 java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.10"
-maven-publish = "0.27.0"
+maven-publish = "0.28.0"
 fasterxml-jackson = "2.16.2"
 bouncyCastle = "1.77"
 

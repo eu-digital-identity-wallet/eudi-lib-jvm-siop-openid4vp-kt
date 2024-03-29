@@ -2,7 +2,7 @@
   "id": "mDL-sample-req",
   "input_descriptors": [
     {
-      "id": "mDL",
+      "id": "org.iso.18013.5.1.mDL",
       "format": {
         "mso_mdoc": {
           "alg": [
@@ -16,37 +16,19 @@
         "fields": [
           {
             "path": [
-              "$.mdoc.doctype"
-            ],
-            "filter": {
-              "type": "string",
-              "const": "org.iso.18013.5.1.mDL"
-            }
-          },
-          {
-            "path": [
-              "$.mdoc.namespace"
-            ],
-            "filter": {
-              "type": "string",
-              "const": "org.iso.18013.5.1"
-            }
-          },
-          {
-            "path": [
-              "$.mdoc.family_name"
+              "$['org.iso.18013.5.1']['family_name']"
             ],
             "intent_to_retain": false
           },
           {
             "path": [
-              "$.mdoc.portrait"
+              "$['org.iso.18013.5.1']['portrait']"
             ],
             "intent_to_retain": false
           },
           {
             "path": [
-              "$.mdoc.driving_privileges"
+              "$['org.iso.18013.5.1']['driving_privileges']"
             ],
             "intent_to_retain": false
           }

@@ -21,7 +21,8 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.*
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.X509SanDns
 import eu.europa.ec.eudi.prex.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -379,61 +380,196 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
     )
 
 val PidPresentationDefinition = """
-            {
-              "id": "pid-request",
-              "input_descriptors": [
-                {
-                  "id": "pid",
-                  "format": {
-                    "mso_mdoc": {
-                      "alg": [
-                        "EdDSA",
-                        "ES256"
-                      ]
-                    }
-                  },
-                  "constraints": {
-                   
-                    "fields": [
-                      {
-                        "path": [
-                          "$.mdoc.doctype"
-                        ],
-                        "filter": {
-                          "type": "string",
-                          "const": "org.iso.18013.5.1.mDL"
-                        }
-                      },
-                      {
-                        "path": [
-                          "$.mdoc.namespace"
-                        ],
-                        "filter": {
-                          "type": "string",
-                          "const": "org.iso.18013.5.1"
-                        }
-                      },
-                      {
-                        "path": [
-                          "$.mdoc.family_name"
-                        ],
-                        "intent_to_retain": false
-                      },
-                      {
-                        "path": [
-                          "$.mdoc.portrait"
-                        ],
-                        "intent_to_retain": false
-                      },
-                      {
-                        "path": [
-                          "$.mdoc.driving_privileges"
-                        ],
-                        "intent_to_retain": false
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
+{
+  "id": "pid-request",
+  "input_descriptors": [
+    {
+      "id": "eu.europa.ec.eudiw.pid.1",
+      "format": {
+        "mso_mdoc": {
+          "alg": [
+            "ES256",
+            "ES384",
+            "ES512",
+            "EdDSA"
+          ]
+        }
+      },
+      "name": "EUDI PID",
+      "purpose": "We need to verify your identity",
+      "constraints": {
+        "fields": [
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['family_name']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['given_name']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['birth_date']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['age_over_18']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['age_in_years']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['age_birth_year']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['family_name_birth']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['given_name_birth']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['birth_place']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['birth_country']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['birth_state']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['birth_city']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['resident_address']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['resident_country']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['resident_state']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['resident_city']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['resident_postal_code']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['resident_street']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['resident_house_number']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['gender']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['nationality']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['issuance_date']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['expiry_date']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['issuing_authority']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['document_number']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['administrative_number']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['issuing_country']"
+            ],
+            "intent_to_retain": false
+          },
+          {
+            "path": [
+              "$['eu.europa.ec.eudiw.pid.1']['issuing_jurisdiction']"
+            ],
+            "intent_to_retain": false
+          }
+        ]
+      }
+    }
+  ]
+}
 """.trimIndent()

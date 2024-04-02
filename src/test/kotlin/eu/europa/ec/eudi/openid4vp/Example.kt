@@ -318,7 +318,7 @@ private class Wallet(
                 listOf(
                     DescriptorMap(
                         id = inputDescriptor.id,
-                        format = ClaimFormat.MsoMdoc,
+                        format = "mso_mdoc",
                         path = JsonPath.jsonPath("$")!!,
                     ),
                 ),

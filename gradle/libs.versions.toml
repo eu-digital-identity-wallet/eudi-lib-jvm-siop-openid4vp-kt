@@ -1,7 +1,7 @@
 [versions]
 coroutines = "1.7.3"
-dependency-check = "9.0.9"
-sonarqube = "4.4.1.3373"
+dependency-check = "9.1.0"
+sonarqube = "5.0.0.4638"
 spotless = "6.25.0"
 kotlin = "1.9.21"
 ktor = "2.3.6"
@@ -10,10 +10,10 @@ nimbus-sdk = "11.8"
 uri-kmp = "0.0.18"
 java = "17"
 ktlint = "0.50.0"
-dokka = "1.9.10"
+dokka = "1.9.20"
 maven-publish = "0.28.0"
-fasterxml-jackson = "2.16.2"
-bouncyCastle = "1.77"
+fasterxml-jackson = "2.17.0"
+bouncyCastle = "1.78"
 
 [libraries]
 fasterxml-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "fasterxml-jackson" }

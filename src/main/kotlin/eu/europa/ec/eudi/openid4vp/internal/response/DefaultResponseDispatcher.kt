@@ -193,7 +193,7 @@ internal object DirectPostForm {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
-                put(VP_TOKEN_FORM_PARAM, p.vpToken)
+                put(VP_TOKEN_FORM_PARAM, p.vpToken.value)
                 put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
@@ -202,7 +202,7 @@ internal object DirectPostForm {
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
-                put(VP_TOKEN_FORM_PARAM, p.vpToken)
+                put(VP_TOKEN_FORM_PARAM, p.vpToken.value)
                 put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)

@@ -154,7 +154,7 @@ class AuthorizationResponseBuilderTest {
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                "dummy_vp_token",
+                VpToken.Generic("dummy_vp_token"),
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
             val response = resolvedRequest.responseWith(vpTokenConsensus)

@@ -133,7 +133,13 @@ sealed interface ResponseMode : Serializable {
 }
 
 typealias Jwt = String
-typealias VpToken = String
+
+sealed interface VpToken {
+    val value: String
+
+    data class Generic(override val value: String) : VpToken
+    data class MsoMdoc(override val value: String, val apu: String) : VpToken
+}
 
 /**
  * The type of the `id_token`

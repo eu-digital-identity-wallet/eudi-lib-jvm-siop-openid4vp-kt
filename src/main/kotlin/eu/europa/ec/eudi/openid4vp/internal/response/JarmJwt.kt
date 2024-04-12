@@ -82,8 +82,18 @@ private fun SiopOpenId4VPConfig.encrypt(
 
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = requirement
     val jweEncrypter = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
+
+    val (apv, apu) = when (data) {
+        is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken as? VpToken.MsoMdoc
+        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> data.vpToken as? VpToken.MsoMdoc
+        else -> null
+    }?.let { data.nonce to it.apu } ?: (null to null)
+
     val jweHeader = JWEHeader.Builder(jweAlgorithm, encryptionMethod)
-        .agreementPartyVInfo(Base64URL.encode(data.nonce))
+        .apply {
+            apv?.let { agreementPartyVInfo(Base64URL.encode(it)) }
+            apu?.let { agreementPartyUInfo(Base64URL.encode(it)) }
+        }
         .build()
 
     val claimSet = JwtPayloadFactory.encryptedJwtClaimSet(data)
@@ -127,7 +137,12 @@ private object JwtPayloadFactory {
             payloadClaims(data)
         }.asJWTClaimSet()
 
-    fun signedJwtClaimSet(data: AuthorizationResponsePayload, issuer: Issuer?, issuedAt: Instant, ttl: Duration?): JWTClaimsSet =
+    fun signedJwtClaimSet(
+        data: AuthorizationResponsePayload,
+        issuer: Issuer?,
+        issuedAt: Instant,
+        ttl: Duration?,
+    ): JWTClaimsSet =
         buildJsonObject {
             issuer?.let { put("iss", it.value) }
             put("aud", data.clientId)
@@ -148,13 +163,13 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                put(VP_TOKEN_CLAIM, data.vpToken)
+                put(VP_TOKEN_CLAIM, data.vpToken.value)
                 put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
                 put(ID_TOKEN_CLAIM, data.idToken)
-                put(VP_TOKEN_CLAIM, data.vpToken)
+                put(VP_TOKEN_CLAIM, data.vpToken.value)
                 put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
             }
 

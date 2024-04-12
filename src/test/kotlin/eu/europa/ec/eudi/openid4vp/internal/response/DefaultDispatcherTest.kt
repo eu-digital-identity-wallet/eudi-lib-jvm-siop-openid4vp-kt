@@ -211,6 +211,8 @@ class DefaultDispatcherTest {
 
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
+                    val apv = assertNotNull(encryptedJwt.header.agreementPartyVInfo)
+                    assertEquals(verifierRequest.nonce, apv.decodeToString())
                     val jwtClaimSet = encryptedJwt.jwtClaimsSet
                     assertEquals(vpTokenConsensus.vpToken, jwtClaimSet.getClaim("vp_token"))
                 }
@@ -239,6 +241,7 @@ class DefaultDispatcherTest {
 
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
+                    assertNull(encryptedJwt.header.agreementPartyVInfo)
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
@@ -270,6 +273,7 @@ class DefaultDispatcherTest {
 
                     val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                         val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
+                        assertNull(encryptedJwt.header.agreementPartyVInfo)
                         val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                         assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                         assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)

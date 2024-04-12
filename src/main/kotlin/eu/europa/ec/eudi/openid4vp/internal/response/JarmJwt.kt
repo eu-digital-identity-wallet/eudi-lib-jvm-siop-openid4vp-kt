@@ -83,7 +83,7 @@ private fun SiopOpenId4VPConfig.encrypt(
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = requirement
     val jweEncrypter = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
     val jweHeader = JWEHeader.Builder(jweAlgorithm, encryptionMethod)
-        .agreementPartyVInfo(Base64URL(data.nonce))
+        .agreementPartyVInfo(Base64URL.encode(data.nonce))
         .build()
 
     val claimSet = JwtPayloadFactory.encryptedJwtClaimSet(data)

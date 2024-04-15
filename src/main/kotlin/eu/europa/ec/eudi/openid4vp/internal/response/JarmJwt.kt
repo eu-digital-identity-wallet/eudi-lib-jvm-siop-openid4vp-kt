@@ -77,6 +77,12 @@ private fun SiopOpenId4VPConfig.encrypt(
     requirement: JarmRequirement.Encrypted,
     data: AuthorizationResponsePayload,
 ): EncryptedJWT {
+    fun VpToken.apu(): Base64URL? =
+        when (this) {
+            is VpToken.MsoMdoc -> this.apu
+            else -> null
+        }
+
     val encryptionCfg = jarmConfiguration.encryptionConfig()
     checkNotNull(encryptionCfg) { "Wallet doesn't support encrypted JARM" }
 
@@ -84,15 +90,15 @@ private fun SiopOpenId4VPConfig.encrypt(
     val jweEncrypter = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
 
     val (apv, apu) = when (data) {
-        is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken as? VpToken.MsoMdoc
-        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> data.vpToken as? VpToken.MsoMdoc
+        is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken.apu()
+        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> data.vpToken.apu()
         else -> null
-    }?.let { data.nonce to it.apu } ?: (null to null)
+    }?.let { Base64URL.encode(data.nonce) to it } ?: (null to null)
 
     val jweHeader = JWEHeader.Builder(jweAlgorithm, encryptionMethod)
         .apply {
-            apv?.let { agreementPartyVInfo(Base64URL.encode(it)) }
-            apu?.let { agreementPartyUInfo(it) }
+            apv?.let(::agreementPartyVInfo)
+            apu?.let(::agreementPartyUInfo)
         }
         .build()
 

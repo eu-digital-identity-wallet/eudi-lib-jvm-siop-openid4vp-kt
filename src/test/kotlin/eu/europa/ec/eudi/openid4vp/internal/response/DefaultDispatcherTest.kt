@@ -25,6 +25,7 @@ import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
@@ -199,22 +200,27 @@ class DefaultDispatcherTest {
 
         @Test
         fun `if response type direct_post jwt, JWE should be returned if only encryption info specified`() = runTest {
-            suspend fun test(redirectUri: URI? = null) {
+            suspend fun test(vpToken: VpToken, redirectUri: URI? = null) {
                 val verifierRequest = createOpenId4VPRequest(
                     Verifier.metaDataRequestingEncryptedResponse,
                     ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
                 )
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    "dummy_vp_token",
+                    vpToken,
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
 
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
-                    val apv = assertNotNull(encryptedJwt.header.agreementPartyVInfo)
-                    assertEquals(verifierRequest.nonce, apv.decodeToString())
+                    if (vpToken is VpToken.MsoMdoc) {
+                        assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
+                        assertEquals(vpToken.apu, encryptedJwt.header.agreementPartyUInfo)
+                    } else {
+                        assertNull(encryptedJwt.header.agreementPartyVInfo)
+                        assertNull(encryptedJwt.header.agreementPartyUInfo)
+                    }
                     val jwtClaimSet = encryptedJwt.jwtClaimsSet
-                    assertEquals(vpTokenConsensus.vpToken, jwtClaimSet.getClaim("vp_token"))
+                    assertEquals(vpTokenConsensus.vpToken.value, jwtClaimSet.getClaim("vp_token"))
                 }
 
                 val outcome = dispatcher.dispatch(verifierRequest, vpTokenConsensus)
@@ -222,8 +228,10 @@ class DefaultDispatcherTest {
                 assertEquals(expectedOutcome, outcome)
             }
 
-            test()
-            test(URI.create("https://redirect.here"))
+            test(VpToken.Generic("dummy_vp_token"))
+            test(VpToken.MsoMdoc("dummy_vp_token", Base64URL.encode("dummy_apu")))
+            test(VpToken.Generic("dummy_vp_token"), URI.create("https://redirect.here"))
+            test(VpToken.MsoMdoc("dummy_vp_token", Base64URL.encode("dummy_apu")), URI.create("https://redirect.here"))
         }
 
         @Test
@@ -235,17 +243,18 @@ class DefaultDispatcherTest {
                 )
 
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    "dummy_vp_token",
+                    VpToken.Generic("dummy_vp_token"),
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
 
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                     assertNull(encryptedJwt.header.agreementPartyVInfo)
+                    assertNull(encryptedJwt.header.agreementPartyUInfo)
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
-                    assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
+                    assertEquals(vpTokenConsensus.vpToken.value, jwtClaimsSet.getClaim("vp_token"))
                 }
                 val outcome = dispatcher.dispatch(verifiersRequest, vpTokenConsensus)
                 val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
@@ -267,17 +276,18 @@ class DefaultDispatcherTest {
                     )
 
                     val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                        "dummy_vp_token",
+                        VpToken.Generic("dummy_vp_token"),
                         PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                     )
 
                     val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                         val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                         assertNull(encryptedJwt.header.agreementPartyVInfo)
+                        assertNull(encryptedJwt.header.agreementPartyUInfo)
                         val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                         assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                         assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
-                        assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
+                        assertEquals(vpTokenConsensus.vpToken.value, jwtClaimsSet.getClaim("vp_token"))
 
                     }
                     val outcome = dispatcher.dispatch(verifiersRequest, vpTokenConsensus)
@@ -299,7 +309,7 @@ class DefaultDispatcherTest {
 
                 val resolvedRequest = createOpenId4VPRequest(verifierMetaData, responseMode)
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    vpToken = "dummy_vp_token",
+                    vpToken = VpToken.Generic("dummy_vp_token"),
                     presentationSubmission = PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
 
@@ -308,7 +318,7 @@ class DefaultDispatcherTest {
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
                     assertNotNull(jwtClaimsSet.expirationTime)
-                    assertEquals(vpTokenConsensus.vpToken, jwtClaimsSet.getClaim("vp_token"))
+                    assertEquals(vpTokenConsensus.vpToken.value, jwtClaimsSet.getClaim("vp_token"))
                 }
 
                 val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)

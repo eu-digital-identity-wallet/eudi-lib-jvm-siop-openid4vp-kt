@@ -77,13 +77,29 @@ private fun SiopOpenId4VPConfig.encrypt(
     requirement: JarmRequirement.Encrypted,
     data: AuthorizationResponsePayload,
 ): EncryptedJWT {
+    fun VpToken.apu(): Base64URL? =
+        when (this) {
+            is VpToken.MsoMdoc -> this.apu
+            else -> null
+        }
+
     val encryptionCfg = jarmConfiguration.encryptionConfig()
     checkNotNull(encryptionCfg) { "Wallet doesn't support encrypted JARM" }
 
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = requirement
     val jweEncrypter = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
+
+    val (apv, apu) = when (data) {
+        is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken.apu()
+        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> data.vpToken.apu()
+        else -> null
+    }?.let { Base64URL.encode(data.nonce) to it } ?: (null to null)
+
     val jweHeader = JWEHeader.Builder(jweAlgorithm, encryptionMethod)
-        .agreementPartyVInfo(Base64URL.encode(data.nonce))
+        .apply {
+            apv?.let(::agreementPartyVInfo)
+            apu?.let(::agreementPartyUInfo)
+        }
         .build()
 
     val claimSet = JwtPayloadFactory.encryptedJwtClaimSet(data)
@@ -127,7 +143,12 @@ private object JwtPayloadFactory {
             payloadClaims(data)
         }.asJWTClaimSet()
 
-    fun signedJwtClaimSet(data: AuthorizationResponsePayload, issuer: Issuer?, issuedAt: Instant, ttl: Duration?): JWTClaimsSet =
+    fun signedJwtClaimSet(
+        data: AuthorizationResponsePayload,
+        issuer: Issuer?,
+        issuedAt: Instant,
+        ttl: Duration?,
+    ): JWTClaimsSet =
         buildJsonObject {
             issuer?.let { put("iss", it.value) }
             put("aud", data.clientId)
@@ -148,13 +169,13 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                put(VP_TOKEN_CLAIM, data.vpToken)
+                put(VP_TOKEN_CLAIM, data.vpToken.value)
                 put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
                 put(ID_TOKEN_CLAIM, data.idToken)
-                put(VP_TOKEN_CLAIM, data.vpToken)
+                put(VP_TOKEN_CLAIM, data.vpToken.value)
                 put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
             }
 

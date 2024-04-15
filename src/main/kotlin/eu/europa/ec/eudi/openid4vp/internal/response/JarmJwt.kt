@@ -92,7 +92,7 @@ private fun SiopOpenId4VPConfig.encrypt(
     val jweHeader = JWEHeader.Builder(jweAlgorithm, encryptionMethod)
         .apply {
             apv?.let { agreementPartyVInfo(Base64URL.encode(it)) }
-            apu?.let { agreementPartyUInfo(Base64URL.encode(it)) }
+            apu?.let { agreementPartyUInfo(it) }
         }
         .build()
 

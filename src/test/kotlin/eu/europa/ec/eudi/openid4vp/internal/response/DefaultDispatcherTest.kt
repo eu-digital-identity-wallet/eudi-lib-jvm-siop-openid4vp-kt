@@ -214,7 +214,7 @@ class DefaultDispatcherTest {
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                     if (vpToken is VpToken.MsoMdoc) {
                         assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
-                        assertEquals(Base64URL.encode(vpToken.apu), encryptedJwt.header.agreementPartyUInfo)
+                        assertEquals(vpToken.apu, encryptedJwt.header.agreementPartyUInfo)
                     } else {
                         assertNull(encryptedJwt.header.agreementPartyVInfo)
                         assertNull(encryptedJwt.header.agreementPartyUInfo)
@@ -229,9 +229,9 @@ class DefaultDispatcherTest {
             }
 
             test(VpToken.Generic("dummy_vp_token"))
-            test(VpToken.MsoMdoc("dummy_vp_token", "dummy_apu"))
+            test(VpToken.MsoMdoc("dummy_vp_token", Base64URL.encode("dummy_apu")))
             test(VpToken.Generic("dummy_vp_token"), URI.create("https://redirect.here"))
-            test(VpToken.MsoMdoc("dummy_vp_token", "dummy_apu"), URI.create("https://redirect.here"))
+            test(VpToken.MsoMdoc("dummy_vp_token", Base64URL.encode("dummy_apu")), URI.create("https://redirect.here"))
         }
 
         @Test

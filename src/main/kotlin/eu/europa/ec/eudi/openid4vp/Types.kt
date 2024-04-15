@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.util.Base64URL
 import java.io.Serializable
 import java.net.URI
 import java.net.URL
@@ -138,7 +139,7 @@ sealed interface VpToken {
     val value: String
 
     data class Generic(override val value: String) : VpToken
-    data class MsoMdoc(override val value: String, val apu: String) : VpToken
+    data class MsoMdoc(override val value: String, val apu: Base64URL) : VpToken
 }
 
 /**

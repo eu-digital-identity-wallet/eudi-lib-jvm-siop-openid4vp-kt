@@ -86,6 +86,7 @@ class UnvalidatedRequestResolverTest {
             SupportedClientIdScheme.Preregistered(
                 PreregisteredClient(
                     clientId = "Verifier",
+                    legalName = "Verifier",
                     jarConfig = JWSAlgorithm.RS256 to JwkSetSource.ByValue(
                         Json.parseToJsonElement(
                             JWKSet(signingKey).toPublicJWKSet().toString(),

@@ -67,7 +67,7 @@ class DefaultDispatcherTest {
 
     internal object Verifier {
 
-        const val CLIENT_ID = "https://client.example.org"
+        val CLIENT = Client.Preregistered("https://client.example.org", "Verifier")
 
         val jarmEncryptionKeyPair: ECKey = ECKeyGenerator(Curve.P_256)
             .keyUse(KeyUse.ENCRYPTION)
@@ -253,7 +253,7 @@ class DefaultDispatcherTest {
                     assertNull(encryptedJwt.header.agreementPartyUInfo)
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
+                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
                     assertEquals(vpTokenConsensus.vpToken.value, jwtClaimsSet.getClaim("vp_token"))
                 }
                 val outcome = dispatcher.dispatch(verifiersRequest, vpTokenConsensus)
@@ -286,7 +286,7 @@ class DefaultDispatcherTest {
                         assertNull(encryptedJwt.header.agreementPartyUInfo)
                         val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                         assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                        assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
+                        assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
                         assertEquals(vpTokenConsensus.vpToken.value, jwtClaimsSet.getClaim("vp_token"))
 
                     }
@@ -316,7 +316,7 @@ class DefaultDispatcherTest {
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT_ID)
+                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
                     assertNotNull(jwtClaimsSet.expirationTime)
                     assertEquals(vpTokenConsensus.vpToken.value, jwtClaimsSet.getClaim("vp_token"))
                 }
@@ -343,7 +343,7 @@ class DefaultDispatcherTest {
                     inputDescriptors = emptyList(),
                 ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
-                clientId = Verifier.CLIENT_ID,
+                client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
                 state = genState(),

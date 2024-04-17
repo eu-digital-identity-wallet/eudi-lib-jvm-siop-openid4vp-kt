@@ -41,12 +41,14 @@ sealed interface JwkSetSource {
  * The out-of-band knowledge of a Verifier, used in [SupportedClientIdScheme.Preregistered]
 
  * @param clientId the client id of a trusted verifier
+ * @param legalName the name of the trusted verifier
  * @param jarConfig in case, verifier communicates his request using JAR, the signing algorithm
  * that is uses to sign his request and a [way][JwkSetSource] to obtain his public key
  *
  */
 data class PreregisteredClient(
     val clientId: String,
+    val legalName: String,
     val jarConfig: Pair<JWSAlgorithm, JwkSetSource>? = null,
 )
 

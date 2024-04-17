@@ -102,7 +102,7 @@ private fun AuthenticatedClient.toClient(): Client =
     when (this) {
         is AuthenticatedClient.Preregistered -> Client.Preregistered(
             preregisteredClient.clientId,
-            preregisteredClient.name,
+            preregisteredClient.legalName,
         )
 
         is AuthenticatedClient.RedirectUri -> Client.RedirectUri(clientId)

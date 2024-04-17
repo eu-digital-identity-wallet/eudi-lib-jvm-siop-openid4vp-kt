@@ -30,7 +30,7 @@ import java.security.cert.X509Certificate
  */
 sealed interface Client : Serializable {
 
-    data class Preregistered(val clientId: String, val name: String) : Client
+    data class Preregistered(val clientId: String, val legalName: String) : Client
     data class RedirectUri(val clientId: URI) : Client
     data class X509SanDns(val clientId: String, val cert: X509Certificate) : Client
     data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
@@ -65,7 +65,7 @@ fun X509Certificate.legalName(): String? {
  */
 fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate::legalName): String? {
     return when (this) {
-        is Preregistered -> name
+        is Preregistered -> this.legalName
         is RedirectUri -> null
         is X509SanDns -> cert.legalName()
         is X509SanUri -> cert.legalName()

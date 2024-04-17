@@ -48,22 +48,27 @@ sealed interface Client : Serializable {
 }
 
 /**
- * Gets the legal name of this [Client].
+ * Gets the legal name (i.e. CN) from this [X509Certificate].
  */
-fun Client.legalName(): String? {
-    fun X509Certificate.commonName(): String? {
-        val distinguishedName = X500Name(subjectX500Principal.name)
-        val commonNames = distinguishedName.getRDNs(BCStyle.CN).orEmpty().toList()
-            .flatMap { it.typesAndValues.orEmpty().toList() }
-            .map { it.value.toString() }
-        return commonNames.firstOrNull { it.isNotBlank() }
-    }
+fun X509Certificate.legalName(): String? {
+    val distinguishedName = X500Name(subjectX500Principal.name)
+    val commonNames = distinguishedName.getRDNs(BCStyle.CN).orEmpty().toList()
+        .flatMap { it.typesAndValues.orEmpty().toList() }
+        .map { it.value.toString() }
+    return commonNames.firstOrNull { it.isNotBlank() }
+}
 
+/**
+ * Gets the legal name of this [Client].
+ *
+ * @param legalName a function to extract a legal name from a [X509Certificate]. Defaults to [X509Certificate.legalName].
+ */
+fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate::legalName): String? {
     return when (this) {
         is Preregistered -> name
         is RedirectUri -> null
-        is X509SanDns -> cert.commonName()
-        is X509SanUri -> cert.commonName()
+        is X509SanDns -> cert.legalName()
+        is X509SanUri -> cert.legalName()
     }
 }
 

@@ -53,7 +53,9 @@ sealed interface Client : Serializable {
 fun Client.legalName(): String? {
     fun X509Certificate.commonName(): String? {
         val distinguishedName = X500Name(subjectX500Principal.name)
-        val commonNames = distinguishedName.getRDNs(BCStyle.CN).orEmpty().mapNotNull { it.toString() }
+        val commonNames = distinguishedName.getRDNs(BCStyle.CN).orEmpty().toList()
+            .flatMap { it.typesAndValues.orEmpty().toList() }
+            .map { it.value.toString() }
         return commonNames.firstOrNull { it.isNotBlank() }
     }
 

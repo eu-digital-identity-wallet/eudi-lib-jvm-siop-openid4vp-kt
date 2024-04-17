@@ -15,10 +15,55 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x500.style.BCStyle
 import java.io.Serializable
+import java.net.URI
+import java.security.cert.X509Certificate
+
+/**
+ * Represents an OAuth2 RP that submitted an Authorization Request.
+ */
+sealed interface Client : Serializable {
+
+    data class Preregistered(val clientId: String, val name: String) : Client
+    data class RedirectUri(val clientId: URI) : Client
+    data class X509SanDns(val clientId: String, val cert: X509Certificate) : Client
+    data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
+
+    /**
+     * The id of the client.
+     */
+    val id: String
+        get() = when (this) {
+            is Preregistered -> clientId
+            is RedirectUri -> clientId.toString()
+            is X509SanDns -> clientId
+            is X509SanUri -> clientId.toString()
+        }
+}
+
+/**
+ * Gets the legal name of this [Client].
+ */
+fun Client.legalName(): String? {
+    fun X509Certificate.commonName(): String? {
+        val distinguishedName = X500Name(subjectX500Principal.name)
+        val commonNames = distinguishedName.getRDNs(BCStyle.CN).orEmpty().mapNotNull { it.toString() }
+        return commonNames.firstOrNull { it.isNotBlank() }
+    }
+
+    return when (this) {
+        is Preregistered -> name
+        is RedirectUri -> null
+        is X509SanDns -> cert.commonName()
+        is X509SanUri -> cert.commonName()
+    }
+}
 
 /**
  * Represents an OAUTH2 authorization request. In particular
@@ -28,7 +73,7 @@ import java.io.Serializable
  */
 sealed interface ResolvedRequestObject : Serializable {
 
-    val clientId: String
+    val client: Client
     val responseMode: ResponseMode
     val state: String?
     val nonce: String
@@ -43,7 +88,7 @@ sealed interface ResolvedRequestObject : Serializable {
      * SIOPv2 Authentication request for issuing an id_token
      */
     data class SiopAuthentication(
-        override val clientId: String,
+        override val client: Client,
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
@@ -57,7 +102,7 @@ sealed interface ResolvedRequestObject : Serializable {
      * OpenId4VP Authorization request for presenting a vp_token
      */
     data class OpenId4VPAuthorization(
-        override val clientId: String,
+        override val client: Client,
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
@@ -69,7 +114,7 @@ sealed interface ResolvedRequestObject : Serializable {
      * OpenId4VP combined with SIOPv2 request for presenting an id_token & vp_token
      */
     data class SiopOpenId4VPAuthentication(
-        override val clientId: String,
+        override val client: Client,
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,

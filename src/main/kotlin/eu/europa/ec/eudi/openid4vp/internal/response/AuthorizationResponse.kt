@@ -198,7 +198,7 @@ internal fun ResolvedRequestObject.responseWith(
 private fun ResolvedRequestObject.responsePayload(
     consensus: Consensus,
 ): AuthorizationResponsePayload = when (consensus) {
-    is Consensus.NegativeConsensus -> AuthorizationResponsePayload.NoConsensusResponseData(nonce, state, clientId)
+    is Consensus.NegativeConsensus -> AuthorizationResponsePayload.NoConsensusResponseData(nonce, state, client.id)
     is Consensus.PositiveConsensus -> when (this) {
         is ResolvedRequestObject.SiopAuthentication -> {
             require(consensus is Consensus.PositiveConsensus.IdTokenConsensus) { "IdTokenConsensus expected" }
@@ -206,7 +206,7 @@ private fun ResolvedRequestObject.responsePayload(
                 consensus.idToken,
                 nonce,
                 state,
-                clientId,
+                client.id,
             )
         }
 
@@ -217,7 +217,7 @@ private fun ResolvedRequestObject.responsePayload(
                 consensus.presentationSubmission,
                 nonce,
                 state,
-                clientId,
+                client.id,
             )
         }
 
@@ -229,7 +229,7 @@ private fun ResolvedRequestObject.responsePayload(
                 consensus.presentationSubmission,
                 nonce,
                 state,
-                clientId,
+                client.id,
             )
         }
     }

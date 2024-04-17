@@ -127,6 +127,7 @@ class Verifier private constructor(
         fun asPreregisteredClient(verifierApi: URL): PreregisteredClient {
             return PreregisteredClient(
                 "Verifier",
+                "Verifier",
                 JWSAlgorithm.RS256 to JwkSetSource.ByReference(URI("$verifierApi/wallet/public-keys.json")),
             )
         }

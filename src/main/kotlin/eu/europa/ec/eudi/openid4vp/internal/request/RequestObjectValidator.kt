@@ -65,7 +65,7 @@ internal sealed interface PresentationDefinitionSource {
  */
 internal sealed interface ValidatedRequestObject {
 
-    val clientId: String
+    val client: AuthenticatedClient
     val clientMetaDataSource: ClientMetaDataSource?
     val nonce: String
     val responseMode: ResponseMode
@@ -77,7 +77,7 @@ internal sealed interface ValidatedRequestObject {
     data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
         override val clientMetaDataSource: ClientMetaDataSource?,
-        override val clientId: String,
+        override val client: AuthenticatedClient,
         override val nonce: String,
         val scope: Scope,
         override val responseMode: ResponseMode,
@@ -90,7 +90,7 @@ internal sealed interface ValidatedRequestObject {
     data class OpenId4VPAuthorization(
         val presentationDefinitionSource: PresentationDefinitionSource,
         override val clientMetaDataSource: ClientMetaDataSource?,
-        override val clientId: String,
+        override val client: AuthenticatedClient,
         override val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String?,
@@ -103,7 +103,7 @@ internal sealed interface ValidatedRequestObject {
         val idTokenType: List<IdTokenType>,
         val presentationDefinitionSource: PresentationDefinitionSource,
         override val clientMetaDataSource: ClientMetaDataSource?,
-        override val clientId: String,
+        override val client: AuthenticatedClient,
         override val nonce: String,
         val scope: Scope,
         override val responseMode: ResponseMode,
@@ -128,12 +128,6 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     val nonce = requiredNonce(requestObject)
     val responseType = requiredResponseType(requestObject)
     val responseMode = requiredResponseMode(client, requestObject)
-    val clientId = when (client) {
-        is AuthenticatedClient.Preregistered -> client.preregisteredClient.clientId
-        is AuthenticatedClient.RedirectUri -> client.clientId.toString()
-        is AuthenticatedClient.X509SanDns -> client.clientId
-        is AuthenticatedClient.X509SanUri -> client.clientId.toString()
-    }
     val presentationDefinitionSource =
         optionalPresentationDefinitionSource(requestObject, responseType) { scope().getOrNull() }
     val clientMetaDataSource = optionalClientMetaDataSource(responseMode, requestObject)
@@ -143,7 +137,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
         idTokenType,
         checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
         clientMetaDataSource,
-        clientId,
+        client,
         nonce,
         scope().getOrThrow(),
         responseMode,
@@ -153,7 +147,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     fun idToken() = SiopAuthentication(
         idTokenType,
         clientMetaDataSource,
-        clientId,
+        client,
         nonce,
         scope().getOrThrow(),
         responseMode,
@@ -163,7 +157,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     fun vpToken() = OpenId4VPAuthorization(
         checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
         clientMetaDataSource,
-        clientId,
+        client,
         nonce,
         responseMode,
         state,

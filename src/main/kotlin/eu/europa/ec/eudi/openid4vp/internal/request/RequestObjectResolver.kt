@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import eu.europa.ec.eudi.openid4vp.Client
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
@@ -42,7 +43,7 @@ internal class RequestObjectResolver(
     ): ResolvedRequestObject = coroutineScope {
         val presentationDefinition = presentationDefinition(request.presentationDefinitionSource)
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
-            clientId = request.clientId,
+            client = request.client.toClient(),
             responseMode = request.responseMode,
             state = request.state,
             nonce = request.nonce,
@@ -60,7 +61,7 @@ internal class RequestObjectResolver(
     ): ResolvedRequestObject {
         val presentationDefinition = presentationDefinition(authorization.presentationDefinitionSource)
         return ResolvedRequestObject.OpenId4VPAuthorization(
-            clientId = authorization.clientId,
+            client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
             state = authorization.state,
             nonce = authorization.nonce,
@@ -74,7 +75,7 @@ internal class RequestObjectResolver(
         clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject {
         return ResolvedRequestObject.SiopAuthentication(
-            clientId = authentication.clientId,
+            client = authentication.client.toClient(),
             responseMode = authentication.responseMode,
             state = authentication.state,
             nonce = authentication.nonce,
@@ -96,3 +97,15 @@ internal class RequestObjectResolver(
         else null
     }
 }
+
+private fun AuthenticatedClient.toClient(): Client =
+    when (this) {
+        is AuthenticatedClient.Preregistered -> Client.Preregistered(
+            preregisteredClient.clientId,
+            preregisteredClient.name,
+        )
+
+        is AuthenticatedClient.RedirectUri -> Client.RedirectUri(clientId)
+        is AuthenticatedClient.X509SanDns -> Client.X509SanDns(clientId, chain[0])
+        is AuthenticatedClient.X509SanUri -> Client.X509SanUri(clientId, chain[0])
+    }

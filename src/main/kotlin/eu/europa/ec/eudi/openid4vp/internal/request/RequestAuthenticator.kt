@@ -27,10 +27,10 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
+import eu.europa.ec.eudi.openid4vp.internal.*
+import eu.europa.ec.eudi.openid4vp.internal.DID
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
-import eu.europa.ec.eudi.openid4vp.internal.sanOfDNSName
-import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -165,19 +165,20 @@ private suspend fun lookupKeyByDID(
     clientId: DID,
     lookupPublicKeyByDIDUrl: LookupPublicKeyByDIDUrl,
 ): PublicKey = withContext(Dispatchers.IO) {
-    val keyUrl: DIDUrl = run {
+    val keyUrl: AbsoluteDIDUrl = run {
         val kid = ensureNotNull(request.jwt.header?.keyID) {
             invalidJarJwt("Missing kid fot client_id $clientId")
         }
-        ensureNotNull(DIDUrl.parse(kid).getOrNull()) {
+        ensureNotNull(AbsoluteDIDUrl.parse(kid).getOrNull()) {
             invalidJarJwt("kid should be DID URL")
         }
     }
     ensure(keyUrl.toString().startsWith(clientId.toString())) {
         invalidJarJwt("kid should be DID URL sub-resource of $clientId but is $keyUrl")
     }
-    ensureNotNull(lookupPublicKeyByDIDUrl.resolveKey(keyUrl.uri)) {
-        TODO("Raise a suitable exception")
+    val key = runCatching { lookupPublicKeyByDIDUrl.resolveKey(keyUrl.uri) }.getOrNull()
+    ensureNotNull(key) {
+        RequestValidationError.DIDResolutionFailed(keyUrl.toString()).asException()
     }
 }
 

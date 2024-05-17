@@ -13,37 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.europa.ec.eudi.openid4vp
+package eu.europa.ec.eudi.openid4vp.internal
 
 import java.net.URI
-import java.security.PublicKey
 
 @JvmInline
-value class DIDUrl private constructor(val uri: URI) {
+internal value class AbsoluteDIDUrl private constructor(val uri: URI) {
+
     override fun toString(): String = uri.toString()
 
     companion object {
-        fun parse(s: String): Result<DIDUrl> = runCatching {
+        fun parse(s: String): Result<AbsoluteDIDUrl> = runCatching {
             val uri = URI.create(s)
-            require(uri.scheme == "did") { "Scheme should be did" }
-            require(uri.isAbsolute)
+            uri.ensureScheme()
+            uri.ensureIsAbsolute()
             val (_, method, _) = s.split(":", limit = 3)
             require(method.isNotEmpty())
-            DIDUrl(uri)
+            require(!uri.query.isNullOrEmpty() || !uri.path.isNullOrBlank() || !uri.fragment.isNullOrBlank())
+            AbsoluteDIDUrl(uri)
         }
     }
 }
 
 @JvmInline
-value class DID private constructor(val uri: URI) {
+internal value class DID private constructor(val uri: URI) {
 
     override fun toString(): String = uri.toString()
 
     companion object {
         fun parse(s: String): Result<DID> = runCatching {
             val uri = URI.create(s)
-            require(uri.scheme == "did") { "Scheme should be did" }
-            require(uri.isAbsolute)
+            uri.ensureScheme()
+            uri.ensureIsAbsolute()
             require(uri.path.isNullOrEmpty())
             require(uri.fragment.isNullOrEmpty())
             require(uri.query.isNullOrEmpty())
@@ -55,8 +56,5 @@ value class DID private constructor(val uri: URI) {
     }
 }
 
-typealias DIDMethod = String
-
-interface LookupPublicKeyByDIDUrl {
-    suspend fun resolveKey(didUrl: URI): PublicKey?
-}
+private fun URI.ensureScheme() = require(scheme == "did") { "Scheme should be did" }
+private fun URI.ensureIsAbsolute() = require(isAbsolute)

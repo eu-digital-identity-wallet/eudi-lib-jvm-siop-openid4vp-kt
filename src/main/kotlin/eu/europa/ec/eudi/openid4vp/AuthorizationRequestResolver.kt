@@ -34,7 +34,7 @@ sealed interface Client : Serializable {
     data class RedirectUri(val clientId: URI) : Client
     data class X509SanDns(val clientId: String, val cert: X509Certificate) : Client
     data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
-    data class DIDClient(val clientId: DID) : Client
+    data class DIDClient(val clientId: URI) : Client
 
     /**
      * The id of the client.
@@ -264,6 +264,8 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class InvalidClientIdScheme(val value: String) : RequestValidationError
 
     data class InvalidIdTokenType(val value: String) : RequestValidationError
+
+    data class DIDResolutionFailed(val didUrl: String) : RequestValidationError
 }
 
 /**

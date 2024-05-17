@@ -98,6 +98,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is UnableToFetchClientMetadata,
                 is UnableToFetchPresentationDefinition,
                 is UnableToFetchRequestObject,
+                is DIDResolutionFailed,
                 -> PROCESSING_FAILURE
             }
         }

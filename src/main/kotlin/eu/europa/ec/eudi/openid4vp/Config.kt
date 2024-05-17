@@ -29,6 +29,7 @@ import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
+import java.security.PublicKey
 import java.security.cert.X509Certificate
 import java.time.Duration
 
@@ -54,6 +55,10 @@ data class PreregisteredClient(
 
 fun interface X509CertificateTrust {
     fun isTrusted(chain: List<X509Certificate>): Boolean
+}
+
+interface LookupPublicKeyByDIDUrl {
+    suspend fun resolveKey(didUrl: URI): PublicKey?
 }
 
 /**

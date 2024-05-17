@@ -99,6 +99,8 @@ sealed interface SupportedClientIdScheme {
      * In this scheme, Verifier must NOT sign his request
      */
     data object RedirectUri : SupportedClientIdScheme
+
+    data class DID(val lookup: LookupPublicKeyByDIDUrl) : SupportedClientIdScheme
 }
 
 /**
@@ -264,6 +266,7 @@ internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme)
         is SupportedClientIdScheme.X509SanUri -> ClientIdScheme.X509_SAN_URI
         is SupportedClientIdScheme.X509SanDns -> ClientIdScheme.X509_SAN_DNS
         SupportedClientIdScheme.RedirectUri -> ClientIdScheme.RedirectUri
+        is SupportedClientIdScheme.DID -> ClientIdScheme.DID
     }
 
     return supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }

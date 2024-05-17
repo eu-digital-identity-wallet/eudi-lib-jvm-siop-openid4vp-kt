@@ -35,11 +35,14 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.net.URI
+import java.security.PublicKey
 import java.security.cert.X509Certificate
 
 internal sealed interface AuthenticatedClient {
@@ -47,6 +50,7 @@ internal sealed interface AuthenticatedClient {
     data class RedirectUri(val clientId: URI) : AuthenticatedClient
     data class X509SanDns(val clientId: String, val chain: List<X509Certificate>) : AuthenticatedClient
     data class X509SanUri(val clientId: URI, val chain: List<X509Certificate>) : AuthenticatedClient
+    data class DIDClient(val client: DID, val publicKey: PublicKey) : AuthenticatedClient
 }
 
 internal data class AuthenticatedRequest(
@@ -74,7 +78,7 @@ internal class RequestAuthenticator(siopOpenId4VPConfig: SiopOpenId4VPConfig, ht
 }
 
 private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
-    fun authenticateClient(request: FetchedRequest): AuthenticatedClient {
+    suspend fun authenticateClient(request: FetchedRequest): AuthenticatedClient {
         val requestObject = when (request) {
             is FetchedRequest.JwtSecured -> request.jwt.requestObject()
             is FetchedRequest.Plain -> request.requestObject
@@ -117,6 +121,14 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
                 val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.X509SanUri(clientIdUri, chain)
             }
+
+            is SupportedClientIdScheme.DID -> {
+                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                val clientIdAsDID =
+                    ensureNotNull(DID.parse(clientId).getOrNull()) { RequestValidationError.InvalidClientId.asException() }
+                val clientPubKey = lookupKeyByDID(request, clientIdAsDID, clientIdScheme.lookup)
+                AuthenticatedClient.DIDClient(clientIdAsDID, clientPubKey)
+            }
         }
     }
 
@@ -145,6 +157,27 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
         }
         ensure(trust.isTrusted(pubCertChain)) { invalidJarJwt("Untrusted x5c") }
         return pubCertChain
+    }
+}
+
+private suspend fun lookupKeyByDID(
+    request: FetchedRequest.JwtSecured,
+    clientId: DID,
+    lookupPublicKeyByDIDUrl: LookupPublicKeyByDIDUrl,
+): PublicKey = withContext(Dispatchers.IO) {
+    val keyUrl: DIDUrl = run {
+        val kid = ensureNotNull(request.jwt.header?.keyID) {
+            invalidJarJwt("Missing kid fot client_id $clientId")
+        }
+        ensureNotNull(DIDUrl.parse(kid).getOrNull()) {
+            invalidJarJwt("kid should be DID URL")
+        }
+    }
+    ensure(keyUrl.toString().startsWith(clientId.toString())) {
+        invalidJarJwt("kid should be DID URL sub-resource of $clientId but is $keyUrl")
+    }
+    ensureNotNull(lookupPublicKeyByDIDUrl.resolveKey(keyUrl.uri)) {
+        TODO("Raise a suitable exception")
     }
 }
 
@@ -194,6 +227,9 @@ private class JarJwtSignatureVerifier(
 
             is AuthenticatedClient.RedirectUri ->
                 throw RequestValidationError.UnsupportedClientIdScheme.asException()
+
+            is AuthenticatedClient.DIDClient ->
+                JWSKeySelector<SecurityContext> { _, _ -> listOf(client.publicKey) }
         }
 
     @Throws(AuthorizationRequestException::class)

@@ -34,6 +34,7 @@ sealed interface Client : Serializable {
     data class RedirectUri(val clientId: URI) : Client
     data class X509SanDns(val clientId: String, val cert: X509Certificate) : Client
     data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
+    data class DIDClient(val clientId: DID) : Client
 
     /**
      * The id of the client.
@@ -44,11 +45,12 @@ sealed interface Client : Serializable {
             is RedirectUri -> clientId.toString()
             is X509SanDns -> clientId
             is X509SanUri -> clientId.toString()
+            is DIDClient -> clientId.toString()
         }
 }
 
 /**
- * Gets the legal name (i.e. CN) from this [X509Certificate].
+ * Gets the legal name (i.e., CN) from this [X509Certificate].
  */
 fun X509Certificate.legalName(): String? {
     val distinguishedName = X500Name(subjectX500Principal.name)
@@ -69,6 +71,7 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
         is RedirectUri -> null
         is X509SanDns -> cert.legalName()
         is X509SanUri -> cert.legalName()
+        is DIDClient -> null
     }
 }
 

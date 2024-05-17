@@ -249,6 +249,8 @@ private fun requiredResponseMode(
         is AuthenticatedClient.RedirectUri -> ensure(client.clientId == uri) {
             UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
         }
+
+        is AuthenticatedClient.DIDClient -> Unit
     }
     return responseMode
 }

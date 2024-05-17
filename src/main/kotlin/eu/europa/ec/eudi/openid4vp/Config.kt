@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.ECKey
@@ -105,7 +106,27 @@ sealed interface SupportedClientIdScheme {
      */
     data object RedirectUri : SupportedClientIdScheme
 
+    /**
+     * Wallet trusts verifiers that are able to present a client identifier which is a DID
+     *
+     * In this scheme, Verifier must always sign his request (JAR), signed by a key
+     * that can be referenced via the DID
+     *
+     * @param lookup a function for getting the public key of the verifier by
+     * resolving a given DID URL
+     */
     data class DID(val lookup: LookupPublicKeyByDIDUrl) : SupportedClientIdScheme
+
+    /**
+     * Wallet trust verifiers that are able to present a signed Verifier Attestation, which
+     * is issued by a party trusted by the Wallet
+     *
+     * In this scheme, Verifier must always sign his request (JAR), having in its JOSE
+     * header a Verifier Attestation JWT under `jwt` claim
+     *
+     * @param trust a function for verifying the digital signature of the Verifier Attestation JWT.
+     */
+    data class VerifierAttestation(val trust: JWSVerifier) : SupportedClientIdScheme
 }
 
 /**
@@ -272,6 +293,7 @@ internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme)
         is SupportedClientIdScheme.X509SanDns -> ClientIdScheme.X509_SAN_DNS
         SupportedClientIdScheme.RedirectUri -> ClientIdScheme.RedirectUri
         is SupportedClientIdScheme.DID -> ClientIdScheme.DID
+        is SupportedClientIdScheme.VerifierAttestation -> ClientIdScheme.VERIFIER_ATTESTATION
     }
 
     return supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }

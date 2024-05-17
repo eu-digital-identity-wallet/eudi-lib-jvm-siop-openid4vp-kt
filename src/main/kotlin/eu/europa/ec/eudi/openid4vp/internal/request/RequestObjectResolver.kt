@@ -109,4 +109,5 @@ private fun AuthenticatedClient.toClient(): Client =
         is AuthenticatedClient.X509SanDns -> Client.X509SanDns(clientId, chain[0])
         is AuthenticatedClient.X509SanUri -> Client.X509SanUri(clientId, chain[0])
         is AuthenticatedClient.DIDClient -> Client.DIDClient(client.uri)
+        is AuthenticatedClient.Attested -> Client.Attested(clientId)
     }

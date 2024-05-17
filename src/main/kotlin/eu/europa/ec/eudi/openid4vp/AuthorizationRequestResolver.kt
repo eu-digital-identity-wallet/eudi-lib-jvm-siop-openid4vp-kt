@@ -35,6 +35,7 @@ sealed interface Client : Serializable {
     data class X509SanDns(val clientId: String, val cert: X509Certificate) : Client
     data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
     data class DIDClient(val clientId: URI) : Client
+    data class Attested(val clientId: String) : Client
 
     /**
      * The id of the client.
@@ -46,6 +47,7 @@ sealed interface Client : Serializable {
             is X509SanDns -> clientId
             is X509SanUri -> clientId.toString()
             is DIDClient -> clientId.toString()
+            is Attested -> clientId
         }
 }
 
@@ -72,6 +74,7 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
         is X509SanDns -> cert.legalName()
         is X509SanUri -> cert.legalName()
         is DIDClient -> null
+        is Attested -> null
     }
 }
 

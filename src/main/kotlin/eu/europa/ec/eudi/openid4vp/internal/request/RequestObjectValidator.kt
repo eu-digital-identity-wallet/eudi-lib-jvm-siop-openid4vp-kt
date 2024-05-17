@@ -251,6 +251,24 @@ private fun requiredResponseMode(
         }
 
         is AuthenticatedClient.DIDClient -> Unit
+
+        is AuthenticatedClient.Attested -> {
+            val allowedUris = when (responseMode) {
+                is ResponseMode.Query,
+                is ResponseMode.QueryJwt,
+                is ResponseMode.Fragment,
+                is ResponseMode.FragmentJwt,
+                -> client.claims.redirectUris
+                is ResponseMode.DirectPost,
+                is ResponseMode.DirectPostJwt,
+                -> client.claims.responseUris
+            }
+            if (!allowedUris.isNullOrEmpty()) {
+                ensure(uri.toString() in allowedUris) {
+                    UnsupportedResponseMode("$responseMode use a URI that is not included in attested URIs $allowedUris").asException()
+                }
+            }
+        }
     }
     return responseMode
 }

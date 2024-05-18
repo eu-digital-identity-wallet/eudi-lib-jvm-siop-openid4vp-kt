@@ -79,7 +79,7 @@ internal class RequestAuthenticator(siopOpenId4VPConfig: SiopOpenId4VPConfig, ht
     }
 }
 
-private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
+internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
     suspend fun authenticateClient(request: FetchedRequest): AuthenticatedClient {
         val requestObject = when (request) {
             is FetchedRequest.JwtSecured -> request.jwt.requestObject()

@@ -100,13 +100,17 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             SupportedClientIdScheme.RedirectUri -> {
-                ensure(request is FetchedRequest.Plain) { invalidScheme("$clientIdScheme cannot be used in signed request") }
+                ensure(request is FetchedRequest.Plain) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in signed request")
+                }
                 val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.RedirectUri(clientIdUri)
             }
 
             is SupportedClientIdScheme.X509SanDns -> {
-                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
                 val chain = x5c(request, clientIdScheme.trust) {
                     val dnsNames = sanOfDNSName().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses DNS names") }
@@ -115,7 +119,9 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             is SupportedClientIdScheme.X509SanUri -> {
-                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
                 val chain = x5c(request, clientIdScheme.trust) {
                     val dnsNames = sanOfUniformResourceIdentifier().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses URI names") }
@@ -125,7 +131,9 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             is SupportedClientIdScheme.DID -> {
-                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
                 val clientIdAsDID =
                     ensureNotNull(
                         DID.parse(clientId).getOrNull(),
@@ -135,7 +143,9 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             is SupportedClientIdScheme.VerifierAttestation -> {
-                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
                 val attestedClaims = verifierAttestation(request, clientId, clientIdScheme.trust)
                 AuthenticatedClient.Attested(clientId, attestedClaims)
             }
@@ -177,7 +187,7 @@ private suspend fun lookupKeyByDID(
 ): PublicKey = withContext(Dispatchers.IO) {
     val keyUrl: AbsoluteDIDUrl = run {
         val kid = ensureNotNull(request.jwt.header?.keyID) {
-            invalidJarJwt("Missing kid fot client_id $clientId")
+            invalidJarJwt("Missing kid for client_id $clientId")
         }
         ensureNotNull(AbsoluteDIDUrl.parse(kid).getOrNull()) {
             invalidJarJwt("kid should be DID URL")

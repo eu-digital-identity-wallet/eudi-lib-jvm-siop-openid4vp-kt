@@ -127,6 +127,15 @@ sealed interface SupportedClientIdScheme {
      * @param trust a function for verifying the digital signature of the Verifier Attestation JWT.
      */
     data class VerifierAttestation(val trust: JWSVerifier) : SupportedClientIdScheme
+
+    fun scheme(): ClientIdScheme = when (this) {
+        is DID -> ClientIdScheme.DID
+        is Preregistered -> ClientIdScheme.PreRegistered
+        RedirectUri -> ClientIdScheme.RedirectUri
+        is VerifierAttestation -> ClientIdScheme.VERIFIER_ATTESTATION
+        is X509SanDns -> ClientIdScheme.X509_SAN_DNS
+        is X509SanUri -> ClientIdScheme.X509_SAN_URI
+    }
 }
 
 /**

@@ -37,6 +37,7 @@ import java.net.URI
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class RequestAuthenticatorTest
 
@@ -169,7 +170,7 @@ class ClientAuthenticatorTest {
     }
 
     @Test
-    fun `when scheme is did signed request passes`() = runTest {
+    fun `when scheme is DID cannot be used with unsigned requests`() = runTest {
         val clientId = DID.parse("did:example:123").getOrThrow()
         val keyUrl = AbsoluteDIDUrl.parse("$clientId#01").getOrThrow()
         val (alg, key) = randomKey()
@@ -193,10 +194,89 @@ class ClientAuthenticatorTest {
         val request = UnvalidatedRequestObject(
             clientId = clientId.toString(),
             clientIdScheme = "did",
-        ).signed(alg, key) { keyID(keyUrl.toString()) }
+        ).plain()
 
-        val client = clientAuthenticator.authenticateClient(request)
-        assertEquals(AuthenticatedClient.DIDClient(clientId, key.toPublicKey()), client)
+        val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+            clientAuthenticator.authenticateClient(request)
+        }
+        assertTrue {
+            error.value.endsWith("cannot be used in unsigned request")
+        }
+    }
+
+    @Test
+    fun `when scheme is DID`() = runTest {
+        val clientId = DID.parse("did:example:123").getOrThrow()
+        val keyUrl = AbsoluteDIDUrl.parse("$clientId#01").getOrThrow()
+        val (alg, key) = randomKey()
+
+        val clientAuthenticator = ClientAuthenticator(
+            SiopOpenId4VPConfig(
+                jarmConfiguration = JarmConfiguration.NotSupported,
+                vpConfiguration = VPConfiguration(
+                    presentationDefinitionUriSupported = false,
+                    emptyMap(),
+                ),
+                supportedClientIdSchemes = listOf(
+                    SupportedClientIdScheme.DID { url ->
+                        assertEquals(keyUrl.uri, url)
+                        key.toPublicKey()
+                    },
+                ),
+            ),
+        )
+        run {
+            // without kid JOSE Header
+            val request = UnvalidatedRequestObject(
+                clientId = clientId.toString(),
+                clientIdScheme = "did",
+            ).signed(alg, key)
+
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.cause.startsWith("Missing kid")
+            }
+        }
+        run {
+            // with a non DID URL kid JOSE Header
+            val request = UnvalidatedRequestObject(
+                clientId = clientId.toString(),
+                clientIdScheme = "did",
+            ).signed(alg, key) { keyID("foo") }
+
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.cause.endsWith("kid should be DID URL")
+            }
+        }
+        run {
+            // with a irrelevant DID
+            val request = UnvalidatedRequestObject(
+                clientId = clientId.toString(),
+                clientIdScheme = "did",
+            ).signed(alg, key) { keyID("did:foo:bar#1") }
+
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.cause.contains("kid should be DID URL sub-resource")
+            }
+        }
+
+        run {
+            val request = UnvalidatedRequestObject(
+                clientId = clientId.toString(),
+                clientIdScheme = "did",
+            ).signed(alg, key) { keyID(keyUrl.toString()) }
+
+            val client = clientAuthenticator.authenticateClient(request)
+            assertEquals(AuthenticatedClient.DIDClient(clientId, key.toPublicKey()), client)
+        }
     }
 }
 

@@ -58,7 +58,7 @@ fun interface X509CertificateTrust {
     fun isTrusted(chain: List<X509Certificate>): Boolean
 }
 
-interface LookupPublicKeyByDIDUrl {
+fun interface LookupPublicKeyByDIDUrl {
     suspend fun resolveKey(didUrl: URI): PublicKey?
 }
 

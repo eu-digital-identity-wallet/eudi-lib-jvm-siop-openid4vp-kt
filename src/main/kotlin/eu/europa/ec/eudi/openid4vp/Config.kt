@@ -122,8 +122,12 @@ sealed interface SupportedClientIdScheme {
      * header a Verifier Attestation JWT under `jwt` claim
      *
      * @param trust a function for verifying the digital signature of the Verifier Attestation JWT.
+     * @param clockSkew clockSkew between wallet and attestation issuer
      */
-    data class VerifierAttestation(val trust: JWSVerifier) : SupportedClientIdScheme
+    data class VerifierAttestation(
+        val trust: JWSVerifier,
+        val clockSkew: Duration = Duration.ofSeconds(10),
+    ) : SupportedClientIdScheme
 
     fun scheme(): ClientIdScheme = when (this) {
         is DID -> ClientIdScheme.DID

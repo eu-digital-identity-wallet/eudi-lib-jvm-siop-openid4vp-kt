@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.jwk.AsymmetricJWK
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
@@ -26,8 +25,12 @@ import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.*
 import com.nimbusds.jose.shaded.gson.Gson
 import com.nimbusds.jose.util.X509CertUtils
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.BadJWTException
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
+import com.nimbusds.jwt.proc.JWTClaimsSetVerifier
+import com.nimbusds.jwt.util.DateUtils
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.*
@@ -46,6 +49,10 @@ import java.security.PublicKey
 import java.security.cert.X509Certificate
 import java.time.Clock
 import java.time.Instant
+import java.util.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toKotlinDuration
 
 internal sealed interface AuthenticatedClient {
     data class Preregistered(val preregisteredClient: PreregisteredClient) : AuthenticatedClient
@@ -147,8 +154,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val attestedClaims =
-                    verifierAttestation(request, clientId, clientIdScheme.trust, siopOpenId4VPConfig.clock)
+                val attestedClaims = verifierAttestation(siopOpenId4VPConfig.clock, clientIdScheme, request, clientId)
                 AuthenticatedClient.Attested(clientId, attestedClaims)
             }
         }
@@ -205,11 +211,12 @@ private suspend fun lookupKeyByDID(
 }
 
 private fun verifierAttestation(
+    clock: Clock,
+    supportedScheme: SupportedClientIdScheme.VerifierAttestation,
     request: FetchedRequest.JwtSecured,
     clientId: String,
-    trust: JWSVerifier,
-    clock: Clock,
 ): VerifierAttestationClaims {
+    val (trust, skew) = supportedScheme
     fun invalidVerifierAttestationJwt(cause: String?) =
         invalidJarJwt("Invalid VerifierAttestation JWT. Details: $cause")
 
@@ -231,6 +238,7 @@ private fun verifierAttestation(
     }
 
     val verifierAttestationClaimSet = try {
+        ExpNbfChecks(clock, skew.toKotlinDuration()).verify(verifierAttestationJwt.jwtClaimsSet, null)
         verifierAttestationJwt.verifierAttestationClaims()
     } catch (t: Throwable) {
         throw invalidVerifierAttestationJwt(t.message)
@@ -271,6 +279,7 @@ private class JarJwtSignatureVerifier(
                         null,
                     )
                 jwsKeySelector = jwsKeySelector(client)
+                jwtClaimsSetVerifier = ExpNbfChecks(siopOpenId4VPConfig.clock, 60.seconds)
             }
             jwtProcessor.process(signedJwt, null)
         } catch (e: JOSEException) {
@@ -407,6 +416,31 @@ private fun VerifierAttestationClaims.ensureValidAt(now: Instant) {
         require(nbf < exp) { "not before after expiration" }
         iat?.let { iat ->
             require(nbf >= iat) { "not before cannot be before issuance" }
+        }
+    }
+}
+
+private class ExpNbfChecks(
+    private val clock: Clock,
+    private val skew: Duration,
+) : JWTClaimsSetVerifier<SecurityContext> {
+
+    @Throws(BadJWTException::class)
+    override fun verify(claimsSet: JWTClaimsSet, context: SecurityContext?) {
+        val now = Date.from(clock.instant())
+        val skewInSeconds = skew.inWholeSeconds
+        val exp = claimsSet.expirationTime
+        if (exp != null) {
+            if (!DateUtils.isAfter(exp, now, skewInSeconds)) {
+                throw BadJWTException("Expired JWT")
+            }
+        }
+
+        val nbf = claimsSet.notBeforeTime
+        if (nbf != null) {
+            if (!DateUtils.isBefore(nbf, now, skewInSeconds)) {
+                throw BadJWTException("JWT before use time")
+            }
         }
     }
 }

@@ -15,15 +15,14 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
+import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
@@ -32,6 +31,8 @@ import eu.europa.ec.eudi.openid4vp.internal.DID
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertThrows
 import java.net.URI
 import java.time.Clock
@@ -40,267 +41,293 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-//
-// Common tests
-//
+class ClientAuthenticatorTest {
 
-class ClientAuthenticatorCommonTest {
+    @DisplayName("when handling a request")
+    @Nested
+    inner class ClientAuthenticatorCommonTest {
 
-    private val cfg = SiopOpenId4VPConfig(
-        supportedClientIdSchemes = listOf(
-            SupportedClientIdScheme.RedirectUri,
-        ),
-        clock = Clock.systemDefaultZone(),
-    )
-    private val clientAuthenticator = ClientAuthenticator(cfg)
+        private val cfg = SiopOpenId4VPConfig(
+            supportedClientIdSchemes = listOf(
+                SupportedClientIdScheme.RedirectUri,
+            ),
+            clock = Clock.systemDefaultZone(),
+        )
+        private val clientAuthenticator = ClientAuthenticator(cfg)
 
-    @Test
-    fun `when client_id is missing, no authentication can be done`() = runTest {
-        val request = UnvalidatedRequestObject(clientId = null).plain()
-        assertFailsWithError<RequestValidationError.MissingClientId> {
-            clientAuthenticator.authenticateClient(request)
+        @Test
+        fun `if client_id is missing, authentication fails`() = runTest {
+            val request = UnvalidatedRequestObject(clientId = null).plain()
+            assertFailsWithError<RequestValidationError.MissingClientId> {
+                clientAuthenticator.authenticateClient(request)
+            }
+        }
+
+        @Test
+        fun `if client_id_scheme is missing, authentication fails`() = runTest {
+            val request = UnvalidatedRequestObject(
+                clientId = "foo",
+                clientIdScheme = null,
+            ).plain()
+
+            assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+                clientAuthenticator.authenticateClient(request)
+            }
+        }
+
+        @Test
+        fun `if client_id_scheme is invalid, authentication fails`() = runTest {
+            val request = UnvalidatedRequestObject(
+                clientId = "foo",
+                responseMode = "bar",
+            ).plain()
+
+            assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+                clientAuthenticator.authenticateClient(request)
+            }
         }
     }
 
-    @Test
-    fun `when scheme is missing, no authentication can be done`() = runTest {
-        val request = UnvalidatedRequestObject(
-            clientId = "foo",
-            clientIdScheme = null,
-        ).plain()
+    @DisplayName("when handling a request with `redirect_uri` scheme")
+    @Nested
+    inner class ClientAuthenticatorWhenUsingRedirectUriTest {
+        private val clientId = URI.create("http://localhost:8080")
+        private val cfg = SiopOpenId4VPConfig(
+            supportedClientIdSchemes = listOf(
+                SupportedClientIdScheme.RedirectUri,
+            ),
+        )
+        private val clientAuthenticator = ClientAuthenticator(cfg)
 
-        assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
-            clientAuthenticator.authenticateClient(request)
-        }
-    }
+        @Test
+        fun `if request is not signed, authentication succeeds`() =
+            runTest {
+                val request = UnvalidatedRequestObject(
+                    clientId = clientId.toString(),
+                    clientIdScheme = "redirect_uri",
+                ).plain()
 
-    @Test
-    fun `when scheme is wrong, no authentication can be done`() = runTest {
-        val request = UnvalidatedRequestObject(
-            clientId = "foo",
-            responseMode = "bar",
-        ).plain()
+                val client = clientAuthenticator.authenticateClient(request)
+                assertEquals(AuthenticatedClient.RedirectUri(clientId), client)
+            }
 
-        assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
-            clientAuthenticator.authenticateClient(request)
-        }
-    }
-}
-
-//
-// Redirect URI tests
-//
-
-class ClientAuthenticatorWhenUsingRedirectUriTest {
-    private val clientId = URI.create("http://localhost:8080")
-    private val cfg = SiopOpenId4VPConfig(
-        supportedClientIdSchemes = listOf(
-            SupportedClientIdScheme.RedirectUri,
-        ),
-        clock = Clock.systemDefaultZone(),
-    )
-    private val clientAuthenticator = ClientAuthenticator(cfg)
-
-    @Test
-    fun `when scheme is redirect_uri, client_id is URI and request is not signed, we have authentication`() =
-        runTest {
+        @Test
+        fun `if  request is signed, authentication fails`() = runTest {
+            val (alg, key) = randomKey()
             val request = UnvalidatedRequestObject(
                 clientId = clientId.toString(),
                 clientIdScheme = "redirect_uri",
-            ).plain()
+            ).signed(alg, key)
 
-            val client = clientAuthenticator.authenticateClient(request)
-            assertEquals(AuthenticatedClient.RedirectUri(clientId), client)
-        }
-
-    @Test
-    fun `when scheme is redirect_uri signed request fail`() = runTest {
-        val (alg, key) = randomKey()
-        val request = UnvalidatedRequestObject(
-            clientId = clientId.toString(),
-            clientIdScheme = "redirect_uri",
-        ).signed(alg, key)
-
-        val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
-            clientAuthenticator.authenticateClient(request)
-        }
-        assertEquals("RedirectUri cannot be used in signed request", error.value)
-    }
-}
-
-//
-// DID scheme tests
-//
-
-class ClientAuthenticatorWhenUsingDIDTest {
-    private val clientId = DID.parse("did:example:123").getOrThrow()
-    private val keyUrl = AbsoluteDIDUrl.parse("$clientId#01").getOrThrow()
-    private val algAndKey = randomKey()
-    private val cfg = SiopOpenId4VPConfig(
-        supportedClientIdSchemes = listOf(
-            SupportedClientIdScheme.DID { url ->
-                assertEquals(keyUrl.uri, url)
-                algAndKey.second.toPublicKey()
-            },
-        ),
-        clock = Clock.systemDefaultZone(),
-    )
-    private val clientAuthenticator = ClientAuthenticator(cfg)
-    private val requestObject = UnvalidatedRequestObject(
-        clientId = clientId.toString(),
-        clientIdScheme = "did",
-    )
-
-    @Test
-    fun `when scheme is DID cannot be used with unsigned requests`() = runTest {
-        val request = requestObject.plain()
-
-        val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
-            clientAuthenticator.authenticateClient(request)
-        }
-        assertTrue {
-            error.value.endsWith("cannot be used in unsigned request")
+            val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertEquals("RedirectUri cannot be used in signed request", error.value)
         }
     }
 
-    @Test
-    fun `when scheme is DID a kid must be present`() = runTest {
-        val (alg, key) = algAndKey
-
-        // without kid JOSE Header
-        val request = requestObject.signed(alg, key)
-
-        val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
-            clientAuthenticator.authenticateClient(request)
-        }
-        assertTrue {
-            error.cause.startsWith("Missing kid")
-        }
-    }
-
-    @Test
-    fun `when scheme is DID kid must be DID URL `() = runTest {
-        val (alg, key) = algAndKey
-        // with a non DID URL kid JOSE Header
-        val request = requestObject.signed(alg, key) { keyID("foo") }
-
-        val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
-            clientAuthenticator.authenticateClient(request)
-        }
-        assertTrue {
-            error.cause.endsWith("kid should be DID URL")
-        }
-    }
-
-    @Test
-    fun `when scheme is DID kid should be sub-resource of client_id `() = runTest {
-        val (alg, key) = algAndKey
-
-        // with an irrelevant DID
-        val request = requestObject.signed(alg, key) { keyID("did:foo:bar#1") }
-
-        val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
-            clientAuthenticator.authenticateClient(request)
-        }
-        assertTrue {
-            error.cause.contains("kid should be DID URL sub-resource")
-        }
-    }
-
-    @Test
-    fun `when scheme is DID if resolution fails, authentication fails`() = runTest {
-        val (alg, key) = algAndKey
-        val failingResolution = LookupPublicKeyByDIDUrl { _ ->
-            throw RuntimeException("Something happened")
-        }
-        val clientAuthenticator = ClientAuthenticator(
-            cfg.copy(
-                supportedClientIdSchemes = listOf(
-                    SupportedClientIdScheme.DID(failingResolution),
-                ),
+    @DisplayName("when handling a request with `did` scheme")
+    @Nested
+    inner class ClientAuthenticatorWhenUsingDIDTest {
+        private val clientId = DID.parse("did:example:123").getOrThrow()
+        private val keyUrl = AbsoluteDIDUrl.parse("$clientId#01").getOrThrow()
+        private val algAndKey = randomKey()
+        private val cfg = SiopOpenId4VPConfig(
+            supportedClientIdSchemes = listOf(
+                SupportedClientIdScheme.DID { url ->
+                    assertEquals(keyUrl.uri, url)
+                    algAndKey.second.toPublicKey()
+                },
             ),
         )
-
-        val request = requestObject.signed(alg, key) { keyID(keyUrl.toString()) }
-        assertFailsWithError<RequestValidationError.DIDResolutionFailed> {
-            clientAuthenticator.authenticateClient(request)
-        }
-    }
-
-    @Test
-    fun `when scheme is DID if resolution succeeds, must authenticate`() = runTest {
-        val (alg, key) = algAndKey
-        val request = requestObject.signed(alg, key) { keyID(keyUrl.toString()) }
-        val client = clientAuthenticator.authenticateClient(request)
-        assertEquals(AuthenticatedClient.DIDClient(clientId, key.toPublicKey()), client)
-    }
-}
-
-//
-// Verifier Attestation Tests
-//
-
-class ClientAuthenticatorWhenUsingVerifierAttestationTest {
-
-    private val clientId = "someClient"
-    private val algAndKey = randomKey()
-
-    private val cfg = SiopOpenId4VPConfig(
-        supportedClientIdSchemes = listOf(
-            SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
-        ),
-        clock = Clock.systemDefaultZone(),
-    )
-    private val clientAuthenticator = ClientAuthenticator(cfg)
-    private val requestObject = UnvalidatedRequestObject(
-        clientId = clientId,
-        clientIdScheme = "verifier_attestation",
-    )
-
-    @Test
-    fun `when scheme is verifier_attestation cannot be used with unsigned requests`() = runTest {
-        val request = requestObject.plain()
-
-        val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
-            clientAuthenticator.authenticateClient(request)
-        }
-        assertTrue {
-            error.value.endsWith("cannot be used in unsigned request")
-        }
-    }
-
-    @Test
-    fun `when scheme is verifier_attestation with a JAR missing jwt JOSE, should fail`() = runTest {
-        val (alg, key) = algAndKey
-        val request = requestObject.signed(alg, key)
-        val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
-            clientAuthenticator.authenticateClient(request)
-        }
-        assertTrue {
-            error.cause.contains("Missing jwt JOSE Header")
-        }
-    }
-
-    @Test
-    fun `when scheme is verifier_attestation happy path `() = runTest {
-        val (alg, key) = algAndKey
-
-        val verifierAttestation = AttestationIssuer.attestation(
-            clock = cfg.clock,
-            clientId = clientId,
-            clientPubKey = key.toPublicJWK(),
+        private val clientAuthenticator = ClientAuthenticator(cfg)
+        private val requestObject = UnvalidatedRequestObject(
+            clientId = clientId.toString(),
+            clientIdScheme = "did",
         )
-        val request = requestObject.signedWithAttestation(alg, key, verifierAttestation)
 
-        val client = clientAuthenticator.authenticateClient(request)
-        assertIs<AuthenticatedClient.Attested>(client)
-        assertEquals(clientId, client.clientId)
-        assertEquals(AttestationIssuer.ID, client.claims.iss)
-        assertEquals(clientId, client.claims.sub)
-        assertEquals(key.toPublicJWK(), client.claims.verifierPubJwk)
+        @Test
+        fun `if request is not signed, authentication fails`() = runTest {
+            val request = requestObject.plain()
+
+            val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.value.endsWith("cannot be used in unsigned request")
+            }
+        }
+
+        @Test
+        fun `if kid JOSE HEADER is missing, authentication fails`() = runTest {
+            val (alg, key) = algAndKey
+
+            // without kid JOSE Header
+            val request = requestObject.signed(alg, key)
+
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.cause.startsWith("Missing kid")
+            }
+        }
+
+        @Test
+        fun `if kid JOSE HEADER is not a DID URL, authentication fails`() = runTest {
+            val (alg, key) = algAndKey
+            // with a non DID URL kid JOSE Header
+            val request = requestObject.signed(alg, key) { keyID("foo") }
+
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.cause.endsWith("kid should be DID URL")
+            }
+        }
+
+        @Test
+        fun `if kid JOSE HEADER is DID URL but not a sub-resource of client_id, authentication fails`() = runTest {
+            val (alg, key) = algAndKey
+
+            // with irrelevant DID
+            val request = requestObject.signed(alg, key) { keyID("did:foo:bar#1") }
+
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.cause.contains("kid should be DID URL sub-resource")
+            }
+        }
+
+        @Test
+        fun `if resolution fails, authentication fails`() = runTest {
+            val (alg, key) = algAndKey
+            val failingResolution = LookupPublicKeyByDIDUrl { _ ->
+                throw RuntimeException("Something happened")
+            }
+            val clientAuthenticator = ClientAuthenticator(
+                cfg.copy(
+                    supportedClientIdSchemes = listOf(
+                        SupportedClientIdScheme.DID(failingResolution),
+                    ),
+                ),
+            )
+
+            val request = requestObject.signed(alg, key) { keyID(keyUrl.toString()) }
+            assertFailsWithError<RequestValidationError.DIDResolutionFailed> {
+                clientAuthenticator.authenticateClient(request)
+            }
+        }
+
+        @Test
+        fun `if resolution succeeds, authentication succeeds`() = runTest {
+            val (alg, key) = algAndKey
+            val request = requestObject.signed(alg, key) { keyID(keyUrl.toString()) }
+            val client = clientAuthenticator.authenticateClient(request)
+            assertEquals(AuthenticatedClient.DIDClient(clientId, key.toPublicKey()), client)
+        }
+    }
+
+    @DisplayName("when handling a request with `verifier_attestation` scheme")
+    @Nested
+    inner class ClientAuthenticatorWhenUsingVerifierAttestationTest {
+
+        private val clientId = "someClient"
+        private val algAndKey = randomKey()
+
+        private val cfg = SiopOpenId4VPConfig(
+            supportedClientIdSchemes = listOf(
+                SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
+            ),
+            clock = Clock.systemDefaultZone(),
+        )
+        private val clientAuthenticator = ClientAuthenticator(cfg)
+        private val requestObject = UnvalidatedRequestObject(
+            clientId = clientId,
+            clientIdScheme = "verifier_attestation",
+        )
+
+        @Test
+        fun `if request is unsigned, authentication fails`() = runTest {
+            val request = requestObject.plain()
+
+            val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.value.endsWith("cannot be used in unsigned request")
+            }
+        }
+
+        @Test
+        fun `if JAR is missing the jwt JOSE header, authentication fails`() = runTest {
+            val (alg, key) = algAndKey
+            val request = requestObject.signed(alg, key)
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue {
+                error.cause.contains("Missing jwt JOSE Header")
+            }
+        }
+
+        @Test
+        fun `if JAR contains an attestation from a trusted issuer, authentication succeeds`() = runTest {
+            val (alg, key) = algAndKey
+
+            val verifierAttestation = AttestationIssuer.attestation(
+                clock = cfg.clock,
+                clientId = clientId,
+                clientPubKey = key.toPublicJWK(),
+            )
+            val request = requestObject.signedWithAttestation(alg, key, verifierAttestation)
+
+            val client = clientAuthenticator.authenticateClient(request)
+            assertIs<AuthenticatedClient.Attested>(client)
+            assertEquals(clientId, client.clientId)
+            assertEquals(AttestationIssuer.ID, client.claims.iss)
+            assertEquals(clientId, client.claims.sub)
+            assertEquals(key.toPublicJWK(), client.claims.verifierPubJwk)
+        }
+
+        @Test
+        fun `if JAR contains an attestation from an untrusted issuer, authentication fails`() = runTest {
+            val (alg, key) = algAndKey
+
+            val verifierAttestation = AttestationIssuer.attestation(
+                clock = cfg.clock,
+                clientId = clientId,
+                clientPubKey = key.toPublicJWK(),
+            )
+
+            // Do not trust AttestationIssuer
+            val notTrustingVerifier = object : JWSVerifier by AttestationIssuer.verifier {
+                override fun verify(header: JWSHeader?, signingInput: ByteArray?, signature: Base64URL?): Boolean {
+                    throw JOSEException("Fail")
+                }
+            }
+
+            val clientAuthenticator = ClientAuthenticator(
+                cfg.copy(
+                    supportedClientIdSchemes = listOf(
+                        SupportedClientIdScheme.VerifierAttestation(
+                            notTrustingVerifier,
+                        ),
+                    ),
+                ),
+            )
+
+            val request = requestObject.signedWithAttestation(alg, key, verifierAttestation)
+            val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+                clientAuthenticator.authenticateClient(request)
+            }
+            assertTrue { "Not trusted" in error.cause }
+        }
     }
 }
-
 //
 // Support
 //

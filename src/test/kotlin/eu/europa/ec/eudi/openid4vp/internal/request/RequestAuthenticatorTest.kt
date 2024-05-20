@@ -15,9 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.*
+import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
-import com.nimbusds.jose.crypto.factories.DefaultJWSVerifierFactory
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
@@ -34,13 +35,10 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.assertThrows
 import java.net.URI
 import java.time.Clock
-import java.util.Date
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-
-class RequestAuthenticatorTest
 
 //
 // Common tests
@@ -247,42 +245,6 @@ class ClientAuthenticatorWhenUsingVerifierAttestationTest {
     private val clientId = "someClient"
     private val algAndKey = randomKey()
 
-    private object AttestationIssuer {
-        val id = "Attestation Issuer"
-        val algAndKey = randomKey()
-
-        val verifier: JWSVerifier = run {
-            val (alg, key) = algAndKey
-            val h = JWSHeader.Builder(alg).build()
-            DefaultJWSVerifierFactory().createJWSVerifier(h, key.toPublicKey())
-        }
-
-        fun attestation(
-            clock: Clock,
-            verifier: String,
-            verifierJwk: JWK,
-        ): SignedJWT {
-            val (alg, key) = algAndKey
-            val signer = DefaultJWSSignerFactory().createJWSSigner(key, alg)
-            val header = JWSHeader.Builder(alg)
-                .type(JOSEObjectType("verifier-attestation+jwt"))
-                .build()
-            val now = clock.instant()
-            val iat = Date.from(now)
-            val exp = Date.from(now.plusSeconds(60))
-            val claimSet = with(JWTClaimsSet.Builder()) {
-                issuer(id)
-                subject(verifier)
-                issueTime(iat)
-                expirationTime(exp)
-                claim("cnf", mapOf("jwk" to verifierJwk.toPublicJWK().toJSONObject()))
-                build()
-            }
-
-            return SignedJWT(header, claimSet).apply { sign(signer) }
-        }
-    }
-
     private val cfg = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(
             SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
@@ -320,39 +282,30 @@ class ClientAuthenticatorWhenUsingVerifierAttestationTest {
     }
 
     @Test
-    fun `when scheme is verifier_attestation `() = runTest {
+    fun `when scheme is verifier_attestation happy path `() = runTest {
         val (alg, key) = algAndKey
 
         val verifierAttestation = AttestationIssuer.attestation(
             clock = Clock.systemDefaultZone(),
-            verifier = clientId,
-            verifierJwk = key.toPublicJWK(),
+            clientId = clientId,
+            clientPubKey = key.toPublicJWK(),
         )
         val request = requestObject.signedWithAttestation(alg, key, verifierAttestation)
 
         val client = clientAuthenticator.authenticateClient(request)
         assertIs<AuthenticatedClient.Attested>(client)
         assertEquals(clientId, client.clientId)
-        assertEquals(AttestationIssuer.id, client.claims.iss)
+        assertEquals(AttestationIssuer.ID, client.claims.iss)
         assertEquals(clientId, client.claims.sub)
         assertEquals(key.toPublicJWK(), client.claims.verifierPubJwk)
     }
-
-    private fun UnvalidatedRequestObject.signedWithAttestation(
-        alg: JWSAlgorithm,
-        key: JWK,
-        attestation: SignedJWT,
-    ) =
-        signed(alg, key) {
-            this.customParam("jwt", attestation.serialize())
-        }
 }
 
 //
 // Support
 //
 
-private fun randomKey(): Pair<JWSAlgorithm, ECKey> =
+fun randomKey(): Pair<JWSAlgorithm, ECKey> =
     JWSAlgorithm.ES256 to ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).generate()
 
 private inline fun <reified E : AuthorizationRequestError> assertFailsWithError(block: () -> Unit): E {
@@ -362,6 +315,14 @@ private inline fun <reified E : AuthorizationRequestError> assertFailsWithError(
 
 private fun UnvalidatedRequestObject.plain(): FetchedRequest.Plain =
     FetchedRequest.Plain(this)
+
+private fun UnvalidatedRequestObject.signedWithAttestation(
+    alg: JWSAlgorithm,
+    key: JWK,
+    attestation: SignedJWT,
+): FetchedRequest.JwtSecured = signed(alg, key) {
+    this.customParam("jwt", attestation.serialize())
+}
 
 private fun UnvalidatedRequestObject.signed(
     alg: JWSAlgorithm,

@@ -15,10 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
+import com.nimbusds.jose.crypto.factories.DefaultJWSVerifierFactory
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
@@ -232,6 +231,73 @@ class ClientAuthenticatorWhenUsingDIDTest {
         val client = clientAuthenticator.authenticateClient(request)
         assertEquals(AuthenticatedClient.DIDClient(clientId, key.toPublicKey()), client)
     }
+}
+
+//
+// Verifier Attestation Tests
+//
+
+class ClientAuthenticatorWhenUsingVerifierAttestationTest {
+
+    private val clientId = "someClient"
+    private val algAndKey = randomKey()
+
+    private object AttestationIssuer {
+        val algAndKey = randomKey()
+        val signer: JWSSigner = run {
+            val (alg, key) = algAndKey
+            DefaultJWSSignerFactory().createJWSSigner(key, alg)
+        }
+        val verifier: JWSVerifier = run {
+            val (alg, key) = algAndKey
+            val h = JWSHeader.Builder(alg).build()
+            DefaultJWSVerifierFactory().createJWSVerifier(h, key.toPublicKey())
+        }
+    }
+
+    private val cfg = SiopOpenId4VPConfig(
+        supportedClientIdSchemes = listOf(
+            SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
+        ),
+    )
+    private val clientAuthenticator = ClientAuthenticator(cfg)
+    private val requestObject = UnvalidatedRequestObject(
+        clientId = clientId,
+        clientIdScheme = "verifier_attestation",
+    )
+
+    @Test
+    fun `when scheme is verifier_attestation cannot be used with unsigned requests`() = runTest {
+        val request = requestObject.plain()
+
+        val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+            clientAuthenticator.authenticateClient(request)
+        }
+        assertTrue {
+            error.value.endsWith("cannot be used in unsigned request")
+        }
+    }
+
+    @Test
+    fun `when scheme is verifier_attestation with a JAR missing jwt JOSE, should fail`() = runTest {
+        val (alg, key) = algAndKey
+        val request = requestObject.signed(alg, key)
+        val error = assertFailsWithError<RequestValidationError.InvalidJarJwt> {
+            clientAuthenticator.authenticateClient(request)
+        }
+        assertTrue {
+            error.cause.contains("Missing jwt JOSE Header")
+        }
+    }
+
+    private fun UnvalidatedRequestObject.signedWithAttestation(
+        alg: JWSAlgorithm,
+        key: JWK,
+        attestation: SignedJWT,
+    ) =
+        signed(alg, key) {
+            this.customParam("jwt", attestation.serialize())
+        }
 }
 
 //

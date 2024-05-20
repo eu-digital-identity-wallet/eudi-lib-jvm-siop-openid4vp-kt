@@ -45,6 +45,7 @@ import java.net.URI
 import java.net.URLEncoder
 import java.security.KeyStore
 import java.security.cert.X509Certificate
+import java.time.Clock
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -98,6 +99,7 @@ class UnvalidatedRequestResolverTest {
             SupportedClientIdScheme.X509SanUri(::validateChain),
             SupportedClientIdScheme.RedirectUri,
         ),
+        clock = Clock.systemDefaultZone(),
     )
 
     private val resolver = DefaultAuthorizationRequestResolver(walletConfig, DefaultHttpClientFactory)

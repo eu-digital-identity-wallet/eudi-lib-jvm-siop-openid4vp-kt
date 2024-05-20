@@ -44,6 +44,7 @@ import kotlinx.serialization.json.jsonObject
 import java.net.URI
 import java.security.PublicKey
 import java.security.cert.X509Certificate
+import java.time.Clock
 import java.time.Instant
 
 internal sealed interface AuthenticatedClient {
@@ -146,7 +147,8 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val attestedClaims = verifierAttestation(request, clientId, clientIdScheme.trust)
+                val attestedClaims =
+                    verifierAttestation(request, clientId, clientIdScheme.trust, siopOpenId4VPConfig.clock)
                 AuthenticatedClient.Attested(clientId, attestedClaims)
             }
         }
@@ -206,6 +208,7 @@ private fun verifierAttestation(
     request: FetchedRequest.JwtSecured,
     clientId: String,
     trust: JWSVerifier,
+    clock: Clock,
 ): VerifierAttestationClaims {
     fun invalidVerifierAttestationJwt(cause: String?) =
         invalidJarJwt("Invalid VerifierAttestation JWT. Details: $cause")
@@ -235,7 +238,12 @@ private fun verifierAttestation(
     ensure(verifierAttestationClaimSet.sub == clientId) {
         invalidVerifierAttestationJwt("sub claim and authorization's request client_id don't match")
     }
-    // TODO check exp, iat, nbf
+
+    try {
+        verifierAttestationClaimSet.ensureValidAt(clock.instant())
+    } catch (t: Throwable) {
+        throw invalidVerifierAttestationJwt(t.message)
+    }
 
     return verifierAttestationClaimSet
 }
@@ -385,3 +393,20 @@ private fun SignedJWT.verifierAttestationClaims(): VerifierAttestationClaims =
             responseUris = getStringListClaim("response_uris")?.toList(),
         )
     }
+
+private fun VerifierAttestationClaims.ensureValidAt(now: Instant) {
+    require(exp > now) { "expired" }
+
+    iat?.let { iat ->
+        require(iat <= now) { "cannot be issued in the future" }
+        require(iat < exp) { "cannot be issued after expiration" }
+    }
+
+    nbf?.let { nbf ->
+        require(nbf <= now) { "not yet active" }
+        require(nbf < exp) { "not before after expiration" }
+        iat?.let { iat ->
+            require(nbf >= iat) { "not before cannot be before issuance" }
+        }
+    }
+}

@@ -15,11 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
-import com.nimbusds.jose.JWSVerifier
+import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.ECKey
@@ -32,6 +28,7 @@ import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.PublicKey
 import java.security.cert.X509Certificate
+import java.time.Clock
 import java.time.Duration
 
 sealed interface JwkSetSource {
@@ -268,12 +265,14 @@ fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
  * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
  * [JarmConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
+ * @param clock the system Clock
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
  */
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
     val jarmConfiguration: JarmConfiguration = NotSupported,
     val vpConfiguration: VPConfiguration = VPConfiguration.Default,
+    val clock: Clock,
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
 ) {
     init {
@@ -284,8 +283,9 @@ data class SiopOpenId4VPConfig(
         issuer: Issuer? = SelfIssued,
         jarmConfiguration: JarmConfiguration = NotSupported,
         vpConfiguration: VPConfiguration = VPConfiguration.Default,
+        clock: Clock,
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
-    ) : this(issuer, jarmConfiguration, vpConfiguration, supportedClientIdSchemes.toList())
+    ) : this(issuer, jarmConfiguration, vpConfiguration, clock, supportedClientIdSchemes.toList())
 
     companion object {
         /**

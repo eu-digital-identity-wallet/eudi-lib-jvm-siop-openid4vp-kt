@@ -38,6 +38,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.assertDoesNotThrow
+import java.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -53,6 +54,7 @@ class AuthorizationResponseBuilderTest {
                 supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
+            clock = Clock.systemDefaultZone(),
         )
 
         val clientMetaDataValidator = ManagedClientMetaValidator(DefaultHttpClientFactory)

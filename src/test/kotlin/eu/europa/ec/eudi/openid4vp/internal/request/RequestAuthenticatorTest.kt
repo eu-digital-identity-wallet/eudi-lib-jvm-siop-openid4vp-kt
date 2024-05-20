@@ -52,6 +52,7 @@ class ClientAuthenticatorCommonTest {
         supportedClientIdSchemes = listOf(
             SupportedClientIdScheme.RedirectUri,
         ),
+        clock = Clock.systemDefaultZone(),
     )
     private val clientAuthenticator = ClientAuthenticator(cfg)
 
@@ -98,6 +99,7 @@ class ClientAuthenticatorWhenUsingRedirectUriTest {
         supportedClientIdSchemes = listOf(
             SupportedClientIdScheme.RedirectUri,
         ),
+        clock = Clock.systemDefaultZone(),
     )
     private val clientAuthenticator = ClientAuthenticator(cfg)
 
@@ -143,6 +145,7 @@ class ClientAuthenticatorWhenUsingDIDTest {
                 algAndKey.second.toPublicKey()
             },
         ),
+        clock = Clock.systemDefaultZone(),
     )
     private val clientAuthenticator = ClientAuthenticator(cfg)
     private val requestObject = UnvalidatedRequestObject(
@@ -284,6 +287,7 @@ class ClientAuthenticatorWhenUsingVerifierAttestationTest {
         supportedClientIdSchemes = listOf(
             SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
         ),
+        clock = Clock.systemDefaultZone(),
     )
     private val clientAuthenticator = ClientAuthenticator(cfg)
     private val requestObject = UnvalidatedRequestObject(

@@ -122,11 +122,11 @@ sealed interface SupportedClientIdScheme {
      * header a Verifier Attestation JWT under `jwt` claim
      *
      * @param trust a function for verifying the digital signature of the Verifier Attestation JWT.
-     * @param clockSkew clockSkew between wallet and attestation issuer
+     * @param clockSkew max acceptable skew between wallet and attestation issuer
      */
     data class VerifierAttestation(
         val trust: JWSVerifier,
-        val clockSkew: Duration = Duration.ofSeconds(10),
+        val clockSkew: Duration = Duration.ofSeconds(15L),
     ) : SupportedClientIdScheme
 
     fun scheme(): ClientIdScheme = when (this) {
@@ -270,6 +270,7 @@ fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
  * [JarmConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
  * @param clock the system Clock. If not provided system's default clock will be used.
+ * @param jarClockSkew max acceptable skew between wallet and verifier
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
  */
 data class SiopOpenId4VPConfig(
@@ -277,6 +278,7 @@ data class SiopOpenId4VPConfig(
     val jarmConfiguration: JarmConfiguration = NotSupported,
     val vpConfiguration: VPConfiguration = VPConfiguration.Default,
     val clock: Clock = Clock.systemDefaultZone(),
+    val jarClockSkew: Duration = Duration.ofSeconds(15L),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
 ) {
     init {
@@ -287,9 +289,10 @@ data class SiopOpenId4VPConfig(
         issuer: Issuer? = SelfIssued,
         jarmConfiguration: JarmConfiguration = NotSupported,
         vpConfiguration: VPConfiguration = VPConfiguration.Default,
-        clock: Clock,
+        clock: Clock = Clock.systemDefaultZone(),
+        jarSkew: Duration = Duration.ofSeconds(15L),
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
-    ) : this(issuer, jarmConfiguration, vpConfiguration, clock, supportedClientIdSchemes.toList())
+    ) : this(issuer, jarmConfiguration, vpConfiguration, clock, jarSkew, supportedClientIdSchemes.toList())
 
     companion object {
         /**

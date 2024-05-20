@@ -51,7 +51,6 @@ import java.time.Clock
 import java.time.Instant
 import java.util.*
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toKotlinDuration
 
 internal sealed interface AuthenticatedClient {
@@ -238,19 +237,13 @@ private fun verifierAttestation(
     }
 
     val verifierAttestationClaimSet = try {
-        ExpNbfChecks(clock, skew.toKotlinDuration()).verify(verifierAttestationJwt.jwtClaimsSet, null)
+        TimeChecks(clock, skew.toKotlinDuration()).verify(verifierAttestationJwt.jwtClaimsSet, null)
         verifierAttestationJwt.verifierAttestationClaims()
     } catch (t: Throwable) {
         throw invalidVerifierAttestationJwt(t.message)
     }
     ensure(verifierAttestationClaimSet.sub == clientId) {
         invalidVerifierAttestationJwt("sub claim and authorization's request client_id don't match")
-    }
-
-    try {
-        verifierAttestationClaimSet.ensureValidAt(clock.instant())
-    } catch (t: Throwable) {
-        throw invalidVerifierAttestationJwt(t.message)
     }
 
     return verifierAttestationClaimSet
@@ -279,7 +272,7 @@ private class JarJwtSignatureVerifier(
                         null,
                     )
                 jwsKeySelector = jwsKeySelector(client)
-                jwtClaimsSetVerifier = ExpNbfChecks(siopOpenId4VPConfig.clock, 60.seconds)
+                jwtClaimsSetVerifier = TimeChecks(siopOpenId4VPConfig.clock, siopOpenId4VPConfig.jarClockSkew.toKotlinDuration())
             }
             jwtProcessor.process(signedJwt, null)
         } catch (e: JOSEException) {
@@ -403,24 +396,7 @@ private fun SignedJWT.verifierAttestationClaims(): VerifierAttestationClaims =
         )
     }
 
-private fun VerifierAttestationClaims.ensureValidAt(now: Instant) {
-    require(exp > now) { "expired" }
-
-    iat?.let { iat ->
-        require(iat <= now) { "cannot be issued in the future" }
-        require(iat < exp) { "cannot be issued after expiration" }
-    }
-
-    nbf?.let { nbf ->
-        require(nbf <= now) { "not yet active" }
-        require(nbf < exp) { "not before after expiration" }
-        iat?.let { iat ->
-            require(nbf >= iat) { "not before cannot be before issuance" }
-        }
-    }
-}
-
-private class ExpNbfChecks(
+private class TimeChecks(
     private val clock: Clock,
     private val skew: Duration,
 ) : JWTClaimsSetVerifier<SecurityContext> {
@@ -429,6 +405,7 @@ private class ExpNbfChecks(
     override fun verify(claimsSet: JWTClaimsSet, context: SecurityContext?) {
         val now = Date.from(clock.instant())
         val skewInSeconds = skew.inWholeSeconds
+
         val exp = claimsSet.expirationTime
         if (exp != null) {
             if (!DateUtils.isAfter(exp, now, skewInSeconds)) {
@@ -436,10 +413,29 @@ private class ExpNbfChecks(
             }
         }
 
+        val iat = claimsSet.issueTime
+        if (iat != null) {
+            if (!DateUtils.isBefore(iat, now, skewInSeconds)) {
+                throw BadJWTException("JWT issued in the future")
+            }
+
+            if (exp != null && !exp.after(iat)) {
+                throw BadJWTException("JWT issued after expiration")
+            }
+        }
+
         val nbf = claimsSet.notBeforeTime
         if (nbf != null) {
             if (!DateUtils.isBefore(nbf, now, skewInSeconds)) {
-                throw BadJWTException("JWT before use time")
+                throw BadJWTException("JWT not yet active")
+            }
+
+            if (exp != null && !nbf.before(exp)) {
+                throw BadJWTException("JWT active after expiration")
+            }
+
+            if (iat != null && !nbf.after(iat)) {
+                throw BadJWTException("JWT active before issuance")
             }
         }
     }

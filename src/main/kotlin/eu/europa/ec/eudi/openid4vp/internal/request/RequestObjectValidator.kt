@@ -231,7 +231,7 @@ private fun requiredResponseMode(
         "query" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Query(it) }
         "query.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.QueryJwt(it) }
         null, "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
-        "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
+        "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.FragmentJwt(it) }
         else -> throw UnsupportedResponseMode(unvalidated.responseMode).asException()
     }
 
@@ -259,6 +259,7 @@ private fun requiredResponseMode(
                 is ResponseMode.Fragment,
                 is ResponseMode.FragmentJwt,
                 -> client.claims.redirectUris
+
                 is ResponseMode.DirectPost,
                 is ResponseMode.DirectPostJwt,
                 -> client.claims.responseUris

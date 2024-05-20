@@ -295,15 +295,5 @@ data class SiopOpenId4VPConfig(
     }
 }
 
-internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? {
-    fun SupportedClientIdScheme.scheme(): ClientIdScheme = when (this) {
-        is SupportedClientIdScheme.Preregistered -> ClientIdScheme.PreRegistered
-        is SupportedClientIdScheme.X509SanUri -> ClientIdScheme.X509_SAN_URI
-        is SupportedClientIdScheme.X509SanDns -> ClientIdScheme.X509_SAN_DNS
-        SupportedClientIdScheme.RedirectUri -> ClientIdScheme.RedirectUri
-        is SupportedClientIdScheme.DID -> ClientIdScheme.DID
-        is SupportedClientIdScheme.VerifierAttestation -> ClientIdScheme.VERIFIER_ATTESTATION
-    }
-
-    return supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }
-}
+internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
+    supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }

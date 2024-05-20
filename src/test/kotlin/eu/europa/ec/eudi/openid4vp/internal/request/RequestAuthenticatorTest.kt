@@ -33,6 +33,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.assertThrows
 import java.net.URI
+import java.time.Clock
+import java.util.Date
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -243,15 +245,38 @@ class ClientAuthenticatorWhenUsingVerifierAttestationTest {
     private val algAndKey = randomKey()
 
     private object AttestationIssuer {
+        val id = "Attestation Issuer"
         val algAndKey = randomKey()
-        val signer: JWSSigner = run {
-            val (alg, key) = algAndKey
-            DefaultJWSSignerFactory().createJWSSigner(key, alg)
-        }
+
         val verifier: JWSVerifier = run {
             val (alg, key) = algAndKey
             val h = JWSHeader.Builder(alg).build()
             DefaultJWSVerifierFactory().createJWSVerifier(h, key.toPublicKey())
+        }
+
+        fun attestation(
+            clock: Clock,
+            verifier: String,
+            verifierJwk: JWK,
+        ): SignedJWT {
+            val (alg, key) = algAndKey
+            val signer = DefaultJWSSignerFactory().createJWSSigner(key, alg)
+            val header = JWSHeader.Builder(alg)
+                .type(JOSEObjectType("verifier-attestation+jwt"))
+                .build()
+            val now = clock.instant()
+            val iat = Date.from(now)
+            val exp = Date.from(now.plusSeconds(60))
+            val claimSet = with(JWTClaimsSet.Builder()) {
+                issuer(id)
+                subject(verifier)
+                issueTime(iat)
+                expirationTime(exp)
+                claim("cnf", mapOf("jwk" to verifierJwk.toPublicJWK().toJSONObject()))
+                build()
+            }
+
+            return SignedJWT(header, claimSet).apply { sign(signer) }
         }
     }
 
@@ -288,6 +313,25 @@ class ClientAuthenticatorWhenUsingVerifierAttestationTest {
         assertTrue {
             error.cause.contains("Missing jwt JOSE Header")
         }
+    }
+
+    @Test
+    fun `when scheme is verifier_attestation `() = runTest {
+        val (alg, key) = algAndKey
+
+        val verifierAttestation = AttestationIssuer.attestation(
+            clock = Clock.systemDefaultZone(),
+            verifier = clientId,
+            verifierJwk = key.toPublicJWK(),
+        )
+        val request = requestObject.signedWithAttestation(alg, key, verifierAttestation)
+
+        val client = clientAuthenticator.authenticateClient(request)
+        assertIs<AuthenticatedClient.Attested>(client)
+        assertEquals(clientId, client.clientId)
+        assertEquals(AttestationIssuer.id, client.claims.iss)
+        assertEquals(clientId, client.claims.sub)
+        assertEquals(key.toPublicJWK(), client.claims.verifierPubJwk)
     }
 
     private fun UnvalidatedRequestObject.signedWithAttestation(

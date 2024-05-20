@@ -371,8 +371,12 @@ private fun SignedJWT.verifierAttestationClaims(): VerifierAttestationClaims =
             nbf = notBeforeTime?.toInstant(),
             verifierPubJwk = run {
                 val cnf = requireNotNull(getJSONObjectClaim("cnf")) { "Missing cnf" }
-                val jwk = requireNotNull(cnf["jwk"]) { "Missing jwk" }
-                require(jwk is JWK && !jwk.isPrivate) { "Not a public JWK" }
+                val jwk = runCatching {
+                    val jwkObj = requireNotNull(cnf["jwk"]) { "Missing jwk" }
+                    JWK.parse(Gson().toJson(jwkObj))
+                }.getOrNull()
+                requireNotNull(jwk) { "Missing jwk" }
+                require(!jwk.isPrivate) { "Not a public JWK" }
                 require(jwk is AsymmetricJWK) { "Not a valid JWK" }
                 jwk
             },

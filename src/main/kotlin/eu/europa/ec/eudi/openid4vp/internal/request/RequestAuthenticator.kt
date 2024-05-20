@@ -232,7 +232,7 @@ private fun verifierAttestation(
             invalidVerifierAttestationJwt("typ is not $expectedType ")
         }
         parsedJwt.apply {
-            runCatching { verify(trust) }.getOrElse { invalidVerifierAttestationJwt("Not trusted. $it") }
+            runCatching { verify(trust) }.getOrElse { throw invalidVerifierAttestationJwt("Not trusted. $it") }
         }
     }
 

@@ -40,6 +40,7 @@ class DIDTest {
             "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
             sampleDidJwk,
             "did:ebsi:ziE2n8Ckhi6ut5Z8Cexrihd",
+            "did:eosio:4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11:caleosblocks",
         ).forEach {
             assertNotNull(DID.parse(it).getOrNull(), "Failed to parse $it")
         }
@@ -52,6 +53,9 @@ class DIDTest {
             "dns:danubetech.com",
             "did:   :zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
             "did:jwk:   ",
+            "did:example:123?service=agent&relativeRef=/credentials#degree",
+            "did:example:123?service=agent&relativeRef=/credentials",
+            "did:eosio:4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11:caleosblocks#123",
         ).forEach {
             assertNull(DID.parse(it).getOrNull(), "Parsed should fail for $it")
         }
@@ -60,12 +64,12 @@ class DIDTest {
     @Test
     fun `valid should DIDs should not be parsed as DIDURLs`() {
         listOf(
-            "did:ethr:mainnet:0x3b0bc51ab9de1e5b7b6e34e5b960285805c41736",
             "did:dns:danubetech.com",
             "did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169",
             "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
             sampleDidJwk,
             "did:ebsi:ziE2n8Ckhi6ut5Z8Cexrihd",
+            "did:ethr:mainnet:0x3b0bc51ab9de1e5b7b6e34e5b960285805c41736",
         ).forEach {
             assertNull(AbsoluteDIDUrl.parse(it).getOrNull(), "Parsed should fail for $it")
         }
@@ -78,6 +82,8 @@ class DIDTest {
             "did:dns:danubetech.com#z6MkjvBkt8ETnxXGBFPSGgYKb43q7oNHLX8BiYSPcXVG6gY6",
             "did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169#zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169",
             "did:ebsi:ziE2n8Ckhi6ut5Z8Cexrihd#key-1",
+            "did:example:123?service=agent&relativeRef=/credentials#degree",
+            "did:eosio:4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11:caleosblocks#123",
         ).forEach {
             assertNotNull(AbsoluteDIDUrl.parse(it).getOrNull(), "Failed to parse $it")
         }

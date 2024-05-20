@@ -23,14 +23,12 @@ internal value class AbsoluteDIDUrl private constructor(val uri: URI) {
     override fun toString(): String = uri.toString()
 
     companion object {
+
         fun parse(s: String): Result<AbsoluteDIDUrl> = runCatching {
-            val uri = URI.create(s)
-            uri.ensureScheme()
-            uri.ensureIsAbsolute()
-            val (_, method, _) = s.split(":", limit = 3)
-            require(method.isNotEmpty())
-            require(!uri.query.isNullOrEmpty() || !uri.path.isNullOrBlank() || !uri.fragment.isNullOrBlank())
-            AbsoluteDIDUrl(uri)
+            fun isNotDID() = DID.parse(s).getOrNull() == null
+            if (DID_URL_SYNTAX.matches(s) && isNotDID())
+                AbsoluteDIDUrl(URI.create(s))
+            else error("Not a valid DID URL: $s")
         }
     }
 }
@@ -42,19 +40,17 @@ internal value class DID private constructor(val uri: URI) {
 
     companion object {
         fun parse(s: String): Result<DID> = runCatching {
-            val uri = URI.create(s)
-            uri.ensureScheme()
-            uri.ensureIsAbsolute()
-            require(uri.path.isNullOrEmpty())
-            require(uri.fragment.isNullOrEmpty())
-            require(uri.query.isNullOrEmpty())
-            val (_, method, identifier) = s.split(":", limit = 3)
-            require(method.isNotEmpty())
-            require(identifier.isNotEmpty())
-            DID(uri)
+            if (DID_SYNTAX.matches(s)) DID(URI.create(s))
+            else error("Not a DID")
         }
     }
 }
 
-private fun URI.ensureScheme() = require(scheme == "did") { "Scheme should be did" }
-private fun URI.ensureIsAbsolute() = require(isAbsolute)
+private val DID_URL_SYNTAX = (
+    "^did:[a-z0-9]+:(([A-Z.a-z0-9]|-|_|%[0-9A-Fa-f][0-9A-Fa-f])*:)" +
+        "*([A-Z.a-z0-9]|-|_|%[0-9A-Fa-f][0-9A-Fa-f])+(/(([-A-Z._a-z0-9]|~)|%[0-9A-Fa-f][0-9A-Fa-f]|([!$&'()*+,;=])|:|@)*)" +
+        "*(\\?(((([-A-Z._a-z0-9]|~)|%[0-9A-Fa-f][0-9A-Fa-f]|([!$&'()*+,;=])|:|@)|/|\\?)*))" +
+        "?(#(((([-A-Z._a-z0-9]|~)|%[0-9A-Fa-f][0-9A-Fa-f]|([!$&'()*+,;=])|:|@)|/|\\?)*))?$"
+    ).toRegex()
+private val DID_SYNTAX =
+    "^did:[a-z0-9]+:(([A-Z.a-z0-9]|-|_|%[0-9A-Fa-f][0-9A-Fa-f])*:)*([A-Z.a-z0-9]|-|_|%[0-9A-Fa-f][0-9A-Fa-f])+$".toRegex()

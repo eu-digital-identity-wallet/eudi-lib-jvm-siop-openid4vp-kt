@@ -235,6 +235,7 @@ private fun verifierAttestation(
     ensure(verifierAttestationClaimSet.sub == clientId) {
         invalidVerifierAttestationJwt("sub claim and authorization's request client_id don't match")
     }
+    // TODO check exp, iat, nbf
 
     return verifierAttestationClaimSet
 }

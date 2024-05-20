@@ -286,7 +286,7 @@ class ClientAuthenticatorWhenUsingVerifierAttestationTest {
         val (alg, key) = algAndKey
 
         val verifierAttestation = AttestationIssuer.attestation(
-            clock = Clock.systemDefaultZone(),
+            clock = cfg.clock,
             clientId = clientId,
             clientPubKey = key.toPublicJWK(),
         )

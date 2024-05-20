@@ -265,14 +265,14 @@ fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
  * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
  * [JarmConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
- * @param clock the system Clock
+ * @param clock the system Clock. If not provided system's default clock will be used.
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
  */
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
     val jarmConfiguration: JarmConfiguration = NotSupported,
     val vpConfiguration: VPConfiguration = VPConfiguration.Default,
-    val clock: Clock,
+    val clock: Clock = Clock.systemDefaultZone(),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
 ) {
     init {

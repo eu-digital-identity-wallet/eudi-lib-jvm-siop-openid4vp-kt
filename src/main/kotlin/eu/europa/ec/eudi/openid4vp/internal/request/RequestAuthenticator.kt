@@ -17,36 +17,49 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.JOSEException
 import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.jwk.AsymmetricJWK
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.*
 import com.nimbusds.jose.shaded.gson.Gson
 import com.nimbusds.jose.util.X509CertUtils
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.proc.BadJWTException
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
+import com.nimbusds.jwt.proc.JWTClaimsSetVerifier
+import com.nimbusds.jwt.util.DateUtils
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
-import eu.europa.ec.eudi.openid4vp.internal.ensure
-import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
-import eu.europa.ec.eudi.openid4vp.internal.sanOfDNSName
-import eu.europa.ec.eudi.openid4vp.internal.sanOfUniformResourceIdentifier
+import eu.europa.ec.eudi.openid4vp.internal.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.net.URI
+import java.security.PublicKey
 import java.security.cert.X509Certificate
+import java.time.Clock
+import java.time.Instant
+import java.util.*
+import kotlin.time.Duration
+import kotlin.time.toKotlinDuration
 
 internal sealed interface AuthenticatedClient {
     data class Preregistered(val preregisteredClient: PreregisteredClient) : AuthenticatedClient
     data class RedirectUri(val clientId: URI) : AuthenticatedClient
     data class X509SanDns(val clientId: String, val chain: List<X509Certificate>) : AuthenticatedClient
     data class X509SanUri(val clientId: URI, val chain: List<X509Certificate>) : AuthenticatedClient
+    data class DIDClient(val client: DID, val publicKey: PublicKey) : AuthenticatedClient
+    data class Attested(val clientId: String, val claims: VerifierAttestationClaims) : AuthenticatedClient
 }
 
 internal data class AuthenticatedRequest(
@@ -73,8 +86,8 @@ internal class RequestAuthenticator(siopOpenId4VPConfig: SiopOpenId4VPConfig, ht
     }
 }
 
-private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
-    fun authenticateClient(request: FetchedRequest): AuthenticatedClient {
+internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
+    suspend fun authenticateClient(request: FetchedRequest): AuthenticatedClient {
         val requestObject = when (request) {
             is FetchedRequest.JwtSecured -> request.jwt.requestObject()
             is FetchedRequest.Plain -> request.requestObject
@@ -94,13 +107,17 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
             }
 
             SupportedClientIdScheme.RedirectUri -> {
-                ensure(request is FetchedRequest.Plain) { invalidScheme("$clientIdScheme cannot be used in signed request") }
+                ensure(request is FetchedRequest.Plain) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in signed request")
+                }
                 val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.RedirectUri(clientIdUri)
             }
 
             is SupportedClientIdScheme.X509SanDns -> {
-                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
                 val chain = x5c(request, clientIdScheme.trust) {
                     val dnsNames = sanOfDNSName().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses DNS names") }
@@ -109,13 +126,35 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
             }
 
             is SupportedClientIdScheme.X509SanUri -> {
-                ensure(request is FetchedRequest.JwtSecured) { invalidScheme("$clientIdScheme cannot be used in unsigned request") }
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
                 val chain = x5c(request, clientIdScheme.trust) {
                     val dnsNames = sanOfUniformResourceIdentifier().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses URI names") }
                 }
                 val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.X509SanUri(clientIdUri, chain)
+            }
+
+            is SupportedClientIdScheme.DID -> {
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
+                val clientIdAsDID =
+                    ensureNotNull(
+                        DID.parse(clientId).getOrNull(),
+                    ) { RequestValidationError.InvalidClientId.asException() }
+                val clientPubKey = lookupKeyByDID(request, clientIdAsDID, clientIdScheme.lookup)
+                AuthenticatedClient.DIDClient(clientIdAsDID, clientPubKey)
+            }
+
+            is SupportedClientIdScheme.VerifierAttestation -> {
+                ensure(request is FetchedRequest.JwtSecured) {
+                    invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
+                }
+                val attestedClaims = verifierAttestation(siopOpenId4VPConfig.clock, clientIdScheme, request, clientId)
+                AuthenticatedClient.Attested(clientId, attestedClaims)
             }
         }
     }
@@ -148,6 +187,68 @@ private class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VP
     }
 }
 
+private suspend fun lookupKeyByDID(
+    request: FetchedRequest.JwtSecured,
+    clientId: DID,
+    lookupPublicKeyByDIDUrl: LookupPublicKeyByDIDUrl,
+): PublicKey = withContext(Dispatchers.IO) {
+    val keyUrl: AbsoluteDIDUrl = run {
+        val kid = ensureNotNull(request.jwt.header?.keyID) {
+            invalidJarJwt("Missing kid for client_id $clientId")
+        }
+        ensureNotNull(AbsoluteDIDUrl.parse(kid).getOrNull()) {
+            invalidJarJwt("kid should be DID URL")
+        }
+    }
+    ensure(keyUrl.toString().startsWith(clientId.toString())) {
+        invalidJarJwt("kid should be DID URL sub-resource of $clientId but is $keyUrl")
+    }
+    val key = runCatching { lookupPublicKeyByDIDUrl.resolveKey(keyUrl.uri) }.getOrNull()
+    ensureNotNull(key) {
+        RequestValidationError.DIDResolutionFailed(keyUrl.toString()).asException()
+    }
+}
+
+private fun verifierAttestation(
+    clock: Clock,
+    supportedScheme: SupportedClientIdScheme.VerifierAttestation,
+    request: FetchedRequest.JwtSecured,
+    clientId: String,
+): VerifierAttestationClaims {
+    val (trust, skew) = supportedScheme
+    fun invalidVerifierAttestationJwt(cause: String?) =
+        invalidJarJwt("Invalid VerifierAttestation JWT. Details: $cause")
+
+    val verifierAttestationJwt = run {
+        val jwtString = request.jwt.header.customParams["jwt"]
+        ensureNotNull(jwtString) { invalidJarJwt("Missing jwt JOSE Header") }
+        ensure(jwtString is String) { invalidJarJwt("jwt JOSE Header doesn't contain a JWT") }
+
+        val parsedJwt = runCatching { SignedJWT.parse(jwtString) }.getOrElse { error ->
+            throw invalidVerifierAttestationJwt("Cannot be parsed  $error")
+        }
+        val expectedType = "verifier-attestation+jwt"
+        ensure(parsedJwt.header.type == JOSEObjectType(expectedType)) {
+            invalidVerifierAttestationJwt("typ is not $expectedType ")
+        }
+        parsedJwt.apply {
+            runCatching { verify(trust) }.getOrElse { invalidVerifierAttestationJwt("Not trusted. $it") }
+        }
+    }
+
+    val verifierAttestationClaimSet = try {
+        TimeChecks(clock, skew.toKotlinDuration()).verify(verifierAttestationJwt.jwtClaimsSet, null)
+        verifierAttestationJwt.verifierAttestationClaims()
+    } catch (t: Throwable) {
+        throw invalidVerifierAttestationJwt(t.message)
+    }
+    ensure(verifierAttestationClaimSet.sub == clientId) {
+        invalidVerifierAttestationJwt("sub claim and authorization's request client_id don't match")
+    }
+
+    return verifierAttestationClaimSet
+}
+
 /**
  * Validates a JWT that represents an Authorization Request according to RFC9101
  *
@@ -171,6 +272,7 @@ private class JarJwtSignatureVerifier(
                         null,
                     )
                 jwsKeySelector = jwsKeySelector(client)
+                jwtClaimsSetVerifier = TimeChecks(siopOpenId4VPConfig.clock, siopOpenId4VPConfig.jarClockSkew.toKotlinDuration())
             }
             jwtProcessor.process(signedJwt, null)
         } catch (e: JOSEException) {
@@ -194,6 +296,12 @@ private class JarJwtSignatureVerifier(
 
             is AuthenticatedClient.RedirectUri ->
                 throw RequestValidationError.UnsupportedClientIdScheme.asException()
+
+            is AuthenticatedClient.DIDClient ->
+                JWSKeySelector<SecurityContext> { _, _ -> listOf(client.publicKey) }
+
+            is AuthenticatedClient.Attested ->
+                JWSKeySelector<SecurityContext> { _, _ -> listOf(client.claims.verifierPubJwk.toPublicKey()) }
         }
 
     @Throws(AuthorizationRequestException::class)
@@ -250,5 +358,85 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
             supportedAlgorithm = getStringClaim("supported_algorithm"),
             idTokenType = getStringClaim("id_token_type"),
         )
+    }
+}
+
+internal data class VerifierAttestationClaims(
+    val iss: String,
+    val sub: String,
+    val iat: Instant?,
+    val exp: Instant,
+    val nbf: Instant?,
+    val verifierPubJwk: AsymmetricJWK,
+    val redirectUris: List<String>?,
+    val responseUris: List<String>?,
+)
+
+private fun SignedJWT.verifierAttestationClaims(): VerifierAttestationClaims =
+    with(jwtClaimsSet) {
+        VerifierAttestationClaims(
+            iss = requireNotNull(issuer) { "Missing iss" },
+            sub = requireNotNull(subject) { "Missing sub" },
+            iat = issueTime?.toInstant(),
+            exp = requireNotNull(expirationTime?.toInstant()) { "Missing exp" },
+            nbf = notBeforeTime?.toInstant(),
+            verifierPubJwk = run {
+                val cnf = requireNotNull(getJSONObjectClaim("cnf")) { "Missing cnf" }
+                val jwk = runCatching {
+                    val jwkObj = requireNotNull(cnf["jwk"]) { "Missing jwk" }
+                    JWK.parse(Gson().toJson(jwkObj))
+                }.getOrNull()
+                requireNotNull(jwk) { "Missing jwk" }
+                require(!jwk.isPrivate) { "Not a public JWK" }
+                require(jwk is AsymmetricJWK) { "Not a valid JWK" }
+                jwk
+            },
+            redirectUris = getStringListClaim("redirect_uris")?.toList(),
+            responseUris = getStringListClaim("response_uris")?.toList(),
+        )
+    }
+
+private class TimeChecks(
+    private val clock: Clock,
+    private val skew: Duration,
+) : JWTClaimsSetVerifier<SecurityContext> {
+
+    @Throws(BadJWTException::class)
+    override fun verify(claimsSet: JWTClaimsSet, context: SecurityContext?) {
+        val now = Date.from(clock.instant())
+        val skewInSeconds = skew.inWholeSeconds
+
+        val exp = claimsSet.expirationTime
+        if (exp != null) {
+            if (!DateUtils.isAfter(exp, now, skewInSeconds)) {
+                throw BadJWTException("Expired JWT")
+            }
+        }
+
+        val iat = claimsSet.issueTime
+        if (iat != null) {
+            if (!DateUtils.isBefore(iat, now, skewInSeconds)) {
+                throw BadJWTException("JWT issued in the future")
+            }
+
+            if (exp != null && !exp.after(iat)) {
+                throw BadJWTException("JWT issued after expiration")
+            }
+        }
+
+        val nbf = claimsSet.notBeforeTime
+        if (nbf != null) {
+            if (!DateUtils.isBefore(nbf, now, skewInSeconds)) {
+                throw BadJWTException("JWT not yet active")
+            }
+
+            if (exp != null && !nbf.before(exp)) {
+                throw BadJWTException("JWT active after expiration")
+            }
+
+            if (iat != null && !nbf.after(iat)) {
+                throw BadJWTException("JWT active before issuance")
+            }
+        }
     }
 }

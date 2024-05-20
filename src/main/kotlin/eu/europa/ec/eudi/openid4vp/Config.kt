@@ -15,10 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSSigner
+import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.ECKey
@@ -29,7 +26,9 @@ import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
+import java.security.PublicKey
 import java.security.cert.X509Certificate
+import java.time.Clock
 import java.time.Duration
 
 sealed interface JwkSetSource {
@@ -54,6 +53,10 @@ data class PreregisteredClient(
 
 fun interface X509CertificateTrust {
     fun isTrusted(chain: List<X509Certificate>): Boolean
+}
+
+fun interface LookupPublicKeyByDIDUrl {
+    suspend fun resolveKey(didUrl: URI): PublicKey?
 }
 
 /**
@@ -99,6 +102,41 @@ sealed interface SupportedClientIdScheme {
      * In this scheme, Verifier must NOT sign his request
      */
     data object RedirectUri : SupportedClientIdScheme
+
+    /**
+     * Wallet trusts verifiers that are able to present a client identifier which is a DID
+     *
+     * In this scheme, Verifier must always sign his request (JAR), signed by a key
+     * that can be referenced via the DID
+     *
+     * @param lookup a function for getting the public key of the verifier by
+     * resolving a given DID URL
+     */
+    data class DID(val lookup: LookupPublicKeyByDIDUrl) : SupportedClientIdScheme
+
+    /**
+     * Wallet trust verifiers that are able to present a signed Verifier Attestation, which
+     * is issued by a party trusted by the Wallet
+     *
+     * In this scheme, Verifier must always sign his request (JAR), having in its JOSE
+     * header a Verifier Attestation JWT under `jwt` claim
+     *
+     * @param trust a function for verifying the digital signature of the Verifier Attestation JWT.
+     * @param clockSkew max acceptable skew between wallet and attestation issuer
+     */
+    data class VerifierAttestation(
+        val trust: JWSVerifier,
+        val clockSkew: Duration = Duration.ofSeconds(15L),
+    ) : SupportedClientIdScheme
+
+    fun scheme(): ClientIdScheme = when (this) {
+        is DID -> ClientIdScheme.DID
+        is Preregistered -> ClientIdScheme.PreRegistered
+        RedirectUri -> ClientIdScheme.RedirectUri
+        is VerifierAttestation -> ClientIdScheme.VERIFIER_ATTESTATION
+        is X509SanDns -> ClientIdScheme.X509_SAN_DNS
+        is X509SanUri -> ClientIdScheme.X509_SAN_URI
+    }
 }
 
 /**
@@ -231,12 +269,16 @@ fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
  * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
  * [JarmConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
+ * @param clock the system Clock. If not provided system's default clock will be used.
+ * @param jarClockSkew max acceptable skew between wallet and verifier
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
  */
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
     val jarmConfiguration: JarmConfiguration = NotSupported,
     val vpConfiguration: VPConfiguration = VPConfiguration.Default,
+    val clock: Clock = Clock.systemDefaultZone(),
+    val jarClockSkew: Duration = Duration.ofSeconds(15L),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
 ) {
     init {
@@ -247,8 +289,10 @@ data class SiopOpenId4VPConfig(
         issuer: Issuer? = SelfIssued,
         jarmConfiguration: JarmConfiguration = NotSupported,
         vpConfiguration: VPConfiguration = VPConfiguration.Default,
+        clock: Clock = Clock.systemDefaultZone(),
+        jarClockSkew: Duration = Duration.ofSeconds(15L),
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
-    ) : this(issuer, jarmConfiguration, vpConfiguration, supportedClientIdSchemes.toList())
+    ) : this(issuer, jarmConfiguration, vpConfiguration, clock, jarClockSkew, supportedClientIdSchemes.toList())
 
     companion object {
         /**
@@ -258,13 +302,5 @@ data class SiopOpenId4VPConfig(
     }
 }
 
-internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? {
-    fun SupportedClientIdScheme.scheme(): ClientIdScheme = when (this) {
-        is SupportedClientIdScheme.Preregistered -> ClientIdScheme.PreRegistered
-        is SupportedClientIdScheme.X509SanUri -> ClientIdScheme.X509_SAN_URI
-        is SupportedClientIdScheme.X509SanDns -> ClientIdScheme.X509_SAN_DNS
-        SupportedClientIdScheme.RedirectUri -> ClientIdScheme.RedirectUri
-    }
-
-    return supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }
-}
+internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
+    supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }

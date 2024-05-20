@@ -56,6 +56,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 import java.net.URI
+import java.time.Clock
 import java.util.*
 import kotlin.test.*
 
@@ -117,6 +118,7 @@ class DefaultDispatcherTest {
                 supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
             ),
+            clock = Clock.systemDefaultZone(),
         )
 
         /**

@@ -231,7 +231,7 @@ private fun requiredResponseMode(
         "query" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Query(it) }
         "query.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.QueryJwt(it) }
         null, "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
-        "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
+        "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.FragmentJwt(it) }
         else -> throw UnsupportedResponseMode(unvalidated.responseMode).asException()
     }
 
@@ -248,6 +248,27 @@ private fun requiredResponseMode(
 
         is AuthenticatedClient.RedirectUri -> ensure(client.clientId == uri) {
             UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
+        }
+
+        is AuthenticatedClient.DIDClient -> Unit
+
+        is AuthenticatedClient.Attested -> {
+            val allowedUris = when (responseMode) {
+                is ResponseMode.Query,
+                is ResponseMode.QueryJwt,
+                is ResponseMode.Fragment,
+                is ResponseMode.FragmentJwt,
+                -> client.claims.redirectUris
+
+                is ResponseMode.DirectPost,
+                is ResponseMode.DirectPostJwt,
+                -> client.claims.responseUris
+            }
+            if (!allowedUris.isNullOrEmpty()) {
+                ensure(uri.toString() in allowedUris) {
+                    UnsupportedResponseMode("$responseMode use a URI that is not included in attested URIs $allowedUris").asException()
+                }
+            }
         }
     }
     return responseMode

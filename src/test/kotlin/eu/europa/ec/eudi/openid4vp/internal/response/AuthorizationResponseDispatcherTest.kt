@@ -37,6 +37,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
+import java.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -47,7 +48,7 @@ class AuthorizationResponseDispatcherTest {
 
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
-
+        clock = Clock.systemDefaultZone(),
     )
 
     private val clientMetadataStr =

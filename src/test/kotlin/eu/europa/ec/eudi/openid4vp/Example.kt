@@ -42,6 +42,7 @@ import java.net.URL
 import java.net.URLEncoder
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import java.time.Clock
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
@@ -378,6 +379,7 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
             supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),
         ),
         supportedClientIdSchemes = supportedClientIdScheme,
+        clock = Clock.systemDefaultZone(),
     )
 
 val PidPresentationDefinition = """

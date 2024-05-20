@@ -2,7 +2,7 @@
 
 The `eudi-lib-jvm-siop-openid4vp-kt` is a Kotlin library, targeting JVM, that supports
 the [SIOPv2 (draft 12)](https://openid.bitbucket.io/connect/openid-connect-self-issued-v2-1_0.html)
-and [OpenId4VP (draft 19)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) protocols.
+and [OpenId4VP (draft 20)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) protocols.
 In particular, the library focus on the wallet's role using those two protocols with constraints
 included in ISO 23220-4 and ISO-18013-7
 
@@ -115,7 +115,9 @@ Library requires the presence of `client_id_scheme` with one of the following va
 - `x509-san-dns` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
 - `x509-san-uri` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
 - `redirect_uri` where verifier must send the authorization request in plain (JAR cannot be used)
--
+- `did` where verifier must send the authorization request signed (JAR) using a key resolvable via DID URL.
+- `verifier_attestation` where verifier must send the authorization request signed (JAR), witch contains a verifier attestation JWT from a trusted issuer
+
 ### Authorization Request encoding
 
 OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET

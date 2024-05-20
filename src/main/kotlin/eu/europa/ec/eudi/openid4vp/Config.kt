@@ -290,9 +290,9 @@ data class SiopOpenId4VPConfig(
         jarmConfiguration: JarmConfiguration = NotSupported,
         vpConfiguration: VPConfiguration = VPConfiguration.Default,
         clock: Clock = Clock.systemDefaultZone(),
-        jarSkew: Duration = Duration.ofSeconds(15L),
+        jarClockSkew: Duration = Duration.ofSeconds(15L),
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
-    ) : this(issuer, jarmConfiguration, vpConfiguration, clock, jarSkew, supportedClientIdSchemes.toList())
+    ) : this(issuer, jarmConfiguration, vpConfiguration, clock, jarClockSkew, supportedClientIdSchemes.toList())
 
     companion object {
         /**

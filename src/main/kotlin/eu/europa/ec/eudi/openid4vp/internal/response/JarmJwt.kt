@@ -87,7 +87,7 @@ private fun SiopOpenId4VPConfig.encrypt(
     checkNotNull(encryptionCfg) { "Wallet doesn't support encrypted JARM" }
 
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = requirement
-    val jweEncrypter = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
+    val (jweKey, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
 
     val (apv, apu) = when (data) {
         is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken.apu()
@@ -99,6 +99,7 @@ private fun SiopOpenId4VPConfig.encrypt(
         .apply {
             apv?.let(::agreementPartyVInfo)
             apu?.let(::agreementPartyUInfo)
+            jweKey.toPublicJWK().keyID?.let(::keyID)
         }
         .build()
 
@@ -116,7 +117,7 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
 
     val signedJwt = sign(requirement.signed, data)
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = requirement.encryptResponse
-    val jweEncrypter = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
+    val (encKey, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
     return JWEObject(
         JWEHeader(jweAlgorithm, encryptionMethod),
         Payload(signedJwt),
@@ -126,8 +127,8 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
 private fun keyAndEncryptor(
     jweAlgorithm: JWEAlgorithm,
     jwkSet: JWKSet,
-): JWEEncrypter = EncrypterFactory.findEncrypters(jweAlgorithm, jwkSet)
-    .firstNotNullOfOrNull { it.value }
+): Pair<JWK, JWEEncrypter> = EncrypterFactory.findEncrypters(jweAlgorithm, jwkSet)
+    .firstNotNullOfOrNull { (key, encrypter) -> key to encrypter }
     ?: error("Cannot find appropriate encryption key for ${jweAlgorithm.name}")
 
 private object JwtPayloadFactory {

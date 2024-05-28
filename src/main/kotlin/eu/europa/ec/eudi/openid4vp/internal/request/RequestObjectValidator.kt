@@ -164,12 +164,14 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     )
 
     return when (responseType) {
-        ResponseType.VpAndIdToken -> idAndVpToken()
-        ResponseType.IdToken -> idToken()
-        ResponseType.VpToken ->
-            // If scope is defined and its value is "openid" then id token must also be returned
-            if (scope().getOrNull()?.value == "openid") idAndVpToken()
+        ResponseType.VpAndIdToken -> {
+            val requestedScopes = scope().map { it.items() }.getOrElse { emptyList() }
+            if ("openid" in requestedScopes) idAndVpToken()
             else vpToken()
+        }
+
+        ResponseType.IdToken -> idToken()
+        ResponseType.VpToken -> vpToken()
     }
 }
 

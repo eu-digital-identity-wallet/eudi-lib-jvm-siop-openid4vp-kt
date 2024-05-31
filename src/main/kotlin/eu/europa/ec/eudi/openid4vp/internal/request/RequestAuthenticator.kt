@@ -413,29 +413,10 @@ private class TimeChecks(
             }
         }
 
-        val iat = claimsSet.issueTime
-        if (iat != null) {
-            if (!DateUtils.isBefore(iat, now, skewInSeconds)) {
-                throw BadJWTException("JWT issued in the future")
-            }
-
-            if (exp != null && !exp.after(iat)) {
-                throw BadJWTException("JWT issued after expiration")
-            }
-        }
-
         val nbf = claimsSet.notBeforeTime
         if (nbf != null) {
             if (!DateUtils.isBefore(nbf, now, skewInSeconds)) {
-                throw BadJWTException("JWT not yet active")
-            }
-
-            if (exp != null && !nbf.before(exp)) {
-                throw BadJWTException("JWT active after expiration")
-            }
-
-            if (iat != null && !nbf.after(iat)) {
-                throw BadJWTException("JWT active before issuance")
+                throw BadJWTException("JWT before use time")
             }
         }
     }

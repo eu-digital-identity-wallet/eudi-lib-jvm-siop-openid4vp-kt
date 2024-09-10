@@ -162,7 +162,7 @@ class AuthorizationResponseDispatcherTest {
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                vpToken = VpToken(verifiablePresentations = listOf(VerifiablePresentation.Generic("vp_token"))),
+                vpToken = VpToken.Generic("vp_token"),
                 presentationSubmission = presentationSubmission,
             )
 

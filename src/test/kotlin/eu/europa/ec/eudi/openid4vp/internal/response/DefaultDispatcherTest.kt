@@ -234,22 +234,16 @@ class DefaultDispatcherTest {
                 assertEquals(expectedOutcome, outcome)
             }
 
-            test(VpToken(verifiablePresentations = listOf(VerifiablePresentation.Generic("dummy_vp_token"))))
+            test(VpToken.Generic("dummy_vp_token"))
             test(
-                VpToken(
-                    verifiablePresentations = listOf(VerifiablePresentation.MsoMdoc("dummy_vp_token")),
-                    apu = Base64URL.encode("dummy_apu"),
-                ),
+                VpToken.MsoMdoc(Base64URL.encode("dummy_apu"), "dummy_vp_token"),
             )
             test(
-                VpToken(verifiablePresentations = listOf(VerifiablePresentation.Generic("dummy_vp_token"))),
+                VpToken.Generic("dummy_vp_token"),
                 redirectUri = URI.create("https://redirect.here"),
             )
             test(
-                VpToken(
-                    verifiablePresentations = listOf(VerifiablePresentation.MsoMdoc("dummy_vp_token")),
-                    apu = Base64URL.encode("dummy_apu"),
-                ),
+                VpToken.MsoMdoc(Base64URL.encode("dummy_apu"), "dummy_vp_token"),
                 redirectUri = URI.create("https://redirect.here"),
             )
         }
@@ -263,7 +257,7 @@ class DefaultDispatcherTest {
                 )
 
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    VpToken(verifiablePresentations = listOf(VerifiablePresentation.Generic("dummy_vp_token"))),
+                    VpToken.Generic("dummy_vp_token"),
                     PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
 
@@ -296,7 +290,7 @@ class DefaultDispatcherTest {
                     )
 
                     val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                        VpToken(verifiablePresentations = listOf(VerifiablePresentation.Generic("dummy_vp_token"))),
+                        VpToken.Generic("dummy_vp_token"),
                         PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                     )
 
@@ -331,7 +325,7 @@ class DefaultDispatcherTest {
 
                 val resolvedRequest = createOpenId4VPRequest(verifierMetaData, responseMode)
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    vpToken = VpToken(verifiablePresentations = listOf(VerifiablePresentation.Generic("dummy_vp_token"))),
+                    vpToken = VpToken.Generic("dummy_vp_token"),
                     presentationSubmission = PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
                 )
 
@@ -351,6 +345,78 @@ class DefaultDispatcherTest {
             test()
             test(URI.create("https://redirect.here"))
         }
+
+        @Test
+        fun `support vp_token with multiple verifiable presentations`() = runTest {
+            suspend fun test(vpToken: VpToken, redirectUri: URI? = null) {
+                val verifierMetaData = UnvalidatedClientMetaData(
+                    authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
+                )
+                val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
+
+                val resolvedRequest = createOpenId4VPRequest(verifierMetaData, responseMode)
+                val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
+                    vpToken = vpToken,
+                    presentationSubmission = PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                )
+
+                val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
+                    val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
+                    assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
+                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
+                    assertNotNull(jwtClaimsSet.expirationTime)
+                    assertEquals(vpTokenConsensus.vpToken.toJson(), jwtClaimsSet.vpTokenClaim())
+                }
+
+                val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
+                val outcome = dispatcher.dispatch(resolvedRequest, vpTokenConsensus)
+                assertEquals(expectedOutcome, outcome)
+            }
+
+            test(vpTokenWithMultipleGenericPresentations())
+            test(vpTokenWithMultipleGenericPresentations(), URI.create("https://redirect.here"))
+            test(vpTokenWithMultipleMsoMdocPresentations(), URI.create("https://redirect.here"))
+            test(vpTokenWithMultipleMixedPresentations(), URI.create("https://redirect.here"))
+        }
+
+        private fun vpTokenWithMultipleMixedPresentations(): VpToken =
+            VpToken(
+                verifiablePresentations = listOf(
+                    VerifiablePresentation.Generic("dummy_vp_token"),
+                    VerifiablePresentation.MsoMdoc("dummy_vp_token"),
+                    VerifiablePresentation.JsonObj(
+                        buildJsonObject {
+                            put("claimString", JsonPrimitive("claim1_value"))
+                            put(
+                                "claimArray",
+                                buildJsonArray {
+                                    add(JsonPrimitive("array_value_1"))
+                                    add(JsonPrimitive("array_value_2"))
+                                    add(JsonPrimitive("array_value_3"))
+                                },
+                            )
+                            put(
+                                "claimObject",
+                                buildJsonObject {
+                                    put("child_json_obj_1", JsonPrimitive("val1"))
+                                    put("child_json_obj_2", JsonPrimitive("val2"))
+                                },
+                            )
+                        },
+                    ),
+                ),
+            )
+
+        private fun vpTokenWithMultipleGenericPresentations(): VpToken =
+            VpToken.Generic("dummy_vp_token_1", "dummy_vp_token_2", "dummy_vp_token_3")
+
+        private fun vpTokenWithMultipleMsoMdocPresentations(): VpToken =
+            VpToken.MsoMdoc(
+                Base64URL.encode("dummy_apu"),
+                "dummy_msomdoc_vp_token_1",
+                "dummy_msomdoc_vp_token_2",
+                "dummy_msomdoc_vp_token_3",
+            )
 
         private suspend fun createOpenId4VPRequest(
             unvalidatedClientMetaData: UnvalidatedClientMetaData,

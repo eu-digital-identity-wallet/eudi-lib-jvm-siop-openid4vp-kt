@@ -148,9 +148,26 @@ sealed interface VerifiablePresentation {
     value class JsonObj(val value: JsonObject) : VerifiablePresentation
 }
 
-data class VpToken(val verifiablePresentations: List<VerifiablePresentation>, val apu: Base64URL? = null) {
+data class VpToken(
+    val verifiablePresentations: List<VerifiablePresentation>,
+    val apu: Base64URL? = null,
+) {
+
     init {
         require(verifiablePresentations.isNotEmpty())
+    }
+
+    companion object {
+
+        fun Generic(vararg values: String) =
+            VpToken(
+                verifiablePresentations = values.map { VerifiablePresentation.Generic(it) },
+            )
+
+        fun MsoMdoc(apu: Base64URL, vararg values: String) = VpToken(
+            verifiablePresentations = values.map { VerifiablePresentation.MsoMdoc(it) },
+            apu = apu,
+        )
     }
 }
 

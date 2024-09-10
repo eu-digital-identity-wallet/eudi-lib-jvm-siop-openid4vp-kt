@@ -94,14 +94,9 @@ private fun jweHeader(
     jweKey: JWK,
     data: AuthorizationResponsePayload,
 ): JWEHeader {
-    fun VpToken.apu(): Base64URL? =
-        when (this) {
-            is VpToken.MsoMdoc -> this.apu
-            else -> null
-        }
     val (apv, apu) = when (data) {
-        is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken.apu()
-        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> data.vpToken.apu()
+        is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken.apu
+        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> data.vpToken.apu
         else -> null
     }?.let { Base64URL.encode(data.nonce) to it } ?: (null to null)
 
@@ -176,13 +171,13 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                put(VP_TOKEN_CLAIM, data.vpToken.value)
+                put(VP_TOKEN_CLAIM, data.vpToken.toJson())
                 put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
                 put(ID_TOKEN_CLAIM, data.idToken)
-                put(VP_TOKEN_CLAIM, data.vpToken.value)
+                put(VP_TOKEN_CLAIM, data.vpToken.toJson())
                 put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
             }
 
@@ -203,6 +198,27 @@ private object JwtPayloadFactory {
     }
 }
 
+internal fun VpToken.toJson(): JsonElement {
+    fun VerifiablePresentation.asJson(): JsonElement {
+        return when (this) {
+            is VerifiablePresentation.Generic -> JsonPrimitive(value)
+            is VerifiablePresentation.JsonObj -> value
+            is VerifiablePresentation.MsoMdoc -> JsonPrimitive(this.value)
+        }
+    }
+
+    return when (verifiablePresentations.size) {
+        1 -> verifiablePresentations.first().asJson()
+        0 -> error("Not expected")
+        else -> {
+            buildJsonArray {
+                for (vp in verifiablePresentations) {
+                    add(vp.asJson())
+                }
+            }
+        }
+    }
+}
 private object EncrypterFactory {
 
     fun findEncrypters(

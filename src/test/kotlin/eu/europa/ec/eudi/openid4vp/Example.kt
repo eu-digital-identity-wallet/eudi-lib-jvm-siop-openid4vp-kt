@@ -313,7 +313,7 @@ private class Wallet(
         val presentationDefinition = request.presentationDefinition
         val inputDescriptor = presentationDefinition.inputDescriptors.first()
         return Consensus.PositiveConsensus.VPTokenConsensus(
-            vpToken = VpToken.Generic("foo"),
+            vpToken = VpToken(verifiablePresentations = listOf(VerifiablePresentation.Generic("foo"))),
             presentationSubmission = PresentationSubmission(
                 id = Id("pid-res"),
                 definitionId = presentationDefinition.id,

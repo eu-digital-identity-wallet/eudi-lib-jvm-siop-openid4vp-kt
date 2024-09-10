@@ -20,6 +20,7 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.util.Base64URL
+import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.net.URI
 import java.net.URL
@@ -135,11 +136,22 @@ sealed interface ResponseMode : Serializable {
 
 typealias Jwt = String
 
-sealed interface VpToken {
-    val value: String
+sealed interface VerifiablePresentation {
 
-    data class Generic(override val value: String) : VpToken
-    data class MsoMdoc(override val value: String, val apu: Base64URL) : VpToken
+    @JvmInline
+    value class Generic(val value: String) : VerifiablePresentation
+
+    @JvmInline
+    value class MsoMdoc(val value: String) : VerifiablePresentation
+
+    @JvmInline
+    value class JsonObj(val value: JsonObject) : VerifiablePresentation
+}
+
+data class VpToken(val verifiablePresentations: List<VerifiablePresentation>, val apu: Base64URL? = null) {
+    init {
+        require(verifiablePresentations.isNotEmpty())
+    }
 }
 
 /**

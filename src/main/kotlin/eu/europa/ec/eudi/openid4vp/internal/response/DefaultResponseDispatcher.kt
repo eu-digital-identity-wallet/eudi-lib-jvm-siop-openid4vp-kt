@@ -193,7 +193,7 @@ internal object DirectPostForm {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
-                put(VP_TOKEN_FORM_PARAM, p.vpToken.value)
+                put(VP_TOKEN_FORM_PARAM, p.vpToken.asParam())
                 put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
@@ -202,7 +202,7 @@ internal object DirectPostForm {
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
-                put(VP_TOKEN_FORM_PARAM, p.vpToken.value)
+                put(VP_TOKEN_FORM_PARAM, p.vpToken.asParam())
                 put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
@@ -223,6 +223,36 @@ internal object DirectPostForm {
                     put(STATE_FORM_PARAM, it)
                 }
             }
+        }
+    }
+}
+
+internal fun VpToken.asParam(): String {
+    fun VerifiablePresentation.asParam(): String {
+        return when (this) {
+            is VerifiablePresentation.Generic -> value
+            is VerifiablePresentation.JsonObj -> Json.encodeToString(value)
+            is VerifiablePresentation.MsoMdoc -> value
+        }
+    }
+
+    fun VerifiablePresentation.asJson(): JsonElement {
+        return when (this) {
+            is VerifiablePresentation.Generic -> JsonPrimitive(value)
+            is VerifiablePresentation.JsonObj -> value
+            is VerifiablePresentation.MsoMdoc -> JsonPrimitive(this.value)
+        }
+    }
+
+    return when (verifiablePresentations.size) {
+        1 -> verifiablePresentations.first().asParam()
+        0 -> error("Not expected")
+        else -> {
+            buildJsonArray {
+                for (vp in verifiablePresentations) {
+                    add(vp.asJson())
+                }
+            }.run(Json::encodeToString)
         }
     }
 }

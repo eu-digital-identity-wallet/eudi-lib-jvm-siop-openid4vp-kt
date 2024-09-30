@@ -66,7 +66,7 @@ internal sealed interface PresentationDefinitionSource {
 internal sealed interface ValidatedRequestObject {
 
     val client: AuthenticatedClient
-    val clientMetaDataSource: ClientMetaDataSource?
+    val clientMetaData: UnvalidatedClientMetaData?
     val nonce: String
     val responseMode: ResponseMode
     val state: String?
@@ -76,7 +76,7 @@ internal sealed interface ValidatedRequestObject {
      */
     data class SiopAuthentication(
         val idTokenType: List<IdTokenType>,
-        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientMetaData: UnvalidatedClientMetaData?,
         override val client: AuthenticatedClient,
         override val nonce: String,
         val scope: Scope,
@@ -89,7 +89,7 @@ internal sealed interface ValidatedRequestObject {
      */
     data class OpenId4VPAuthorization(
         val presentationDefinitionSource: PresentationDefinitionSource,
-        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientMetaData: UnvalidatedClientMetaData?,
         override val client: AuthenticatedClient,
         override val nonce: String,
         override val responseMode: ResponseMode,
@@ -102,7 +102,7 @@ internal sealed interface ValidatedRequestObject {
     data class SiopOpenId4VPAuthentication(
         val idTokenType: List<IdTokenType>,
         val presentationDefinitionSource: PresentationDefinitionSource,
-        override val clientMetaDataSource: ClientMetaDataSource?,
+        override val clientMetaData: UnvalidatedClientMetaData?,
         override val client: AuthenticatedClient,
         override val nonce: String,
         val scope: Scope,
@@ -356,21 +356,12 @@ private fun parsePresentationDefinitionSource(
 private fun optionalClientMetaDataSource(
     responseMode: ResponseMode,
     unvalidated: UnvalidatedRequestObject,
-): ClientMetaDataSource? {
+): UnvalidatedClientMetaData? {
     val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
-    val hasCMDUri = !unvalidated.clientMetadataUri.isNullOrEmpty()
 
-    fun requiredClientMetaData(): ClientMetaDataSource.ByValue {
+    fun requiredClientMetaData(): UnvalidatedClientMetaData {
         checkNotNull(unvalidated.clientMetaData)
-        return ClientMetaDataSource.ByValue(jsonSupport.decodeFromJsonElement(unvalidated.clientMetaData))
-    }
-
-    fun requiredClientMetaDataUri(): ClientMetaDataSource.ByReference {
-        checkNotNull(unvalidated.clientMetadataUri)
-        val uri = unvalidated.clientMetadataUri
-            .asURL { InvalidClientMetaDataUri.asException() }
-            .getOrThrow()
-        return ClientMetaDataSource.ByReference(uri)
+        return jsonSupport.decodeFromJsonElement(unvalidated.clientMetaData)
     }
 
     fun required() = when (responseMode) {
@@ -383,9 +374,7 @@ private fun optionalClientMetaDataSource(
     }
 
     return when {
-        hasCMD && !hasCMDUri -> requiredClientMetaData()
-        !hasCMD && hasCMDUri -> requiredClientMetaDataUri()
-        hasCMD && hasCMDUri -> throw OneOfClientMedataOrUri.asException()
+        hasCMD -> requiredClientMetaData()
         else -> {
             ensure(!required()) {
                 InvalidClientMetaData("Missing client metadata").asException()

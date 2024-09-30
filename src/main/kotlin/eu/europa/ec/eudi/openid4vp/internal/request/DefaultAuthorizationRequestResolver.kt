@@ -38,7 +38,6 @@ import java.net.URL
 @Serializable
 internal data class UnvalidatedRequestObject(
     @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
     @SerialName("client_id_scheme") val clientIdScheme: String? = null,
     @Required val nonce: String? = null,
     @SerialName("client_id") val clientId: String? = null,

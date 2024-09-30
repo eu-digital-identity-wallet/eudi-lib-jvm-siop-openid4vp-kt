@@ -22,12 +22,10 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.ResolutionError.ClientMetadataJwkResolutionFailed
-import eu.europa.ec.eudi.openid4vp.ResolutionError.UnableToFetchClientMetadata
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import java.io.IOException
 import java.net.URL
@@ -35,35 +33,8 @@ import java.text.ParseException
 
 internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
 
-    /**
-     * Gets the meta-data from the [clientMetaDataSource] and then validates them
-     * @param clientMetaDataSource the source to obtain the meta-data
-     * @param responseMode the response mode under which the meta-data should be validated
-     * @throws AuthorizationRequestException in case of a problem
-     */
     @Throws(AuthorizationRequestException::class)
     suspend fun validateClientMetaData(
-        clientMetaDataSource: ClientMetaDataSource,
-        responseMode: ResponseMode,
-    ): ValidatedClientMetaData {
-        val unvalidatedClientMetaData = resolveClientMetaData(clientMetaDataSource)
-        return validate(unvalidatedClientMetaData, responseMode)
-    }
-
-    private suspend fun resolveClientMetaData(clientMetaDataSource: ClientMetaDataSource): UnvalidatedClientMetaData =
-        when (clientMetaDataSource) {
-            is ClientMetaDataSource.ByValue -> clientMetaDataSource.metaData
-            is ClientMetaDataSource.ByReference -> try {
-                httpClient.get(clientMetaDataSource.url).body<UnvalidatedClientMetaData>()
-            } catch (t: IOException) {
-                throw UnableToFetchClientMetadata(t).asException()
-            } catch (t: SerializationException) {
-                throw UnableToFetchClientMetadata(t).asException()
-            }
-        }
-
-    @Throws(AuthorizationRequestException::class)
-    internal suspend fun validate(
         unvalidated: UnvalidatedClientMetaData,
         responseMode: ResponseMode,
     ): ValidatedClientMetaData {

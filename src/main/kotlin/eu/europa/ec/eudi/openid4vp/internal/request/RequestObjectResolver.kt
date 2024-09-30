@@ -90,12 +90,10 @@ internal class RequestObjectResolver(
         presentationDefinitionSource: PresentationDefinitionSource,
     ) = presentationDefinitionResolver.resolvePresentationDefinition(presentationDefinitionSource)
 
-    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? {
-        val source = validated.clientMetaDataSource
-        return if (source != null)
-            clientMetaDataValidator.validateClientMetaData(source, validated.responseMode)
-        else null
-    }
+    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
+        validated.clientMetaData?.let { unvalidated ->
+            clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
+        }
 }
 
 private fun AuthenticatedClient.toClient(): Client =

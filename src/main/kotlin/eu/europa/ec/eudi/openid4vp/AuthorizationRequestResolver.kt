@@ -226,10 +226,6 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class UnsupportedClientMetaData(val value: String) : RequestValidationError
 
-    data object InvalidClientMetaDataUri : RequestValidationError {
-        private fun readResolve(): Any = InvalidClientMetaDataUri
-    }
-
     data object OneOfClientMedataOrUri : RequestValidationError {
         private fun readResolve(): Any = OneOfClientMedataOrUri
     }
@@ -283,7 +279,6 @@ sealed interface ResolutionError : AuthorizationRequestError {
     }
 
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
-    data class UnableToFetchClientMetadata(val cause: Throwable) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkUriUnparsable(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError

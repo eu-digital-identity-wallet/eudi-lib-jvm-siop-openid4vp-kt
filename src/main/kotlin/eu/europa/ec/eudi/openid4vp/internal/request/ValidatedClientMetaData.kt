@@ -25,7 +25,6 @@ import eu.europa.ec.eudi.openid4vp.internal.ensure
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
-import java.net.URL
 
 @Serializable
 internal data class UnvalidatedClientMetaData(
@@ -36,11 +35,6 @@ internal data class UnvalidatedClientMetaData(
     @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
 )
-
-internal sealed interface ClientMetaDataSource {
-    data class ByValue(val metaData: UnvalidatedClientMetaData) : ClientMetaDataSource
-    data class ByReference(val url: URL) : ClientMetaDataSource
-}
 
 internal data class ValidatedClientMetaData(
     val jwkSet: JWKSet? = null,

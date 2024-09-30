@@ -87,7 +87,6 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 
                 is ClientMetadataJwkUriUnparsable,
-                InvalidClientMetaDataUri,
                 -> INVALID_REGISTRATION_URI
 
                 is InvalidPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_REFERENCE
@@ -95,7 +94,6 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is ClientMetadataJwkResolutionFailed,
                 FetchingPresentationDefinitionNotSupported,
                 is PresentationDefinitionNotFoundForScope,
-                is UnableToFetchClientMetadata,
                 is UnableToFetchPresentationDefinition,
                 is UnableToFetchRequestObject,
                 is DIDResolutionFailed,

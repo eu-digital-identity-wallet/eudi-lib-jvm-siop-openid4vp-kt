@@ -1,6 +1,6 @@
 [versions]
 coroutines = "1.7.3"
-dependency-check = "10.0.3"
+dependency-check = "10.0.4"
 sonarqube = "5.1.0.4882"
 spotless = "6.25.0"
 kotlin = "1.9.21"
@@ -12,7 +12,7 @@ java = "17"
 ktlint = "0.50.0"
 dokka = "1.9.20"
 maven-publish = "0.29.0"
-fasterxml-jackson = "2.17.2"
+fasterxml-jackson = "2.18.0"
 bouncyCastle = "1.78.1"
 
 [libraries]

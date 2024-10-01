@@ -431,6 +431,7 @@ class DefaultDispatcherTest {
                     inputDescriptors = emptyList(),
                 ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
+                vpFormats = listOf(VpFormat.MsoMdoc),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,

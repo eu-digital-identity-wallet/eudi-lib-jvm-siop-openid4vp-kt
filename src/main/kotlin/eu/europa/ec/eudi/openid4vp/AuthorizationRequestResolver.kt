@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
@@ -78,6 +79,17 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
     }
 }
 
+sealed interface VpFormat : java.io.Serializable {
+    data class SdJwtVc(
+        val sdJwtAlgorithms: List<JWSAlgorithm>,
+        val kbJwtAlgorithms: List<JWSAlgorithm>,
+    ) : VpFormat
+
+    data object MsoMdoc : VpFormat {
+        private fun readResolve(): Any = MsoMdoc
+    }
+}
+
 /**
  * Represents an OAUTH2 authorization request. In particular
  * either a [SIOPv2 for id_token][SiopOpenId4VPAuthentication] or
@@ -120,6 +132,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
+        val vpFormats: List<VpFormat>,
         val presentationDefinition: PresentationDefinition,
     ) : ResolvedRequestObject
 
@@ -132,6 +145,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
+        val vpFormats: List<VpFormat>,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,

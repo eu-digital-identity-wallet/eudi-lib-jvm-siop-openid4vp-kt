@@ -46,13 +46,14 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
         ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
             RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
         }
-
+        val vpFormats = unvalidated.vpFormats?.formats().orEmpty()
         return ValidatedClientMetaData(
             jwkSet = jwkSets,
             subjectSyntaxTypesSupported = types,
             authorizationSignedResponseAlg = authSgnRespAlg,
             authorizationEncryptedResponseAlg = authEncRespAlg,
             authorizationEncryptedResponseEnc = authEncRespEnc,
+            vpFormats = vpFormats,
         )
     }
 
@@ -161,6 +162,21 @@ private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
         isJWKThumbprint() -> SubjectSyntaxType.JWKThumbprint
         isDecentralizedIdentifier() -> parseDecentralizedIdentifier()
         else -> null
+    }
+}
+
+private fun VpFormats.formats(): List<VpFormat> {
+    fun VcSdJwt.format(): VpFormat.SdJwtVc {
+        fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
+        return VpFormat.SdJwtVc(
+            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
+            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
+        )
+    }
+
+    return buildList {
+        msoMdoc?.let { add(VpFormat.MsoMdoc) }
+        vcSdJwt?.let { sdJwtVc -> add(sdJwtVc.format()) }
     }
 }
 

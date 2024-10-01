@@ -154,6 +154,7 @@ class AuthorizationResponseDispatcherTest {
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     jarmRequirement = walletConfig.jarmRequirement(validated),
+                    vpFormats = listOf(VpFormat.MsoMdoc),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

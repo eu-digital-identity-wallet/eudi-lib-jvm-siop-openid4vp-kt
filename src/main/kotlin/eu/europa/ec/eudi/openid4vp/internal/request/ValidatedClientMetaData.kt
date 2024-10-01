@@ -34,6 +34,19 @@ internal data class UnvalidatedClientMetaData(
     @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
+    @SerialName("vp_formats") val vpFormats: VpFormats? = null,
+)
+
+@Serializable
+internal class VpFormats(
+    @SerialName("vc+sd-jwt") val vcSdJwt: VcSdJwt? = null,
+    @SerialName("mso_mdoc") val msoMdoc: JsonObject? = null,
+)
+
+@Serializable
+internal class VcSdJwt(
+    @SerialName("sd-jwt_alg_values") val sdJwtAlgorithms: List<String>? = null,
+    @SerialName("kb-jwt_alg_values") val kdJwtAlgorithms: List<String>? = null,
 )
 
 internal data class ValidatedClientMetaData(
@@ -42,6 +55,7 @@ internal data class ValidatedClientMetaData(
     val authorizationSignedResponseAlg: JWSAlgorithm? = null,
     val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
     val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
+    val vpFormats: List<VpFormat> = emptyList(),
 )
 
 @Throws(AuthorizationRequestException::class)

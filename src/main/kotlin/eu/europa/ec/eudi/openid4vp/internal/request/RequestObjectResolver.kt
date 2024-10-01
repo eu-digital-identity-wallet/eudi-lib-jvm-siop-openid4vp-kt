@@ -48,6 +48,7 @@ internal class RequestObjectResolver(
             state = request.state,
             nonce = request.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
+            vpFormats = clientMetaData?.vpFormats.orEmpty(),
             idTokenType = request.idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
@@ -66,6 +67,7 @@ internal class RequestObjectResolver(
             state = authorization.state,
             nonce = authorization.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
+            vpFormats = clientMetaData?.vpFormats.orEmpty(),
             presentationDefinition = presentationDefinition,
         )
     }

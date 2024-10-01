@@ -130,13 +130,13 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     val responseMode = requiredResponseMode(client, requestObject)
     val presentationDefinitionSource =
         optionalPresentationDefinitionSource(requestObject, responseType) { scope().getOrNull() }
-    val clientMetaDataSource = optionalClientMetaDataSource(responseMode, requestObject)
+    val clientMetaData = optionalClientMetaData(responseMode, requestObject)
     val idTokenType = optionalIdTokenType(requestObject)
 
     fun idAndVpToken() = SiopOpenId4VPAuthentication(
         idTokenType,
         checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
-        clientMetaDataSource,
+        clientMetaData,
         client,
         nonce,
         scope().getOrThrow(),
@@ -146,7 +146,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
 
     fun idToken() = SiopAuthentication(
         idTokenType,
-        clientMetaDataSource,
+        clientMetaData,
         client,
         nonce,
         scope().getOrThrow(),
@@ -156,7 +156,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
 
     fun vpToken() = OpenId4VPAuthorization(
         checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
-        clientMetaDataSource,
+        clientMetaData,
         client,
         nonce,
         responseMode,
@@ -353,7 +353,7 @@ private fun parsePresentationDefinitionSource(
     }
 }
 
-private fun optionalClientMetaDataSource(
+private fun optionalClientMetaData(
     responseMode: ResponseMode,
     unvalidated: UnvalidatedRequestObject,
 ): UnvalidatedClientMetaData? {

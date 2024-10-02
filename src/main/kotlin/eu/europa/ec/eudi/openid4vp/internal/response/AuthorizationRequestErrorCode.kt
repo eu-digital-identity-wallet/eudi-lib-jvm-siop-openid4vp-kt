@@ -76,6 +76,8 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is UnsupportedClientMetaData,
                 is InvalidIdTokenType,
                 is HttpError,
+                InvalidRequestUriMethod,
+                InvalidUseOfBothRequestAndRequestUri,
                 -> INVALID_REQUEST
 
                 BothJwkUriAndInlineJwks,

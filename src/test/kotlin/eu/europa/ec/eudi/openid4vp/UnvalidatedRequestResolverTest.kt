@@ -33,6 +33,7 @@ import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestR
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationExchange
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
@@ -218,7 +219,7 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
-    fun `JAR auth request, request passed as JWT, verified with pre-registered client scheme`() = runTest {
+    fun `JAR auth request, request passed as JWT, verified with pre-registered client scheme`() = runBlocking {
         suspend fun test(typ: JOSEObjectType? = null) {
             val jwkSet = JWKSet(signingKey)
             val unvalidatedClientMetaData = UnvalidatedClientMetaData(

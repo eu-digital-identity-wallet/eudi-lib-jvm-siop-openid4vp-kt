@@ -41,13 +41,37 @@ internal data class UnvalidatedClientMetaData(
 internal class VpFormats(
     @SerialName("vc+sd-jwt") val vcSdJwt: VcSdJwt? = null,
     @SerialName("mso_mdoc") val msoMdoc: JsonObject? = null,
-)
+) {
+    companion object {
+
+        fun make(fs: List<VpFormat>): VpFormats {
+            val vcSdJwt = fs.filterIsInstance<VpFormat.SdJwtVc>().run {
+                check(size <= 1)
+                firstOrNull()?.let { VcSdJwt.make(it) }
+            }
+            val msdMdoc = fs.filterIsInstance<VpFormat.MsoMdoc>().run {
+                check(size <= 1)
+                firstOrNull()?.let { JsonObject(emptyMap()) }
+            }
+            return VpFormats(vcSdJwt, msdMdoc)
+        }
+    }
+}
 
 @Serializable
 internal class VcSdJwt(
     @SerialName("sd-jwt_alg_values") val sdJwtAlgorithms: List<String>? = null,
     @SerialName("kb-jwt_alg_values") val kdJwtAlgorithms: List<String>? = null,
-)
+) {
+    companion object {
+        fun make(f: VpFormat.SdJwtVc): VcSdJwt {
+            return VcSdJwt(
+                sdJwtAlgorithms = f.sdJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
+                kdJwtAlgorithms = f.kbJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
+            )
+        }
+    }
+}
 
 internal data class ValidatedClientMetaData(
     val jwkSet: JWKSet? = null,

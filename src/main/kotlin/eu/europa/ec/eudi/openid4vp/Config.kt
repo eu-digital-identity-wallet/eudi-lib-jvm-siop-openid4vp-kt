@@ -150,13 +150,23 @@ sealed interface SupportedClientIdScheme {
 data class VPConfiguration(
     val presentationDefinitionUriSupported: Boolean,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition>,
+    val vpFormats: List<VpFormat>,
 ) {
+
     companion object {
+        val DefaultFormats = listOf(
+            VpFormat.MsoMdoc,
+            VpFormat.sdJwtVc(
+                sdJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+                kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+            ),
+        )
+
         /**
          * A default [VPConfiguration] which enables fetching presentation definitions by reference and
          * doesn't contain any [VPConfiguration.knownPresentationDefinitionsPerScope]
          */
-        val Default = VPConfiguration(true, emptyMap())
+        val Default = VPConfiguration(true, emptyMap(), DefaultFormats)
     }
 }
 
@@ -258,6 +268,28 @@ fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
     is Encryption -> this
     is SigningAndEncryption -> encryption
     NotSupported -> null
+}
+
+sealed interface VpFormat : java.io.Serializable {
+    data class SdJwtVc(
+        val sdJwtAlgorithms: List<JWSAlgorithm>,
+        val kbJwtAlgorithms: List<JWSAlgorithm>,
+    ) : VpFormat {
+        init {
+            require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
+        }
+    }
+
+    data object MsoMdoc : VpFormat {
+        private fun readResolve(): Any = MsoMdoc
+    }
+
+    companion object {
+        fun sdJwtVc(sdJwtAlgorithms: List<JWSAlgorithm>, kbJwtAlgorithms: List<JWSAlgorithm>): SdJwtVc =
+            SdJwtVc(sdJwtAlgorithms, kbJwtAlgorithms)
+
+        fun msoMdoc(): VpFormat.MsoMdoc = MsoMdoc
+    }
 }
 
 /**

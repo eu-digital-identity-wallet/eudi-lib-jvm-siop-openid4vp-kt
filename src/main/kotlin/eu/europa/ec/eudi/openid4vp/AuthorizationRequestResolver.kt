@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
@@ -76,17 +75,6 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
         is X509SanUri -> cert.legalName()
         is DIDClient -> null
         is Attested -> null
-    }
-}
-
-sealed interface VpFormat : java.io.Serializable {
-    data class SdJwtVc(
-        val sdJwtAlgorithms: List<JWSAlgorithm>,
-        val kbJwtAlgorithms: List<JWSAlgorithm>,
-    ) : VpFormat
-
-    data object MsoMdoc : VpFormat {
-        private fun readResolve(): Any = MsoMdoc
     }
 }
 
@@ -166,6 +154,14 @@ data class HttpError(val cause: Throwable) : AuthorizationRequestError
 sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class InvalidJarJwt(val cause: String) : AuthorizationRequestError
+
+    data object InvalidUseOfBothRequestAndRequestUri : RequestValidationError {
+        private fun readResolve(): Any = InvalidUseOfBothRequestAndRequestUri
+    }
+
+    data object InvalidRequestUriMethod : RequestValidationError {
+        private fun readResolve(): Any = InvalidRequestUriMethod
+    }
 
     //
     // Response Type errors

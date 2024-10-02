@@ -90,8 +90,7 @@ fun assertClientIdScheme(
             supportedClientIdSchemes.map { it.scheme().value() },
             schemes.mapNotNull { it.jsonPrimitive.contentOrNull },
         )
-    } 
-    else {
+    } else {
         assertNull(schemes)
     }
 }

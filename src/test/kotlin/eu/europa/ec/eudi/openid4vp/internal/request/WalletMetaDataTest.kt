@@ -77,6 +77,19 @@ private fun assertMetadata(config: SiopOpenId4VPConfig) {
     assertJarmEncryption(config.jarmConfiguration.encryptionConfig(), walletMetaData)
     assertJarmSigning(config.jarmConfiguration.signingConfig(), walletMetaData)
     assertClientIdScheme(config.supportedClientIdSchemes, walletMetaData)
+    assertPresentationDefinitionUriSupported(config.vpConfiguration, walletMetaData)
+}
+
+fun assertPresentationDefinitionUriSupported(vpConfiguration: VPConfiguration, walletMetaData: JsonObject) {
+    val value = walletMetaData["presentation_definition_uri_supported"]
+    if (vpConfiguration.presentationDefinitionUriSupported) {
+        assertIs<JsonPrimitive>(value)
+        assertTrue { value.boolean }
+    } else {
+        assertTrue {
+            value == null || (value is JsonPrimitive && !value.boolean)
+        }
+    }
 }
 
 fun assertClientIdScheme(

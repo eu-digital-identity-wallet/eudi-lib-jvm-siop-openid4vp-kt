@@ -377,8 +377,9 @@ data class JarConfiguration(
 
     companion object {
         /**
-         * The default JAR configuration list as trusted algorithms ES256, ES384 and ES512.
+         * The default JAR configuration list as trusted algorithms ES256, ES384, and ES512.
          * Also, both `request_uri_method` are supported.
+         *
          * @see SupportedRequestUriMethods.Default
          */
         val Default = JarConfiguration(

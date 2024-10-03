@@ -100,6 +100,7 @@ class UnvalidatedRequestResolverTest {
             SupportedClientIdScheme.X509SanUri(::validateChain),
             SupportedClientIdScheme.RedirectUri,
         ),
+        vpConfiguration = VPConfiguration(vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256)),
         clock = Clock.systemDefaultZone(),
     )
 

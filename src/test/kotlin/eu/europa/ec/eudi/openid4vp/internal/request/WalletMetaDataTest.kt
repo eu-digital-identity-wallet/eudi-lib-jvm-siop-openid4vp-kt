@@ -28,7 +28,7 @@ class WalletMetaDataTest {
     @Test
     fun `basic test`() {
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
+            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
                 presentationDefinitionUriSupported = false,
                 knownPresentationDefinitionsPerScope = emptyMap(),
@@ -51,7 +51,7 @@ class WalletMetaDataTest {
     @Test
     fun `without JARM encryption or signing option`() {
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
+            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
                 presentationDefinitionUriSupported = false,
                 knownPresentationDefinitionsPerScope = emptyMap(),
@@ -92,7 +92,7 @@ fun assertPresentationDefinitionUriSupported(vpConfiguration: VPConfiguration, w
     }
 }
 
-fun assertClientIdScheme(
+private fun assertClientIdScheme(
     supportedClientIdSchemes: List<SupportedClientIdScheme>,
     walletMetaData: JsonObject,
 ) {
@@ -108,7 +108,7 @@ fun assertClientIdScheme(
     }
 }
 
-fun assertJarmSigning(
+private fun assertJarmSigning(
     signingConfig: JarmConfiguration.Signing?,
     walletMetaData: JsonObject,
 ) {

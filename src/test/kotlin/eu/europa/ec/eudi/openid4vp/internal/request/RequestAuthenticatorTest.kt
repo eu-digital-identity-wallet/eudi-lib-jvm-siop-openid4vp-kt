@@ -51,6 +51,7 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.RedirectUri,
             ),
+            vpConfiguration = VPConfiguration.Default,
             clock = Clock.systemDefaultZone(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -96,6 +97,7 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.RedirectUri,
             ),
+            vpConfiguration = VPConfiguration.Default,
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
 
@@ -139,6 +141,7 @@ class ClientAuthenticatorTest {
                     algAndKey.second.toPublicKey()
                 },
             ),
+            vpConfiguration = VPConfiguration.Default,
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(
@@ -242,6 +245,7 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
             ),
+            vpConfiguration = VPConfiguration.Default,
             clock = Clock.systemDefaultZone(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)

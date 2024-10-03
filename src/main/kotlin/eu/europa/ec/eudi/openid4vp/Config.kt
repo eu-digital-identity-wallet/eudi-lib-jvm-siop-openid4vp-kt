@@ -81,7 +81,11 @@ sealed interface SupportedClientIdScheme {
      * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
      * indicates whether is trusted or not
      */
-    data class X509SanUri(val trust: X509CertificateTrust) : SupportedClientIdScheme
+    data class X509SanUri(val trust: X509CertificateTrust) : SupportedClientIdScheme {
+        companion object {
+            internal val NoValidation: X509SanUri = X509SanUri { _ -> true }
+        }
+    }
 
     /**
      * Wallet trusts verifiers that are able to present a Client Identifier which is a DNS name and
@@ -93,7 +97,11 @@ sealed interface SupportedClientIdScheme {
      * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
      * indicates whether is trusted or not
      */
-    data class X509SanDns(val trust: X509CertificateTrust) : SupportedClientIdScheme
+    data class X509SanDns(val trust: X509CertificateTrust) : SupportedClientIdScheme {
+        companion object {
+            internal val NoValidation: X509SanDns = X509SanDns { _ -> true }
+        }
+    }
 
     /**
      * Wallet trusts verifiers that present an authorization request having a redirect URI
@@ -146,27 +154,26 @@ sealed interface SupportedClientIdScheme {
  * which is communicated by the verifier by reference using `presentation_definition_uri`.
  * @param knownPresentationDefinitionsPerScope a set of presentation definitions that a verifier may request via
  * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
+ * @param vpFormats The formats the wallet supports
  */
 data class VPConfiguration(
-    val presentationDefinitionUriSupported: Boolean,
-    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition>,
+    val presentationDefinitionUriSupported: Boolean = true,
+    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val vpFormats: List<VpFormat>,
 ) {
 
     companion object {
-        val DefaultFormats = listOf(
+        private val msoMdocAndSdJwtVcES256 = listOf(
             VpFormat.MsoMdoc,
-            VpFormat.sdJwtVc(
-                sdJwtAlgorithms = listOf(JWSAlgorithm.ES256),
-                kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
-            ),
+            VpFormat.SdJwtVc.ES256,
         )
 
         /**
          * A default [VPConfiguration] which enables fetching presentation definitions by reference and
-         * doesn't contain any [VPConfiguration.knownPresentationDefinitionsPerScope]
+         * doesn't contain any [VPConfiguration.knownPresentationDefinitionsPerScope] and supports
+         * [mso_mdoc][VpFormat.MsoMdoc] and [sd-jwt-vc][VpFormat.SdJwtVc]
          */
-        val Default = VPConfiguration(true, emptyMap(), DefaultFormats)
+        val Default = VPConfiguration(true, emptyMap(), msoMdocAndSdJwtVcES256)
     }
 }
 
@@ -278,6 +285,9 @@ sealed interface VpFormat : java.io.Serializable {
         init {
             require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
         }
+        companion object {
+            val ES256 = SdJwtVc(listOf(JWSAlgorithm.ES256), listOf(JWSAlgorithm.ES256))
+        }
     }
 
     data object MsoMdoc : VpFormat {
@@ -287,8 +297,6 @@ sealed interface VpFormat : java.io.Serializable {
     companion object {
         fun sdJwtVc(sdJwtAlgorithms: List<JWSAlgorithm>, kbJwtAlgorithms: List<JWSAlgorithm>): SdJwtVc =
             SdJwtVc(sdJwtAlgorithms, kbJwtAlgorithms)
-
-        fun msoMdoc(): VpFormat.MsoMdoc = MsoMdoc
     }
 }
 

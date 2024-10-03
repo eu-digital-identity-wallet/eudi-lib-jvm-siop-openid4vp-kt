@@ -112,12 +112,13 @@ class DefaultDispatcherTest {
         }
 
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
+            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             jarmConfiguration = JarmConfiguration.SigningAndEncryption(
                 signer = JarmSigner(jarmSigningKeyPair),
                 supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
             ),
+            vpConfiguration = VPConfiguration.Default,
             clock = Clock.systemDefaultZone(),
         )
 

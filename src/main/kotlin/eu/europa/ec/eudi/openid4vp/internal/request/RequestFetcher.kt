@@ -65,11 +65,21 @@ internal class RequestFetcher(
         request: UnvalidatedRequest.JwtSecured.PassByReference,
     ): Pair<Jwt, Nonce?> {
         val (_, requestUri, requestUriMethod) = request
+        val supportedMethods = siopOpenId4VPConfig.jarConfiguration.supportedRequestUriMethods
         return when (requestUriMethod) {
-            null, RequestUriMethod.GET -> jwtUsingGet(requestUri) to null
+            null, RequestUriMethod.GET -> {
+                ensure(supportedMethods.isGetSupported()) {
+                    unsupportedRequestUriMethod(RequestUriMethod.GET)
+                }
+                jwtUsingGet(requestUri) to null
+            }
+
             RequestUriMethod.POST -> {
-                val walletNonce = siopOpenId4VPConfig.generateWalletNonce()
-                jwtUsingPost(requestUri, walletNonce) to walletNonce
+                val postOptions = ensureNotNull(supportedMethods.isPostSupported()) {
+                    unsupportedRequestUriMethod(RequestUriMethod.POST)
+                }
+
+                jwtUsingPost(requestUri, postOptions)
             }
         }
     }
@@ -77,22 +87,26 @@ internal class RequestFetcher(
     private suspend fun jwtUsingGet(requestUri: URL): Jwt =
         httpClient.get(requestUri) { addAcceptContentTypeJwt() }.body()
 
-    private suspend fun jwtUsingPost(requestUri: URL, walletNonce: Nonce?): Jwt {
+    private suspend fun jwtUsingPost(
+        requestUri: URL,
+        postOptions: SupportedRequestUriMethods.Post,
+    ): Pair<Jwt, Nonce?> {
+        val walletNonce = when (val nonceOption = postOptions.useWalletNonce) {
+            is NonceOption.Use -> Nonce(nonceOption.byteLength)
+            NonceOption.DoNotUse -> null
+        }
+        val walletMetaData = if (postOptions.includeWalletMetadata) {
+            walletMetaData(siopOpenId4VPConfig)
+        } else null
+
         val form =
             parameters {
                 walletNonce?.let { append(WALLET_NONCE_FORM_PARAM, it.toString()) }
-                val walletMetaData = walletMetaData(siopOpenId4VPConfig)
-                append(WALLET_METADATA_FORM_PARAM, Json.encodeToString(walletMetaData))
+                walletMetaData?.let { append(WALLET_METADATA_FORM_PARAM, Json.encodeToString(it)) }
             }
         return httpClient.submitForm(requestUri.toString(), form) { addAcceptContentTypeJwt() }.body()
     }
 }
-
-private fun SiopOpenId4VPConfig.generateWalletNonce(): Nonce? =
-    when (val nonceOption = jarConfiguration.useWalletNonce) {
-        is NonceOption.Use -> Nonce(nonceOption.byteLength)
-        NonceOption.DoNotUse -> null
-    }
 
 private fun String.parseJwt(): SignedJWT = try {
     SignedJWT.parse(this)
@@ -126,6 +140,9 @@ private fun UnvalidatedRequest.JwtSecured.ensureSameClientId(signedJwt: SignedJW
 
 private fun invalidJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()
+
+private fun unsupportedRequestUriMethod(m: RequestUriMethod): AuthorizationRequestException =
+    RequestValidationError.UnsupportedRequestUriMethod(m).asException()
 
 private const val APPLICATION_JWT = "application/jwt"
 private const val APPLICATION_OAUTH_AUTHZ_REQ_JWT = "application/oauth-authz-req+jwt"

@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp
 import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
+import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
@@ -159,6 +160,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = InvalidUseOfBothRequestAndRequestUri
     }
 
+    data class UnsupportedRequestUriMethod(val method: RequestUriMethod) : RequestValidationError
     data object InvalidRequestUriMethod : RequestValidationError {
         private fun readResolve(): Any = InvalidRequestUriMethod
     }

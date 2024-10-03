@@ -78,6 +78,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is HttpError,
                 InvalidRequestUriMethod,
                 InvalidUseOfBothRequestAndRequestUri,
+                is UnsupportedRequestUriMethod,
                 -> INVALID_REQUEST
 
                 BothJwkUriAndInlineJwks,

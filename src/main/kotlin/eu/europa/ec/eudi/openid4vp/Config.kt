@@ -285,6 +285,7 @@ sealed interface VpFormat : java.io.Serializable {
         init {
             require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
         }
+
         companion object {
             val ES256 = SdJwtVc(listOf(JWSAlgorithm.ES256), listOf(JWSAlgorithm.ES256))
         }
@@ -312,21 +313,78 @@ sealed interface NonceOption {
 }
 
 /**
+ * Which of the `request_uri_method` are supported by the wallet
+ */
+sealed interface SupportedRequestUriMethods {
+
+    /**
+     * Indicates support to `request_uri_method` `get`
+     */
+    data object Get : SupportedRequestUriMethods
+
+    /**
+     * Options related to `request_uri_method` equal to `post`
+     *
+     * @param includeWalletMetadata whether to include wallet metadata or not
+     * @param useWalletNonce whether to use wallet_nonce
+     */
+    data class Post(
+        val includeWalletMetadata: Boolean = true,
+        val useWalletNonce: NonceOption = NonceOption.Use(),
+    ) : SupportedRequestUriMethods
+
+    /**
+     * Both methods are supported
+     */
+    data class Both(val post: Post) : SupportedRequestUriMethods
+
+    fun isGetSupported(): Boolean = when (this) {
+        is Both, Get -> true
+        is Post -> false
+    }
+
+    fun isPostSupported(): Post? = when (this) {
+        is Both -> post
+        Get -> null
+        is Post -> this
+    }
+
+    companion object {
+        /**
+         * The default option is to support both `get` and `post`
+         * and in the later case, include `wallet_metadata` and `wallet_nonce`
+         */
+        val Default: SupportedRequestUriMethods =
+            Both(
+                post = Post(true, NonceOption.Use()),
+            )
+    }
+}
+
+/**
  * Options related to JWT-Secured authorization requests
  *
  * @param supportedAlgorithms the algorithms supported for the signature of the JAR
- * @param useWalletNonce whether to use wallet_nonce while retrieving JAR using the `post `request_uri_method`
+ * @param supportedRequestUriMethods which of the `request_uri_method` methods are supported
  */
 data class JarConfiguration(
     val supportedAlgorithms: List<JWSAlgorithm>,
-    val useWalletNonce: NonceOption = NonceOption.Use(),
+    val supportedRequestUriMethods: SupportedRequestUriMethods = SupportedRequestUriMethods.Default,
 ) {
     init {
         require(supportedAlgorithms.isNotEmpty()) { "JAR signing algorithms cannot be empty" }
     }
 
     companion object {
-        val Default = JarConfiguration(listOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512))
+        /**
+         * The default JAR configuration list as trusted algorithms ES256, ES384 and ES512.
+         * Also, both `request_uri_method` are supported.
+         * @see SupportedRequestUriMethods.Default
+         */
+        val Default = JarConfiguration(
+            supportedAlgorithms = listOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512),
+            supportedRequestUriMethods = SupportedRequestUriMethods.Default,
+        )
     }
 }
 
@@ -336,7 +394,8 @@ data class JarConfiguration(
  * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
  *
  * @param issuer an optional id for the wallet. If not provided defaults to [SelfIssued].
- * @param jarConfiguration options related to JWT Secure authorization requests
+ * @param jarConfiguration options related to JWT Secure authorization requests.
+ * If not provided, it will default to [JarConfiguration.Default]
  * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
  * [JarmConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.

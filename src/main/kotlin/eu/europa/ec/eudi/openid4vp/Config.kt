@@ -300,13 +300,26 @@ sealed interface VpFormat : java.io.Serializable {
     }
 }
 
+sealed interface NonceOption {
+    data object DoNotUse : NonceOption
+
+    @JvmInline
+    value class Use(val byteLength: Int = 32) : NonceOption {
+        init {
+            require(byteLength > 1) { "Byte length should be greater than 1" }
+        }
+    }
+}
+
 /**
  * Options related to JWT-Secured authorization requests
  *
  * @param supportedAlgorithms the algorithms supported for the signature of the JAR
+ * @param useWalletNonce whether to use wallet_nonce while retrieving JAR using the `post `request_uri_method`
  */
 data class JarConfiguration(
     val supportedAlgorithms: List<JWSAlgorithm>,
+    val useWalletNonce: NonceOption = NonceOption.Use(),
 ) {
     init {
         require(supportedAlgorithms.isNotEmpty()) { "JAR signing algorithms cannot be empty" }

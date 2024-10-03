@@ -100,6 +100,9 @@ class UnvalidatedRequestResolverTest {
             SupportedClientIdScheme.X509SanUri(::validateChain),
             SupportedClientIdScheme.RedirectUri,
         ),
+        jarConfiguration = JarConfiguration(
+            supportedAlgorithms = listOf(JWSAlgorithm.RS256),
+        ),
         vpConfiguration = VPConfiguration(vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256)),
         clock = Clock.systemDefaultZone(),
     )

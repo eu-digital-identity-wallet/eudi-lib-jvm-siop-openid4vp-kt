@@ -301,11 +301,29 @@ sealed interface VpFormat : java.io.Serializable {
 }
 
 /**
+ * Options related to JWT-Secured authorization requests
+ *
+ * @param supportedAlgorithms the algorithms supported for the signature of the JAR
+ */
+data class JarConfiguration(
+    val supportedAlgorithms: List<JWSAlgorithm>,
+) {
+    init {
+        require(supportedAlgorithms.isNotEmpty()) { "JAR signing algorithms cannot be empty" }
+    }
+
+    companion object {
+        val Default = JarConfiguration(listOf(JWSAlgorithm.ES256, JWSAlgorithm.ES384, JWSAlgorithm.ES512))
+    }
+}
+
+/**
  * Wallet configuration options for SIOP & OpenId4VP protocols.
  *
  * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
  *
  * @param issuer an optional id for the wallet. If not provided defaults to [SelfIssued].
+ * @param jarConfiguration options related to JWT Secure authorization requests
  * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
  * [JarmConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
@@ -315,6 +333,7 @@ sealed interface VpFormat : java.io.Serializable {
  */
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
+    val jarConfiguration: JarConfiguration = JarConfiguration.Default,
     val jarmConfiguration: JarmConfiguration = NotSupported,
     val vpConfiguration: VPConfiguration = VPConfiguration.Default,
     val clock: Clock = Clock.systemDefaultZone(),
@@ -327,12 +346,21 @@ data class SiopOpenId4VPConfig(
 
     constructor(
         issuer: Issuer? = SelfIssued,
+        jarConfiguration: JarConfiguration = JarConfiguration.Default,
         jarmConfiguration: JarmConfiguration = NotSupported,
         vpConfiguration: VPConfiguration = VPConfiguration.Default,
         clock: Clock = Clock.systemDefaultZone(),
         jarClockSkew: Duration = Duration.ofSeconds(15L),
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
-    ) : this(issuer, jarmConfiguration, vpConfiguration, clock, jarClockSkew, supportedClientIdSchemes.toList())
+    ) : this(
+        issuer,
+        jarConfiguration,
+        jarmConfiguration,
+        vpConfiguration,
+        clock,
+        jarClockSkew,
+        supportedClientIdSchemes.toList(),
+    )
 
     companion object {
         /**

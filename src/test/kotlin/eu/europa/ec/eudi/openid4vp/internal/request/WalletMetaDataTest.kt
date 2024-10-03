@@ -57,10 +57,7 @@ class WalletMetaDataTest {
                 knownPresentationDefinitionsPerScope = emptyMap(),
                 vpFormats = listOf(
                     VpFormat.MsoMdoc,
-                    VpFormat.sdJwtVc(
-                        sdJwtAlgorithms = listOf(JWSAlgorithm.ES256),
-                        kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
-                    ),
+                    VpFormat.SdJwtVc.ES256,
                 ),
             ),
             jarmConfiguration = JarmConfiguration.NotSupported,
@@ -78,9 +75,19 @@ private fun assertMetadata(config: SiopOpenId4VPConfig) {
     assertJarmSigning(config.jarmConfiguration.signingConfig(), walletMetaData)
     assertClientIdScheme(config.supportedClientIdSchemes, walletMetaData)
     assertPresentationDefinitionUriSupported(config.vpConfiguration, walletMetaData)
+    assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
 }
 
-fun assertPresentationDefinitionUriSupported(vpConfiguration: VPConfiguration, walletMetaData: JsonObject) {
+private fun assertJarSigning(supportedAlgorithms: List<JWSAlgorithm>, walletMetaData: JsonObject) {
+    val algs = walletMetaData["request_object_signing_alg_values_supported"]
+    assertIs<JsonArray>(algs)
+    assertContentEquals(
+        supportedAlgorithms.map { it.name },
+        algs.mapNotNull { it.jsonPrimitive.contentOrNull },
+    )
+}
+
+private fun assertPresentationDefinitionUriSupported(vpConfiguration: VPConfiguration, walletMetaData: JsonObject) {
     val value = walletMetaData["presentation_definition_uri_supported"]
     if (vpConfiguration.presentationDefinitionUriSupported) {
         assertIs<JsonPrimitive>(value)
@@ -112,7 +119,7 @@ private fun assertJarmSigning(
     signingConfig: JarmConfiguration.Signing?,
     walletMetaData: JsonObject,
 ) {
-    val algs = walletMetaData["request_object_signing_alg_values_supported"]
+    val algs = walletMetaData["authorization_signing_alg_values_supported"]
     if (signingConfig != null) {
         assertIs<JsonArray>(algs)
         assertContentEquals(

@@ -118,7 +118,9 @@ class DefaultDispatcherTest {
                 supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
             ),
-            vpConfiguration = VPConfiguration.Default,
+            vpConfiguration = VPConfiguration(
+                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
             clock = Clock.systemDefaultZone(),
         )
 

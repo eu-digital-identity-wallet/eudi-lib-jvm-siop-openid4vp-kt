@@ -54,7 +54,9 @@ class AuthorizationResponseBuilderTest {
                 supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
-            vpConfiguration = VPConfiguration.Default,
+            vpConfiguration = VPConfiguration(
+                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
             clock = Clock.systemDefaultZone(),
         )
 

@@ -51,7 +51,9 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.RedirectUri,
             ),
-            vpConfiguration = VPConfiguration.Default,
+            vpConfiguration = VPConfiguration(
+                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
             clock = Clock.systemDefaultZone(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -97,7 +99,9 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.RedirectUri,
             ),
-            vpConfiguration = VPConfiguration.Default,
+            vpConfiguration = VPConfiguration(
+                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
 
@@ -141,7 +145,9 @@ class ClientAuthenticatorTest {
                     algAndKey.second.toPublicKey()
                 },
             ),
-            vpConfiguration = VPConfiguration.Default,
+            vpConfiguration = VPConfiguration(
+                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(
@@ -245,7 +251,9 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
             ),
-            vpConfiguration = VPConfiguration.Default,
+            vpConfiguration = VPConfiguration(
+                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
             clock = Clock.systemDefaultZone(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)

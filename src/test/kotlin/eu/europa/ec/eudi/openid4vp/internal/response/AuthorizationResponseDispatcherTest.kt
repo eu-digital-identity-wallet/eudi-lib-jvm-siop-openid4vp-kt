@@ -48,7 +48,9 @@ class AuthorizationResponseDispatcherTest {
 
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
-        vpConfiguration = VPConfiguration.Default,
+        vpConfiguration = VPConfiguration(
+            vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+        ),
         clock = Clock.systemDefaultZone(),
     )
 

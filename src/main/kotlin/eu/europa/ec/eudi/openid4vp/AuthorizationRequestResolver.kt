@@ -143,7 +143,7 @@ sealed interface ResolvedRequestObject : Serializable {
 }
 
 /**
- * Errors that can occur while validating & resolving an authorization request
+ * Errors that can occur while validating and resolving an authorization request
  */
 sealed interface AuthorizationRequestError : Serializable
 
@@ -317,12 +317,12 @@ fun <T> AuthorizationRequestError.asFailure(): Result<T> =
     Result.failure(asException())
 
 /**
- * The outcome of [validating & resolving][AuthorizationRequestResolver.resolveRequestUri]
+ * The outcome of [validating and resolving][AuthorizationRequestResolver.resolveRequestUri]
  * an authorization request.
  */
 sealed interface Resolution {
     /**
-     * Represents the success of validating & resolving an authorization request
+     * Represents the success of validating and resolving an authorization request
      * into a [requestObject]
      */
     data class Success(val requestObject: ResolvedRequestObject) : Resolution

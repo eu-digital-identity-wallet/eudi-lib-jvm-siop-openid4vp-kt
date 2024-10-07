@@ -42,7 +42,7 @@ sealed interface JwkSetSource {
  * @param clientId the client id of a trusted verifier
  * @param legalName the name of the trusted verifier
  * @param jarConfig in case, verifier communicates his request using JAR, the signing algorithm
- * that is uses to sign his request and a [way][JwkSetSource] to obtain his public key
+ * that is uses to sign his request and a [way][JwkSetSource] to get his public key
  *
  */
 data class PreregisteredClient(
@@ -160,22 +160,7 @@ data class VPConfiguration(
     val presentationDefinitionUriSupported: Boolean = true,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val vpFormats: List<VpFormat>,
-) {
-
-    companion object {
-        private val msoMdocAndSdJwtVcES256 = listOf(
-            VpFormat.MsoMdoc,
-            VpFormat.SdJwtVc.ES256,
-        )
-
-        /**
-         * A default [VPConfiguration] which enables fetching presentation definitions by reference and
-         * doesn't contain any [VPConfiguration.knownPresentationDefinitionsPerScope] and supports
-         * [mso_mdoc][VpFormat.MsoMdoc] and [sd-jwt-vc][VpFormat.SdJwtVc]
-         */
-        val Default = VPConfiguration(true, emptyMap(), msoMdocAndSdJwtVcES256)
-    }
-}
+)
 
 interface JarmSigner : JWSSigner {
     fun getKeyId(): String
@@ -399,7 +384,7 @@ data class JarConfiguration(
  * If not provided, it will default to [JarConfiguration.Default]
  * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
  * [JarmConfiguration.NotSupported].
- * @param vpConfiguration options about OpenId4VP. If not provided, [VPConfiguration.Default] is being used.
+ * @param vpConfiguration options about OpenId4VP.
  * @param clock the system Clock. If not provided system's default clock will be used.
  * @param jarClockSkew max acceptable skew between wallet and verifier
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
@@ -408,7 +393,7 @@ data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
     val jarConfiguration: JarConfiguration = JarConfiguration.Default,
     val jarmConfiguration: JarmConfiguration = NotSupported,
-    val vpConfiguration: VPConfiguration = VPConfiguration.Default,
+    val vpConfiguration: VPConfiguration,
     val clock: Clock = Clock.systemDefaultZone(),
     val jarClockSkew: Duration = Duration.ofSeconds(15L),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
@@ -421,7 +406,7 @@ data class SiopOpenId4VPConfig(
         issuer: Issuer? = SelfIssued,
         jarConfiguration: JarConfiguration = JarConfiguration.Default,
         jarmConfiguration: JarmConfiguration = NotSupported,
-        vpConfiguration: VPConfiguration = VPConfiguration.Default,
+        vpConfiguration: VPConfiguration,
         clock: Clock = Clock.systemDefaultZone(),
         jarClockSkew: Duration = Duration.ofSeconds(15L),
         vararg supportedClientIdSchemes: SupportedClientIdScheme,

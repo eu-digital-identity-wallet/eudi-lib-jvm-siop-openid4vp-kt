@@ -47,7 +47,10 @@ class AuthorizationResponseDispatcherTest {
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
 
     private val walletConfig = SiopOpenId4VPConfig(
-        supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
+        supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+        vpConfiguration = VPConfiguration(
+            vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+        ),
         clock = Clock.systemDefaultZone(),
     )
 
@@ -154,6 +157,7 @@ class AuthorizationResponseDispatcherTest {
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     jarmRequirement = walletConfig.jarmRequirement(validated),
+                    vpFormats = VpFormats(VpFormat.MsoMdoc),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

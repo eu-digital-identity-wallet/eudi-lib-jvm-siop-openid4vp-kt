@@ -97,16 +97,33 @@ enum class ClientIdScheme {
 
     ;
 
+    fun value(): String = when (this) {
+        PreRegistered -> PRE_REGISTERED_NAME
+        RedirectUri -> REDIRECT_URI_NAME
+        EntityId -> ENTITY_ID_NAME
+        DID -> DID_NAME
+        X509_SAN_URI -> X509_SAN_URI_NAME
+        X509_SAN_DNS -> X509_SAN_DNS_NAME
+        VERIFIER_ATTESTATION -> VERIFIER_ATTESTATION_NAME
+    }
+
     companion object {
+        private const val PRE_REGISTERED_NAME = "pre-registered"
+        private const val REDIRECT_URI_NAME = "redirect_uri"
+        private const val ENTITY_ID_NAME = "entity_id"
+        private const val DID_NAME = "did"
+        private const val X509_SAN_URI_NAME = "x509_san_uri"
+        private const val X509_SAN_DNS_NAME = "x509_san_dns"
+        private const val VERIFIER_ATTESTATION_NAME = "verifier_attestation"
 
         fun make(s: String): ClientIdScheme? = when (s) {
-            "pre-registered" -> PreRegistered
-            "redirect_uri" -> RedirectUri
-            "entity_id" -> EntityId
-            "did" -> DID
-            "x509_san_uri" -> X509_SAN_URI
-            "x509_san_dns" -> X509_SAN_DNS
-            "verifier_attestation" -> VERIFIER_ATTESTATION
+            PRE_REGISTERED_NAME -> PreRegistered
+            REDIRECT_URI_NAME -> RedirectUri
+            ENTITY_ID_NAME -> EntityId
+            DID_NAME -> DID
+            X509_SAN_URI_NAME -> X509_SAN_URI
+            X509_SAN_DNS_NAME -> X509_SAN_DNS
+            VERIFIER_ATTESTATION_NAME -> VERIFIER_ATTESTATION
             else -> null
         }
     }

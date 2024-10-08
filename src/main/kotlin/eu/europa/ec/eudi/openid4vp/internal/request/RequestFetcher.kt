@@ -16,41 +16,96 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jwt.SignedJWT
-import eu.europa.ec.eudi.openid4vp.AuthorizationRequestException
-import eu.europa.ec.eudi.openid4vp.Jwt
-import eu.europa.ec.eudi.openid4vp.RequestValidationError
-import eu.europa.ec.eudi.openid4vp.asException
+import com.nimbusds.openid.connect.sdk.Nonce
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.ensure
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.net.URL
 import java.text.ParseException
 
-internal class RequestFetcher(private val httpClient: HttpClient) {
+internal class RequestFetcher(
+    private val httpClient: HttpClient,
+    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
+) {
     /**
      * Fetches the authorization request, if needed
      */
     suspend fun fetchRequest(request: UnvalidatedRequest): FetchedRequest = when (request) {
         is UnvalidatedRequest.Plain -> FetchedRequest.Plain(request.requestObject)
         is UnvalidatedRequest.JwtSecured -> {
-            val jwt = when (request) {
-                is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt
+            val (jwt, walletNonce) = when (request) {
+                is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt to null
                 is UnvalidatedRequest.JwtSecured.PassByReference -> jwt(request)
             }
             val signedJwt = jwt.parseJwt()
-            ensure(request.clientId == signedJwt.jwtClaimsSet.getStringClaim("client_id")) {
-                invalidJwt("ClientId mismatch. JAR request ${request.clientId}, jwt ${request.clientId}")
+
+            with(siopOpenId4VPConfig) {
+                ensureSupportedSigningAlgorithm(signedJwt)
             }
-            FetchedRequest.JwtSecured(request.clientId, signedJwt)
+            val clientId = with(request) {
+                ensureSameClientId(signedJwt)
+            }
+
+            if (walletNonce != null) {
+                ensureSameWalletNonce(walletNonce, signedJwt)
+            }
+
+            FetchedRequest.JwtSecured(clientId, signedJwt)
         }
     }
 
-    private suspend fun jwt(passByReference: UnvalidatedRequest.JwtSecured.PassByReference): Jwt =
-        httpClient.get(passByReference.jwtURI) {
-            accept(ContentType.parse("application/oauth-authz-req+jwt"))
-            accept(ContentType.parse("application/jwt"))
-        }.body<String>()
+    private suspend fun jwt(
+        request: UnvalidatedRequest.JwtSecured.PassByReference,
+    ): Pair<Jwt, Nonce?> {
+        val (_, requestUri, requestUriMethod) = request
+        val supportedMethods = siopOpenId4VPConfig.jarConfiguration.supportedRequestUriMethods
+        return when (requestUriMethod) {
+            null, RequestUriMethod.GET -> {
+                ensure(supportedMethods.isGetSupported()) {
+                    unsupportedRequestUriMethod(RequestUriMethod.GET)
+                }
+                jwtUsingGet(requestUri) to null
+            }
+
+            RequestUriMethod.POST -> {
+                val postOptions = ensureNotNull(supportedMethods.isPostSupported()) {
+                    unsupportedRequestUriMethod(RequestUriMethod.POST)
+                }
+
+                jwtUsingPost(requestUri, postOptions)
+            }
+        }
+    }
+
+    private suspend fun jwtUsingGet(requestUri: URL): Jwt =
+        httpClient.get(requestUri) { addAcceptContentTypeJwt() }.body()
+
+    private suspend fun jwtUsingPost(
+        requestUri: URL,
+        postOptions: SupportedRequestUriMethods.Post,
+    ): Pair<Jwt, Nonce?> {
+        val walletNonce = when (val nonceOption = postOptions.useWalletNonce) {
+            is NonceOption.Use -> Nonce(nonceOption.byteLength)
+            NonceOption.DoNotUse -> null
+        }
+        val walletMetaData = if (postOptions.includeWalletMetadata) {
+            walletMetaData(siopOpenId4VPConfig)
+        } else null
+
+        val form =
+            parameters {
+                walletNonce?.let { append(WALLET_NONCE_FORM_PARAM, it.toString()) }
+                walletMetaData?.let { append(WALLET_METADATA_FORM_PARAM, Json.encodeToString(it)) }
+            }
+        return httpClient.submitForm(requestUri.toString(), form) { addAcceptContentTypeJwt() }.body()
+    }
 }
 
 private fun String.parseJwt(): SignedJWT = try {
@@ -59,5 +114,42 @@ private fun String.parseJwt(): SignedJWT = try {
     throw invalidJwt("JAR JWT parse error")
 }
 
+private fun ensureSameWalletNonce(expectedWalletNonce: Nonce, signedJwt: SignedJWT) {
+    val walletNonce = signedJwt.jwtClaimsSet.getStringClaim(WALLET_NONCE_FORM_PARAM)
+    ensure(expectedWalletNonce.toString() == walletNonce) {
+        invalidJwt("Mismatch of wallet_nonce. Expected $expectedWalletNonce, actual $walletNonce")
+    }
+}
+
+private fun SiopOpenId4VPConfig.ensureSupportedSigningAlgorithm(signedJwt: SignedJWT) {
+    val signingAlg = ensureNotNull(signedJwt.header.algorithm) {
+        invalidJwt("JAR is missing alg claim from header")
+    }
+    ensure(signingAlg in jarConfiguration.supportedAlgorithms) {
+        invalidJwt("JAR is signed with ${signingAlg.name} which is not supported")
+    }
+}
+
+private fun UnvalidatedRequest.JwtSecured.ensureSameClientId(signedJwt: SignedJWT): String {
+    val jarClientId = signedJwt.jwtClaimsSet.getStringClaim("client_id")
+    ensure(clientId == jarClientId) {
+        invalidJwt("ClientId mismatch. JAR request $clientId, jwt $jarClientId")
+    }
+    return clientId
+}
+
 private fun invalidJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()
+
+private fun unsupportedRequestUriMethod(m: RequestUriMethod): AuthorizationRequestException =
+    RequestValidationError.UnsupportedRequestUriMethod(m).asException()
+
+private const val APPLICATION_JWT = "application/jwt"
+private const val APPLICATION_OAUTH_AUTHZ_REQ_JWT = "application/oauth-authz-req+jwt"
+private const val WALLET_NONCE_FORM_PARAM = "wallet_nonce"
+private const val WALLET_METADATA_FORM_PARAM = "wallet_metadata"
+
+private fun HttpRequestBuilder.addAcceptContentTypeJwt() {
+    accept(ContentType.parse(APPLICATION_OAUTH_AUTHZ_REQ_JWT))
+    accept(ContentType.parse(APPLICATION_JWT))
+}

@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp
 import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
+import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
@@ -120,6 +121,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
+        val vpFormats: VpFormats,
         val presentationDefinition: PresentationDefinition,
     ) : ResolvedRequestObject
 
@@ -132,6 +134,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
+        val vpFormats: VpFormats,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
@@ -140,7 +143,7 @@ sealed interface ResolvedRequestObject : Serializable {
 }
 
 /**
- * Errors that can occur while validating & resolving an authorization request
+ * Errors that can occur while validating and resolving an authorization request
  */
 sealed interface AuthorizationRequestError : Serializable
 
@@ -152,6 +155,15 @@ data class HttpError(val cause: Throwable) : AuthorizationRequestError
 sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class InvalidJarJwt(val cause: String) : AuthorizationRequestError
+
+    data object InvalidUseOfBothRequestAndRequestUri : RequestValidationError {
+        private fun readResolve(): Any = InvalidUseOfBothRequestAndRequestUri
+    }
+
+    data class UnsupportedRequestUriMethod(val method: RequestUriMethod) : RequestValidationError
+    data object InvalidRequestUriMethod : RequestValidationError {
+        private fun readResolve(): Any = InvalidRequestUriMethod
+    }
 
     //
     // Response Type errors
@@ -226,10 +238,6 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class UnsupportedClientMetaData(val value: String) : RequestValidationError
 
-    data object InvalidClientMetaDataUri : RequestValidationError {
-        private fun readResolve(): Any = InvalidClientMetaDataUri
-    }
-
     data object OneOfClientMedataOrUri : RequestValidationError {
         private fun readResolve(): Any = OneOfClientMedataOrUri
     }
@@ -283,7 +291,6 @@ sealed interface ResolutionError : AuthorizationRequestError {
     }
 
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
-    data class UnableToFetchClientMetadata(val cause: Throwable) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkUriUnparsable(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
@@ -310,12 +317,12 @@ fun <T> AuthorizationRequestError.asFailure(): Result<T> =
     Result.failure(asException())
 
 /**
- * The outcome of [validating & resolving][AuthorizationRequestResolver.resolveRequestUri]
+ * The outcome of [validating and resolving][AuthorizationRequestResolver.resolveRequestUri]
  * an authorization request.
  */
 sealed interface Resolution {
     /**
-     * Represents the success of validating & resolving an authorization request
+     * Represents the success of validating and resolving an authorization request
      * into a [requestObject]
      */
     data class Success(val requestObject: ResolvedRequestObject) : Resolution

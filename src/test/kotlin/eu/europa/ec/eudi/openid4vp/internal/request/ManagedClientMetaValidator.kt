@@ -26,7 +26,7 @@ internal class ManagedClientMetaValidator(
         unvalidated: UnvalidatedClientMetaData,
         responseMode: ResponseMode,
     ): ValidatedClientMetaData =
-        httpClientFactory().use {
-            ClientMetaDataValidator(it).validate(unvalidated, responseMode)
+        httpClientFactory().use { httpClient ->
+            ClientMetaDataValidator(httpClient).validateClientMetaData(unvalidated, responseMode)
         }
 }

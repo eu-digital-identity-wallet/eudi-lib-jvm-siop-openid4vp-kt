@@ -147,6 +147,40 @@ sealed interface SupportedClientIdScheme {
     }
 }
 
+@JvmInline
+value class VpFormats(val values: List<VpFormat>) {
+
+    constructor(vararg formats: VpFormat) : this(formats.toList())
+
+    init {
+        ensureUniquePerFormat(values)
+    }
+
+    operator fun contains(that: VpFormat) = that in values
+
+    companion object {
+        val Empty: VpFormats = VpFormats(emptyList())
+
+        internal fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
+            formats
+                .groupBy { it.formatName() }
+                .forEach { (formatName, instances) ->
+                    require(instances.size == 1) {
+                        "Multiple instances ${instances.size} found for $formatName."
+                    }
+                }
+        }
+
+        private enum class FormatName {
+            MSO_MDOC, SD_JWT_VC
+        }
+        private fun VpFormat.formatName() = when (this) {
+            VpFormat.MsoMdoc -> FormatName.MSO_MDOC
+            is VpFormat.SdJwtVc -> FormatName.SD_JWT_VC
+        }
+    }
+}
+
 /**
  * Configurations options for OpenId4VP
  *
@@ -159,7 +193,7 @@ sealed interface SupportedClientIdScheme {
 data class VPConfiguration(
     val presentationDefinitionUriSupported: Boolean = true,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
-    val vpFormats: List<VpFormat>,
+    val vpFormats: VpFormats,
 )
 
 interface JarmSigner : JWSSigner {

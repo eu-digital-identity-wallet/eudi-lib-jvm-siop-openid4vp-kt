@@ -46,7 +46,7 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
         ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
             RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
         }
-        val vpFormats = unvalidated.vpFormats?.formats().orEmpty()
+        val vpFormats = vpFormats(unvalidated)
         return ValidatedClientMetaData(
             jwkSet = jwkSets,
             subjectSyntaxTypesSupported = types,
@@ -56,6 +56,13 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
             vpFormats = vpFormats,
         )
     }
+
+    private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
+        try {
+            VpFormats(unvalidated.vpFormats?.formats().orEmpty())
+        } catch (e: IllegalArgumentException) {
+            throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
+        }
 
     private suspend fun jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet {
         val jwks = clientMetadata.jwks

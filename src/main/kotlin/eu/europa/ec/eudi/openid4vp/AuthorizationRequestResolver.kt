@@ -121,7 +121,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
-        val vpFormats: List<VpFormat>,
+        val vpFormats: VpFormats,
         val presentationDefinition: PresentationDefinition,
     ) : ResolvedRequestObject
 
@@ -134,7 +134,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
-        val vpFormats: List<VpFormat>,
+        val vpFormats: VpFormats,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,

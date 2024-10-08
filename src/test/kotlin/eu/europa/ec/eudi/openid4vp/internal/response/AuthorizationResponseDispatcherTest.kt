@@ -49,7 +49,7 @@ class AuthorizationResponseDispatcherTest {
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
         vpConfiguration = VPConfiguration(
-            vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
         ),
         clock = Clock.systemDefaultZone(),
     )
@@ -157,7 +157,7 @@ class AuthorizationResponseDispatcherTest {
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     jarmRequirement = walletConfig.jarmRequirement(validated),
-                    vpFormats = listOf(VpFormat.MsoMdoc),
+                    vpFormats = VpFormats(VpFormat.MsoMdoc),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

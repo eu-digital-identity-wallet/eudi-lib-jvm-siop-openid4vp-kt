@@ -55,7 +55,7 @@ class AuthorizationResponseBuilderTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -152,7 +152,7 @@ class AuthorizationResponseBuilderTest {
                         inputDescriptors = emptyList(),
                     ),
                     jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
-                    vpFormats = listOf(VpFormat.MsoMdoc),
+                    vpFormats = VpFormats(VpFormat.MsoMdoc),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

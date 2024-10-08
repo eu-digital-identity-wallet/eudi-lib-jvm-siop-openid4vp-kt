@@ -119,7 +119,7 @@ class DefaultDispatcherTest {
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = listOf(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -434,7 +434,7 @@ class DefaultDispatcherTest {
                     inputDescriptors = emptyList(),
                 ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
-                vpFormats = listOf(VpFormat.MsoMdoc),
+                vpFormats = VpFormats(VpFormat.MsoMdoc),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,

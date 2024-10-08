@@ -44,12 +44,12 @@ internal class VpFormatsTO(
 ) {
     companion object {
 
-        fun make(fs: List<VpFormat>): VpFormatsTO {
-            val vcSdJwt = fs.filterIsInstance<VpFormat.SdJwtVc>().run {
+        fun make(fs: VpFormats): VpFormatsTO {
+            val vcSdJwt = fs.values.filterIsInstance<VpFormat.SdJwtVc>().run {
                 check(size <= 1)
                 firstOrNull()?.let { VcSdJwtTO.make(it) }
             }
-            val msdMdoc = fs.filterIsInstance<VpFormat.MsoMdoc>().run {
+            val msdMdoc = fs.values.filterIsInstance<VpFormat.MsoMdoc>().run {
                 check(size <= 1)
                 firstOrNull()?.let { JsonObject(emptyMap()) }
             }
@@ -79,7 +79,7 @@ internal data class ValidatedClientMetaData(
     val authorizationSignedResponseAlg: JWSAlgorithm? = null,
     val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
     val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
-    val vpFormats: List<VpFormat> = emptyList(),
+    val vpFormats: VpFormats = VpFormats(emptyList()),
 )
 
 @Throws(AuthorizationRequestException::class)

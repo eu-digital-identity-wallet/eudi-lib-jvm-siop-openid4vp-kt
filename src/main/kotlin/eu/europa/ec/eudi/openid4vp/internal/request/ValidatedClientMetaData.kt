@@ -34,38 +34,38 @@ internal data class UnvalidatedClientMetaData(
     @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
-    @SerialName("vp_formats") val vpFormats: VpFormats? = null,
+    @SerialName("vp_formats") val vpFormats: VpFormatsTO? = null,
 )
 
 @Serializable
-internal class VpFormats(
-    @SerialName("vc+sd-jwt") val vcSdJwt: VcSdJwt? = null,
+internal class VpFormatsTO(
+    @SerialName("vc+sd-jwt") val vcSdJwt: VcSdJwtTO? = null,
     @SerialName("mso_mdoc") val msoMdoc: JsonObject? = null,
 ) {
     companion object {
 
-        fun make(fs: List<VpFormat>): VpFormats {
+        fun make(fs: List<VpFormat>): VpFormatsTO {
             val vcSdJwt = fs.filterIsInstance<VpFormat.SdJwtVc>().run {
                 check(size <= 1)
-                firstOrNull()?.let { VcSdJwt.make(it) }
+                firstOrNull()?.let { VcSdJwtTO.make(it) }
             }
             val msdMdoc = fs.filterIsInstance<VpFormat.MsoMdoc>().run {
                 check(size <= 1)
                 firstOrNull()?.let { JsonObject(emptyMap()) }
             }
-            return VpFormats(vcSdJwt, msdMdoc)
+            return VpFormatsTO(vcSdJwt, msdMdoc)
         }
     }
 }
 
 @Serializable
-internal class VcSdJwt(
+internal class VcSdJwtTO(
     @SerialName("sd-jwt_alg_values") val sdJwtAlgorithms: List<String>? = null,
     @SerialName("kb-jwt_alg_values") val kdJwtAlgorithms: List<String>? = null,
 ) {
     companion object {
-        fun make(f: VpFormat.SdJwtVc): VcSdJwt {
-            return VcSdJwt(
+        fun make(f: VpFormat.SdJwtVc): VcSdJwtTO {
+            return VcSdJwtTO(
                 sdJwtAlgorithms = f.sdJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
                 kdJwtAlgorithms = f.kbJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
             )

@@ -165,8 +165,8 @@ private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
     }
 }
 
-private fun VpFormats.formats(): List<VpFormat> {
-    fun VcSdJwt.format(): VpFormat.SdJwtVc {
+private fun VpFormatsTO.formats(): List<VpFormat> {
+    fun VcSdJwtTO.format(): VpFormat.SdJwtVc {
         fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
         return VpFormat.SdJwtVc(
             sdJwtAlgorithms = sdJwtAlgorithms.algs(),

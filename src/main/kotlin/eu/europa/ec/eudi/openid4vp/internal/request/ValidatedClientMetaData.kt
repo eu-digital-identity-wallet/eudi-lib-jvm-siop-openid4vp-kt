@@ -25,7 +25,6 @@ import eu.europa.ec.eudi.openid4vp.internal.ensure
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
-import java.net.URL
 
 @Serializable
 internal data class UnvalidatedClientMetaData(
@@ -35,11 +34,43 @@ internal data class UnvalidatedClientMetaData(
     @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
+    @SerialName("vp_formats") val vpFormats: VpFormatsTO? = null,
 )
 
-internal sealed interface ClientMetaDataSource {
-    data class ByValue(val metaData: UnvalidatedClientMetaData) : ClientMetaDataSource
-    data class ByReference(val url: URL) : ClientMetaDataSource
+@Serializable
+internal class VpFormatsTO(
+    @SerialName("vc+sd-jwt") val vcSdJwt: VcSdJwtTO? = null,
+    @SerialName("mso_mdoc") val msoMdoc: JsonObject? = null,
+) {
+    companion object {
+
+        fun make(fs: VpFormats): VpFormatsTO {
+            val vcSdJwt = fs.values.filterIsInstance<VpFormat.SdJwtVc>().run {
+                check(size <= 1)
+                firstOrNull()?.let { VcSdJwtTO.make(it) }
+            }
+            val msdMdoc = fs.values.filterIsInstance<VpFormat.MsoMdoc>().run {
+                check(size <= 1)
+                firstOrNull()?.let { JsonObject(emptyMap()) }
+            }
+            return VpFormatsTO(vcSdJwt, msdMdoc)
+        }
+    }
+}
+
+@Serializable
+internal class VcSdJwtTO(
+    @SerialName("sd-jwt_alg_values") val sdJwtAlgorithms: List<String>? = null,
+    @SerialName("kb-jwt_alg_values") val kdJwtAlgorithms: List<String>? = null,
+) {
+    companion object {
+        fun make(f: VpFormat.SdJwtVc): VcSdJwtTO {
+            return VcSdJwtTO(
+                sdJwtAlgorithms = f.sdJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
+                kdJwtAlgorithms = f.kbJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
+            )
+        }
+    }
 }
 
 internal data class ValidatedClientMetaData(
@@ -48,6 +79,7 @@ internal data class ValidatedClientMetaData(
     val authorizationSignedResponseAlg: JWSAlgorithm? = null,
     val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
     val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
+    val vpFormats: VpFormats = VpFormats(emptyList()),
 )
 
 @Throws(AuthorizationRequestException::class)

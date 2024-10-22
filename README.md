@@ -23,7 +23,7 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 
 This is a Kotlin library, targeting JVM, that supports 
 the [SIOPv2 (draft 12)](https://openid.bitbucket.io/connect/openid-connect-self-issued-v2-1_0.html) 
-and [OpenId4VP (draft 20)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) protocols.
+and [OpenId4VP (draft 21)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html) protocols.
 In particular, the library focus on the wallet's role using those two protocols with constraints
 included in ISO 23220-4 and ISO-18013-7
 
@@ -70,8 +70,8 @@ val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)
 Wallet receives an OAUTH2 Authorization request, formed by the Verifier, that may represent
 
 - a [SIOPv2 authentication request](https://openid.bitbucket.io/connect/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-a), or
-- a [OpenID4VP authorization request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request) or,
-- a combined [SIOP & OpenID4VP request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-combining-this-specificatio)
+- a [OpenID4VP authorization request](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html#name-authorization-request) or,
+- a combined [SIOP & OpenID4VP request](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html#name-combining-this-specificatio)
 
 In the same device scenario, the aforementioned authorization request reaches the wallet in terms of a deep link.
 Similarly, in the cross-device scenario, the request would be obtained via scanning a QR Code.
@@ -148,7 +148,7 @@ and then run the Example.
 
 ## SIOPv2 & OpenId4VP features supported
 
-### `response_mode`
+### Parameter `response_mode`
 
 A Wallet can take the form of a web or mobile application.
 OpenId4VP describes flows for both cases. Given that we are focusing on a mobile wallet we could
@@ -174,6 +174,15 @@ Library requires the presence of `client_id_scheme` with one of the following va
 - `did` where verifier must send the authorization request signed (JAR) using a key resolvable via DID URL.
 - `verifier_attestation` where verifier must send the authorization request signed (JAR), witch contains a verifier attestation JWT from a trusted issuer
 
+### Retrieving Authorization Request 
+
+According to OpenID4VP, when the `request_uri` parameter is included in the authorization request wallet must fetch the Authorization Request by following this URI.
+In this case there are two methods to get the request, controlled by the `request_uri_method` comunicated by the verifier:
+- Via an HTTP GET: In this case the Wallet MUST send the request to retrieve the Request Object using the HTTP GET method, as defined in [RFC9101](https://www.rfc-editor.org/rfc/rfc9101.html). 
+- Via an HTTP POST: In this case a supporting Wallet MUST send the request using the HTTP POST method as detailed in [Section 5.8](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html#name-request-uri-method-post).
+ 
+In the later case wallet can communicate its [metadata](src/main/kotlin/eu/europa/ec/eudi/openid4vp/internal/request/WalletMetaData.kt) to the verifier. Library supports both methods.
+
 ### Authorization Request encoding
 
 OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET
@@ -196,18 +205,15 @@ Presentation Definition JSON object.
 
 According to OpenId4VP, verifier may pass the `presentation_definition` either
 
-* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.1)
-* [by reference](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-presentation_definition_uri)
-* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-using-scope-parameter-to-re)
+* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html#section-5.1)
+* [by reference](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html#section-5.2)
+* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html#section-5.3)
 
 Library supports all these options
 
 ### Client metadata in Authorization Request
-According to [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request) verifier may pass his metadata (client metadata) either
-* by value, or
-* by reference
-
-Library supports both options
+According to [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html#name-authorization-request) verifier may pass his metadata (client metadata) by value. 
+Library parses and validates the verifier metadata. 
 
 ### Supported response types
 

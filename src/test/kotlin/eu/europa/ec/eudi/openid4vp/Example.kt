@@ -375,6 +375,7 @@ object SslSettings {
 
 private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
+        vpConfiguration = VPConfiguration(vpFormats = VpFormats(VpFormat.MsoMdoc)),
         jarmConfiguration = JarmConfiguration.Encryption(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
             supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),

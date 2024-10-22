@@ -49,10 +49,13 @@ class AuthorizationResponseBuilderTest {
     internal object Wallet {
 
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns { _ -> true }),
+            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             jarmConfiguration = JarmConfiguration.Encryption(
                 supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
+            ),
+            vpConfiguration = VPConfiguration(
+                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -149,6 +152,7 @@ class AuthorizationResponseBuilderTest {
                         inputDescriptors = emptyList(),
                     ),
                     jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
+                    vpFormats = VpFormats(VpFormat.MsoMdoc),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

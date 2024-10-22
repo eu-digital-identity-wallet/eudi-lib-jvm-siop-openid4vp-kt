@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import com.eygraber.uri.Uri
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
 import io.ktor.client.*
@@ -38,7 +39,6 @@ import java.net.URL
 @Serializable
 internal data class UnvalidatedRequestObject(
     @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    @SerialName("client_metadata_uri") val clientMetadataUri: String? = null,
     @SerialName("client_id_scheme") val clientIdScheme: String? = null,
     @Required val nonce: String? = null,
     @SerialName("client_id") val clientId: String? = null,
@@ -53,6 +53,10 @@ internal data class UnvalidatedRequestObject(
     val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
     @SerialName("id_token_type") val idTokenType: String? = null,
 )
+
+enum class RequestUriMethod {
+    GET, POST
+}
 
 /**
  * OAUTH2 authorization request
@@ -80,7 +84,11 @@ internal sealed interface UnvalidatedRequest {
         /**
          * A JAR passed by reference
          */
-        data class PassByReference(override val clientId: String, val jwtURI: URL) : JwtSecured
+        data class PassByReference(
+            override val clientId: String,
+            val jwtURI: URL,
+            val requestURIMethod: RequestUriMethod?,
+        ) : JwtSecured
     }
 
     companion object {
@@ -96,13 +104,28 @@ internal sealed interface UnvalidatedRequest {
 
             val requestValue = uri.getQueryParameter("request")
             val requestUriValue = uri.getQueryParameter("request_uri")
-
+            val requestUriMethod =
+                uri.getQueryParameter("request_uri_method")?.let { value ->
+                    when (value) {
+                        "get" -> RequestUriMethod.GET
+                        "post" -> RequestUriMethod.POST
+                        else -> throw RequestValidationError.InvalidRequestUriMethod.asException()
+                    }
+                }
             when {
-                !requestValue.isNullOrEmpty() -> PassByValue(clientId(), requestValue)
-                !requestUriValue.isNullOrEmpty() ->
-                    requestUriValue.asURL()
-                        .map { PassByReference(clientId(), it) }
-                        .getOrThrow()
+                !requestValue.isNullOrEmpty() -> {
+                    ensure(requestUriValue == null) {
+                        RequestValidationError.InvalidUseOfBothRequestAndRequestUri.asException()
+                    }
+                    ensure(requestUriMethod == null) {
+                        RequestValidationError.InvalidRequestUriMethod.asException()
+                    }
+                    PassByValue(clientId(), requestValue)
+                }
+                !requestUriValue.isNullOrEmpty() -> {
+                    val requestUri = requestUriValue.asURL().getOrThrow()
+                    PassByReference(clientId(), requestUri, requestUriMethod)
+                }
 
                 else -> notSecured(uri)
             }
@@ -151,7 +174,7 @@ internal class DefaultAuthorizationRequestResolver(
         }
 
     private suspend fun resolveRequestUri(httpClient: HttpClient, uri: String): Resolution {
-        val requestFetcher = RequestFetcher(httpClient)
+        val requestFetcher = RequestFetcher(httpClient, siopOpenId4VPConfig)
         val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, httpClient)
         val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, httpClient)
 

@@ -176,7 +176,7 @@ internal object DirectPostForm {
 
     fun parametersOf(p: AuthorizationResponsePayload): Parameters =
         of(p).let { form ->
-            Parameters.build {
+            parameters {
                 form.entries.forEach { (name, value) -> append(name, value) }
             }
         }

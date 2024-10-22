@@ -350,7 +350,6 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
             responseMode = getStringClaim("response_mode"),
             clientIdScheme = getStringClaim("client_id_scheme"),
             clientMetaData = getJSONObjectClaim("client_metadata")?.asJsonObject(),
-            clientMetadataUri = getStringClaim("client_metadata_uri"),
             clientId = getStringClaim("client_id"),
             responseUri = getStringClaim("response_uri"),
             redirectUri = getStringClaim("redirect_uri"),

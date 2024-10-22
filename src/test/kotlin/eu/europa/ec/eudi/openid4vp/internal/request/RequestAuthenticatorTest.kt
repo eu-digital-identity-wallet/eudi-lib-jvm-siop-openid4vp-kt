@@ -51,6 +51,9 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.RedirectUri,
             ),
+            vpConfiguration = VPConfiguration(
+                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
             clock = Clock.systemDefaultZone(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -96,6 +99,9 @@ class ClientAuthenticatorTest {
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.RedirectUri,
             ),
+            vpConfiguration = VPConfiguration(
+                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+            ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
 
@@ -138,6 +144,9 @@ class ClientAuthenticatorTest {
                     assertEquals(keyUrl.uri, url)
                     algAndKey.second.toPublicKey()
                 },
+            ),
+            vpConfiguration = VPConfiguration(
+                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -241,6 +250,9 @@ class ClientAuthenticatorTest {
         private val cfg = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(
                 SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
+            ),
+            vpConfiguration = VPConfiguration(
+                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )

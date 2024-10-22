@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import eu.europa.ec.eudi.openid4vp.Client
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
+import eu.europa.ec.eudi.openid4vp.VpFormats
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
@@ -48,6 +49,7 @@ internal class RequestObjectResolver(
             state = request.state,
             nonce = request.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
+            vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
             idTokenType = request.idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
@@ -66,6 +68,7 @@ internal class RequestObjectResolver(
             state = authorization.state,
             nonce = authorization.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
+            vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
             presentationDefinition = presentationDefinition,
         )
     }
@@ -90,12 +93,10 @@ internal class RequestObjectResolver(
         presentationDefinitionSource: PresentationDefinitionSource,
     ) = presentationDefinitionResolver.resolvePresentationDefinition(presentationDefinitionSource)
 
-    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? {
-        val source = validated.clientMetaDataSource
-        return if (source != null)
-            clientMetaDataValidator.validateClientMetaData(source, validated.responseMode)
-        else null
-    }
+    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
+        validated.clientMetaData?.let { unvalidated ->
+            clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
+        }
 }
 
 private fun AuthenticatedClient.toClient(): Client =

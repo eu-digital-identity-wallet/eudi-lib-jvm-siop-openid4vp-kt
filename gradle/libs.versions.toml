@@ -13,7 +13,7 @@ ktlint = "0.50.0"
 dokka = "1.9.20"
 maven-publish = "0.29.0"
 fasterxml-jackson = "2.18.2"
-bouncyCastle = "1.78.1"
+bouncyCastle = "1.79"
 
 [libraries]
 fasterxml-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "fasterxml-jackson" }

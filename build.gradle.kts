@@ -59,6 +59,13 @@ kotlin {
     }
     compilerOptions {
         apiVersion = KotlinVersion.KOTLIN_2_0
+        optIn = listOf(
+            "kotlinx.serialization.ExperimentalSerializationApi",
+            "kotlin.contracts.ExperimentalContracts",
+        )
+        freeCompilerArgs = listOf(
+            "-Xconsistent-data-class-copy-visibility",
+        )
     }
 }
 

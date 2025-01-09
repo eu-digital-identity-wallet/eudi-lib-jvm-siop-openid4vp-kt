@@ -130,66 +130,60 @@ private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
  */
 internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequestObject {
     val (client, requestObject) = request
-    fun scope() = requiredScope(requestObject)
+    val scope = requiredScope(requestObject)
     val state = requestObject.state
     val nonce = requiredNonce(requestObject)
     val responseType = requiredResponseType(requestObject)
     val responseMode = requiredResponseMode(client, requestObject)
-    val querySource = optionalQuerySource(requestObject, responseType) { scope().getOrNull() }
     val clientMetaData = optionalClientMetaData(responseMode, requestObject)
     val idTokenType = optionalIdTokenType(requestObject)
 
-    fun idAndVpToken() = SiopOpenId4VPAuthentication(
+    fun idAndVpToken(): SiopOpenId4VPAuthentication {
+        val nonOpenIdScope = with(Scope) { scope.getOrNull()?.items()?.filter { it != OpenId }?.mergeOrNull() }
+        val querySource = parseQuerySource(requestObject, nonOpenIdScope)
+        return SiopOpenId4VPAuthentication(
+            idTokenType,
+            querySource,
+            clientMetaData,
+            client,
+            nonce,
+            scope.getOrThrow(),
+            responseMode,
+            state,
+        )
+    }
+
+    fun idToken(): SiopAuthentication = SiopAuthentication(
         idTokenType,
-        checkNotNull(querySource) { "Query source missing" },
         clientMetaData,
         client,
         nonce,
-        scope().getOrThrow(),
+        scope.getOrThrow(),
         responseMode,
         state,
     )
 
-    fun idToken() = SiopAuthentication(
-        idTokenType,
-        clientMetaData,
-        client,
-        nonce,
-        scope().getOrThrow(),
-        responseMode,
-        state,
-    )
-
-    fun vpToken() = OpenId4VPAuthorization(
-        checkNotNull(querySource) { "Query source missing" },
-        clientMetaData,
-        client,
-        nonce,
-        responseMode,
-        state,
-    )
+    fun vpToken(): OpenId4VPAuthorization {
+        val querySource = parseQuerySource(requestObject, scope.getOrNull())
+        return OpenId4VPAuthorization(
+            querySource,
+            clientMetaData,
+            client,
+            nonce,
+            responseMode,
+            state,
+        )
+    }
 
     return when (responseType) {
         ResponseType.VpAndIdToken -> {
-            val requestedScopes = scope().map { it.items() }.getOrElse { emptyList() }
-            if ("openid" in requestedScopes) idAndVpToken()
+            if (scope.getOrNull()?.contains(Scope.OpenId) == true) idAndVpToken()
             else vpToken()
         }
 
         ResponseType.IdToken -> idToken()
         ResponseType.VpToken -> vpToken()
     }
-}
-
-private fun optionalQuerySource(
-    authorizationRequest: UnvalidatedRequestObject,
-    responseType: ResponseType,
-    scopeProvider: () -> Scope?,
-): QuerySource? = when (responseType) {
-    ResponseType.VpToken, ResponseType.VpAndIdToken ->
-        parseQuerySource(authorizationRequest, scopeProvider())
-
-    ResponseType.IdToken -> null
 }
 
 private fun optionalIdTokenType(unvalidated: UnvalidatedRequestObject): List<IdTokenType> =
@@ -332,7 +326,7 @@ private fun parseQuerySource(
     val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
     val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
     val hasDcqlQuery = !unvalidated.dcqlQuery.isNullOrEmpty()
-    val hasScope = null != scope
+    val hasScope = scope != null
 
     fun requiredPd() = try {
         checkNotNull(unvalidated.presentationDefinition)
@@ -358,7 +352,7 @@ private fun parseQuerySource(
         throw InvalidDigitalCredentialsQuery(t).asException()
     }
 
-    fun requiredScope() = QuerySource.ByScope(scope!!)
+    fun requiredScope() = QuerySource.ByScope(checkNotNull(scope))
 
     val querySourceCount = listOf(hasPd, hasPdUri, hasDcqlQuery, hasScope).count { it }
 

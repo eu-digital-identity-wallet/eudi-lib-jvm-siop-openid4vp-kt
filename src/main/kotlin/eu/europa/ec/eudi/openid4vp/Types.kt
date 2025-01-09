@@ -37,11 +37,25 @@ sealed interface SubjectSyntaxType : Serializable {
 
 @JvmInline
 value class Scope private constructor(val value: String) {
-    fun items(): List<String> = value.split(" ")
+    fun items(): List<Scope> = value.split(SEPARATOR).map { Scope(it) }
+    operator fun plus(other: Scope): Scope = Scope("$value$SEPARATOR${other.value}")
+    operator fun contains(other: Scope): Boolean {
+        val thisFlatten = items().flatMap { it.items() }
+        val otherFlatten = other.items().flatMap { it.items() }
+        return thisFlatten.containsAll(otherFlatten)
+    }
 
     companion object {
+
+        fun List<Scope>.mergeOrNull(): Scope? =
+            if (isEmpty()) null
+            else fold(EMPTY, Scope::plus)
+
+        val OpenId = Scope("openid")
+        private val EMPTY = Scope("")
+        private const val SEPARATOR = " "
         fun make(s: String): Scope? = s.trim()
-            .takeIf { trimmed -> trimmed.split(" ").isNotEmpty() }
+            .takeIf { trimmed -> trimmed.split(SEPARATOR).isNotEmpty() }
             ?.let { Scope(it) }
     }
 }

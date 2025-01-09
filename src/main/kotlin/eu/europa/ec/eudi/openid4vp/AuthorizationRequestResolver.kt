@@ -185,7 +185,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = MissingQuerySource
     }
 
-    data object MultipleQuerySources  : RequestValidationError {
+    data object MultipleQuerySources : RequestValidationError {
         private fun readResolve(): Any = MultipleQuerySources
     }
 

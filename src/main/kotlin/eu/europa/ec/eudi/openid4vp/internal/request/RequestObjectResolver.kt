@@ -114,11 +114,11 @@ internal class RequestObjectResolver(
 
     private fun lookupKnownPresentationDefinitionsOrDCQLQueries(scope: Scope): Query {
         scope.items().forEach { item ->
-            siopOpenId4VPConfig.vpConfiguration.knownPresentationDefinitionsPerScope[item]
+            siopOpenId4VPConfig.vpConfiguration.knownPresentationDefinitionsPerScope[item.value]
                 ?.let { return Query.ByPresentationDefinition(it) }
         }
         scope.items().forEach { item ->
-            siopOpenId4VPConfig.vpConfiguration.knownDCQLQueriesPerScope[item]
+            siopOpenId4VPConfig.vpConfiguration.knownDCQLQueriesPerScope[item.value]
                 ?.let { return Query.ByDigitalCredentialsQuery(it) }
         }
         throw ResolutionError.UnknownScope(scope).asException()

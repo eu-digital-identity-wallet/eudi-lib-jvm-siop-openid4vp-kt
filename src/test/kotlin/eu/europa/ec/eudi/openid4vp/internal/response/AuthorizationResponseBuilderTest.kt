@@ -147,9 +147,11 @@ class AuthorizationResponseBuilderTest {
 
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    presentationDefinition = PresentationDefinition(
-                        id = Id("pdId"),
-                        inputDescriptors = emptyList(),
+                    query = Query.ByPresentationDefinition(
+                        PresentationDefinition(
+                            id = Id("pdId"),
+                            inputDescriptors = emptyList(),
+                        ),
                     ),
                     jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
                     vpFormats = VpFormats(VpFormat.MsoMdoc),

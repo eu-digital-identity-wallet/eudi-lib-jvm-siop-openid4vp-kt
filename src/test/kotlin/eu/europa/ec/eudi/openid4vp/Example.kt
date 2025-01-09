@@ -311,13 +311,14 @@ private class Wallet(
     }
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
-        val presentationDefinition = request.presentationDefinition
-        val inputDescriptor = presentationDefinition.inputDescriptors.first()
+        val presentationQuery = request.query
+        require(presentationQuery is Query.ByPresentationDefinition)
+        val inputDescriptor = presentationQuery.value.inputDescriptors.first()
         return Consensus.PositiveConsensus.VPTokenConsensus(
             vpToken = VpToken.Generic("foo"),
             presentationSubmission = PresentationSubmission(
                 id = Id("pid-res"),
-                definitionId = presentationDefinition.id,
+                definitionId = presentationQuery.value.id,
                 listOf(
                     DescriptorMap(
                         id = inputDescriptor.id,

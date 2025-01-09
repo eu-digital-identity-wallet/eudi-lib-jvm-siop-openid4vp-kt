@@ -51,9 +51,9 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * and holder's [Consensus.PositiveConsensus.VPTokenConsensus]
      *
      * @param vpToken the vp_token
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param presentationSubmission the presentation submission
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationDefinition]
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      */
     data class OpenId4VPAuthorization(
@@ -72,7 +72,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * @param vpToken the vp_token
      *       that fulfils the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
      * @param presentationSubmission the presentation submission
-     *  that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
+     *  that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.query]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      */
     data class SiopOpenId4VPAuthentication(

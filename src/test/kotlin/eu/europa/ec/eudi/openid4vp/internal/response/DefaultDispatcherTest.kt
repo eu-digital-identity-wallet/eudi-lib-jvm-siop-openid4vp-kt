@@ -429,9 +429,11 @@ class DefaultDispatcherTest {
                 Wallet.clientMetaDataValidator.validate(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                presentationDefinition = PresentationDefinition(
-                    id = Id("pdId"),
-                    inputDescriptors = emptyList(),
+                query = Query.ByPresentationDefinition(
+                    PresentationDefinition(
+                        id = Id("pdId"),
+                        inputDescriptors = emptyList(),
+                    ),
                 ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
                 vpFormats = VpFormats(VpFormat.MsoMdoc),

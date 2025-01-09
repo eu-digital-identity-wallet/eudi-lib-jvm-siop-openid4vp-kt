@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
@@ -27,6 +28,20 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.MalformedURLException
 import java.net.URI
 import java.net.URL
+
+internal sealed interface QuerySource {
+
+    @JvmInline
+    value class ByPresentationDefinitionSource(
+        val value: PresentationDefinitionSource,
+    ) : QuerySource
+
+    @JvmInline
+    value class ByDCQLQuery(val value: DCQL) : QuerySource
+
+    @JvmInline
+    value class ByScope(val value: Scope) : QuerySource
+}
 
 internal sealed interface PresentationDefinitionSource {
 
@@ -43,14 +58,6 @@ internal sealed interface PresentationDefinitionSource {
      * The resource MUST be exposed without a further need to authenticate or authorize
      */
     data class ByReference(val url: URL) : PresentationDefinitionSource
-
-    /**
-     * When a presentation definition is pre-agreed between wallet and verifier, using
-     * a specific [scope]. In this case, verifier doesn't communicate the presentation definition
-     * neither [by value][ByValue] nor by [ByReference]. Rather, the wallet
-     * has been configured (via a specific scope) with a well-known definition
-     */
-    data class Implied(val scope: Scope) : PresentationDefinitionSource
 }
 
 /**
@@ -88,7 +95,7 @@ internal sealed interface ValidatedRequestObject {
      * A valid OpenID4VP authorization
      */
     data class OpenId4VPAuthorization(
-        val presentationDefinitionSource: PresentationDefinitionSource,
+        val querySource: QuerySource,
         override val clientMetaData: UnvalidatedClientMetaData?,
         override val client: AuthenticatedClient,
         override val nonce: String,
@@ -101,7 +108,7 @@ internal sealed interface ValidatedRequestObject {
      */
     data class SiopOpenId4VPAuthentication(
         val idTokenType: List<IdTokenType>,
-        val presentationDefinitionSource: PresentationDefinitionSource,
+        val querySource: QuerySource,
         override val clientMetaData: UnvalidatedClientMetaData?,
         override val client: AuthenticatedClient,
         override val nonce: String,
@@ -128,14 +135,13 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     val nonce = requiredNonce(requestObject)
     val responseType = requiredResponseType(requestObject)
     val responseMode = requiredResponseMode(client, requestObject)
-    val presentationDefinitionSource =
-        optionalPresentationDefinitionSource(requestObject, responseType) { scope().getOrNull() }
+    val querySource = optionalQuerySource(requestObject, responseType) { scope().getOrNull() }
     val clientMetaData = optionalClientMetaData(responseMode, requestObject)
     val idTokenType = optionalIdTokenType(requestObject)
 
     fun idAndVpToken() = SiopOpenId4VPAuthentication(
         idTokenType,
-        checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
+        checkNotNull(querySource) { "Query source missing" },
         clientMetaData,
         client,
         nonce,
@@ -155,7 +161,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     )
 
     fun vpToken() = OpenId4VPAuthorization(
-        checkNotNull(presentationDefinitionSource) { "Presentation definition missing" },
+        checkNotNull(querySource) { "Query source missing" },
         clientMetaData,
         client,
         nonce,
@@ -175,13 +181,13 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     }
 }
 
-private fun optionalPresentationDefinitionSource(
+private fun optionalQuerySource(
     authorizationRequest: UnvalidatedRequestObject,
     responseType: ResponseType,
     scopeProvider: () -> Scope?,
-): PresentationDefinitionSource? = when (responseType) {
+): QuerySource? = when (responseType) {
     ResponseType.VpToken, ResponseType.VpAndIdToken ->
-        parsePresentationDefinitionSource(authorizationRequest, scopeProvider())
+        parseQuerySource(authorizationRequest, scopeProvider())
 
     ResponseType.IdToken -> null
 }
@@ -319,18 +325,19 @@ private fun requiredResponseType(unvalidated: UnvalidatedRequestObject): Respons
  *
  * @param unvalidated the request to validate
  */
-private fun parsePresentationDefinitionSource(
+private fun parseQuerySource(
     unvalidated: UnvalidatedRequestObject,
     scope: Scope?,
-): PresentationDefinitionSource {
+): QuerySource {
     val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
     val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
+    val hasDcqlQuery = !unvalidated.dcqlQuery.isNullOrEmpty()
     val hasScope = null != scope
 
     fun requiredPd() = try {
         checkNotNull(unvalidated.presentationDefinition)
         val pd = jsonSupport.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
-        PresentationDefinitionSource.ByValue(pd)
+        QuerySource.ByPresentationDefinitionSource(PresentationDefinitionSource.ByValue(pd))
     } catch (t: SerializationException) {
         throw InvalidPresentationDefinition(t).asException()
     }
@@ -338,18 +345,30 @@ private fun parsePresentationDefinitionSource(
     fun requiredPdUri() = try {
         checkNotNull(unvalidated.presentationDefinitionUri)
         val pdUri = unvalidated.presentationDefinitionUri.asURL().getOrThrow()
-        PresentationDefinitionSource.ByReference(pdUri)
+        QuerySource.ByPresentationDefinitionSource(PresentationDefinitionSource.ByReference(pdUri))
     } catch (t: MalformedURLException) {
         throw InvalidPresentationDefinitionUri.asException()
     }
 
-    fun requiredScope() = PresentationDefinitionSource.Implied(scope!!)
+    fun requiredDcqlQuery() = try {
+        checkNotNull(unvalidated.dcqlQuery)
+        val dcq = jsonSupport.decodeFromJsonElement<DCQL>(unvalidated.dcqlQuery)
+        QuerySource.ByDCQLQuery(dcq)
+    } catch (t: SerializationException) {
+        throw InvalidDigitalCredentialsQuery(t).asException()
+    }
+
+    fun requiredScope() = QuerySource.ByScope(scope!!)
+
+    val querySourceCount = listOf(hasPd, hasPdUri, hasDcqlQuery, hasScope).count { it }
 
     return when {
-        hasPd && !hasPdUri -> requiredPd()
-        !hasPd && hasPdUri -> requiredPdUri()
+        querySourceCount > 1 -> throw MultipleQuerySources.asException()
+        hasDcqlQuery -> requiredDcqlQuery()
+        hasPd -> requiredPd()
+        hasPdUri -> requiredPdUri()
         hasScope -> requiredScope()
-        else -> throw MissingPresentationDefinition.asException()
+        else -> throw MissingQuerySource.asException()
     }
 }
 

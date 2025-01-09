@@ -62,6 +62,13 @@ class UnvalidatedRequestResolverTest {
         .replace("  ", "")
         .also { URLEncoder.encode(it, "UTF-8") }
 
+    private val dcqlQuery = readFileAsText("dcql/basic_example.json")
+        .replace("\r\n", "")
+        .replace("\r", "")
+        .replace("\n", "")
+        .replace("  ", "")
+        .also { URLEncoder.encode(it, "UTF-8") }
+
     private val signingKey = RSAKeyGenerator(2048)
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
         .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
@@ -140,6 +147,28 @@ class UnvalidatedRequestResolverTest {
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
                     "&presentation_definition=$pd" +
+                    "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
+
+            val resolution = resolver.resolveRequestUri(authRequest)
+            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        test(genState())
+        test()
+    }
+
+    @Test
+    fun `vp token auth request with DCQL query`() = runTest {
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=vp_token" +
+                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&client_id_scheme=redirect_uri" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&dcql_query=$dcqlQuery" +
                     "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
 
             val resolution = resolver.resolveRequestUri(authRequest)

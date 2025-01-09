@@ -162,7 +162,7 @@ class AuthorizationResponseDispatcherTest {
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
-                    presentationDefinition = presentationDefinition,
+                    query = Query.ByPresentationDefinition(presentationDefinition),
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(

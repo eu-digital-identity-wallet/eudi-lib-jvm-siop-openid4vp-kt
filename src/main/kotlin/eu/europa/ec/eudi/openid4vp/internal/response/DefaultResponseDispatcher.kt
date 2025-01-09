@@ -109,7 +109,7 @@ internal class DefaultDispatcher(
         val uri = when (val response = request.responseWith(consensus)) {
             is Fragment -> response.encodeRedirectURI()
             is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
-            is Query -> response.encodeRedirectURI()
+            is AuthorizationResponse.Query -> response.encodeRedirectURI()
             is QueryJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             else -> error("Unexpected response $response")
         }
@@ -117,7 +117,7 @@ internal class DefaultDispatcher(
     }
 }
 
-internal fun Query.encodeRedirectURI(): URI =
+internal fun AuthorizationResponse.Query.encodeRedirectURI(): URI =
     with(redirectUri.toUri().buildUpon()) {
         DirectPostForm.of(data).forEach { (key, value) -> appendQueryParameter(key, value) }
         build()

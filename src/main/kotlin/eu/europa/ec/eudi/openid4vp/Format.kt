@@ -28,7 +28,10 @@ public value class Format(public val value: String) {
 
     public companion object {
         public val MsoMdoc: Format get() = Format(OpenId4VPSpec.FORMAT_MSO_MDOC)
-        public val SdJwtVcDeprecated: Format get() = Format(OpenId4VPSpec.FORMAT_SD_JWT_VC)
+
+        @Deprecated(message = "Removed by spec")
+        public val SdJwtVcDeprecated: Format get() = Format(OpenId4VPSpec.FORMAT_SD_JWT_VC_DEPRECATED)
+
         public val SdJwtVc: Format get() = Format(OpenId4VPSpec.FORMAT_SD_JWT_VC)
         public val W3CLdpVc: Format get() = Format(OpenId4VPSpec.FORMAT_W3C_JSONLD_DATA_INTEGRITY)
         public val W3CJwtVcJsonLd: Format get() = Format(OpenId4VPSpec.FORMAT_W3C_JSONLD_SIGNED_JWT)

@@ -68,7 +68,7 @@ enum class ClientIdScheme {
      * This value indicates that the Client Identifier is an Entity Identifier
      * defined in OpenID Federation.
      */
-    EntityId,
+    HTTPS,
 
     /**
      * This value indicates that the Client Identifier is a DID
@@ -100,7 +100,7 @@ enum class ClientIdScheme {
     fun value(): String = when (this) {
         PreRegistered -> PRE_REGISTERED_NAME
         RedirectUri -> REDIRECT_URI_NAME
-        EntityId -> ENTITY_ID_NAME
+        HTTPS -> HTTPS_NAME
         DID -> DID_NAME
         X509_SAN_URI -> X509_SAN_URI_NAME
         X509_SAN_DNS -> X509_SAN_DNS_NAME
@@ -110,7 +110,7 @@ enum class ClientIdScheme {
     companion object {
         private const val PRE_REGISTERED_NAME = "pre-registered"
         private const val REDIRECT_URI_NAME = "redirect_uri"
-        private const val ENTITY_ID_NAME = "entity_id"
+        private const val HTTPS_NAME = "https"
         private const val DID_NAME = "did"
         private const val X509_SAN_URI_NAME = "x509_san_uri"
         private const val X509_SAN_DNS_NAME = "x509_san_dns"
@@ -119,7 +119,7 @@ enum class ClientIdScheme {
         fun make(s: String): ClientIdScheme? = when (s) {
             PRE_REGISTERED_NAME -> PreRegistered
             REDIRECT_URI_NAME -> RedirectUri
-            ENTITY_ID_NAME -> EntityId
+            HTTPS_NAME -> HTTPS
             DID_NAME -> DID
             X509_SAN_URI_NAME -> X509_SAN_URI
             X509_SAN_DNS_NAME -> X509_SAN_DNS

@@ -33,8 +33,6 @@ public value class Format(public val value: String) {
         public val SdJwtVcDeprecated: Format get() = Format(OpenId4VPSpec.FORMAT_SD_JWT_VC_DEPRECATED)
 
         public val SdJwtVc: Format get() = Format(OpenId4VPSpec.FORMAT_SD_JWT_VC)
-        public val W3CLdpVc: Format get() = Format(OpenId4VPSpec.FORMAT_W3C_JSONLD_DATA_INTEGRITY)
-        public val W3CJwtVcJsonLd: Format get() = Format(OpenId4VPSpec.FORMAT_W3C_JSONLD_SIGNED_JWT)
         public val W3CJwtVcJson: Format get() = Format(OpenId4VPSpec.FORMAT_W3C_SIGNED_JWT)
     }
 }

@@ -41,8 +41,6 @@ object OpenId4VPSpec {
     )
     public const val FORMAT_SD_JWT_VC_DEPRECATED: String = "vc+sd-jwt"
     public const val FORMAT_SD_JWT_VC: String = "dc+sd-jwt"
-    public const val FORMAT_W3C_JSONLD_DATA_INTEGRITY: String = "ldp_vc"
-    public const val FORMAT_W3C_JSONLD_SIGNED_JWT: String = "jwt_vc_json-ld"
     public const val FORMAT_W3C_SIGNED_JWT: String = "jwt_vc_json"
 
     public const val DCQL_CREDENTIALS: String = "credentials"

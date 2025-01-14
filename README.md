@@ -163,9 +163,9 @@ Library currently supports `response_mode`
 * `query.jwt`
 
 
-### Supported Client ID Scheme
+### Supported Client ID Schemes
 
-Library requires the presence of `client_id_scheme` with one of the following values:
+Library requires the presence of a `client_id` using one of the following schemes:
 
 - `pre-registered` assuming out of bound knowledge of verifier meta-data. A verifier may send an authorization request signed (JAR) or plain
 - `x509-san-dns` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate

@@ -67,21 +67,9 @@ class ClientAuthenticatorTest {
         }
 
         @Test
-        fun `if client_id_scheme is missing, authentication fails`() = runTest {
+        fun `if client_id scheme is invalid, authentication fails`() = runTest {
             val request = UnvalidatedRequestObject(
-                clientId = "foo",
-                clientIdScheme = null,
-            ).plain()
-
-            assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
-                clientAuthenticator.authenticateClient(request)
-            }
-        }
-
-        @Test
-        fun `if client_id_scheme is invalid, authentication fails`() = runTest {
-            val request = UnvalidatedRequestObject(
-                clientId = "foo",
+                clientId = "bar:foo",
                 responseMode = "bar",
             ).plain()
 
@@ -109,8 +97,7 @@ class ClientAuthenticatorTest {
         fun `if request is not signed, authentication succeeds`() =
             runTest {
                 val request = UnvalidatedRequestObject(
-                    clientId = clientId.toString(),
-                    clientIdScheme = "redirect_uri",
+                    clientId = "redirect_uri:$clientId",
                 ).plain()
 
                 val client = clientAuthenticator.authenticateClient(request)
@@ -121,8 +108,7 @@ class ClientAuthenticatorTest {
         fun `if  request is signed, authentication fails`() = runTest {
             val (alg, key) = randomKey()
             val request = UnvalidatedRequestObject(
-                clientId = clientId.toString(),
-                clientIdScheme = "redirect_uri",
+                clientId = "redirect_uri:$clientId",
             ).signed(alg, key)
 
             val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
@@ -152,7 +138,6 @@ class ClientAuthenticatorTest {
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(
             clientId = clientId.toString(),
-            clientIdScheme = "did",
         )
 
         @Test
@@ -258,8 +243,7 @@ class ClientAuthenticatorTest {
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(
-            clientId = clientId,
-            clientIdScheme = "verifier_attestation",
+            clientId = "verifier_attestation:$clientId",
         )
 
         @Test

@@ -118,18 +118,18 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val chain = x5c(request, clientIdScheme.trust) {
+                val chain = x5c(clientId, request, clientIdScheme.trust) {
                     val dnsNames = sanOfDNSName().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses DNS names") }
                 }
-                AuthenticatedClient.X509SanDns(request.clientId, chain)
+                AuthenticatedClient.X509SanDns(clientId, chain)
             }
 
             is SupportedClientIdScheme.X509SanUri -> {
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val chain = x5c(request, clientIdScheme.trust) {
+                val chain = x5c(clientId, request, clientIdScheme.trust) {
                     val dnsNames = sanOfUniformResourceIdentifier().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses URI names") }
                 }
@@ -160,15 +160,35 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
     }
 
     private fun clientIdAndScheme(requestObject: UnvalidatedRequestObject): Pair<String, SupportedClientIdScheme> {
-        val clientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
-        val clientIdScheme = requestObject.clientIdScheme?.let { ClientIdScheme.make(it) }
-        ensureNotNull(clientIdScheme) { invalidScheme("Missing or invalid client_id_scheme") }
+        val (clientIdScheme, clientId) = run {
+            val schemeAndClientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
+            if (OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR !in schemeAndClientId) {
+                ClientIdScheme.PreRegistered to schemeAndClientId
+            } else {
+                val parts = schemeAndClientId.split(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR, limit = 2)
+                val scheme = ClientIdScheme.make(parts[0])
+                ensureNotNull(scheme) { invalidScheme("Invalid client_id scheme") }
+                when (scheme) {
+                    ClientIdScheme.PreRegistered -> throw invalidScheme(
+                        "client_id scheme cannot be ${ClientIdScheme.PreRegistered.value()}",
+                    )
+                    ClientIdScheme.RedirectUri -> scheme to parts[1]
+                    ClientIdScheme.HTTPS -> scheme to schemeAndClientId
+                    ClientIdScheme.DID -> scheme to schemeAndClientId
+                    ClientIdScheme.X509_SAN_URI -> scheme to parts[1]
+                    ClientIdScheme.X509_SAN_DNS -> scheme to parts[1]
+                    ClientIdScheme.VERIFIER_ATTESTATION -> scheme to parts[1]
+                }
+            }
+        }
+
         val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
         ensureNotNull(supportedClientIdScheme) { RequestValidationError.UnsupportedClientIdScheme.asException() }
         return clientId to supportedClientIdScheme
     }
 
     private fun x5c(
+        clientId: String,
         request: FetchedRequest.JwtSecured,
         trust: X509CertificateTrust,
         subjectAlternativeNames: X509Certificate.() -> List<String>,
@@ -179,7 +199,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
         ensure(pubCertChain.isNotEmpty()) { invalidJarJwt("Invalid x5c") }
 
         val alternativeNames = pubCertChain[0].subjectAlternativeNames()
-        ensure(request.clientId in alternativeNames) {
+        ensure(clientId in alternativeNames) {
             invalidJarJwt("ClientId not found in certificate's subject alternative names")
         }
         ensure(trust.isTrusted(pubCertChain)) { invalidJarJwt("Untrusted x5c") }
@@ -348,7 +368,6 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
             scope = getStringClaim("scope"),
             nonce = getStringClaim("nonce"),
             responseMode = getStringClaim("response_mode"),
-            clientIdScheme = getStringClaim("client_id_scheme"),
             clientMetaData = getJSONObjectClaim("client_metadata")?.asJsonObject(),
             clientId = getStringClaim("client_id"),
             responseUri = getStringClaim("response_uri"),

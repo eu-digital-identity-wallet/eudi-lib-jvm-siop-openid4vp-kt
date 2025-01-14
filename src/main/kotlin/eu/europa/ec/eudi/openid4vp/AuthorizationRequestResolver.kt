@@ -39,14 +39,14 @@ sealed interface Client : Serializable {
     data class Attested(val clientId: String) : Client
 
     /**
-     * The id of the client.
+     * The id of the client prefixed with the client id scheme.
      */
     val id: String
         get() = when (this) {
             is Preregistered -> clientId
-            is RedirectUri -> clientId.toString()
-            is X509SanDns -> clientId
-            is X509SanUri -> clientId.toString()
+            is RedirectUri -> "${ClientIdScheme.RedirectUri.value()}${OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR}$clientId"
+            is X509SanDns -> "${ClientIdScheme.X509_SAN_DNS.value()}${OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR}$clientId"
+            is X509SanUri -> "${ClientIdScheme.X509_SAN_URI.value()}${OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR}$clientId"
             is DIDClient -> clientId.toString()
             is Attested -> clientId
         }

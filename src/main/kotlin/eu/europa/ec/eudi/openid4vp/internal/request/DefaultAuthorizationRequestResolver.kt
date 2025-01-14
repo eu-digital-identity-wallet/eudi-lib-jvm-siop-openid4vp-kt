@@ -39,7 +39,6 @@ import java.net.URL
 @Serializable
 internal data class UnvalidatedRequestObject(
     @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    @SerialName("client_id_scheme") val clientIdScheme: String? = null,
     @Required val nonce: String? = null,
     @SerialName("client_id") val clientId: String? = null,
     @SerialName("response_type") val responseType: String? = null,
@@ -146,7 +145,6 @@ internal sealed interface UnvalidatedRequest {
                     scope = uri.getQueryParameter("scope"),
                     nonce = uri.getQueryParameter("nonce"),
                     responseMode = uri.getQueryParameter("response_mode"),
-                    clientIdScheme = uri.getQueryParameter("client_id_scheme"),
                     clientMetaData = jsonObject("client_metadata"),
                     clientId = uri.getQueryParameter("client_id"),
                     responseUri = uri.getQueryParameter("response_uri"),

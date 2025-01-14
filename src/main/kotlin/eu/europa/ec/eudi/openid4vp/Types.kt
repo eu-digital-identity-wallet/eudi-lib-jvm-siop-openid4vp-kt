@@ -98,32 +98,24 @@ enum class ClientIdScheme {
     ;
 
     fun value(): String = when (this) {
-        PreRegistered -> PRE_REGISTERED_NAME
-        RedirectUri -> REDIRECT_URI_NAME
-        HTTPS -> HTTPS_NAME
-        DID -> DID_NAME
-        X509_SAN_URI -> X509_SAN_URI_NAME
-        X509_SAN_DNS -> X509_SAN_DNS_NAME
-        VERIFIER_ATTESTATION -> VERIFIER_ATTESTATION_NAME
+        PreRegistered -> OpenId4VPSpec.CLIENT_ID_SCHEME_PRE_REGISTERED
+        RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI
+        HTTPS -> OpenId4VPSpec.CLIENT_ID_SCHEME_HTTPS
+        DID -> OpenId4VPSpec.CLIENT_ID_SCHEME_DID
+        X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI
+        X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS
+        VERIFIER_ATTESTATION -> OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION
     }
 
     companion object {
-        private const val PRE_REGISTERED_NAME = "pre-registered"
-        private const val REDIRECT_URI_NAME = "redirect_uri"
-        private const val HTTPS_NAME = "https"
-        private const val DID_NAME = "did"
-        private const val X509_SAN_URI_NAME = "x509_san_uri"
-        private const val X509_SAN_DNS_NAME = "x509_san_dns"
-        private const val VERIFIER_ATTESTATION_NAME = "verifier_attestation"
-
         fun make(s: String): ClientIdScheme? = when (s) {
-            PRE_REGISTERED_NAME -> PreRegistered
-            REDIRECT_URI_NAME -> RedirectUri
-            HTTPS_NAME -> HTTPS
-            DID_NAME -> DID
-            X509_SAN_URI_NAME -> X509_SAN_URI
-            X509_SAN_DNS_NAME -> X509_SAN_DNS
-            VERIFIER_ATTESTATION_NAME -> VERIFIER_ATTESTATION
+            OpenId4VPSpec.CLIENT_ID_SCHEME_PRE_REGISTERED -> PreRegistered
+            OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI -> RedirectUri
+            OpenId4VPSpec.CLIENT_ID_SCHEME_HTTPS -> HTTPS
+            OpenId4VPSpec.CLIENT_ID_SCHEME_DID -> DID
+            OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI -> X509_SAN_URI
+            OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS -> X509_SAN_DNS
+            OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION -> VERIFIER_ATTESTATION
             else -> null
         }
     }

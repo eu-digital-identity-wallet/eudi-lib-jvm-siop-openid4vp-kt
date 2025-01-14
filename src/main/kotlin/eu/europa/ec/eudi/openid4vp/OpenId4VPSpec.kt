@@ -18,4 +18,11 @@ package eu.europa.ec.eudi.openid4vp
 object OpenId4VPSpec {
 
     const val CLIENT_ID_SCHEME_SEPARATOR = ':'
+    const val CLIENT_ID_SCHEME_PRE_REGISTERED = "pre-registered"
+    const val CLIENT_ID_SCHEME_REDIRECT_URI = "redirect_uri"
+    const val CLIENT_ID_SCHEME_HTTPS = "https"
+    const val CLIENT_ID_SCHEME_DID = "did"
+    const val CLIENT_ID_SCHEME_X509_SAN_URI = "x509_san_uri"
+    const val CLIENT_ID_SCHEME_X509_SAN_DNS = "x509_san_dns"
+    const val CLIENT_ID_SCHEME_VERIFIER_ATTESTATION = "verifier_attestation"
 }

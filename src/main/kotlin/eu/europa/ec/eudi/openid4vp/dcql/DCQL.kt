@@ -302,7 +302,7 @@ data class DCQLMetaSdJwtVcExtensions(
 @JvmInline
 value class MsoMdocDocType(val value: String) {
     init {
-        require(value.isNotBlank()) { "Doctype cannt be blank" }
+        require(value.isNotBlank()) { "Doctype can't be blank" }
     }
 
     override fun toString(): String = value

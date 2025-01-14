@@ -247,7 +247,7 @@ data class ClaimsQuery(
 
         fun sdJwtVc(
             id: ClaimId? = null,
-            path: ClaimPath? = null,
+            path: ClaimPath,
             values: JsonArray? = null,
         ): ClaimsQuery = ClaimsQuery(id, path, values)
 

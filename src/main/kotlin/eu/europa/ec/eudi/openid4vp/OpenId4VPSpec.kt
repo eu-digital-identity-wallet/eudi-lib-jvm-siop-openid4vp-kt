@@ -35,11 +35,6 @@ object OpenId4VPSpec {
     public const val WALLET_METADATA: String = "wallet_metadata"
 
     public const val FORMAT_MSO_MDOC: String = "mso_mdoc"
-
-    @Deprecated(
-        message = "Removed by spec",
-    )
-    public const val FORMAT_SD_JWT_VC_DEPRECATED: String = "vc+sd-jwt"
     public const val FORMAT_SD_JWT_VC: String = "dc+sd-jwt"
     public const val FORMAT_W3C_SIGNED_JWT: String = "jwt_vc_json"
 

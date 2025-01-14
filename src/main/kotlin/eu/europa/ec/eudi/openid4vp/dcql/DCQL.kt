@@ -243,6 +243,16 @@ data class ClaimsQuery(
     @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_CLAIM_NAME) override val claimName: MsoMdocClaimName? = null,
 ) : MsoMdocClaimsQueryExtension {
 
+    init {
+        val isJson = path != null && namespace == null && claimName == null
+        val isMdoc = path == null && namespace != null && claimName != null
+
+        require(isJson xor isMdoc) {
+            "Either '${OpenId4VPSpec.DCQL_PATH}', or '${OpenId4VPSpec.DCQL_MSO_MDOC_NAMESPACE}' " +
+                "and '${OpenId4VPSpec.DCQL_MSO_MDOC_CLAIM_NAME}' must be provided"
+        }
+    }
+
     companion object {
 
         fun sdJwtVc(

@@ -122,6 +122,56 @@ enum class ClientIdScheme {
 }
 
 /**
+ * The Original Client Id of a Verifier, i.e. without a Client Id Scheme prefix.
+ */
+typealias OriginalClientId = String
+
+/**
+ * The Client Id of a Verifier as defined by OpenId4Vp.
+ *
+ * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-scheme-an">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-scheme-an</a>
+ */
+data class VerifierId(
+    val scheme: ClientIdScheme,
+    val originalClientId: OriginalClientId,
+) {
+    override fun toString(): String {
+        fun ClientIdScheme.prefix(): String = when (this) {
+            ClientIdScheme.RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
+            ClientIdScheme.X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
+            ClientIdScheme.X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
+            ClientIdScheme.VERIFIER_ATTESTATION ->
+                OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
+            else -> ""
+        }
+
+        return "${scheme.prefix()}$originalClientId"
+    }
+
+    companion object {
+        fun parse(clientId: String): VerifierId? =
+            if (OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR !in clientId) {
+                VerifierId(ClientIdScheme.PreRegistered, clientId)
+            } else {
+                val parts = clientId.split(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR, limit = 2)
+                val originalClientId = parts[1]
+                ClientIdScheme.make(parts[0])
+                    ?.let { scheme ->
+                        when (scheme) {
+                            ClientIdScheme.PreRegistered -> null
+                            ClientIdScheme.RedirectUri -> VerifierId(scheme, originalClientId)
+                            ClientIdScheme.HTTPS -> VerifierId(scheme, clientId)
+                            ClientIdScheme.DID -> VerifierId(scheme, clientId)
+                            ClientIdScheme.X509_SAN_URI -> VerifierId(scheme, originalClientId)
+                            ClientIdScheme.X509_SAN_DNS -> VerifierId(scheme, originalClientId)
+                            ClientIdScheme.VERIFIER_ATTESTATION -> VerifierId(scheme, originalClientId)
+                        }
+                    }
+            }
+    }
+}
+
+/**
  * @see <a href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html</a>
  */
 sealed interface ResponseMode : Serializable {

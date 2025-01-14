@@ -31,24 +31,24 @@ import java.security.cert.X509Certificate
  */
 sealed interface Client : Serializable {
 
-    data class Preregistered(val clientId: String, val legalName: String) : Client
+    data class Preregistered(val clientId: OriginalClientId, val legalName: String) : Client
     data class RedirectUri(val clientId: URI) : Client
-    data class X509SanDns(val clientId: String, val cert: X509Certificate) : Client
+    data class X509SanDns(val clientId: OriginalClientId, val cert: X509Certificate) : Client
     data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
     data class DIDClient(val clientId: URI) : Client
-    data class Attested(val clientId: String) : Client
+    data class Attested(val clientId: OriginalClientId) : Client
 
     /**
      * The id of the client prefixed with the client id scheme.
      */
-    val id: String
+    val id: VerifierId
         get() = when (this) {
-            is Preregistered -> clientId
-            is RedirectUri -> "${ClientIdScheme.RedirectUri.value()}${OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR}$clientId"
-            is X509SanDns -> "${ClientIdScheme.X509_SAN_DNS.value()}${OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR}$clientId"
-            is X509SanUri -> "${ClientIdScheme.X509_SAN_URI.value()}${OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR}$clientId"
-            is DIDClient -> clientId.toString()
-            is Attested -> clientId
+            is Preregistered -> VerifierId(ClientIdScheme.PreRegistered, clientId)
+            is RedirectUri -> VerifierId(ClientIdScheme.RedirectUri, clientId.toString())
+            is X509SanDns -> VerifierId(ClientIdScheme.X509_SAN_DNS, clientId)
+            is X509SanUri -> VerifierId(ClientIdScheme.X509_SAN_URI, clientId.toString())
+            is DIDClient -> VerifierId(ClientIdScheme.DID, clientId.toString())
+            is Attested -> VerifierId(ClientIdScheme.VERIFIER_ATTESTATION, clientId)
         }
 }
 

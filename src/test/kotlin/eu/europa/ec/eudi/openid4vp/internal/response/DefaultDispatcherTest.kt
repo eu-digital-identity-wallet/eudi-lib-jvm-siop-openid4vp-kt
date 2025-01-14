@@ -270,7 +270,7 @@ class DefaultDispatcherTest {
                     assertNull(encryptedJwt.header.agreementPartyUInfo)
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
+                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                     assertEquals(vpTokenConsensus.vpToken.toJson(), jwtClaimsSet.vpTokenClaim())
                 }
                 val outcome = dispatcher.dispatch(verifiersRequest, vpTokenConsensus)
@@ -303,7 +303,7 @@ class DefaultDispatcherTest {
                         assertNull(encryptedJwt.header.agreementPartyUInfo)
                         val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                         assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                        assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
+                        assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                         val vpTokenClaim = jwtClaimsSet.vpTokenClaim()
                         val expectedVpToken = vpTokenConsensus.vpToken.toJson()
                         assertEquals(expectedVpToken, vpTokenClaim)
@@ -335,7 +335,7 @@ class DefaultDispatcherTest {
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
+                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                     assertNotNull(jwtClaimsSet.expirationTime)
                     assertEquals(vpTokenConsensus.vpToken.toJson(), jwtClaimsSet.vpTokenClaim())
                 }
@@ -366,7 +366,7 @@ class DefaultDispatcherTest {
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
-                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id)
+                    assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                     assertNotNull(jwtClaimsSet.expirationTime)
                     assertEquals(vpTokenConsensus.vpToken.toJson(), jwtClaimsSet.vpTokenClaim())
                 }
@@ -452,7 +452,11 @@ class DefaultDispatcherTest {
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() {
             fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
-                val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), state, "client_id")
+                val data = AuthorizationResponsePayload.NoConsensusResponseData(
+                    generateNonce(),
+                    state,
+                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                )
                 val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
                 response.encodeRedirectURI()
                     .asserter {
@@ -468,7 +472,12 @@ class DefaultDispatcherTest {
         fun `when invalid request, redirect_uri must contain an error query parameter`() {
             fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
                 val data =
-                    AuthorizationResponsePayload.InvalidRequest(MissingNonce, generateNonce(), state, "client_id")
+                    AuthorizationResponsePayload.InvalidRequest(
+                        MissingNonce,
+                        generateNonce(),
+                        state,
+                        VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    )
                 val response = AuthorizationResponse.Query(redirectUriBase, data)
                 val redirectURI = response.encodeRedirectURI()
 
@@ -485,7 +494,12 @@ class DefaultDispatcherTest {
         @Test
         fun `when response for SIOPAuthentication, redirect_uri must contain an id_token query parameter`() {
             fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
-                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val data = AuthorizationResponsePayload.SiopAuthentication(
+                    "dummy",
+                    generateNonce(),
+                    state,
+                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                )
                 val response = AuthorizationResponse.Query(redirectUriBase, data)
                 val redirectURI = response.encodeRedirectURI()
 
@@ -501,7 +515,12 @@ class DefaultDispatcherTest {
         @Test
         fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
             fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
-                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val data = AuthorizationResponsePayload.SiopAuthentication(
+                    "dummy",
+                    generateNonce(),
+                    state,
+                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                )
                 val response = AuthorizationResponse.QueryJwt(
                     redirectUriBase,
                     data,
@@ -550,7 +569,11 @@ class DefaultDispatcherTest {
         @Test
         fun `when no consensus, fragment must contain an error`() {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
-                val data = AuthorizationResponsePayload.NoConsensusResponseData(generateNonce(), state, "client_id")
+                val data = AuthorizationResponsePayload.NoConsensusResponseData(
+                    generateNonce(),
+                    state,
+                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 
                 response.encodeRedirectURI()
@@ -567,7 +590,12 @@ class DefaultDispatcherTest {
         fun `when invalid request, fragment must contain an error`() {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
                 val data =
-                    AuthorizationResponsePayload.InvalidRequest(MissingNonce, generateNonce(), state, "client_id")
+                    AuthorizationResponsePayload.InvalidRequest(
+                        MissingNonce,
+                        generateNonce(),
+                        state,
+                        VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 
                 response.encodeRedirectURI()
@@ -584,7 +612,12 @@ class DefaultDispatcherTest {
         @Test
         fun `when SIOPAuthentication, fragment must contain an id_token`() {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
-                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val data = AuthorizationResponsePayload.SiopAuthentication(
+                    "dummy",
+                    generateNonce(),
+                    state,
+                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
                 response.encodeRedirectURI()
                     .asserter { fragmentData ->
@@ -599,7 +632,12 @@ class DefaultDispatcherTest {
         @Test
         fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
-                val data = AuthorizationResponsePayload.SiopAuthentication("dummy", generateNonce(), state, "client_id")
+                val data = AuthorizationResponsePayload.SiopAuthentication(
+                    "dummy",
+                    generateNonce(),
+                    state,
+                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                )
                 val response =
                     AuthorizationResponse.FragmentJwt(
                         redirectUri = redirectUriBase,

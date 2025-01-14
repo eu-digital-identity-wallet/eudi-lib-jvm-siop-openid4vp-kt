@@ -56,10 +56,10 @@ import kotlin.time.toKotlinDuration
 internal sealed interface AuthenticatedClient {
     data class Preregistered(val preregisteredClient: PreregisteredClient) : AuthenticatedClient
     data class RedirectUri(val clientId: URI) : AuthenticatedClient
-    data class X509SanDns(val clientId: String, val chain: List<X509Certificate>) : AuthenticatedClient
+    data class X509SanDns(val clientId: OriginalClientId, val chain: List<X509Certificate>) : AuthenticatedClient
     data class X509SanUri(val clientId: URI, val chain: List<X509Certificate>) : AuthenticatedClient
     data class DIDClient(val client: DID, val publicKey: PublicKey) : AuthenticatedClient
-    data class Attested(val clientId: String, val claims: VerifierAttestationClaims) : AuthenticatedClient
+    data class Attested(val clientId: OriginalClientId, val claims: VerifierAttestationClaims) : AuthenticatedClient
 }
 
 internal data class AuthenticatedRequest(
@@ -93,10 +93,10 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             is FetchedRequest.Plain -> request.requestObject
         }
 
-        val (clientId, clientIdScheme) = clientIdAndScheme(requestObject)
+        val (originalClientId, clientIdScheme) = originalClientIdAndScheme(requestObject)
         return when (clientIdScheme) {
             is Preregistered -> {
-                val registeredClient = clientIdScheme.clients[clientId]
+                val registeredClient = clientIdScheme.clients[originalClientId]
                 ensureNotNull(registeredClient) { RequestValidationError.InvalidClientId.asException() }
                 if (request is FetchedRequest.JwtSecured) {
                     ensureNotNull(registeredClient.jarConfig) {
@@ -110,85 +110,64 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
                 ensure(request is FetchedRequest.Plain) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in signed request")
                 }
-                val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
-                AuthenticatedClient.RedirectUri(clientIdUri)
+                val originalClientIdAsUri = originalClientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
+                AuthenticatedClient.RedirectUri(originalClientIdAsUri)
             }
 
             is SupportedClientIdScheme.X509SanDns -> {
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val chain = x5c(clientId, request, clientIdScheme.trust) {
+                val chain = x5c(originalClientId, request, clientIdScheme.trust) {
                     val dnsNames = sanOfDNSName().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses DNS names") }
                 }
-                AuthenticatedClient.X509SanDns(clientId, chain)
+                AuthenticatedClient.X509SanDns(originalClientId, chain)
             }
 
             is SupportedClientIdScheme.X509SanUri -> {
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val chain = x5c(clientId, request, clientIdScheme.trust) {
+                val chain = x5c(originalClientId, request, clientIdScheme.trust) {
                     val dnsNames = sanOfUniformResourceIdentifier().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses URI names") }
                 }
-                val clientIdUri = clientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
-                AuthenticatedClient.X509SanUri(clientIdUri, chain)
+                val originalClientIdAsUri = originalClientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
+                AuthenticatedClient.X509SanUri(originalClientIdAsUri, chain)
             }
 
             is SupportedClientIdScheme.DID -> {
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val clientIdAsDID =
-                    ensureNotNull(
-                        DID.parse(clientId).getOrNull(),
-                    ) { RequestValidationError.InvalidClientId.asException() }
-                val clientPubKey = lookupKeyByDID(request, clientIdAsDID, clientIdScheme.lookup)
-                AuthenticatedClient.DIDClient(clientIdAsDID, clientPubKey)
+                val originalClientIdAsDID = ensureNotNull(DID.parse(originalClientId).getOrNull()) {
+                    RequestValidationError.InvalidClientId.asException()
+                }
+                val clientPubKey = lookupKeyByDID(request, originalClientIdAsDID, clientIdScheme.lookup)
+                AuthenticatedClient.DIDClient(originalClientIdAsDID, clientPubKey)
             }
 
             is SupportedClientIdScheme.VerifierAttestation -> {
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val attestedClaims = verifierAttestation(siopOpenId4VPConfig.clock, clientIdScheme, request, clientId)
-                AuthenticatedClient.Attested(clientId, attestedClaims)
+                val attestedClaims = verifierAttestation(siopOpenId4VPConfig.clock, clientIdScheme, request, originalClientId)
+                AuthenticatedClient.Attested(originalClientId, attestedClaims)
             }
         }
     }
 
-    private fun clientIdAndScheme(requestObject: UnvalidatedRequestObject): Pair<String, SupportedClientIdScheme> {
-        val (clientIdScheme, clientId) = run {
-            val schemeAndClientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
-            if (OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR !in schemeAndClientId) {
-                ClientIdScheme.PreRegistered to schemeAndClientId
-            } else {
-                val parts = schemeAndClientId.split(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR, limit = 2)
-                val scheme = ClientIdScheme.make(parts[0])
-                ensureNotNull(scheme) { invalidScheme("Invalid client_id scheme") }
-                when (scheme) {
-                    ClientIdScheme.PreRegistered -> throw invalidScheme(
-                        "client_id scheme cannot be ${ClientIdScheme.PreRegistered.value()}",
-                    )
-                    ClientIdScheme.RedirectUri -> scheme to parts[1]
-                    ClientIdScheme.HTTPS -> scheme to schemeAndClientId
-                    ClientIdScheme.DID -> scheme to schemeAndClientId
-                    ClientIdScheme.X509_SAN_URI -> scheme to parts[1]
-                    ClientIdScheme.X509_SAN_DNS -> scheme to parts[1]
-                    ClientIdScheme.VERIFIER_ATTESTATION -> scheme to parts[1]
-                }
-            }
-        }
-
-        val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(clientIdScheme)
+    private fun originalClientIdAndScheme(requestObject: UnvalidatedRequestObject): Pair<OriginalClientId, SupportedClientIdScheme> {
+        val clientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
+        val verifierId = ensureNotNull(VerifierId.parse(clientId)) { invalidScheme("Invalid client_id scheme") }
+        val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(verifierId.scheme)
         ensureNotNull(supportedClientIdScheme) { RequestValidationError.UnsupportedClientIdScheme.asException() }
-        return clientId to supportedClientIdScheme
+        return verifierId.originalClientId to supportedClientIdScheme
     }
 
     private fun x5c(
-        clientId: String,
+        originalClientId: OriginalClientId,
         request: FetchedRequest.JwtSecured,
         trust: X509CertificateTrust,
         subjectAlternativeNames: X509Certificate.() -> List<String>,
@@ -199,7 +178,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
         ensure(pubCertChain.isNotEmpty()) { invalidJarJwt("Invalid x5c") }
 
         val alternativeNames = pubCertChain[0].subjectAlternativeNames()
-        ensure(clientId in alternativeNames) {
+        ensure(originalClientId in alternativeNames) {
             invalidJarJwt("ClientId not found in certificate's subject alternative names")
         }
         ensure(trust.isTrusted(pubCertChain)) { invalidJarJwt("Untrusted x5c") }
@@ -233,7 +212,7 @@ private fun verifierAttestation(
     clock: Clock,
     supportedScheme: SupportedClientIdScheme.VerifierAttestation,
     request: FetchedRequest.JwtSecured,
-    clientId: String,
+    originalClientId: OriginalClientId,
 ): VerifierAttestationClaims {
     val (trust, skew) = supportedScheme
     fun invalidVerifierAttestationJwt(cause: String?) =
@@ -262,7 +241,7 @@ private fun verifierAttestation(
     } catch (t: Throwable) {
         throw invalidVerifierAttestationJwt(t.message)
     }
-    ensure(verifierAttestationClaimSet.sub == clientId) {
+    ensure(verifierAttestationClaimSet.sub == originalClientId) {
         invalidVerifierAttestationJwt("sub claim and authorization's request client_id don't match")
     }
 

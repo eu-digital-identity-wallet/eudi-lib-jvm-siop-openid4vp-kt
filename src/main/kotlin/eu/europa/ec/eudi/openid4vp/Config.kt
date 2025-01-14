@@ -46,7 +46,7 @@ sealed interface JwkSetSource {
  *
  */
 data class PreregisteredClient(
-    val clientId: String,
+    val clientId: OriginalClientId,
     val legalName: String,
     val jarConfig: Pair<JWSAlgorithm, JwkSetSource>? = null,
 )
@@ -67,7 +67,7 @@ sealed interface SupportedClientIdScheme {
     /**
      * The Client Identifier is known to the Wallet in advance of the Authorization Request.
      */
-    data class Preregistered(val clients: Map<String, PreregisteredClient>) : SupportedClientIdScheme {
+    data class Preregistered(val clients: Map<OriginalClientId, PreregisteredClient>) : SupportedClientIdScheme {
         constructor(vararg clients: PreregisteredClient) : this(clients.toList().associateBy { it.clientId })
     }
 

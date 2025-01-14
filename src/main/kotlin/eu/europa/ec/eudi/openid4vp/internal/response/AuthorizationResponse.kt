@@ -28,7 +28,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
 
     val nonce: String
     val state: String?
-    val clientId: String
+    val clientId: VerifierId
 
     sealed interface Success : AuthorizationResponsePayload
 
@@ -43,7 +43,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val idToken: Jwt,
         override val nonce: String,
         override val state: String?,
-        override val clientId: String,
+        override val clientId: VerifierId,
     ) : Success
 
     /**
@@ -61,7 +61,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val presentationSubmission: PresentationSubmission,
         override val nonce: String,
         override val state: String?,
-        override val clientId: String,
+        override val clientId: VerifierId,
     ) : Success
 
     /**
@@ -81,7 +81,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val presentationSubmission: PresentationSubmission,
         override val nonce: String,
         override val state: String?,
-        override val clientId: String,
+        override val clientId: VerifierId,
     ) : Success
 
     sealed interface Failed : AuthorizationResponsePayload
@@ -95,7 +95,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val error: AuthorizationRequestError,
         override val nonce: String,
         override val state: String?,
-        override val clientId: String,
+        override val clientId: VerifierId,
     ) : Failed
 
     /**
@@ -106,7 +106,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
     data class NoConsensusResponseData(
         override val nonce: String,
         override val state: String?,
-        override val clientId: String,
+        override val clientId: VerifierId,
     ) : Failed
 }
 

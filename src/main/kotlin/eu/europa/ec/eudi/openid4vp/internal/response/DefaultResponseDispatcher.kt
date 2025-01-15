@@ -117,7 +117,7 @@ internal class DefaultDispatcher(
         val uri = when (val response = request.responseWith(consensus, encryptionParameters)) {
             is Fragment -> response.encodeRedirectURI()
             is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
-            is AuthorizationResponse.Query -> response.encodeRedirectURI()
+            is Query -> response.encodeRedirectURI()
             is QueryJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             else -> error("Unexpected response $response")
         }
@@ -125,7 +125,7 @@ internal class DefaultDispatcher(
     }
 }
 
-internal fun AuthorizationResponse.Query.encodeRedirectURI(): URI =
+internal fun Query.encodeRedirectURI(): URI =
     with(redirectUri.toUri().buildUpon()) {
         DirectPostForm.of(data).forEach { (key, value) -> appendQueryParameter(key, value) }
         build()
@@ -193,6 +193,17 @@ internal object DirectPostForm {
     fun of(p: AuthorizationResponsePayload): Map<String, String> {
         fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
 
+        fun MutableMap<String, String>.put(vpContent: VpContent) {
+            when (vpContent) {
+                is PresentationExchange -> {
+                    put(VP_TOKEN_FORM_PARAM, vpContent.verifiablePresentations.asParam())
+                    put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(vpContent.presentationSubmission))
+                }
+
+                is DCQL -> put(VP_TOKEN_FORM_PARAM, vpContent.verifiablePresentations.asParam())
+            }
+        }
+
         return when (p) {
             is AuthorizationResponsePayload.SiopAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
@@ -201,34 +212,16 @@ internal object DirectPostForm {
                 }
             }
 
-            is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                buildMap {
-                    when (p.vpContent) {
-                        is PresentationExchange -> {
-                            put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
-                            put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.vpContent.presentationSubmission))
-                        }
-
-                        is DCQL -> put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
-                    }
-                    p.state?.let {
-                        put(STATE_FORM_PARAM, it)
-                    }
+            is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
+                put(p.vpContent)
+                p.state?.let {
+                    put(STATE_FORM_PARAM, it)
                 }
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
-
-                when (p.vpContent) {
-                    is PresentationExchange -> {
-                        put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
-                        put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.vpContent.presentationSubmission))
-                    }
-
-                    is DCQL -> put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
-                }
-
+                put(p.vpContent)
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }

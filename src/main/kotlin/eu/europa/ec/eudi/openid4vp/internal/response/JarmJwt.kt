@@ -101,8 +101,8 @@ private fun jweHeader(
         }
     }
 
-    val (apv, apu) = when (data.encryptionParameters) {
-        is EncryptionParameters.DiffieHellman -> (data.encryptionParameters as EncryptionParameters.DiffieHellman).apu
+    val (apv, apu) = when (val encryptionParameters = data.encryptionParameters) {
+        is EncryptionParameters.DiffieHellman -> encryptionParameters.apu
         else -> null
     }?.let { Base64URL.encode(data.nonce) to it } ?: (null to null)
 
@@ -177,24 +177,12 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                when (data.vpContent) {
-                    is VpContent.PresentationExchange -> {
-                        put(VP_TOKEN_CLAIM, data.vpContent.verifiablePresentations.toJson())
-                        put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.vpContent.presentationSubmission))
-                    }
-                    is VpContent.DCQL -> put(VP_TOKEN_CLAIM, data.vpContent.verifiablePresentations.toJson())
-                }
+                put(data.vpContent)
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
-                when (data.vpContent) {
-                    is VpContent.PresentationExchange -> {
-                        put(ID_TOKEN_CLAIM, data.idToken)
-                        put(VP_TOKEN_CLAIM, data.vpContent.verifiablePresentations.toJson())
-                        put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.vpContent.presentationSubmission))
-                    }
-                    is VpContent.DCQL -> put(VP_TOKEN_CLAIM, data.vpContent.verifiablePresentations.toJson())
-                }
+                put(ID_TOKEN_CLAIM, data.idToken)
+                put(data.vpContent)
             }
 
             is AuthorizationResponsePayload.InvalidRequest -> {
@@ -205,6 +193,17 @@ private object JwtPayloadFactory {
             is AuthorizationResponsePayload.NoConsensusResponseData -> {
                 put(ERROR_CLAIM, AuthorizationRequestErrorCode.USER_CANCELLED.code)
             }
+        }
+    }
+
+    fun JsonObjectBuilder.put(vpContent: VpContent) {
+        when (vpContent) {
+            is VpContent.PresentationExchange -> {
+                put(VP_TOKEN_CLAIM, vpContent.verifiablePresentations.toJson())
+                put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(vpContent.presentationSubmission))
+            }
+
+            is VpContent.DCQL -> put(VP_TOKEN_CLAIM, vpContent.verifiablePresentations.toJson())
         }
     }
 

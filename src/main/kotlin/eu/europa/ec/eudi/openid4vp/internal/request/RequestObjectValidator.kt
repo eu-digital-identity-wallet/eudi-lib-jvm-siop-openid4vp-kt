@@ -131,6 +131,7 @@ private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
 internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequestObject {
     val (client, requestObject) = request
     val scope = requiredScope(requestObject)
+    val nonOpenIdScope = with(Scope) { scope.getOrNull()?.items()?.filter { it != OpenId }?.mergeOrNull() }
     val state = requestObject.state
     val nonce = requiredNonce(requestObject)
     val responseType = requiredResponseType(requestObject)
@@ -139,7 +140,6 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     val idTokenType = optionalIdTokenType(requestObject)
 
     fun idAndVpToken(): SiopOpenId4VPAuthentication {
-        val nonOpenIdScope = with(Scope) { scope.getOrNull()?.items()?.filter { it != OpenId }?.mergeOrNull() }
         val querySource = parseQuerySource(requestObject, nonOpenIdScope)
         return SiopOpenId4VPAuthentication(
             idTokenType,
@@ -164,7 +164,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     )
 
     fun vpToken(): OpenId4VPAuthorization {
-        val querySource = parseQuerySource(requestObject, scope.getOrNull())
+        val querySource = parseQuerySource(requestObject, nonOpenIdScope)
         return OpenId4VPAuthorization(
             querySource,
             clientMetaData,

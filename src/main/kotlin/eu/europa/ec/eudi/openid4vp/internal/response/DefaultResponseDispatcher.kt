@@ -19,6 +19,9 @@ import com.eygraber.uri.UriCodec
 import com.eygraber.uri.toURI
 import com.eygraber.uri.toUri
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.VpContent.DCQL
+import eu.europa.ec.eudi.openid4vp.VpContent.PresentationExchange
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.*
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
@@ -26,7 +29,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
-import io.ktor.util.*
 import io.ktor.utils.io.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -47,15 +49,20 @@ internal class DefaultDispatcher(
     override suspend fun post(
         request: ResolvedRequestObject,
         consensus: Consensus,
+        encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.VerifierResponse {
-        val (responseUri, parameters) = formParameters(request, consensus)
+        val (responseUri, parameters) = formParameters(request, consensus, encryptionParameters)
         return httpClientFactory().use { httpClient ->
             submitForm(httpClient, responseUri, parameters)
         }
     }
 
-    private fun formParameters(request: ResolvedRequestObject, consensus: Consensus) =
-        when (val response = request.responseWith(consensus)) {
+    private fun formParameters(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+        encryptionParameters: EncryptionParameters?,
+    ) =
+        when (val response = request.responseWith(consensus, encryptionParameters)) {
             is DirectPost -> {
                 val parameters = DirectPostForm.parametersOf(response.data)
                 response.responseUri to parameters
@@ -105,8 +112,9 @@ internal class DefaultDispatcher(
     override suspend fun encodeRedirectURI(
         request: ResolvedRequestObject,
         consensus: Consensus,
+        encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.RedirectURI {
-        val uri = when (val response = request.responseWith(consensus)) {
+        val uri = when (val response = request.responseWith(consensus, encryptionParameters)) {
             is Fragment -> response.encodeRedirectURI()
             is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             is AuthorizationResponse.Query -> response.encodeRedirectURI()
@@ -193,18 +201,34 @@ internal object DirectPostForm {
                 }
             }
 
-            is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
-                put(VP_TOKEN_FORM_PARAM, p.vpToken.asParam())
-                put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
-                p.state?.let {
-                    put(STATE_FORM_PARAM, it)
+            is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
+                buildMap {
+                    when (p.vpContent) {
+                        is PresentationExchange -> {
+                            put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
+                            put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.vpContent.presentationSubmission))
+                        }
+
+                        is DCQL -> put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
+                    }
+                    p.state?.let {
+                        put(STATE_FORM_PARAM, it)
+                    }
                 }
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
-                put(VP_TOKEN_FORM_PARAM, p.vpToken.asParam())
-                put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.presentationSubmission))
+
+                when (p.vpContent) {
+                    is PresentationExchange -> {
+                        put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
+                        put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(p.vpContent.presentationSubmission))
+                    }
+
+                    is DCQL -> put(VP_TOKEN_FORM_PARAM, p.vpContent.verifiablePresentations.asParam())
+                }
+
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }
@@ -228,33 +252,36 @@ internal object DirectPostForm {
     }
 }
 
-internal fun VpToken.asParam(): String {
-    fun VerifiablePresentation.asParam(): String {
-        return when (this) {
-            is VerifiablePresentation.Generic -> value
-            is VerifiablePresentation.JsonObj -> Json.encodeToString(value)
-            is VerifiablePresentation.MsoMdoc -> value
+internal fun Map<QueryId, VerifiablePresentation>.asParam(): String =
+    buildJsonObject {
+        for ((key, value) in iterator()) {
+            put(key.value, value.asParam())
         }
-    }
+    }.run(Json::encodeToString)
 
-    fun VerifiablePresentation.asJson(): JsonElement {
-        return when (this) {
-            is VerifiablePresentation.Generic -> JsonPrimitive(value)
-            is VerifiablePresentation.JsonObj -> value
-            is VerifiablePresentation.MsoMdoc -> JsonPrimitive(this.value)
-        }
-    }
-
-    return when (verifiablePresentations.size) {
-        1 -> verifiablePresentations.first().asParam()
+internal fun List<VerifiablePresentation>.asParam(): String =
+    when (size) {
+        1 -> this.first().asParam()
         0 -> error("Not expected")
         else -> {
             buildJsonArray {
-                for (vp in verifiablePresentations) {
+                for (vp in iterator()) {
                     add(vp.asJson())
                 }
             }.run(Json::encodeToString)
         }
+    }
+
+internal fun VerifiablePresentation.asParam(): String =
+    when (this) {
+        is VerifiablePresentation.Generic -> value
+        is VerifiablePresentation.JsonObj -> Json.encodeToString(value)
+    }
+
+internal fun VerifiablePresentation.asJson(): JsonElement {
+    return when (this) {
+        is VerifiablePresentation.Generic -> JsonPrimitive(value)
+        is VerifiablePresentation.JsonObj -> value
     }
 }
 

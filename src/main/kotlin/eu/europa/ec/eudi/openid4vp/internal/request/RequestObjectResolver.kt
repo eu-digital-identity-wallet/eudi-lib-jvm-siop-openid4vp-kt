@@ -16,7 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.Client
-import eu.europa.ec.eudi.openid4vp.Query
+import eu.europa.ec.eudi.openid4vp.PresentationQuery
 import eu.europa.ec.eudi.openid4vp.ResolutionError
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
 import eu.europa.ec.eudi.openid4vp.Scope
@@ -57,7 +57,7 @@ internal class RequestObjectResolver(
             idTokenType = request.idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
-            query = presentationQuery,
+            presentationQuery = presentationQuery,
         )
     }
 
@@ -73,7 +73,7 @@ internal class RequestObjectResolver(
             nonce = authorization.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
             vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
-            query = presentationQuery,
+            presentationQuery = presentationQuery,
         )
     }
 
@@ -97,13 +97,13 @@ internal class RequestObjectResolver(
         querySource: QuerySource,
     ) = when (querySource) {
         is QuerySource.ByPresentationDefinitionSource ->
-            Query.ByPresentationDefinition(
+            PresentationQuery.ByPresentationDefinition(
                 presentationDefinitionResolver.resolvePresentationDefinition(
                     querySource.value,
                 ),
             )
 
-        is QuerySource.ByDCQLQuery -> Query.ByDigitalCredentialsQuery(
+        is QuerySource.ByDCQLQuery -> PresentationQuery.ByDigitalCredentialsQuery(
             querySource.value,
         )
 
@@ -112,14 +112,14 @@ internal class RequestObjectResolver(
         )
     }
 
-    private fun lookupKnownPresentationDefinitionsOrDCQLQueries(scope: Scope): Query {
+    private fun lookupKnownPresentationDefinitionsOrDCQLQueries(scope: Scope): PresentationQuery {
         scope.items().forEach { item ->
             siopOpenId4VPConfig.vpConfiguration.knownPresentationDefinitionsPerScope[item.value]
-                ?.let { return Query.ByPresentationDefinition(it) }
+                ?.let { return PresentationQuery.ByPresentationDefinition(it) }
         }
         scope.items().forEach { item ->
             siopOpenId4VPConfig.vpConfiguration.knownDCQLQueriesPerScope[item.value]
-                ?.let { return Query.ByDigitalCredentialsQuery(it) }
+                ?.let { return PresentationQuery.ByDigitalCredentialsQuery(it) }
         }
         throw ResolutionError.UnknownScope(scope).asException()
     }

@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.response
 
+import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
@@ -129,7 +130,11 @@ class AuthorizationResponseDispatcherTest {
                 }
 
                 val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
-                val outcome = dispatcher.dispatch(siopAuthRequestObject, idTokenConsensus)
+                val outcome = dispatcher.dispatch(
+                    siopAuthRequestObject,
+                    idTokenConsensus,
+                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                )
                 assertIs<DispatchOutcome.VerifierResponse>(outcome)
             }
         }
@@ -162,12 +167,14 @@ class AuthorizationResponseDispatcherTest {
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
-                    query = Query.ByPresentationDefinition(presentationDefinition),
+                    presentationQuery = PresentationQuery.ByPresentationDefinition(presentationDefinition),
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                vpToken = VpToken.Generic("vp_token"),
-                presentationSubmission = presentationSubmission,
+                VpContent.PresentationExchange(
+                    listOf(VerifiablePresentation.Generic("vp_token")),
+                    presentationSubmission,
+                ),
             )
 
             testApplication {
@@ -206,7 +213,11 @@ class AuthorizationResponseDispatcherTest {
                 }
 
                 val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
-                val outcome = dispatcher.dispatch(openId4VPAuthRequestObject, vpTokenConsensus)
+                val outcome = dispatcher.dispatch(
+                    openId4VPAuthRequestObject,
+                    vpTokenConsensus,
+                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                )
                 assertIs<DispatchOutcome.VerifierResponse>(outcome)
             }
         }

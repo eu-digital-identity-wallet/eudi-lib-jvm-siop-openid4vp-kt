@@ -121,7 +121,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
         val vpFormats: VpFormats,
-        val query: Query,
+        val presentationQuery: PresentationQuery,
     ) : ResolvedRequestObject
 
     /**
@@ -137,7 +137,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
-        val query: Query,
+        val presentationQuery: PresentationQuery,
     ) : ResolvedRequestObject
 }
 
@@ -353,11 +353,11 @@ fun interface AuthorizationRequestResolver {
     suspend fun resolveRequestUri(uri: String): Resolution
 }
 
-sealed interface Query {
+sealed interface PresentationQuery {
 
     @JvmInline
-    value class ByPresentationDefinition(val value: PresentationDefinition) : Query
+    value class ByPresentationDefinition(val value: PresentationDefinition) : PresentationQuery
 
     @JvmInline
-    value class ByDigitalCredentialsQuery(val value: DCQL) : Query
+    value class ByDigitalCredentialsQuery(val value: DCQL) : PresentationQuery
 }

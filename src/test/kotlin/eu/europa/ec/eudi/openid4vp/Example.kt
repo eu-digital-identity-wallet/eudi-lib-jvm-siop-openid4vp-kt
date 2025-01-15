@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
@@ -282,7 +283,7 @@ private class Wallet(
             is Resolution.Success -> {
                 val requestObject = resolution.requestObject
                 val consensus = holderConsensus(requestObject)
-                dispatch(requestObject, consensus)
+                dispatch(requestObject, consensus, EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")))
             }
         }
 
@@ -311,22 +312,23 @@ private class Wallet(
     }
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
-        val presentationQuery = request.query
-        require(presentationQuery is Query.ByPresentationDefinition)
+        val presentationQuery = request.presentationQuery
+        require(presentationQuery is PresentationQuery.ByPresentationDefinition)
         val inputDescriptor = presentationQuery.value.inputDescriptors.first()
         return Consensus.PositiveConsensus.VPTokenConsensus(
-            vpToken = VpToken.Generic("foo"),
-            presentationSubmission = PresentationSubmission(
-                id = Id("pid-res"),
-                definitionId = presentationQuery.value.id,
-                listOf(
-                    DescriptorMap(
-                        id = inputDescriptor.id,
-                        format = "mso_mdoc",
-                        path = JsonPath.jsonPath("$")!!,
+            vpContent = VpContent.PresentationExchange(
+                verifiablePresentations = listOf(VerifiablePresentation.Generic("foo")),
+                presentationSubmission = PresentationSubmission(
+                    id = Id("pid-res"),
+                    definitionId = presentationQuery.value.id,
+                    listOf(
+                        DescriptorMap(
+                            id = inputDescriptor.id,
+                            format = "mso_mdoc",
+                            path = JsonPath.jsonPath("$")!!,
+                        ),
                     ),
                 ),
-
             ),
         )
     }

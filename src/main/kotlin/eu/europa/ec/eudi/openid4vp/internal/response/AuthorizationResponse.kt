@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import java.io.Serializable
 import java.net.URI
 import java.net.URL
@@ -29,6 +28,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
     val nonce: String
     val state: String?
     val clientId: VerifierId
+    val encryptionParameters: EncryptionParameters?
 
     sealed interface Success : AuthorizationResponsePayload
 
@@ -44,24 +44,24 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
+        override val encryptionParameters: EncryptionParameters? = null,
     ) : Success
 
     /**
      * In response to a [ResolvedRequestObject.OpenId4VPAuthorization]
      * and holder's [Consensus.PositiveConsensus.VPTokenConsensus]
      *
-     * @param vpToken the vp_token
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
-     * @param presentationSubmission the presentation submission
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
+     * @param vpContent the vp related information
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationQuery]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
+     * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */
     data class OpenId4VPAuthorization(
-        val vpToken: VpToken,
-        val presentationSubmission: PresentationSubmission,
+        val vpContent: VpContent,
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
+        override val encryptionParameters: EncryptionParameters? = null,
     ) : Success
 
     /**
@@ -69,19 +69,18 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * and holder's [Consensus.PositiveConsensus.IdAndVPTokenConsensus]
      *
      * @param idToken The id_token produced by the wallet
-     * @param vpToken the vp_token
-     *       that fulfils the [ResolvedRequestObject.SiopOpenId4VPAuthentication.presentationDefinition]
-     * @param presentationSubmission the presentation submission
-     *  that fulfil the [ResolvedRequestObject.SiopOpenId4VPAuthentication.query]
+     * @param vpContent the vp related information
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationQuery]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
+     * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */
     data class SiopOpenId4VPAuthentication(
         val idToken: Jwt,
-        val vpToken: VpToken,
-        val presentationSubmission: PresentationSubmission,
+        val vpContent: VpContent,
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
+        override val encryptionParameters: EncryptionParameters? = null,
     ) : Success
 
     sealed interface Failed : AuthorizationResponsePayload
@@ -96,6 +95,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
+        override val encryptionParameters: EncryptionParameters? = null,
     ) : Failed
 
     /**
@@ -107,6 +107,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
+        override val encryptionParameters: EncryptionParameters? = null,
     ) : Failed
 }
 
@@ -190,13 +191,15 @@ internal sealed interface AuthorizationResponse : Serializable {
 
 internal fun ResolvedRequestObject.responseWith(
     consensus: Consensus,
+    encryptionParameters: EncryptionParameters?,
 ): AuthorizationResponse {
-    val payload = responsePayload(consensus)
+    val payload = responsePayload(consensus, encryptionParameters)
     return responseWith(payload)
 }
 
 private fun ResolvedRequestObject.responsePayload(
     consensus: Consensus,
+    encryptionParameters: EncryptionParameters?,
 ): AuthorizationResponsePayload = when (consensus) {
     is Consensus.NegativeConsensus -> AuthorizationResponsePayload.NoConsensusResponseData(nonce, state, client.id)
     is Consensus.PositiveConsensus -> when (this) {
@@ -207,17 +210,18 @@ private fun ResolvedRequestObject.responsePayload(
                 nonce,
                 state,
                 client.id,
+                encryptionParameters,
             )
         }
 
         is ResolvedRequestObject.OpenId4VPAuthorization -> {
             require(consensus is Consensus.PositiveConsensus.VPTokenConsensus) { "VPTokenConsensus expected" }
             AuthorizationResponsePayload.OpenId4VPAuthorization(
-                consensus.vpToken,
-                consensus.presentationSubmission,
+                consensus.vpContent,
                 nonce,
                 state,
                 client.id,
+                encryptionParameters,
             )
         }
 
@@ -225,11 +229,11 @@ private fun ResolvedRequestObject.responsePayload(
             require(consensus is Consensus.PositiveConsensus.IdAndVPTokenConsensus) { "IdAndVPTokenConsensus expected" }
             AuthorizationResponsePayload.SiopOpenId4VPAuthentication(
                 consensus.idToken,
-                consensus.vpToken,
-                consensus.presentationSubmission,
+                consensus.vpContent,
                 nonce,
                 state,
                 client.id,
+                encryptionParameters,
             )
         }
     }

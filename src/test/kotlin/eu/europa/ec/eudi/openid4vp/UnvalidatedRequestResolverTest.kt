@@ -42,7 +42,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
-import java.net.URI
 import java.net.URLEncoder
 import java.security.KeyStore
 import java.security.cert.X509Certificate
@@ -136,8 +135,7 @@ class UnvalidatedRequestResolverTest {
             val authRequest =
                 "https://client.example.org/universal-link?" +
                     "response_type=vp_token" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
@@ -158,8 +156,7 @@ class UnvalidatedRequestResolverTest {
             val authRequest =
                 "https://client.example.org/universal-link?" +
                     "response_type=id_token" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
@@ -181,8 +178,7 @@ class UnvalidatedRequestResolverTest {
             val authRequest =
                 "https://client.example.org/universal-link?" +
                     "response_type=id_token vp_token" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     "&scope=openid" +
@@ -206,8 +202,7 @@ class UnvalidatedRequestResolverTest {
                 "https://client.example.org/universal-link?" +
                     "response_type=vp_token" +
                     "&response_mode=direct_post" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     "&response_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
@@ -236,7 +231,6 @@ class UnvalidatedRequestResolverTest {
             )
             val jwtClaimsSet = jwtClaimsSet(
                 "Verifier",
-                "pre-registered",
                 "https://eudi.netcompany-intrasoft.com/wallet/direct_post",
                 unvalidatedClientMetaData,
             )
@@ -266,10 +260,9 @@ class UnvalidatedRequestResolverTest {
                 load("certificates/certificates.jks"),
                 "12345".toCharArray(),
             )
-            val clientId = "verifier.example.gr"
+            val clientId = "x509_san_dns:verifier.example.gr"
             val jwtClaimsSet = jwtClaimsSet(
                 clientId,
-                "x509_san_dns",
                 "https://verifier.example.gr/wallet/direct_post",
                 UnvalidatedClientMetaData(
                     jwks = Json.parseToJsonElement(JWKSet(signingKey).toPublicJWKSet().toString()).jsonObject,
@@ -302,11 +295,10 @@ class UnvalidatedRequestResolverTest {
                 "12345".toCharArray(),
 
             )
-            val clientId: URI = URI.create("https://verifier.example.gr")
-            val clientIdEncoded = URLEncoder.encode(clientId.toString(), "UTF-8")
+            val clientId = "x509_san_uri:https://verifier.example.gr"
+            val clientIdEncoded = URLEncoder.encode(clientId, "UTF-8")
             val jwtClaimsSet = jwtClaimsSet(
-                clientId.toString(),
-                "x509_san_uri",
+                clientId,
                 "https://verifier.example.gr",
                 UnvalidatedClientMetaData(
                     jwks = Json.parseToJsonElement(JWKSet(signingKey).toPublicJWKSet().toString()).jsonObject,
@@ -382,7 +374,6 @@ class UnvalidatedRequestResolverTest {
 
     private fun jwtClaimsSet(
         clientId: String,
-        clientIdScheme: String,
         responseUri: String,
         clientMetadata: UnvalidatedClientMetaData,
     ): JWTClaimsSet {
@@ -395,7 +386,6 @@ class UnvalidatedRequestResolverTest {
             audience("https://self-issued.me/v2")
             issueTime(Date())
             claim("client_id", clientId)
-            claim("client_id_scheme", clientIdScheme)
             claim("response_uri", responseUri)
             claim("response_type", "vp_token")
             claim("nonce", "nonce")
@@ -414,8 +404,7 @@ class UnvalidatedRequestResolverTest {
             val authRequest =
                 "https://client.example.org/universal-link?" +
                     "response_type=id_token,vp_token" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
@@ -436,8 +425,7 @@ class UnvalidatedRequestResolverTest {
             val authRequest =
                 "https://client.example.org/universal-link?" +
                     "response_type=id_tokens" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
@@ -458,8 +446,7 @@ class UnvalidatedRequestResolverTest {
             val authRequest =
                 "https://client.example.org/universal-link?" +
                     "response_type=id_token" +
-                    "&client_id=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&client_id_scheme=redirect_uri" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     (state?.let { "&state=$it" } ?: "") +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_metadata=$clientMetadataJwksInline"
@@ -479,7 +466,6 @@ class UnvalidatedRequestResolverTest {
             val authRequest =
                 "https://client.example.org/universal-link?" +
                     "response_type=id_token" +
-                    "&client_id_scheme=redirect_uri" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +

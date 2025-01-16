@@ -68,7 +68,7 @@ enum class ClientIdScheme {
      * This value indicates that the Client Identifier is an Entity Identifier
      * defined in OpenID Federation.
      */
-    EntityId,
+    HTTPS,
 
     /**
      * This value indicates that the Client Identifier is a DID
@@ -98,33 +98,83 @@ enum class ClientIdScheme {
     ;
 
     fun value(): String = when (this) {
-        PreRegistered -> PRE_REGISTERED_NAME
-        RedirectUri -> REDIRECT_URI_NAME
-        EntityId -> ENTITY_ID_NAME
-        DID -> DID_NAME
-        X509_SAN_URI -> X509_SAN_URI_NAME
-        X509_SAN_DNS -> X509_SAN_DNS_NAME
-        VERIFIER_ATTESTATION -> VERIFIER_ATTESTATION_NAME
+        PreRegistered -> OpenId4VPSpec.CLIENT_ID_SCHEME_PRE_REGISTERED
+        RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI
+        HTTPS -> OpenId4VPSpec.CLIENT_ID_SCHEME_HTTPS
+        DID -> OpenId4VPSpec.CLIENT_ID_SCHEME_DID
+        X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI
+        X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS
+        VERIFIER_ATTESTATION -> OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION
     }
 
     companion object {
-        private const val PRE_REGISTERED_NAME = "pre-registered"
-        private const val REDIRECT_URI_NAME = "redirect_uri"
-        private const val ENTITY_ID_NAME = "entity_id"
-        private const val DID_NAME = "did"
-        private const val X509_SAN_URI_NAME = "x509_san_uri"
-        private const val X509_SAN_DNS_NAME = "x509_san_dns"
-        private const val VERIFIER_ATTESTATION_NAME = "verifier_attestation"
-
         fun make(s: String): ClientIdScheme? = when (s) {
-            PRE_REGISTERED_NAME -> PreRegistered
-            REDIRECT_URI_NAME -> RedirectUri
-            ENTITY_ID_NAME -> EntityId
-            DID_NAME -> DID
-            X509_SAN_URI_NAME -> X509_SAN_URI
-            X509_SAN_DNS_NAME -> X509_SAN_DNS
-            VERIFIER_ATTESTATION_NAME -> VERIFIER_ATTESTATION
+            OpenId4VPSpec.CLIENT_ID_SCHEME_PRE_REGISTERED -> PreRegistered
+            OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI -> RedirectUri
+            OpenId4VPSpec.CLIENT_ID_SCHEME_HTTPS -> HTTPS
+            OpenId4VPSpec.CLIENT_ID_SCHEME_DID -> DID
+            OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI -> X509_SAN_URI
+            OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS -> X509_SAN_DNS
+            OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION -> VERIFIER_ATTESTATION
             else -> null
+        }
+    }
+}
+
+/**
+ * The Original Client Id of a Verifier, i.e. without a Client Id Scheme prefix.
+ */
+typealias OriginalClientId = String
+
+/**
+ * The Client Id of a Verifier as defined by OpenId4Vp.
+ *
+ * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-scheme-an">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-scheme-an</a>
+ */
+data class VerifierId(
+    val scheme: ClientIdScheme,
+    val originalClientId: OriginalClientId,
+) {
+    val clientId: String = run {
+        val prefix = when (scheme) {
+            ClientIdScheme.RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI
+            ClientIdScheme.X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI
+            ClientIdScheme.X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS
+            ClientIdScheme.VERIFIER_ATTESTATION -> OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION
+            else -> null
+        }
+
+        buildString {
+            if (prefix != null) {
+                append(prefix)
+                append(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR)
+            }
+            append(originalClientId)
+        }
+    }
+
+    override fun toString(): String = clientId
+
+    companion object {
+        fun parse(clientId: String): Result<VerifierId> = runCatching {
+            fun invalid(message: String): Nothing = throw IllegalArgumentException(message)
+
+            if (OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR !in clientId) {
+                VerifierId(ClientIdScheme.PreRegistered, clientId)
+            } else {
+                val parts = clientId.split(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR, limit = 2)
+                val originalClientId = parts[1]
+                val scheme = ClientIdScheme.make(parts[0]) ?: invalid("'$clientId' does not contain a valid Client ID Scheme")
+                when (scheme) {
+                    ClientIdScheme.PreRegistered -> invalid("'${ClientIdScheme.PreRegistered}' cannot be used as a Client ID Scheme")
+                    ClientIdScheme.RedirectUri -> VerifierId(scheme, originalClientId)
+                    ClientIdScheme.HTTPS -> VerifierId(scheme, clientId)
+                    ClientIdScheme.DID -> VerifierId(scheme, clientId)
+                    ClientIdScheme.X509_SAN_URI -> VerifierId(scheme, originalClientId)
+                    ClientIdScheme.X509_SAN_DNS -> VerifierId(scheme, originalClientId)
+                    ClientIdScheme.VERIFIER_ATTESTATION -> VerifierId(scheme, originalClientId)
+                }
+            }
         }
     }
 }

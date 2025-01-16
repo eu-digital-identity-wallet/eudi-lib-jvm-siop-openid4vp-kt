@@ -101,7 +101,7 @@ object SiopIdTokenBuilder {
             IDTokenClaimsSet(
                 Issuer(buildJWKThumbprint()),
                 Subject(buildJWKThumbprint()),
-                listOf(request.client).map { Audience(it.id) },
+                listOf(Audience(request.client.id.toString())),
                 exp,
                 iat,
             ),

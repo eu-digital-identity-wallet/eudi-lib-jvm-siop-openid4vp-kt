@@ -19,16 +19,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 @JvmInline
-public value class Format(public val value: String) {
+value class Format(val value: String) {
     init {
         require(value.isNotBlank()) { "Format cannot be blank" }
     }
 
     override fun toString(): String = value
 
-    public companion object {
-        public val MsoMdoc: Format get() = Format(OpenId4VPSpec.FORMAT_MSO_MDOC)
-        public val SdJwtVc: Format get() = Format(OpenId4VPSpec.FORMAT_SD_JWT_VC)
-        public val W3CJwtVcJson: Format get() = Format(OpenId4VPSpec.FORMAT_W3C_SIGNED_JWT)
+    companion object {
+        val MsoMdoc: Format get() = Format(OpenId4VPSpec.FORMAT_MSO_MDOC)
+        val SdJwtVc: Format get() = Format(OpenId4VPSpec.FORMAT_SD_JWT_VC)
+        val W3CJwtVcJson: Format get() = Format(OpenId4VPSpec.FORMAT_W3C_SIGNED_JWT)
     }
 }

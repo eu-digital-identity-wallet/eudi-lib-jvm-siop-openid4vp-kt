@@ -137,15 +137,20 @@ data class VerifierId(
 ) {
     val clientId: String = run {
         val prefix = when (scheme) {
-            ClientIdScheme.RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
-            ClientIdScheme.X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
-            ClientIdScheme.X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
-            ClientIdScheme.VERIFIER_ATTESTATION ->
-                OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
-            else -> ""
+            ClientIdScheme.RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI
+            ClientIdScheme.X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI
+            ClientIdScheme.X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS
+            ClientIdScheme.VERIFIER_ATTESTATION -> OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION
+            else -> null
         }
 
-        "$prefix$originalClientId"
+        buildString {
+            if (prefix != null) {
+                append(prefix)
+                append(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR)
+            }
+            append(originalClientId)
+        }
     }
 
     override fun toString(): String = clientId

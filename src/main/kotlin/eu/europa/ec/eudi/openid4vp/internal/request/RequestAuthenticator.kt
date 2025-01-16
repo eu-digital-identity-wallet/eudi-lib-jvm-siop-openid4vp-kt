@@ -160,7 +160,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
 
     private fun originalClientIdAndScheme(requestObject: UnvalidatedRequestObject): Pair<OriginalClientId, SupportedClientIdScheme> {
         val clientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
-        val verifierId = ensureNotNull(VerifierId.parse(clientId)) { invalidScheme("Invalid client_id scheme") }
+        val verifierId = VerifierId.parse(clientId).getOrElse { throw invalidScheme("Invalid client_id: ${it.message}") }
         val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(verifierId.scheme)
         ensureNotNull(supportedClientIdScheme) { RequestValidationError.UnsupportedClientIdScheme.asException() }
         return verifierId.originalClientId to supportedClientIdScheme

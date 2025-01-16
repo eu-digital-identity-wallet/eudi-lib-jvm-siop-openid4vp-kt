@@ -156,25 +156,26 @@ data class VerifierId(
     override fun toString(): String = clientId
 
     companion object {
-        fun parse(clientId: String): VerifierId? =
+        fun parse(clientId: String): Result<VerifierId> = runCatching {
+            fun invalid(message: String): Nothing = throw IllegalArgumentException(message)
+
             if (OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR !in clientId) {
                 VerifierId(ClientIdScheme.PreRegistered, clientId)
             } else {
                 val parts = clientId.split(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR, limit = 2)
                 val originalClientId = parts[1]
-                ClientIdScheme.make(parts[0])
-                    ?.let { scheme ->
-                        when (scheme) {
-                            ClientIdScheme.PreRegistered -> null
-                            ClientIdScheme.RedirectUri -> VerifierId(scheme, originalClientId)
-                            ClientIdScheme.HTTPS -> VerifierId(scheme, clientId)
-                            ClientIdScheme.DID -> VerifierId(scheme, clientId)
-                            ClientIdScheme.X509_SAN_URI -> VerifierId(scheme, originalClientId)
-                            ClientIdScheme.X509_SAN_DNS -> VerifierId(scheme, originalClientId)
-                            ClientIdScheme.VERIFIER_ATTESTATION -> VerifierId(scheme, originalClientId)
-                        }
-                    }
+                val scheme = ClientIdScheme.make(parts[0]) ?: invalid("'$clientId' does not contain a valid Client ID Scheme")
+                when (scheme) {
+                    ClientIdScheme.PreRegistered -> invalid("'${ClientIdScheme.PreRegistered}' cannot be used as a Client ID Scheme")
+                    ClientIdScheme.RedirectUri -> VerifierId(scheme, originalClientId)
+                    ClientIdScheme.HTTPS -> VerifierId(scheme, clientId)
+                    ClientIdScheme.DID -> VerifierId(scheme, clientId)
+                    ClientIdScheme.X509_SAN_URI -> VerifierId(scheme, originalClientId)
+                    ClientIdScheme.X509_SAN_DNS -> VerifierId(scheme, originalClientId)
+                    ClientIdScheme.VERIFIER_ATTESTATION -> VerifierId(scheme, originalClientId)
+                }
             }
+        }
     }
 }
 

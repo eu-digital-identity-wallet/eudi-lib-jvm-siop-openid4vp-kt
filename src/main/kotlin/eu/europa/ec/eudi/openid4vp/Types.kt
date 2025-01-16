@@ -135,8 +135,8 @@ data class VerifierId(
     val scheme: ClientIdScheme,
     val originalClientId: OriginalClientId,
 ) {
-    override fun toString(): String {
-        fun ClientIdScheme.prefix(): String = when (this) {
+    val clientId: String = run {
+        val prefix = when (scheme) {
             ClientIdScheme.RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
             ClientIdScheme.X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
             ClientIdScheme.X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS + OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR
@@ -145,8 +145,10 @@ data class VerifierId(
             else -> ""
         }
 
-        return "${scheme.prefix()}$originalClientId"
+        "$prefix$originalClientId"
     }
+
+    override fun toString(): String = clientId
 
     companion object {
         fun parse(clientId: String): VerifierId? =

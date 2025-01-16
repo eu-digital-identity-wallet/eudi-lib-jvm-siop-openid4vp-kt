@@ -226,7 +226,8 @@ class DefaultDispatcherTest {
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
                     assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
-                    assertEquals(Base64URL("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+                    assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+
                     val jwtClaimSet = encryptedJwt.jwtClaimsSet
                     val vpTokenClaim = jwtClaimSet.vpTokenClaim()
                     val vpContent = assertIs<VpContent.PresentationExchange>(vpTokenConsensus.vpContent)
@@ -236,7 +237,7 @@ class DefaultDispatcherTest {
                 val outcome = dispatcher.dispatch(
                     verifierRequest,
                     vpTokenConsensus,
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
                 assertEquals(expectedOutcome, outcome)
@@ -284,7 +285,7 @@ class DefaultDispatcherTest {
                     dispatcher.dispatch(
                         verifiersRequest,
                         vpTokenConsensus,
-                        EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                     )
                 val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
                 assertEquals(expectedOutcome, outcome)
@@ -327,7 +328,7 @@ class DefaultDispatcherTest {
                     val outcome = dispatcher.dispatch(
                         verifiersRequest,
                         vpTokenConsensus,
-                        EncryptionParameters.DiffieHellman(Base64URL("dummy_apu"))
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu"))
                     )
                     val expected = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
                     assertEquals(expected, outcome)
@@ -370,7 +371,7 @@ class DefaultDispatcherTest {
                 val outcome = dispatcher.dispatch(
                     resolvedRequest,
                     vpTokenConsensus,
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 assertEquals(expectedOutcome, outcome)
             }
@@ -647,7 +648,7 @@ class DefaultDispatcherTest {
                     generateNonce(),
                     state,
                     VerifierId(ClientIdScheme.PreRegistered, "client_id"),
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response = AuthorizationResponse.Query(redirectUriBase, data)
                 val redirectURI = response.encodeRedirectURI()
@@ -669,7 +670,7 @@ class DefaultDispatcherTest {
                     generateNonce(),
                     state,
                     VerifierId(ClientIdScheme.PreRegistered, "client_id"),
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response = AuthorizationResponse.QueryJwt(
                     redirectUriBase,
@@ -767,7 +768,7 @@ class DefaultDispatcherTest {
                     generateNonce(),
                     state,
                     VerifierId(ClientIdScheme.PreRegistered, "client_id"),
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
                 response.encodeRedirectURI()
@@ -788,7 +789,7 @@ class DefaultDispatcherTest {
                     generateNonce(),
                     state,
                     VerifierId(ClientIdScheme.PreRegistered, "client_id"),
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response =
                     AuthorizationResponse.FragmentJwt(

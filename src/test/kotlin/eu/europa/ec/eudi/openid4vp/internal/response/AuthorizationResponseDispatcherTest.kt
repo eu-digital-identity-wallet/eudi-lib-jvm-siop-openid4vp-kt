@@ -133,7 +133,7 @@ class AuthorizationResponseDispatcherTest {
                 val outcome = dispatcher.dispatch(
                     siopAuthRequestObject,
                     idTokenConsensus,
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 assertIs<DispatchOutcome.VerifierResponse>(outcome)
             }
@@ -216,7 +216,7 @@ class AuthorizationResponseDispatcherTest {
                 val outcome = dispatcher.dispatch(
                     openId4VPAuthRequestObject,
                     vpTokenConsensus,
-                    EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 assertIs<DispatchOutcome.VerifierResponse>(outcome)
             }

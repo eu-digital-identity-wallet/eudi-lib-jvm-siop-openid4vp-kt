@@ -283,7 +283,7 @@ private class Wallet(
             is Resolution.Success -> {
                 val requestObject = resolution.requestObject
                 val consensus = holderConsensus(requestObject)
-                dispatch(requestObject, consensus, EncryptionParameters.DiffieHellman(Base64URL("dummy_apu")))
+                dispatch(requestObject, consensus, EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")))
             }
         }
 

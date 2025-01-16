@@ -174,6 +174,9 @@ Library requires the presence of a `client_id` using one of the following scheme
 - `did` where verifier must send the authorization request signed (JAR) using a key resolvable via DID URL.
 - `verifier_attestation` where verifier must send the authorization request signed (JAR), witch contains a verifier attestation JWT from a trusted issuer
 
+> [!NOTE]
+> The Client ID Scheme is encoded as a prefix in `client_id`. Absence of such a prefix, indicates the usage of the `pre-registered` Client ID Scheme.
+
 ### Retrieving Authorization Request 
 
 According to OpenID4VP, when the `request_uri` parameter is included in the authorization request wallet must fetch the Authorization Request by following this URI.

@@ -180,11 +180,18 @@ Library requires the presence of a `client_id` using one of the following scheme
 ### Retrieving Authorization Request 
 
 According to OpenID4VP, when the `request_uri` parameter is included in the authorization request wallet must fetch the Authorization Request by following this URI.
-In this case there are two methods to get the request, controlled by the `request_uri_method` comunicated by the verifier:
-- Via an HTTP GET: In this case the Wallet MUST send the request to retrieve the Request Object using the HTTP GET method, as defined in [RFC9101](https://www.rfc-editor.org/rfc/rfc9101.html). 
+In this case there are two methods to get the request, controlled by the `request_uri_method` communicated by the verifier:
+- Via an HTTP GET: In this case the Wallet MUST send the request to retrieve the Request Object using the HTTP GET method, as defined in [RFC9101](https://www.rfc-editor.org/rfc/rfc9101.html).
 - Via an HTTP POST: In this case a supporting Wallet MUST send the request using the HTTP POST method as detailed in [Section 5.11](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request-uri-method-post).
- 
-In the later case wallet can communicate its [metadata](src/main/kotlin/eu/europa/ec/eudi/openid4vp/internal/request/WalletMetaData.kt) to the verifier. Library supports both methods.
+
+In the later case, based on the configured [SupportedRequestUriMethods](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Config.kt), Wallet can communicate to the Verifier:
+- A Nonce value to be included in the JWT-Secured Authorization Request (via `wallet_nonce` parameter)
+- Its [metadata](src/main/kotlin/eu/europa/ec/eudi/openid4vp/internal/request/WalletMetaData.kt)  (via `wallet_metadata` parameter)
+
+Library supports both methods.
+
+> [!NOTE]
+> Library currently does not support encrypted JWT-Secured Authorization Requests.
 
 ### Authorization Request encoding
 

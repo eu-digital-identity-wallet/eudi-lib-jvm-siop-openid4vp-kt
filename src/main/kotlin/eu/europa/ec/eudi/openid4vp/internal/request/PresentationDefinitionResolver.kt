@@ -35,13 +35,10 @@ internal class PresentationDefinitionResolver(
      * [PresentationDefinitionSource.ByValue.presentationDefinition]
      * - [PresentationDefinitionSource.ByReference] methods fetches presentation definition from verifier's
      * [end-point][PresentationDefinitionSource.ByReference.url]
-     * - [PresentationDefinitionSource.Implied] method checks [siopOpenId4VPConfig] to find
-     * a pre-agreed presentation definition
      *
      * Depending on the source the following [errors][ResolutionError] can be raised as [AuthorizationRequestException]
      * - [ResolutionError.UnableToFetchPresentationDefinition]
      * - [ResolutionError.FetchingPresentationDefinitionNotSupported]
-     * - [ResolutionError.PresentationDefinitionNotFoundForScope]
      *
      * @param source the source of presentation definition to be resolved
      * @return the presentation definition or a [ResolutionError] wrapped within a [AuthorizationRequestException]
@@ -57,15 +54,8 @@ internal class PresentationDefinitionResolver(
                     fetchPresentationDefinition(source.url)
                 else
                     throw ResolutionError.FetchingPresentationDefinitionNotSupported.asException()
-
-            is Implied -> lookupKnownPresentationDefinitions(source.scope)
         }
     }
-
-    private fun lookupKnownPresentationDefinitions(scope: Scope): PresentationDefinition =
-        scope.items()
-            .firstNotNullOfOrNull { siopOpenId4VPConfig.vpConfiguration.knownPresentationDefinitionsPerScope[it] }
-            ?: throw ResolutionError.PresentationDefinitionNotFoundForScope(scope).asException()
 
     private suspend fun fetchPresentationDefinition(url: URL): PresentationDefinition =
         try {

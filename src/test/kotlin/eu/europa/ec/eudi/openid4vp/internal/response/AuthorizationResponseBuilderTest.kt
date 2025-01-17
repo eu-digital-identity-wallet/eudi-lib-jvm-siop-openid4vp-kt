@@ -123,7 +123,7 @@ class AuthorizationResponseBuilderTest {
                 ),
             )
 
-            val response = siopAuthRequestObject.responseWith(idTokenConsensus)
+            val response = siopAuthRequestObject.responseWith(idTokenConsensus, null)
             assertIs<AuthorizationResponse.DirectPost>(response)
             val data = response.data
             assertIs<AuthorizationResponsePayload.SiopAuthentication>(data)
@@ -147,9 +147,11 @@ class AuthorizationResponseBuilderTest {
 
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    presentationDefinition = PresentationDefinition(
-                        id = Id("pdId"),
-                        inputDescriptors = emptyList(),
+                    presentationQuery = PresentationQuery.ByPresentationDefinition(
+                        PresentationDefinition(
+                            id = Id("pdId"),
+                            inputDescriptors = emptyList(),
+                        ),
                     ),
                     jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
                     vpFormats = VpFormats(VpFormat.MsoMdoc),
@@ -160,10 +162,12 @@ class AuthorizationResponseBuilderTest {
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                VpToken.Generic("dummy_vp_token"),
-                PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                VpContent.PresentationExchange(
+                    listOf(VerifiablePresentation.Generic("dummy_vp_token")),
+                    PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                ),
             )
-            val response = resolvedRequest.responseWith(vpTokenConsensus)
+            val response = resolvedRequest.responseWith(vpTokenConsensus, null)
 
             assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
             assertIs<AuthorizationResponse.DirectPostJwt>(response)

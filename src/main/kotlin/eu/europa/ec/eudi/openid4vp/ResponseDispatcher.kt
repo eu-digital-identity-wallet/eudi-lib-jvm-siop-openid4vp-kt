@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import java.io.Serializable
 import java.net.URI
 
@@ -57,8 +56,7 @@ sealed interface Consensus : Serializable {
          * @param presentationSubmission the presentation submission to be included in the authorization response
          */
         data class VPTokenConsensus(
-            val vpToken: VpToken,
-            val presentationSubmission: PresentationSubmission,
+            val vpContent: VpContent,
         ) : PositiveConsensus
 
         /**
@@ -70,8 +68,7 @@ sealed interface Consensus : Serializable {
          */
         data class IdAndVPTokenConsensus(
             val idToken: Jwt,
-            val vpToken: VpToken,
-            val presentationSubmission: PresentationSubmission,
+            val vpContent: VpContent,
         ) : PositiveConsensus
     }
 }
@@ -130,14 +127,18 @@ interface Dispatcher {
      * @param consensus Holder's consensus (positive or negative) to this request
      * @return the dispatch outcome as described above
      */
-    suspend fun dispatch(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome =
+    suspend fun dispatch(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+        encryptionParameters: EncryptionParameters?,
+    ): DispatchOutcome =
         when (request.responseMode) {
-            is ResponseMode.DirectPost -> post(request, consensus)
-            is ResponseMode.DirectPostJwt -> post(request, consensus)
-            is ResponseMode.Query -> encodeRedirectURI(request, consensus)
-            is ResponseMode.QueryJwt -> encodeRedirectURI(request, consensus)
-            is ResponseMode.Fragment -> encodeRedirectURI(request, consensus)
-            is ResponseMode.FragmentJwt -> encodeRedirectURI(request, consensus)
+            is ResponseMode.DirectPost -> post(request, consensus, encryptionParameters)
+            is ResponseMode.DirectPostJwt -> post(request, consensus, encryptionParameters)
+            is ResponseMode.Query -> encodeRedirectURI(request, consensus, encryptionParameters)
+            is ResponseMode.QueryJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
+            is ResponseMode.Fragment -> encodeRedirectURI(request, consensus, encryptionParameters)
+            is ResponseMode.FragmentJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
         }
 
     /**
@@ -152,7 +153,11 @@ interface Dispatcher {
      * @param consensus Holder's consensus (positive or negative) to this request
      * @return the verifier's response after receiving the authorization response.
      */
-    suspend fun post(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.VerifierResponse
+    suspend fun post(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+        encryptionParameters: EncryptionParameters?,
+    ): DispatchOutcome.VerifierResponse
 
     /**
      * Method forms a suitable authorization response, based on the [request] and the provided [consensus], and then
@@ -168,5 +173,9 @@ interface Dispatcher {
      * @return a URI pointing to the verifier to which the wallet(caller) must redirect its response. This URI carries
      * the authorization response
      */
-    suspend fun encodeRedirectURI(request: ResolvedRequestObject, consensus: Consensus): DispatchOutcome.RedirectURI
+    suspend fun encodeRedirectURI(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+        encryptionParameters: EncryptionParameters?,
+    ): DispatchOutcome.RedirectURI
 }

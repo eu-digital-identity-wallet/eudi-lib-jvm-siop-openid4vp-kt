@@ -46,6 +46,7 @@ internal data class UnvalidatedRequestObject(
     @SerialName("response_uri") val responseUri: String? = null,
     @SerialName("presentation_definition") val presentationDefinition: JsonObject? = null,
     @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null, // Not utilized from ISO-23330-4
+    @SerialName("dcql_query") val dcqlQuery: JsonObject? = null,
     @SerialName("redirect_uri") val redirectUri: String? = null,
     val scope: String? = null,
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
@@ -142,6 +143,7 @@ internal sealed interface UnvalidatedRequest {
                     responseType = uri.getQueryParameter("response_type"),
                     presentationDefinition = jsonObject("presentation_definition"),
                     presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
+                    dcqlQuery = jsonObject("dcql_query"),
                     scope = uri.getQueryParameter("scope"),
                     nonce = uri.getQueryParameter("nonce"),
                     responseMode = uri.getQueryParameter("response_mode"),

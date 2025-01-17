@@ -25,4 +25,36 @@ object OpenId4VPSpec {
     const val CLIENT_ID_SCHEME_X509_SAN_URI = "x509_san_uri"
     const val CLIENT_ID_SCHEME_X509_SAN_DNS = "x509_san_dns"
     const val CLIENT_ID_SCHEME_VERIFIER_ATTESTATION = "verifier_attestation"
+
+    const val RM_DIRECT_POST: String = "direct_post"
+    const val RM_DIRECT_POST_JWT: String = "direct_post.jwt"
+
+    const val VP_TOKEN: String = "vp_token"
+
+    const val WALLET_NONCE: String = "wallet_nonce"
+    const val WALLET_METADATA: String = "wallet_metadata"
+
+    const val FORMAT_MSO_MDOC: String = "mso_mdoc"
+    const val FORMAT_SD_JWT_VC: String = "dc+sd-jwt"
+    const val FORMAT_W3C_SIGNED_JWT: String = "jwt_vc_json"
+
+    const val DCQL_CREDENTIALS: String = "credentials"
+    const val DCQL_CREDENTIAL_SETS: String = "credential_sets"
+
+    const val DCQL_ID: String = "id"
+    const val DCQL_FORMAT: String = "format"
+    const val DCQL_META: String = "meta"
+    const val DCQL_CLAIMS: String = "claims"
+    const val DCQL_CLAIM_SETS: String = "claim_sets"
+    const val DCQL_OPTIONS: String = "options"
+    const val DCQL_REQUIRED: String = "required"
+    const val DCQL_PURPOSE: String = "purpose"
+    const val DCQL_PATH: String = "path"
+    const val DCQL_VALUES: String = "values"
+    const val DCQL_SD_JWT_VC_VCT_VALUES: String = "vct_values"
+    const val DCQL_MSO_MDOC_DOCTYPE_VALUE: String = "doctype_value"
+    const val DCQL_MSO_MDOC_NAMESPACE: String = "namespace"
+    const val DCQL_MSO_MDOC_CLAIM_NAME: String = "claim_name"
 }
+
+object SIOPv2

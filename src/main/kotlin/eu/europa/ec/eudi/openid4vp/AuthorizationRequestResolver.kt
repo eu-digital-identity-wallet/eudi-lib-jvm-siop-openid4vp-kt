@@ -16,8 +16,7 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import org.bouncycastle.asn1.x500.X500Name
@@ -122,7 +121,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
         val vpFormats: VpFormats,
-        val presentationDefinition: PresentationDefinition,
+        val presentationQuery: PresentationQuery,
     ) : ResolvedRequestObject
 
     /**
@@ -138,7 +137,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
-        val presentationDefinition: PresentationDefinition,
+        val presentationQuery: PresentationQuery,
     ) : ResolvedRequestObject
 }
 
@@ -180,10 +179,14 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class UnsupportedResponseMode(val value: String?) : RequestValidationError
 
     //
-    // Presentation Definition errors
+    // Query source errors
     //
-    data object MissingPresentationDefinition : RequestValidationError {
-        private fun readResolve(): Any = MissingPresentationDefinition
+    data object MissingQuerySource : RequestValidationError {
+        private fun readResolve(): Any = MissingQuerySource
+    }
+
+    data object MultipleQuerySources : RequestValidationError {
+        private fun readResolve(): Any = MultipleQuerySources
     }
 
     data object InvalidClientId : RequestValidationError {
@@ -195,6 +198,8 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data object InvalidPresentationDefinitionUri : RequestValidationError {
         private fun readResolve(): Any = InvalidPresentationDefinitionUri
     }
+
+    data class InvalidDigitalCredentialsQuery(val cause: Throwable) : RequestValidationError
 
     data object InvalidRedirectUri : RequestValidationError {
         private fun readResolve(): Any = InvalidRedirectUri
@@ -283,7 +288,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
  * Errors that can occur while resolving an authorization request
  */
 sealed interface ResolutionError : AuthorizationRequestError {
-    data class PresentationDefinitionNotFoundForScope(val scope: Scope) :
+    data class UnknownScope(val scope: Scope) :
         ResolutionError
 
     data object FetchingPresentationDefinitionNotSupported : ResolutionError {
@@ -346,4 +351,13 @@ fun interface AuthorizationRequestResolver {
      * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
     suspend fun resolveRequestUri(uri: String): Resolution
+}
+
+sealed interface PresentationQuery {
+
+    @JvmInline
+    value class ByPresentationDefinition(val value: PresentationDefinition) : PresentationQuery
+
+    @JvmInline
+    value class ByDigitalCredentialsQuery(val value: DCQL) : PresentationQuery
 }

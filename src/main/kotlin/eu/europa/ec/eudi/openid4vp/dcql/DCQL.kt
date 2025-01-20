@@ -105,6 +105,8 @@ data class CredentialQuery(
      * If omitted, no specific constraints are placed on the metadata or validity of the requested Credential.
      *
      * @see [CredentialQuery.metaMsoMdoc]
+     * @see [CredentialQuery.metaSdJwtVc]
+     * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1-3.6">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1-3.6</a>
      */
     @SerialName(OpenId4VPSpec.DCQL_META) val meta: JsonObject? = null,
 

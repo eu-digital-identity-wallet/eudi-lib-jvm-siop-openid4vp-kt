@@ -154,9 +154,9 @@ class Verifier private constructor(
                             ifOpenId4VPPrEx = { presentationDefinition ->
                                 initOpenId4VpTransactionWithPrEx(client, verifierApi, nonce, presentationDefinition)
                             },
-                            ifOpenId4VPDcql = {dcqlQuery ->
+                            ifOpenId4VPDcql = { dcqlQuery ->
                                 initOpenId4VpTransactionWithDCQL(client, verifierApi, nonce, dcqlQuery)
-                            }
+                            },
                         )
                         val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
                         val uri = formatAuthorizationRequest(initTransactionResponse)
@@ -345,7 +345,7 @@ private class Wallet(
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
         val presentationQuery = request.presentationQuery
-        return when(presentationQuery) {
+        return when (presentationQuery) {
             is PresentationQuery.ByPresentationDefinition -> {
                 val inputDescriptor = presentationQuery.value.inputDescriptors.first()
                 Consensus.PositiveConsensus.VPTokenConsensus(
@@ -368,8 +368,8 @@ private class Wallet(
             is PresentationQuery.ByDigitalCredentialsQuery -> {
                 Consensus.PositiveConsensus.VPTokenConsensus(
                     vpContent = VpContent.DCQL(
-                        verifiablePresentations = mapOf(QueryId("my_query") to VerifiablePresentation.Generic("foo"))
-                    )
+                        verifiablePresentations = mapOf(QueryId("my_query") to VerifiablePresentation.Generic("foo")),
+                    ),
                 )
             }
         }

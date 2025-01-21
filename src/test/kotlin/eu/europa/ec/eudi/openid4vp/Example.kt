@@ -151,11 +151,8 @@ class Verifier private constructor(
                             ifSiop = {
                                 initSiopTransaction(client, verifierApi, nonce)
                             },
-                            ifOpenId4VPPrEx = { presentationDefinition ->
-                                initOpenId4VpTransactionWithPrEx(client, verifierApi, nonce, presentationDefinition)
-                            },
-                            ifOpenId4VPDcql = { dcqlQuery ->
-                                initOpenId4VpTransactionWithDCQL(client, verifierApi, nonce, dcqlQuery)
+                            ifOpenId4VP = { presentationQuery ->
+                                initOpenId4VpTransaction(client, verifierApi, nonce, presentationQuery)
                             },
                         )
                         val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
@@ -183,47 +180,32 @@ class Verifier private constructor(
             return initTransaction(client, verifierApi, request)
         }
 
-        private suspend fun initOpenId4VpTransactionWithPrEx(
+        private suspend fun initOpenId4VpTransaction(
             client: HttpClient,
             verifierApi: URL,
             nonce: String,
-            presentationDefinition: String,
+            presentationQuery: Transaction.PresentationQuery,
         ): JsonObject {
             verifierPrintln("Placing to verifier endpoint OpenId4Vp authorization request  ...")
-            val request =
-                """
-                    {
-                        "type": "vp_token",
-                        "nonce": "$nonce",
-                        "presentation_definition": $presentationDefinition,
-                        "response_mode": "direct_post.jwt" ,
-                        "presentation_definition_mode": "by_reference"
-                        "jar_mode": "by_reference",
-                        "wallet_response_redirect_uri_template":"https://foo?response_code={RESPONSE_CODE}"       
-                    }
-                """.trimIndent()
-            return initTransaction(client, verifierApi, request)
-        }
 
-        private suspend fun initOpenId4VpTransactionWithDCQL(
-            client: HttpClient,
-            verifierApi: URL,
-            nonce: String,
-            dcqlQuery: String,
-        ): JsonObject {
-            verifierPrintln("Placing to verifier endpoint OpenId4Vp authorization request  ...")
+            val (key, value) = when (presentationQuery) {
+                is Transaction.PresentationQuery.PresentationExchange ->
+                    "presentation_definition" to presentationQuery.presentationDefinition
+                is Transaction.PresentationQuery.DCQL -> "dcql_query" to presentationQuery.query
+            }
             val request =
                 """
                     {
                         "type": "vp_token",
                         "nonce": "$nonce",
-                        "dcql_query": $dcqlQuery,
-                        "response_mode": "direct_post.jwt" ,
+                        "$key": $value,
+                        "response_mode": "direct_post.jwt",
                         "presentation_definition_mode": "by_reference"
                         "jar_mode": "by_reference",
                         "wallet_response_redirect_uri_template":"https://foo?response_code={RESPONSE_CODE}"       
                     }
                 """.trimIndent()
+
             return initTransaction(client, verifierApi, request)
         }
 
@@ -260,28 +242,29 @@ sealed interface Transaction {
     val name: String
         get() = when (this) {
             is SIOP -> "SIOP"
-            is OpenId4VPPrEx -> "OpenId4Vp with Presentation Exchange"
-            is OpenId4VPDcql -> "OpenId4Vp with DCQL"
+            is OpenId4VP -> "OpenId4Vp"
         }
 
+    sealed interface PresentationQuery {
+        data class PresentationExchange(val presentationDefinition: String) : PresentationQuery
+        data class DCQL(val query: String) : PresentationQuery
+    }
+
     data object SIOP : Transaction
-    data class OpenId4VPPrEx(val presentationDefinition: String) : Transaction
-    data class OpenId4VPDcql(val dcqlQuery: String) : Transaction
+    data class OpenId4VP(val presentationQuery: PresentationQuery) : Transaction
 
     companion object {
-        val PidRequest = OpenId4VPPrEx(PidPresentationDefinition)
-        val DcqlRequest = OpenId4VPDcql(DcqlQuery)
+        val PidRequest = OpenId4VP(PresentationQuery.PresentationExchange(PidPresentationDefinition))
+        val DcqlRequest = OpenId4VP(PresentationQuery.DCQL(DcqlQuery))
     }
 }
 
 suspend fun <T> Transaction.fold(
     ifSiop: suspend () -> T,
-    ifOpenId4VPPrEx: suspend (String) -> T,
-    ifOpenId4VPDcql: suspend (String) -> T,
+    ifOpenId4VP: suspend (Transaction.PresentationQuery) -> T,
 ): T = when (this) {
     Transaction.SIOP -> ifSiop()
-    is Transaction.OpenId4VPPrEx -> ifOpenId4VPPrEx(presentationDefinition)
-    is Transaction.OpenId4VPDcql -> ifOpenId4VPDcql(dcqlQuery)
+    is Transaction.OpenId4VP -> ifOpenId4VP(presentationQuery)
 }
 
 private class Wallet(

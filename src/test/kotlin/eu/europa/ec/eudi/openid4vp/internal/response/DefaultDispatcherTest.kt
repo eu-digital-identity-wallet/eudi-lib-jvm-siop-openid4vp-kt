@@ -417,36 +417,58 @@ class DefaultDispatcherTest {
 
         @Test
         fun `support dcql vp_token`() = runTest {
-            suspend fun test(vpContent: VpContent, redirectUri: URI? = null) {
-                val verifierMetaData = UnvalidatedClientMetaData(
-                    authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
-                )
-                val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
-
-                val resolvedRequest = createOpenID4VPRequestWithDCQL(verifierMetaData, responseMode)
-                val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    vpContent = vpContent,
-                )
-
+            suspend fun test(resolvedRequest: ResolvedRequestObject, consensus: Consensus, redirectUri: URI? = null) {
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
                     val jwtClaimsSet = responseParam.assertIsJwtSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                     assertNotNull(jwtClaimsSet.expirationTime)
-                    val receivedVpContent = assertIs<VpContent.DCQL>(vpTokenConsensus.vpContent)
-                    assertEquals(
-                        receivedVpContent.verifiablePresentations.toJson(),
-                        jwtClaimsSet.vpTokenClaim(),
-                    )
+                    when (consensus) {
+                        is Consensus.PositiveConsensus.VPTokenConsensus -> {
+                            val receivedVpContent = assertIs<VpContent.DCQL>(consensus.vpContent)
+                            assertEquals(
+                                receivedVpContent.verifiablePresentations.toJson(),
+                                jwtClaimsSet.vpTokenClaim(),
+                            )
+                        }
+                        is Consensus.PositiveConsensus.IdAndVPTokenConsensus -> {
+                            val receivedVpContent = assertIs<VpContent.DCQL>(consensus.vpContent)
+                            assertNotNull(jwtClaimsSet.claims["id_token"], "Expected id_token")
+                            assertEquals(
+                                receivedVpContent.verifiablePresentations.toJson(),
+                                jwtClaimsSet.vpTokenClaim(),
+                            )
+                        }
+                        else -> fail("Expected positive consensus")
+                    }
                 }
 
                 val expectedOutcome = DispatchOutcome.VerifierResponse.Accepted(redirectUri)
-                val outcome = dispatcher.dispatch(resolvedRequest, vpTokenConsensus, null)
+                val outcome = dispatcher.dispatch(resolvedRequest, consensus, null)
                 assertEquals(expectedOutcome, outcome)
             }
 
-            test(dcqlVpTokenWithGenericPresentation())
-            test(dcqlVpTokenWithJsonPresentation())
+            val verifierMetaData = UnvalidatedClientMetaData(
+                authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
+            )
+            val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
+
+            test(
+                createOpenID4VPRequestWithDCQL(verifierMetaData, responseMode),
+                Consensus.PositiveConsensus.VPTokenConsensus(dcqlVpTokenWithGenericPresentation()),
+            )
+            test(
+                createOpenID4VPRequestWithDCQL(verifierMetaData, responseMode),
+                Consensus.PositiveConsensus.VPTokenConsensus(dcqlVpTokenWithGenericPresentation()),
+            )
+            test(
+                createSiopOpenID4VPRequestWithDCQL(verifierMetaData, responseMode),
+                Consensus.PositiveConsensus.IdAndVPTokenConsensus("dummy_jwt", dcqlVpTokenWithGenericPresentation()),
+            )
+            test(
+                createSiopOpenID4VPRequestWithDCQL(verifierMetaData, responseMode),
+                Consensus.PositiveConsensus.IdAndVPTokenConsensus("dummy_jwt", dcqlVpTokenWithJsonPresentation()),
+            )
         }
 
         private fun vpTokenWithMultipleMixedPresentations(): VpContent =
@@ -521,31 +543,7 @@ class DefaultDispatcherTest {
                 presentationQuery = PresentationQuery.ByDigitalCredentialsQuery(
                     DCQL(
                         credentials = listOf(
-                            CredentialQuery(
-                                QueryId("my_credential"),
-                                Format.SdJwtVc,
-                                meta = JsonObject(
-                                    mapOf(
-                                        "vct_values" to
-                                            JsonArray(
-                                                listOf(
-                                                    JsonPrimitive("https://credentials.example.com/identity_credential"),
-                                                ),
-                                            ),
-                                    ),
-                                ),
-                                claims = listOf(
-                                    ClaimsQuery(
-                                        path = ClaimPath(listOf(Claim("last_name"))),
-                                    ),
-                                    ClaimsQuery(
-                                        path = ClaimPath(listOf(Claim("first_name"))),
-                                    ),
-                                    ClaimsQuery(
-                                        path = ClaimPath(listOf(Claim("address"), Claim("street_address"))),
-                                    ),
-                                ),
-                            ),
+                            testCredentialQuery(),
                         ),
                     ),
                 ),
@@ -555,6 +553,33 @@ class DefaultDispatcherTest {
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
                 state = genState(),
+            )
+        }
+
+        private suspend fun createSiopOpenID4VPRequestWithDCQL(
+            unvalidatedClientMetaData: UnvalidatedClientMetaData,
+            responseMode: ResponseMode.DirectPostJwt,
+        ): ResolvedRequestObject.SiopOpenId4VPAuthentication {
+            val clientMetadataValidated =
+                Wallet.clientMetaDataValidator.validate(unvalidatedClientMetaData, responseMode)
+
+            return ResolvedRequestObject.SiopOpenId4VPAuthentication(
+                client = Verifier.CLIENT,
+                responseMode = responseMode,
+                state = genState(),
+                nonce = "0S6_WzA2Mj",
+                jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
+                vpFormats = VpFormats(VpFormat.MsoMdoc),
+                idTokenType = listOf(IdTokenType.SubjectSigned),
+                subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
+                scope = Scope.OpenId,
+                presentationQuery = PresentationQuery.ByDigitalCredentialsQuery(
+                    DCQL(
+                        credentials = listOf(
+                            testCredentialQuery(),
+                        ),
+                    ),
+                ),
             )
         }
 
@@ -590,6 +615,32 @@ class DefaultDispatcherTest {
                     ),
                 ),
             )
+
+        private fun testCredentialQuery(): CredentialQuery = CredentialQuery(
+            QueryId("my_credential"),
+            Format.SdJwtVc,
+            meta = JsonObject(
+                mapOf(
+                    "vct_values" to
+                        JsonArray(
+                            listOf(
+                                JsonPrimitive("https://credentials.example.com/identity_credential"),
+                            ),
+                        ),
+                ),
+            ),
+            claims = listOf(
+                ClaimsQuery(
+                    path = ClaimPath(listOf(Claim("last_name"))),
+                ),
+                ClaimsQuery(
+                    path = ClaimPath(listOf(Claim("first_name"))),
+                ),
+                ClaimsQuery(
+                    path = ClaimPath(listOf(Claim("address"), Claim("street_address"))),
+                ),
+            ),
+        )
     }
 
     @Nested
@@ -765,6 +816,32 @@ class DefaultDispatcherTest {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.SiopAuthentication(
                     "dummy",
+                    generateNonce(),
+                    state,
+                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                )
+                val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
+                response.encodeRedirectURI()
+                    .asserter { fragmentData ->
+                        assertEquals(data.idToken, fragmentData["id_token"])
+                    }
+            }
+
+            genState().let { state -> test(state) { assertFragmentURIContainsStateAnd(state, it) } }
+            test { assertFragmentURIDoesNotContainStateAnd(it) }
+        }
+
+        @Test
+        fun `when SiopOpenId4VPAuthentication, fragment must contain an id_token`() {
+            fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
+                val data = AuthorizationResponsePayload.SiopOpenId4VPAuthentication(
+                    "dummy",
+                    VpContent.DCQL(
+                        mapOf(
+                            QueryId("my_credential") to VerifiablePresentation.Generic("dummy_vp_token"),
+                        ),
+                    ),
                     generateNonce(),
                     state,
                     VerifierId(ClientIdScheme.PreRegistered, "client_id"),

@@ -37,7 +37,6 @@ import eu.europa.ec.eudi.openid4vp.internal.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
@@ -344,6 +343,7 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
             responseType = getStringClaim("response_type"),
             presentationDefinition = getJSONObjectClaim("presentation_definition")?.asJsonObject(),
             presentationDefinitionUri = getStringClaim("presentation_definition_uri"),
+            dcqlQuery = getJSONObjectClaim("dcql_query")?.asJsonObject(),
             scope = getStringClaim("scope"),
             nonce = getStringClaim("nonce"),
             responseMode = getStringClaim("response_mode"),

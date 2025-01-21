@@ -104,12 +104,12 @@ private fun SiopOpenId4VPConfig.ensureValid(
 private fun ensureIsSignedJwt(unverifiedJwt: Jwt): SignedJWT =
     try {
         SignedJWT.parse(unverifiedJwt)
-    } catch (pe: ParseException) {
+    } catch (_: ParseException) {
         throw invalidJwt("JAR JWT parse error")
     }
 
 private fun ensureSameWalletNonce(expectedWalletNonce: Nonce, signedJwt: SignedJWT) {
-    val walletNonce = signedJwt.jwtClaimsSet.getStringClaim(WALLET_NONCE_FORM_PARAM)
+    val walletNonce = signedJwt.jwtClaimsSet.getStringClaim(OpenId4VPSpec.WALLET_NONCE)
     ensure(expectedWalletNonce.toString() == walletNonce) {
         invalidJwt("Mismatch of wallet_nonce. Expected $expectedWalletNonce, actual $walletNonce")
     }
@@ -143,8 +143,6 @@ private fun unsupportedRequestUriMethod(m: RequestUriMethod): AuthorizationReque
 
 private const val APPLICATION_JWT = "application/jwt"
 private const val APPLICATION_OAUTH_AUTHZ_REQ_JWT = "application/oauth-authz-req+jwt"
-private const val WALLET_NONCE_FORM_PARAM = "wallet_nonce"
-private const val WALLET_METADATA_FORM_PARAM = "wallet_metadata"
 
 private suspend fun HttpClient.getJAR(requestUri: URL): Jwt =
     get(requestUri) { addAcceptContentTypeJwt() }.body()
@@ -156,8 +154,8 @@ private suspend fun HttpClient.postForJAR(
 ): Jwt {
     val form =
         parameters {
-            walletNonce?.let { append(WALLET_NONCE_FORM_PARAM, it.toString()) }
-            walletMetaData?.let { append(WALLET_METADATA_FORM_PARAM, Json.encodeToString(it)) }
+            walletNonce?.let { append(OpenId4VPSpec.WALLET_NONCE, it.toString()) }
+            walletMetaData?.let { append(OpenId4VPSpec.WALLET_METADATA, Json.encodeToString(it)) }
         }
     return submitForm(requestUri.toString(), form) { addAcceptContentTypeJwt() }.body<Jwt>()
 }

@@ -62,6 +62,13 @@ class UnvalidatedRequestResolverTest {
         .replace("  ", "")
         .also { URLEncoder.encode(it, "UTF-8") }
 
+    private val dcqlQuery = readFileAsText("dcql/basic_example.json")
+        .replace("\r\n", "")
+        .replace("\r", "")
+        .replace("\n", "")
+        .replace("  ", "")
+        .also { URLEncoder.encode(it, "UTF-8") }
+
     private val signingKey = RSAKeyGenerator(2048)
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
         .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
@@ -151,6 +158,27 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
+    fun `vp token auth request with DCQL query`() = runTest {
+        suspend fun test(state: String? = null) {
+            val authRequest =
+                "https://client.example.org/universal-link?" +
+                    "response_type=vp_token" +
+                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                    "&nonce=n-0S6_WzA2Mj" +
+                    (state?.let { "&state=$it" } ?: "") +
+                    "&dcql_query=$dcqlQuery" +
+                    "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
+
+            val resolution = resolver.resolveRequestUri(authRequest)
+            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        test(genState())
+        test()
+    }
+
+    @Test
     fun `id token auth request`() = runTest {
         suspend fun test(state: String? = null) {
             val authRequest =
@@ -177,7 +205,7 @@ class UnvalidatedRequestResolverTest {
         suspend fun test(state: String? = null) {
             val authRequest =
                 "https://client.example.org/universal-link?" +
-                    "response_type=id_token vp_token" +
+                    "response_type=vp_token%20id_token" +
                     "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
@@ -390,7 +418,6 @@ class UnvalidatedRequestResolverTest {
             claim("response_type", "vp_token")
             claim("nonce", "nonce")
             claim("response_mode", "direct_post")
-            claim("scope", "")
             claim("presentation_definition", Jackson.toJsonObject(presentationDefinition))
             claim("state", "638JwH0b2jrhGlAZQVa50KysVazkI-YpiFcLj2DLMalJpZK6XC22vAsPqXkpwAwXzfYpK-WLc3GhHYK8lbT6rw")
             claim("client_metadata", Jackson.toJsonObject(clientMetadata))

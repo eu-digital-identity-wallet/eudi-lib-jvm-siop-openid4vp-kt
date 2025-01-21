@@ -19,10 +19,12 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.X509SanDns
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.prex.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -82,6 +84,7 @@ fun main(): Unit = runBlocking {
 
     runUseCase(Transaction.SIOP)
     runUseCase(Transaction.PidRequest)
+    runUseCase(Transaction.DcqlRequest)
 }
 
 @Serializable
@@ -148,8 +151,8 @@ class Verifier private constructor(
                             ifSiop = {
                                 initSiopTransaction(client, verifierApi, nonce)
                             },
-                            ifOpenId4VP = { presentationDefinition ->
-                                initOpenId4VpTransaction(client, verifierApi, nonce, presentationDefinition)
+                            ifOpenId4VP = { presentationQuery ->
+                                initOpenId4VpTransaction(client, verifierApi, nonce, presentationQuery)
                             },
                         )
                         val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
@@ -181,21 +184,28 @@ class Verifier private constructor(
             client: HttpClient,
             verifierApi: URL,
             nonce: String,
-            presentationDefinition: String,
+            presentationQuery: Transaction.PresentationQuery,
         ): JsonObject {
             verifierPrintln("Placing to verifier endpoint OpenId4Vp authorization request  ...")
+
+            val (key, value) = when (presentationQuery) {
+                is Transaction.PresentationQuery.PresentationExchange ->
+                    "presentation_definition" to presentationQuery.presentationDefinition
+                is Transaction.PresentationQuery.DCQL -> "dcql_query" to presentationQuery.query
+            }
             val request =
                 """
                     {
                         "type": "vp_token",
                         "nonce": "$nonce",
-                        "presentation_definition": $presentationDefinition,
-                        "response_mode": "direct_post.jwt" ,
+                        "$key": $value,
+                        "response_mode": "direct_post.jwt",
                         "presentation_definition_mode": "by_reference"
                         "jar_mode": "by_reference",
                         "wallet_response_redirect_uri_template":"https://foo?response_code={RESPONSE_CODE}"       
                     }
                 """.trimIndent()
+
             return initTransaction(client, verifierApi, request)
         }
 
@@ -235,20 +245,26 @@ sealed interface Transaction {
             is OpenId4VP -> "OpenId4Vp"
         }
 
+    sealed interface PresentationQuery {
+        data class PresentationExchange(val presentationDefinition: String) : PresentationQuery
+        data class DCQL(val query: String) : PresentationQuery
+    }
+
     data object SIOP : Transaction
-    data class OpenId4VP(val presentationDefinition: String) : Transaction
+    data class OpenId4VP(val presentationQuery: PresentationQuery) : Transaction
 
     companion object {
-        val PidRequest = OpenId4VP(PidPresentationDefinition)
+        val PidRequest = OpenId4VP(PresentationQuery.PresentationExchange(PidPresentationDefinition))
+        val DcqlRequest = OpenId4VP(PresentationQuery.DCQL(DcqlQuery))
     }
 }
 
 suspend fun <T> Transaction.fold(
     ifSiop: suspend () -> T,
-    ifOpenId4VP: suspend (String) -> T,
+    ifOpenId4VP: suspend (Transaction.PresentationQuery) -> T,
 ): T = when (this) {
     Transaction.SIOP -> ifSiop()
-    is Transaction.OpenId4VP -> ifOpenId4VP(presentationDefinition)
+    is Transaction.OpenId4VP -> ifOpenId4VP(presentationQuery)
 }
 
 private class Wallet(
@@ -282,7 +298,7 @@ private class Wallet(
             is Resolution.Success -> {
                 val requestObject = resolution.requestObject
                 val consensus = holderConsensus(requestObject)
-                dispatch(requestObject, consensus)
+                dispatch(requestObject, consensus, EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")))
             }
         }
 
@@ -311,23 +327,35 @@ private class Wallet(
     }
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
-        val presentationDefinition = request.presentationDefinition
-        val inputDescriptor = presentationDefinition.inputDescriptors.first()
-        return Consensus.PositiveConsensus.VPTokenConsensus(
-            vpToken = VpToken.Generic("foo"),
-            presentationSubmission = PresentationSubmission(
-                id = Id("pid-res"),
-                definitionId = presentationDefinition.id,
-                listOf(
-                    DescriptorMap(
-                        id = inputDescriptor.id,
-                        format = "mso_mdoc",
-                        path = JsonPath.jsonPath("$")!!,
+        val presentationQuery = request.presentationQuery
+        return when (presentationQuery) {
+            is PresentationQuery.ByPresentationDefinition -> {
+                val inputDescriptor = presentationQuery.value.inputDescriptors.first()
+                Consensus.PositiveConsensus.VPTokenConsensus(
+                    vpContent = VpContent.PresentationExchange(
+                        verifiablePresentations = listOf(VerifiablePresentation.Generic("foo")),
+                        presentationSubmission = PresentationSubmission(
+                            id = Id("pid-res"),
+                            definitionId = presentationQuery.value.id,
+                            listOf(
+                                DescriptorMap(
+                                    id = inputDescriptor.id,
+                                    format = "mso_mdoc",
+                                    path = JsonPath.jsonPath("$")!!,
+                                ),
+                            ),
+                        ),
                     ),
-                ),
-
-            ),
-        )
+                )
+            }
+            is PresentationQuery.ByDigitalCredentialsQuery -> {
+                Consensus.PositiveConsensus.VPTokenConsensus(
+                    vpContent = VpContent.DCQL(
+                        verifiablePresentations = mapOf(QueryId("my_query") to VerifiablePresentation.Generic("foo")),
+                    ),
+                )
+            }
+        }
     }
 
     companion object {
@@ -577,4 +605,27 @@ val PidPresentationDefinition = """
     }
   ]
 }
+""".trimIndent()
+
+val DcqlQuery = """
+    {
+      "credentials": [
+        {
+          "id": "my_query",
+          "format": "dc+sd-jwt",
+          "meta": {
+            "vct_values": [
+              "https://credentials.example.com/identity_credential"
+            ]
+          },
+          "claims": [
+            {
+              "path": [
+                "family_name"
+              ]
+            }
+          ]
+        }
+      ]
+    }
 """.trimIndent()

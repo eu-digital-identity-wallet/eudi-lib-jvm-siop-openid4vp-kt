@@ -23,6 +23,7 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
@@ -188,11 +189,13 @@ value class VpFormats(val values: List<VpFormat>) {
  * which is communicated by the verifier by reference using `presentation_definition_uri`.
  * @param knownPresentationDefinitionsPerScope a set of presentation definitions that a verifier may request via
  * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
+ * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
  * @param vpFormats The formats the wallet supports
  */
 data class VPConfiguration(
     val presentationDefinitionUriSupported: Boolean = true,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+    val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormats: VpFormats,
 )
 

@@ -20,6 +20,8 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.util.Base64URL
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
+import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.net.URI
@@ -37,11 +39,28 @@ sealed interface SubjectSyntaxType : Serializable {
 
 @JvmInline
 value class Scope private constructor(val value: String) {
-    fun items(): List<String> = value.split(" ")
+    fun items(): List<Scope> = when (value) {
+        "" -> emptyList()
+        else -> value.split(SEPARATOR).map { Scope(it) }
+    }
+    operator fun plus(other: Scope): Scope = Scope("$value$SEPARATOR${other.value}")
+    operator fun contains(other: Scope): Boolean {
+        val thisFlatten = items().flatMap { it.items() }
+        val otherFlatten = other.items().flatMap { it.items() }
+        return thisFlatten.containsAll(otherFlatten)
+    }
 
     companion object {
+
+        fun List<Scope>.mergeOrNull(): Scope? =
+            if (isEmpty()) null
+            else fold(EMPTY, Scope::plus)
+
+        val OpenId = Scope("openid")
+        private val EMPTY = Scope("")
+        private const val SEPARATOR = " "
         fun make(s: String): Scope? = s.trim()
-            .takeIf { trimmed -> trimmed.split(" ").isNotEmpty() }
+            .takeIf { trimmed -> trimmed.split(SEPARATOR).isNotEmpty() }
             ?.let { Scope(it) }
     }
 }
@@ -209,32 +228,23 @@ sealed interface VerifiablePresentation {
     value class Generic(val value: String) : VerifiablePresentation
 
     @JvmInline
-    value class MsoMdoc(val value: String) : VerifiablePresentation
-
-    @JvmInline
     value class JsonObj(val value: JsonObject) : VerifiablePresentation
 }
 
-data class VpToken(
-    val verifiablePresentations: List<VerifiablePresentation>,
-    val apu: Base64URL? = null,
-) {
-
-    init {
-        require(verifiablePresentations.isNotEmpty())
+sealed interface VpContent {
+    data class PresentationExchange(
+        val verifiablePresentations: List<VerifiablePresentation>,
+        val presentationSubmission: PresentationSubmission,
+    ) : VpContent {
+        init {
+            require(verifiablePresentations.isNotEmpty())
+        }
     }
 
-    companion object {
-
-        fun Generic(vararg values: String) =
-            VpToken(
-                verifiablePresentations = values.map { VerifiablePresentation.Generic(it) },
-            )
-
-        fun MsoMdoc(apu: Base64URL, vararg values: String) = VpToken(
-            verifiablePresentations = values.map { VerifiablePresentation.MsoMdoc(it) },
-            apu = apu,
-        )
+    data class DCQL(val verifiablePresentations: Map<QueryId, VerifiablePresentation>) : VpContent {
+        init {
+            require(verifiablePresentations.isNotEmpty())
+        }
     }
 }
 
@@ -275,4 +285,9 @@ sealed interface JarmRequirement : Serializable {
      * specifications
      */
     data class SignedAndEncrypted(val signed: Signed, val encryptResponse: Encrypted) : JarmRequirement
+}
+
+sealed interface EncryptionParameters : Serializable {
+
+    data class DiffieHellman(val apu: Base64URL) : EncryptionParameters
 }

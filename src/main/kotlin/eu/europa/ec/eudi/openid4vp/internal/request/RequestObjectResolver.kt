@@ -16,9 +16,13 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.Client
+import eu.europa.ec.eudi.openid4vp.PresentationQuery
+import eu.europa.ec.eudi.openid4vp.ResolutionError
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
+import eu.europa.ec.eudi.openid4vp.Scope
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.VpFormats
+import eu.europa.ec.eudi.openid4vp.asException
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
@@ -42,7 +46,7 @@ internal class RequestObjectResolver(
         request: SiopOpenId4VPAuthentication,
         clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject = coroutineScope {
-        val presentationDefinition = presentationDefinition(request.presentationDefinitionSource)
+        val presentationQuery = query(request.querySource)
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
             client = request.client.toClient(),
             responseMode = request.responseMode,
@@ -53,7 +57,7 @@ internal class RequestObjectResolver(
             idTokenType = request.idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
-            presentationDefinition = presentationDefinition,
+            presentationQuery = presentationQuery,
         )
     }
 
@@ -61,7 +65,7 @@ internal class RequestObjectResolver(
         authorization: OpenId4VPAuthorization,
         clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject {
-        val presentationDefinition = presentationDefinition(authorization.presentationDefinitionSource)
+        val presentationQuery = query(authorization.querySource)
         return ResolvedRequestObject.OpenId4VPAuthorization(
             client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
@@ -69,7 +73,7 @@ internal class RequestObjectResolver(
             nonce = authorization.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
             vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
-            presentationDefinition = presentationDefinition,
+            presentationQuery = presentationQuery,
         )
     }
 
@@ -89,9 +93,36 @@ internal class RequestObjectResolver(
         )
     }
 
-    private suspend fun presentationDefinition(
-        presentationDefinitionSource: PresentationDefinitionSource,
-    ) = presentationDefinitionResolver.resolvePresentationDefinition(presentationDefinitionSource)
+    private suspend fun query(
+        querySource: QuerySource,
+    ) = when (querySource) {
+        is QuerySource.ByPresentationDefinitionSource ->
+            PresentationQuery.ByPresentationDefinition(
+                presentationDefinitionResolver.resolvePresentationDefinition(
+                    querySource.value,
+                ),
+            )
+
+        is QuerySource.ByDCQLQuery -> PresentationQuery.ByDigitalCredentialsQuery(
+            querySource.value,
+        )
+
+        is QuerySource.ByScope -> lookupKnownPresentationDefinitionsOrDCQLQueries(
+            querySource.value,
+        )
+    }
+
+    private fun lookupKnownPresentationDefinitionsOrDCQLQueries(scope: Scope): PresentationQuery {
+        scope.items().forEach { item ->
+            siopOpenId4VPConfig.vpConfiguration.knownPresentationDefinitionsPerScope[item.value]
+                ?.let { return PresentationQuery.ByPresentationDefinition(it) }
+        }
+        scope.items().forEach { item ->
+            siopOpenId4VPConfig.vpConfiguration.knownDCQLQueriesPerScope[item.value]
+                ?.let { return PresentationQuery.ByDigitalCredentialsQuery(it) }
+        }
+        throw ResolutionError.UnknownScope(scope).asException()
+    }
 
     private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
         validated.clientMetaData?.let { unvalidated ->

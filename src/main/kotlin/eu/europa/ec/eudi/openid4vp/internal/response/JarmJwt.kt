@@ -29,6 +29,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.time.Duration
@@ -94,9 +95,14 @@ private fun jweHeader(
     jweKey: JWK,
     data: AuthorizationResponsePayload,
 ): JWEHeader {
-    val (apv, apu) = when (data) {
-        is AuthorizationResponsePayload.OpenId4VPAuthorization -> data.vpToken.apu
-        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> data.vpToken.apu
+    if (jweAlgorithm in Family.ECDH_ES) {
+        require(data.encryptionParameters is EncryptionParameters.DiffieHellman) {
+            "Diffie-Hellman encryption parameters are required for ${jweAlgorithm.name}"
+        }
+    }
+
+    val (apv, apu) = when (val encryptionParameters = data.encryptionParameters) {
+        is EncryptionParameters.DiffieHellman -> encryptionParameters.apu
         else -> null
     }?.let { Base64URL.encode(data.nonce) to it } ?: (null to null)
 
@@ -171,14 +177,12 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                put(VP_TOKEN_CLAIM, data.vpToken.toJson())
-                put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
+                put(data.vpContent)
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
                 put(ID_TOKEN_CLAIM, data.idToken)
-                put(VP_TOKEN_CLAIM, data.vpToken.toJson())
-                put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(data.presentationSubmission))
+                put(data.vpContent)
             }
 
             is AuthorizationResponsePayload.InvalidRequest -> {
@@ -192,27 +196,44 @@ private object JwtPayloadFactory {
         }
     }
 
+    fun JsonObjectBuilder.put(vpContent: VpContent) {
+        when (vpContent) {
+            is VpContent.PresentationExchange -> {
+                put(VP_TOKEN_CLAIM, vpContent.verifiablePresentations.toJson())
+                put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(vpContent.presentationSubmission))
+            }
+
+            is VpContent.DCQL -> put(VP_TOKEN_CLAIM, vpContent.verifiablePresentations.toJson())
+        }
+    }
+
     private fun JsonObject.asJWTClaimSet(): JWTClaimsSet {
         val jsonStr = Json.encodeToString(this)
         return JWTClaimsSet.parse(jsonStr)
     }
 }
 
-internal fun VpToken.toJson(): JsonElement {
+internal fun Map<QueryId, VerifiablePresentation>.toJson() =
+    buildJsonObject {
+        for ((key, value) in iterator()) {
+            put(key.value, value.asJson())
+        }
+    }
+
+internal fun List<VerifiablePresentation>.toJson(): JsonElement {
     fun VerifiablePresentation.asJson(): JsonElement {
         return when (this) {
             is VerifiablePresentation.Generic -> JsonPrimitive(value)
             is VerifiablePresentation.JsonObj -> value
-            is VerifiablePresentation.MsoMdoc -> JsonPrimitive(this.value)
         }
     }
 
-    return when (verifiablePresentations.size) {
-        1 -> verifiablePresentations.first().asJson()
+    return when (size) {
+        1 -> first().asJson()
         0 -> error("Not expected")
         else -> {
             buildJsonArray {
-                for (vp in verifiablePresentations) {
+                for (vp in iterator()) {
                     add(vp.asJson())
                 }
             }

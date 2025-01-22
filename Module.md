@@ -185,6 +185,9 @@ Library supports all these options
 > [!NOTE]
 > Passing a DCQL Query by reference is not supported by OpenId4VP.
 
+> [!IMPORTANT]  
+> When scope is used, library tries to match it first to a well known Presentation Definition, and then to a well known DCQL query. 
+
 ### Client metadata in Authorization Request
 
 According to [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request) verifier may pass his metadata (client metadata) either

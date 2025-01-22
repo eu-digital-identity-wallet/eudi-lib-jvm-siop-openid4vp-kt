@@ -79,7 +79,7 @@ val dispatchOutcome = siopOpenId4Vp.dispatch(requestObject, consensus)
 
 Project contains an [example](src/test/kotlin/eu/europa/ec/eudi/openid4vp/Example.kt) which
 demonstrates the functionality of the library and in particular the interaction of a
-`Verifier` and a `Wallet` via Verifier's trusted end-point to perform an SIOP Authentication.
+`Verifier` and a `Wallet` via Verifier's trusted end-point to perform an SIOP Authentication, and an OpenId4VP Authorization.
 
 To run the example, you will need to clone [Verifier's trusted end-point](https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt)
 and run it using
@@ -139,8 +139,7 @@ Library supports both methods.
 
 ### Authorization Request encoding
 
-OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET
-request which contains specific HTTP parameters.
+OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET request which contains specific HTTP parameters.
 
 OpenID4VP on the other hand, foresees in addition, support to
 [RFC 9101](https://www.rfc-editor.org/rfc/rfc9101.html#request_object) where
@@ -158,7 +157,7 @@ As per OpenId4VP, the Verifier can describe the requirements of the Verifiable C
 * [Presentation Exchange 2.0.0](https://identity.foundation/presentation-exchange/spec/v2.0.0/)
 * [Digital Credentials Query Language (DCQL)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-digital-credentials-query-l)
 
-Library currently supports **only** Presentation Exchange 2.0.0. Support for DCQL will be added in a future release.
+**Presentation Exchange 2.0.0**:
 
 The Verifier articulated requirements of the Verifiable Credential(s) that are requested, are provided using
 `presentation_definition` and `presentation_definition_uri` parameters that contain a Presentation Definition JSON object.
@@ -170,6 +169,24 @@ According to OpenId4VP, verifier may pass the `presentation_definition` either
 * [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.6)
 
 Library supports all these options
+
+**DCQL**:
+
+The Verifier articulated requirements of the Verifiable Credential(s) that are requested, are provided using
+the `dcql_query` parameter that contains a [DCQL Query](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6-2) JSON object.
+
+According to OpenId4VP, verifier may pass the `dcql_query` either
+
+* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.1-2.6)
+* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.6)
+
+Library supports all these options
+
+> [!NOTE]
+> Passing a DCQL Query by reference is not supported by OpenId4VP.
+
+> [!IMPORTANT]  
+> When scope is used, library tries to match it first to a well known Presentation Definition, and then to a well known DCQL query. 
 
 ### Client metadata in Authorization Request
 

@@ -53,6 +53,7 @@ class AuthorizationResponseDispatcherTest {
             vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
         ),
         clock = Clock.systemDefaultZone(),
+        supportedTransactionDataTypes = emptyList(),
     )
 
     private val clientMetadataStr =
@@ -168,6 +169,7 @@ class AuthorizationResponseDispatcherTest {
                     responseMode = responseMode,
                     state = state,
                     presentationQuery = PresentationQuery.ByPresentationDefinition(presentationDefinition),
+                    transactionData = null,
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(

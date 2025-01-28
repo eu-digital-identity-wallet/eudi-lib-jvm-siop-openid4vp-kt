@@ -26,9 +26,7 @@ import io.ktor.client.plugins.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import java.net.URL
 
 /**
@@ -52,6 +50,7 @@ internal data class UnvalidatedRequestObject(
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
     val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
     @SerialName("id_token_type") val idTokenType: String? = null,
+    @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: List<String>? = null,
 )
 
 enum class RequestUriMethod {
@@ -138,6 +137,9 @@ internal sealed interface UnvalidatedRequest {
             fun jsonObject(p: String): JsonObject? =
                 uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
 
+            fun jsonArray(p: String): JsonArray? =
+                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonArray }
+
             return Plain(
                 UnvalidatedRequestObject(
                     responseType = uri.getQueryParameter("response_type"),
@@ -152,6 +154,7 @@ internal sealed interface UnvalidatedRequest {
                     responseUri = uri.getQueryParameter("response_uri"),
                     redirectUri = uri.getQueryParameter("redirect_uri"),
                     state = uri.getQueryParameter("state"),
+                    transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.map { it.jsonPrimitive.content },
                 ),
             )
         }

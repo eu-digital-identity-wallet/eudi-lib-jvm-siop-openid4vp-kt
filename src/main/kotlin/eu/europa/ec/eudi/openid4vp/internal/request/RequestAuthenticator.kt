@@ -354,6 +354,7 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
             state = getStringClaim("state"),
             supportedAlgorithm = getStringClaim("supported_algorithm"),
             idTokenType = getStringClaim("id_token_type"),
+            transactionData = getStringListClaim(OpenId4VPSpec.TRANSACTION_DATA),
         )
     }
 }

@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
@@ -79,6 +81,27 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
 }
 
 /**
+ * Represents resolved (i.e. support by the Wallet) Transaction Data.
+ *
+ * @property type the type of the Transaction Data
+ * @property credentialIds identifiers of the requested Credentials, this Transaction Data is applicable to
+ * @property hashAlgorithms Hash Algorithms supported both by the Verifier and the Wallet, with which the Hash of this Transaction Data can be calculated
+ * @property value the original Base64Url encoded value as provided by the Verifier, over which the Transaction Data Hash will be calculated
+ */
+data class ResolvedTransactionData(
+    val type: TransactionDataType,
+    val credentialIds: List<CredentialId>,
+    val hashAlgorithms: Set<HashAlgorithm>,
+    val value: String,
+) {
+    init {
+        require(credentialIds.isNotEmpty()) { "credentialIds must not be empty" }
+        require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms must not be empty" }
+        require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
+    }
+}
+
+/**
  * Represents an OAUTH2 authorization request. In particular
  * either a [SIOPv2 for id_token][SiopOpenId4VPAuthentication] or
  * a [OpenId4VP for vp_token][OpenId4VPAuthorization] or
@@ -122,6 +145,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val jarmRequirement: JarmRequirement?,
         val vpFormats: VpFormats,
         val presentationQuery: PresentationQuery,
+        val transactionData: List<ResolvedTransactionData>?,
     ) : ResolvedRequestObject
 
     /**
@@ -138,6 +162,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
         val presentationQuery: PresentationQuery,
+        val transactionData: List<ResolvedTransactionData>?,
     ) : ResolvedRequestObject
 }
 
@@ -299,6 +324,7 @@ sealed interface ResolutionError : AuthorizationRequestError {
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkUriUnparsable(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
+    data class InvalidTransactionData(val cause: Throwable) : ResolutionError
 }
 
 /**

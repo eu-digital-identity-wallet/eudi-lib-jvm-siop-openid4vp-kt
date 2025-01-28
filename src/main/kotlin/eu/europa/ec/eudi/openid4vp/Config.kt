@@ -412,6 +412,21 @@ data class JarConfiguration(
 }
 
 /**
+ * A type of Transaction Data supported by the Wallet.
+ *
+ * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0-22.html#section-5.1-6.2.1">https://openid.net/specs/openid-4-verifiable-presentations-1_0-22.html#section-5.1-6.2.1</a>
+ */
+data class SupportedTransactionDataType(
+    val type: TransactionDataType,
+    val hashAlgorithms: Set<HashAlgorithm>,
+) {
+    init {
+        require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms cannot be empty" }
+        require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
+    }
+}
+
+/**
  * Wallet configuration options for SIOP & OpenId4VP protocols.
  *
  * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
@@ -425,6 +440,7 @@ data class JarConfiguration(
  * @param clock the system Clock. If not provided system's default clock will be used.
  * @param jarClockSkew max acceptable skew between wallet and verifier
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
+ * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
@@ -434,28 +450,11 @@ data class SiopOpenId4VPConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val jarClockSkew: Duration = Duration.ofSeconds(15L),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
+    val supportedTransactionDataTypes: List<SupportedTransactionDataType>,
 ) {
     init {
         require(supportedClientIdSchemes.isNotEmpty()) { "At least a supported client id scheme must be provided" }
     }
-
-    constructor(
-        issuer: Issuer? = SelfIssued,
-        jarConfiguration: JarConfiguration = JarConfiguration.Default,
-        jarmConfiguration: JarmConfiguration = NotSupported,
-        vpConfiguration: VPConfiguration,
-        clock: Clock = Clock.systemDefaultZone(),
-        jarClockSkew: Duration = Duration.ofSeconds(15L),
-        vararg supportedClientIdSchemes: SupportedClientIdScheme,
-    ) : this(
-        issuer,
-        jarConfiguration,
-        jarmConfiguration,
-        vpConfiguration,
-        clock,
-        jarClockSkew,
-        supportedClientIdSchemes.toList(),
-    )
 
     companion object {
         /**

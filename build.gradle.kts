@@ -62,6 +62,7 @@ kotlin {
         optIn = listOf(
             "kotlinx.serialization.ExperimentalSerializationApi",
             "kotlin.contracts.ExperimentalContracts",
+            "kotlin.io.encoding.ExperimentalEncodingApi",
         )
         freeCompilerArgs = listOf(
             "-Xconsistent-data-class-copy-visibility",

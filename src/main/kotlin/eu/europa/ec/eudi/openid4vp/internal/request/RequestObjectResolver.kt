@@ -15,17 +15,15 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import eu.europa.ec.eudi.openid4vp.Client
-import eu.europa.ec.eudi.openid4vp.PresentationQuery
-import eu.europa.ec.eudi.openid4vp.ResolutionError
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
-import eu.europa.ec.eudi.openid4vp.Scope
-import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
-import eu.europa.ec.eudi.openid4vp.VpFormats
-import eu.europa.ec.eudi.openid4vp.asException
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
+import kotlinx.io.bytestring.decodeToByteString
+import kotlinx.io.bytestring.decodeToString
+import kotlinx.serialization.*
+import kotlinx.serialization.json.Json
+import kotlin.io.encoding.Base64
 
 internal class RequestObjectResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
@@ -33,6 +31,8 @@ internal class RequestObjectResolver(
 ) {
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
     private val clientMetaDataValidator = ClientMetaDataValidator(httpClient)
+    private val jsonSupport = Json { ignoreUnknownKeys = true }
+    private val base64UrlCodec = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
     suspend fun resolveRequestObject(validated: ValidatedRequestObject): ResolvedRequestObject {
         val clientMetaData = resolveClientMetaData(validated)
         return when (validated) {
@@ -47,6 +47,7 @@ internal class RequestObjectResolver(
         clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject = coroutineScope {
         val presentationQuery = query(request.querySource)
+        val transactionData = request.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
             client = request.client.toClient(),
             responseMode = request.responseMode,
@@ -58,6 +59,7 @@ internal class RequestObjectResolver(
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
             presentationQuery = presentationQuery,
+            transactionData = transactionData,
         )
     }
 
@@ -66,6 +68,7 @@ internal class RequestObjectResolver(
         clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject {
         val presentationQuery = query(authorization.querySource)
+        val transactionData = authorization.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         return ResolvedRequestObject.OpenId4VPAuthorization(
             client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
@@ -74,6 +77,7 @@ internal class RequestObjectResolver(
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
             vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
             presentationQuery = presentationQuery,
+            transactionData = transactionData,
         )
     }
 
@@ -128,6 +132,47 @@ internal class RequestObjectResolver(
         validated.clientMetaData?.let { unvalidated ->
             clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
         }
+
+    private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<ResolvedTransactionData> {
+        fun PresentationQuery.credentialIds(): List<CredentialId> =
+            when (this) {
+                is PresentationQuery.ByPresentationDefinition -> value.inputDescriptors.map { it.id.value }
+                is PresentationQuery.ByDigitalCredentialsQuery -> value.credentials.map { it.id.value }
+            }.distinct()
+
+        return runCatching {
+            val walletSupportedTransactionDataTypes = siopOpenId4VPConfig.supportedTransactionDataTypes.associateBy { it.type }
+            val credentialIdsInQuery = query.credentialIds()
+
+            unresolvedTransactionData.map { encoded ->
+                val decoded = base64UrlCodec.decodeToByteString(encoded)
+                val serialized = decoded.decodeToString()
+                val deserialized = jsonSupport.decodeFromString<BaseTransactionData>(serialized)
+
+                val walletSupportedTransactionDataType = walletSupportedTransactionDataTypes[deserialized.type]
+                require(walletSupportedTransactionDataType != null) {
+                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '${deserialized.type}'"
+                }
+
+                require(credentialIdsInQuery.containsAll(deserialized.credentialIds)) {
+                    "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '${deserialized.credentialIds}'"
+                }
+
+                val verifierSupportedHashAlgorithms = deserialized.hashAlgorithms ?: setOf(HashAlgorithm.SHA_256)
+                val commonHashAlgorithms = walletSupportedTransactionDataType.hashAlgorithms.intersect(verifierSupportedHashAlgorithms)
+                require(commonHashAlgorithms.isNotEmpty()) {
+                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$verifierSupportedHashAlgorithms'"
+                }
+
+                ResolvedTransactionData(
+                    type = deserialized.type,
+                    credentialIds = deserialized.credentialIds,
+                    hashAlgorithms = commonHashAlgorithms,
+                    value = encoded,
+                )
+            }
+        }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
+    }
 }
 
 private fun AuthenticatedClient.toClient(): Client =
@@ -143,3 +188,23 @@ private fun AuthenticatedClient.toClient(): Client =
         is AuthenticatedClient.DIDClient -> Client.DIDClient(client.uri)
         is AuthenticatedClient.Attested -> Client.Attested(clientId)
     }
+
+@Serializable
+private data class BaseTransactionData(
+
+    @SerialName(OpenId4VPSpec.TRANSACTION_DATA_TYPE)
+    @Required
+    val type: TransactionDataType,
+
+    @SerialName(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
+    @Required
+    val credentialIds: List<CredentialId>,
+
+    @SerialName(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
+    val hashAlgorithms: Set<HashAlgorithm>? = null,
+
+) {
+    init {
+        require(credentialIds.isNotEmpty()) { "'${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}' must not be empty" }
+    }
+}

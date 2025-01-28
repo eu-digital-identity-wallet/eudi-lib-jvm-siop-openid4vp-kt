@@ -101,6 +101,7 @@ internal sealed interface ValidatedRequestObject {
         override val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String?,
+        val transactionData: List<String>?,
     ) : ValidatedRequestObject
 
     /**
@@ -115,6 +116,7 @@ internal sealed interface ValidatedRequestObject {
         val scope: Scope,
         override val responseMode: ResponseMode,
         override val state: String?,
+        val transactionData: List<String>?,
     ) : ValidatedRequestObject
 }
 
@@ -138,6 +140,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     val responseMode = requiredResponseMode(client, requestObject)
     val clientMetaData = optionalClientMetaData(responseMode, requestObject)
     val idTokenType = optionalIdTokenType(requestObject)
+    val transactionData = requestObject.transactionData
 
     fun idAndVpToken(): SiopOpenId4VPAuthentication {
         val querySource = parseQuerySource(requestObject, nonOpenIdScope)
@@ -150,6 +153,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
             scope.getOrThrow(),
             responseMode,
             state,
+            transactionData,
         )
     }
 
@@ -172,6 +176,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
             nonce,
             responseMode,
             state,
+            transactionData,
         )
     }
 

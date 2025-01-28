@@ -58,6 +58,7 @@ class AuthorizationResponseBuilderTest {
                 vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
+            supportedTransactionDataTypes = emptyList(),
         )
 
         val clientMetaDataValidator = ManagedClientMetaValidator(DefaultHttpClientFactory)
@@ -159,6 +160,7 @@ class AuthorizationResponseBuilderTest {
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
+                    transactionData = null,
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(

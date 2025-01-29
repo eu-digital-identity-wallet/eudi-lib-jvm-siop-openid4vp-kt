@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
@@ -23,7 +24,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.*
-import kotlin.io.encoding.Base64
 
 internal class RequestObjectResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
@@ -31,7 +31,7 @@ internal class RequestObjectResolver(
 ) {
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
     private val clientMetaDataValidator = ClientMetaDataValidator(httpClient)
-    private val base64UrlCodec = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+
     suspend fun resolveRequestObject(validated: ValidatedRequestObject): ResolvedRequestObject {
         val clientMetaData = resolveClientMetaData(validated)
         return when (validated) {
@@ -161,7 +161,7 @@ internal class RequestObjectResolver(
             val walletSupportedTransactionDataTypes = siopOpenId4VPConfig.supportedTransactionDataTypes.associateBy { it.type }
 
             unresolvedTransactionData.map { encoded ->
-                val decoded = base64UrlCodec.decodeToByteString(encoded)
+                val decoded = base64UrlNoPadding.decodeToByteString(encoded)
                 val serialized = decoded.decodeToString()
                 val deserialized = jsonSupport.decodeFromString<BaseTransactionData>(serialized)
 

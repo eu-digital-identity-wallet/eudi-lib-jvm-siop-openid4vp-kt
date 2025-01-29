@@ -90,7 +90,7 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
  */
 data class ResolvedTransactionData(
     val type: TransactionDataType,
-    val credentialIds: List<CredentialId>,
+    val credentialIds: List<TransactionDataCredentialId>,
     val hashAlgorithms: Set<HashAlgorithm>,
     val value: String,
 ) {

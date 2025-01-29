@@ -21,6 +21,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
+import eu.europa.ec.eudi.prex.InputDescriptorId
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
@@ -325,4 +326,11 @@ value class HashAlgorithm(val name: String) {
 @JvmInline
 value class TransactionDataType(val value: String)
 
-typealias CredentialId = String
+sealed interface TransactionDataCredentialId {
+
+    @JvmInline
+    value class PresentationExchange(val value: InputDescriptorId) : TransactionDataCredentialId
+
+    @JvmInline
+    value class DCQL(val value: QueryId) : TransactionDataCredentialId
+}

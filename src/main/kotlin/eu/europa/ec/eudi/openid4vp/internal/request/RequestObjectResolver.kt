@@ -134,15 +134,32 @@ internal class RequestObjectResolver(
         }
 
     private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<ResolvedTransactionData> {
-        fun PresentationQuery.credentialIds(): List<CredentialId> =
-            when (this) {
-                is PresentationQuery.ByPresentationDefinition -> value.inputDescriptors.map { it.id.value }
-                is PresentationQuery.ByDigitalCredentialsQuery -> value.credentials.map { it.id.value }
-            }.distinct()
+        fun resolveTransactionDataCredentialIds(unresolved: List<String>): List<TransactionDataCredentialId> =
+            when (query) {
+                is PresentationQuery.ByPresentationDefinition -> {
+                    val inputDescriptorIds = query.value.inputDescriptors.map { it.id }
+                    unresolved.map {
+                        val match = inputDescriptorIds.firstOrNull { inputDescriptorId -> inputDescriptorId.value == it }
+                        requireNotNull(match) {
+                            "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$unresolved'"
+                        }
+                        TransactionDataCredentialId.PresentationExchange(match)
+                    }
+                }
+                is PresentationQuery.ByDigitalCredentialsQuery -> {
+                    val queryIds = query.value.credentials.map { it.id }
+                    unresolved.map {
+                        val match = queryIds.firstOrNull { queryId -> queryId.value == it }
+                        requireNotNull(match) {
+                            "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$unresolved'"
+                        }
+                        TransactionDataCredentialId.DCQL(match)
+                    }
+                }
+            }
 
         return runCatching {
             val walletSupportedTransactionDataTypes = siopOpenId4VPConfig.supportedTransactionDataTypes.associateBy { it.type }
-            val credentialIdsInQuery = query.credentialIds()
 
             unresolvedTransactionData.map { encoded ->
                 val decoded = base64UrlCodec.decodeToByteString(encoded)
@@ -154,9 +171,7 @@ internal class RequestObjectResolver(
                     "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '${deserialized.type}'"
                 }
 
-                require(credentialIdsInQuery.containsAll(deserialized.credentialIds)) {
-                    "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '${deserialized.credentialIds}'"
-                }
+                val transactionDataCredentialIds = resolveTransactionDataCredentialIds(deserialized.credentialIds)
 
                 val verifierSupportedHashAlgorithms = deserialized.hashAlgorithms ?: setOf(HashAlgorithm.SHA_256)
                 val commonHashAlgorithms = walletSupportedTransactionDataType.hashAlgorithms.intersect(verifierSupportedHashAlgorithms)
@@ -166,7 +181,7 @@ internal class RequestObjectResolver(
 
                 ResolvedTransactionData(
                     type = deserialized.type,
-                    credentialIds = deserialized.credentialIds,
+                    credentialIds = transactionDataCredentialIds,
                     hashAlgorithms = commonHashAlgorithms,
                     value = encoded,
                 )
@@ -198,7 +213,7 @@ private data class BaseTransactionData(
 
     @SerialName(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
     @Required
-    val credentialIds: List<CredentialId>,
+    val credentialIds: List<String>,
 
     @SerialName(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
     val hashAlgorithms: Set<HashAlgorithm>? = null,

@@ -45,7 +45,6 @@ class WalletMetaDataTest {
                 supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
-            supportedTransactionDataTypes = emptyList(),
         )
         assertMetadata(config)
     }
@@ -63,7 +62,6 @@ class WalletMetaDataTest {
                 ),
             ),
             jarmConfiguration = JarmConfiguration.NotSupported,
-            supportedTransactionDataTypes = emptyList(),
         )
         assertMetadata(config)
     }

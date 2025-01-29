@@ -111,7 +111,6 @@ class UnvalidatedRequestResolverTest {
         ),
         vpConfiguration = VPConfiguration(vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256)),
         clock = Clock.systemDefaultZone(),
-        supportedTransactionDataTypes = emptyList(),
     )
 
     private val resolver = DefaultAuthorizationRequestResolver(walletConfig, DefaultHttpClientFactory)

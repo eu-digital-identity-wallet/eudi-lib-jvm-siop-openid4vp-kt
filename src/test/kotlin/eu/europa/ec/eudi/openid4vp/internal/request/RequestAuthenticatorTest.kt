@@ -55,7 +55,6 @@ class ClientAuthenticatorTest {
                 vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
-            supportedTransactionDataTypes = emptyList(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
 
@@ -91,7 +90,6 @@ class ClientAuthenticatorTest {
             vpConfiguration = VPConfiguration(
                 vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
-            supportedTransactionDataTypes = emptyList(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
 
@@ -136,7 +134,6 @@ class ClientAuthenticatorTest {
             vpConfiguration = VPConfiguration(
                 vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
-            supportedTransactionDataTypes = emptyList(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(
@@ -243,7 +240,6 @@ class ClientAuthenticatorTest {
                 vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
-            supportedTransactionDataTypes = emptyList(),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(

@@ -448,7 +448,7 @@ data class SiopOpenId4VPConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val jarClockSkew: Duration = Duration.ofSeconds(15L),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
-    val supportedTransactionDataTypes: List<SupportedTransactionDataType>,
+    val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
 ) {
     init {
         require(supportedClientIdSchemes.isNotEmpty()) { "At least a supported client id scheme must be provided" }

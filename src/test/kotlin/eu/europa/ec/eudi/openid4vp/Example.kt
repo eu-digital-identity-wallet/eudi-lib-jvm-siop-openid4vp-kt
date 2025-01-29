@@ -411,7 +411,6 @@ private fun walletConfig(supportedClientIdScheme: List<SupportedClientIdScheme>)
             supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),
         ),
         supportedClientIdSchemes = supportedClientIdScheme,
-        supportedTransactionDataTypes = emptyList(),
         clock = Clock.systemDefaultZone(),
     )
 

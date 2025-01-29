@@ -58,7 +58,6 @@ class AuthorizationResponseBuilderTest {
                 vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
-            supportedTransactionDataTypes = emptyList(),
         )
 
         val clientMetaDataValidator = ManagedClientMetaValidator(DefaultHttpClientFactory)

@@ -303,22 +303,6 @@ sealed interface EncryptionParameters : Serializable {
 value class HashAlgorithm(val name: String) {
     companion object {
         val SHA_256: HashAlgorithm get() = HashAlgorithm("sha-256")
-        val SHA_256_128: HashAlgorithm get() = HashAlgorithm("sha-256-128")
-        val SHA_256_120: HashAlgorithm get() = HashAlgorithm("sha-256-120")
-        val SHA_256_96: HashAlgorithm get() = HashAlgorithm("sha-256-96")
-        val SHA_256_64: HashAlgorithm get() = HashAlgorithm("sha-256-64")
-        val SHA_256_32: HashAlgorithm get() = HashAlgorithm("sha-256-32")
-        val SHA_384: HashAlgorithm get() = HashAlgorithm("sha-384")
-        val SHA_512: HashAlgorithm get() = HashAlgorithm("sha-512")
-        val SHA3_224: HashAlgorithm get() = HashAlgorithm("sha3-224")
-        val SHA3_256: HashAlgorithm get() = HashAlgorithm("sha3-256")
-        val SHA3_384: HashAlgorithm get() = HashAlgorithm("sha3-384")
-        val SHA3_512: HashAlgorithm get() = HashAlgorithm("sha3-512")
-        val BLAKE2S_256: HashAlgorithm get() = HashAlgorithm("blake2s-256")
-        val BLAKE2B_256: HashAlgorithm get() = HashAlgorithm("blake2b-256")
-        val BLAKE2B_512: HashAlgorithm get() = HashAlgorithm("blake2b-512")
-        val K12_256: HashAlgorithm get() = HashAlgorithm("k12-256")
-        val K12_512: HashAlgorithm get() = HashAlgorithm("k12-512")
     }
 }
 

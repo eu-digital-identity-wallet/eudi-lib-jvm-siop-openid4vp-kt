@@ -300,7 +300,6 @@ sealed interface EncryptionParameters : Serializable {
  *
  * @see <a href="https://www.iana.org/assignments/named-information/named-information.xhtml">https://www.iana.org/assignments/named-information/named-information.xhtml</a>
  */
-@kotlinx.serialization.Serializable
 @JvmInline
 value class HashAlgorithm(val name: String) : Serializable {
     companion object {
@@ -308,7 +307,6 @@ value class HashAlgorithm(val name: String) : Serializable {
     }
 }
 
-@kotlinx.serialization.Serializable
 @JvmInline
 value class TransactionDataType(val value: String) : Serializable
 

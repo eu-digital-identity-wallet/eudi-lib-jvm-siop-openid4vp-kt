@@ -21,7 +21,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
-import eu.europa.ec.eudi.prex.InputDescriptorId
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -308,15 +307,21 @@ value class HashAlgorithm(val name: String) : Serializable {
 }
 
 @JvmInline
-value class TransactionDataType(val value: String) : Serializable
+value class TransactionDataType(val value: String) : Serializable {
+    init {
+        require(value.isNotEmpty())
+    }
 
-sealed interface TransactionDataCredentialId : Serializable {
+    override fun toString(): String = value
+}
 
-    @JvmInline
-    value class PresentationExchange(val value: InputDescriptorId) : TransactionDataCredentialId
+@JvmInline
+value class TransactionDataCredentialId(val value: String) : Serializable {
+    init {
+        require(value.isNotEmpty())
+    }
 
-    @JvmInline
-    value class DCQL(val value: QueryId) : TransactionDataCredentialId
+    override fun toString(): String = value
 }
 
 data class TransactionData internal constructor(

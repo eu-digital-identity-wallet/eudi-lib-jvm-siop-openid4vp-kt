@@ -454,6 +454,24 @@ data class SiopOpenId4VPConfig(
         require(supportedClientIdSchemes.isNotEmpty()) { "At least a supported client id scheme must be provided" }
     }
 
+    constructor(
+        issuer: Issuer? = SelfIssued,
+        jarConfiguration: JarConfiguration = JarConfiguration.Default,
+        jarmConfiguration: JarmConfiguration = NotSupported,
+        vpConfiguration: VPConfiguration,
+        clock: Clock = Clock.systemDefaultZone(),
+        jarClockSkew: Duration = Duration.ofSeconds(15L),
+        vararg supportedClientIdSchemes: SupportedClientIdScheme,
+    ) : this(
+        issuer,
+        jarConfiguration,
+        jarmConfiguration,
+        vpConfiguration,
+        clock,
+        jarClockSkew,
+        supportedClientIdSchemes.toList(),
+    )
+
     companion object {
         /**
          * Identifies the wallet as `https://self-issued.me/v2`

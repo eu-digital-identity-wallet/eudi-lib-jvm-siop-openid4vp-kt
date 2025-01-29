@@ -62,10 +62,8 @@ fun main(): Unit = runBlocking {
         walletKeyPair = walletKeyPair,
         holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
         walletConfig = walletConfig(
-            listOf(
-                Preregistered(Verifier.asPreregisteredClient(verifierApi)),
-                X509SanDns(TrustAnyX509),
-            ),
+            Preregistered(Verifier.asPreregisteredClient(verifierApi)),
+            X509SanDns(TrustAnyX509),
         ),
     )
 
@@ -403,7 +401,7 @@ object SslSettings {
     private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
-private fun walletConfig(supportedClientIdScheme: List<SupportedClientIdScheme>) =
+private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
         vpConfiguration = VPConfiguration(vpFormats = VpFormats(VpFormat.MsoMdoc)),
         jarmConfiguration = JarmConfiguration.Encryption(

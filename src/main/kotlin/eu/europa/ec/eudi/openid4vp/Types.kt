@@ -321,5 +321,8 @@ value class HashAlgorithm(val name: String) {
     }
 }
 
-typealias TransactionDataType = String
+@kotlinx.serialization.Serializable
+@JvmInline
+value class TransactionDataType(val value: String)
+
 typealias CredentialId = String

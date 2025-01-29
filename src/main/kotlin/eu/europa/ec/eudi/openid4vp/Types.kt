@@ -299,6 +299,12 @@ sealed interface EncryptionParameters : Serializable {
  */
 @JvmInline
 value class HashAlgorithm(val name: String) : Serializable {
+    init {
+        require(name.isNotEmpty())
+    }
+
+    override fun toString(): String = name
+
     companion object {
         val SHA_256: HashAlgorithm get() = HashAlgorithm("sha-256")
     }

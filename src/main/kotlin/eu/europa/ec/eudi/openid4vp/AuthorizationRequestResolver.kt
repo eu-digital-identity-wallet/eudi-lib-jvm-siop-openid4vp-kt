@@ -117,7 +117,9 @@ data class TransactionData private constructor(val value: Base64URL) : Serializa
     val hashAlgorithms: List<HashAlgorithm>
         get() = jsonObject.optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
             ?.map { HashAlgorithm(it) }
-            ?: listOf(HashAlgorithm.SHA_256)
+            .orEmpty()
+            .plus(HashAlgorithm.SHA_256)
+            .distinct()
 
     /**
      * Converts this Transaction Data to an instance of [T].

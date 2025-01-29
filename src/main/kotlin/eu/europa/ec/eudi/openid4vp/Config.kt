@@ -183,6 +183,19 @@ value class VpFormats(val values: List<VpFormat>) {
 }
 
 /**
+ * A type of Transaction Data supported by the Wallet.
+ */
+data class SupportedTransactionDataType(
+    val type: TransactionDataType,
+    val hashAlgorithms: Set<HashAlgorithm>,
+) {
+    init {
+        require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms cannot be empty" }
+        require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
+    }
+}
+
+/**
  * Configurations options for OpenId4VP
  *
  * @param presentationDefinitionUriSupported indicates whether wallet should fetch a presentation definition
@@ -191,12 +204,14 @@ value class VpFormats(val values: List<VpFormat>) {
  * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
  * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
  * @param vpFormats The formats the wallet supports
+ * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
 data class VPConfiguration(
     val presentationDefinitionUriSupported: Boolean = true,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormats: VpFormats,
+    val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
 )
 
 interface JarmSigner : JWSSigner {
@@ -412,19 +427,6 @@ data class JarConfiguration(
 }
 
 /**
- * A type of Transaction Data supported by the Wallet.
- */
-data class SupportedTransactionDataType(
-    val type: TransactionDataType,
-    val hashAlgorithms: Set<HashAlgorithm>,
-) {
-    init {
-        require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms cannot be empty" }
-        require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
-    }
-}
-
-/**
  * Wallet configuration options for SIOP & OpenId4VP protocols.
  *
  * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
@@ -438,7 +440,6 @@ data class SupportedTransactionDataType(
  * @param clock the system Clock. If not provided system's default clock will be used.
  * @param jarClockSkew max acceptable skew between wallet and verifier
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
- * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
@@ -448,7 +449,6 @@ data class SiopOpenId4VPConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val jarClockSkew: Duration = Duration.ofSeconds(15L),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
-    val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
 ) {
     init {
         require(supportedClientIdSchemes.isNotEmpty()) { "At least a supported client id scheme must be provided" }

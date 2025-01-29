@@ -154,13 +154,13 @@ internal class RequestObjectResolver(
             }
 
         return runCatching {
-            val walletSupportedTransactionDataTypes = siopOpenId4VPConfig.supportedTransactionDataTypes.associateBy { it.type }
+            val supportedTransactionDataTypes = siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes.associateBy { it.type }
 
             unresolvedTransactionData.map { encoded ->
                 val value = TransactionData(encoded).getOrThrow()
 
                 val type = TransactionDataType(value.type)
-                val supportedTransactionDataType = walletSupportedTransactionDataTypes[type]
+                val supportedTransactionDataType = supportedTransactionDataTypes[type]
                 requireNotNull(supportedTransactionDataType) {
                     "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'"
                 }

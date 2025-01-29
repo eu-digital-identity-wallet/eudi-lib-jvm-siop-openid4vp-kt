@@ -413,8 +413,6 @@ data class JarConfiguration(
 
 /**
  * A type of Transaction Data supported by the Wallet.
- *
- * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0-22.html#section-5.1-6.2.1">https://openid.net/specs/openid-4-verifiable-presentations-1_0-22.html#section-5.1-6.2.1</a>
  */
 data class SupportedTransactionDataType(
     val type: TransactionDataType,

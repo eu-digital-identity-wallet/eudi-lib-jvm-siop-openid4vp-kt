@@ -16,13 +16,13 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.*
-import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 
 internal class RequestObjectResolver(
@@ -31,7 +31,6 @@ internal class RequestObjectResolver(
 ) {
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
     private val clientMetaDataValidator = ClientMetaDataValidator(httpClient)
-    private val jsonSupport = Json { ignoreUnknownKeys = true }
     private val base64UrlCodec = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
     suspend fun resolveRequestObject(validated: ValidatedRequestObject): ResolvedRequestObject {
         val clientMetaData = resolveClientMetaData(validated)

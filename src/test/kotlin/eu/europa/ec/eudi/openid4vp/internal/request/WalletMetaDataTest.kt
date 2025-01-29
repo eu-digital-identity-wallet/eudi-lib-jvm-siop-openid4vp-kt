@@ -19,6 +19,7 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.test.*
@@ -201,5 +202,3 @@ private fun assertExpectedVpFormats(
         }
     }
 }
-
-private val jsonSupport = Json { prettyPrint = true }

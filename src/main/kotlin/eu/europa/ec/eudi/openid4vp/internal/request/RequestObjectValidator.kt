@@ -20,10 +20,10 @@ import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.MalformedURLException
 import java.net.URI
@@ -119,8 +119,6 @@ internal sealed interface ValidatedRequestObject {
         val transactionData: List<String>?,
     ) : ValidatedRequestObject
 }
-
-private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
 
 /**
  * Validates that the given [request] represents a valid and supported [ValidatedRequestObject]

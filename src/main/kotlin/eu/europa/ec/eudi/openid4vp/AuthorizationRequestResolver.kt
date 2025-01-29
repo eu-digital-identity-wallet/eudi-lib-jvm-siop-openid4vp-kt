@@ -15,14 +15,20 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import kotlinx.io.bytestring.decodeToByteString
+import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.serializer
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
 import java.io.Serializable
@@ -83,29 +89,83 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
 }
 
 /**
- * Represents resolved (i.e. support by the Wallet) Transaction Data.
+ * Represents resolved (i.e. supported by the Wallet) Transaction Data.
  *
- * @property type the type of the Transaction Data
- * @property credentialIds identifiers of the requested Credentials, this Transaction Data is applicable to
- * @property hashAlgorithms Hash Algorithms supported both by the Verifier and the Wallet, with which the Hash of this Transaction Data can be calculated
  * @property value the original Base64Url encoded value as provided by the Verifier, over which the Transaction Data Hash will be calculated
+ * @property jsonObject this Transaction Data as a generic JsonObject
+ * @property type the type of the Transaction Data
+ * @property credentialIds identifiers of the requested Credentials this Transaction Data is applicable to
+ * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
  */
-data class ResolvedTransactionData internal constructor(
-    val type: TransactionDataType,
-    val credentialIds: List<TransactionDataCredentialId>,
-    val hashAlgorithms: Set<HashAlgorithm>,
-    val value: TransactionData,
-) : Serializable {
+data class TransactionData private constructor(val value: Base64URL) : Serializable {
     init {
-        require(credentialIds.isNotEmpty()) { "credentialIds must not be empty" }
-        require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms must not be empty" }
-        require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
+        require(value.toString().isNotBlank())
     }
 
+    val jsonObject: JsonObject by lazy {
+        val decoded = base64UrlNoPadding.decodeToByteString(value.toString())
+        jsonSupport.decodeFromString(decoded.decodeToString())
+    }
+
+    val type: TransactionDataType
+        get() = TransactionDataType(jsonObject.requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE))
+
+    val credentialIds: List<TransactionDataCredentialId>
+        get() = jsonObject.requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
+            .map { TransactionDataCredentialId(it) }
+
+    val hashAlgorithms: List<HashAlgorithm>
+        get() = jsonObject.optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
+            ?.map { HashAlgorithm(it) }
+            ?: listOf(HashAlgorithm.SHA_256)
+
+    /**
+     * Converts this Transaction Data to an instance of [T].
+     */
     inline fun <reified T> decode(
-        deserializer: DeserializationStrategy<T>,
-        json: Json.Default,
-    ): T = json.decodeFromJsonElement(deserializer, value.deserialized)
+        deserializer: DeserializationStrategy<T> = serializer(),
+        json: Json = Json.Default,
+    ): T = json.decodeFromJsonElement(deserializer, jsonObject)
+
+    companion object {
+        internal operator fun invoke(
+            value: String,
+            supportedTypes: List<SupportedTransactionDataType>,
+            query: PresentationQuery,
+        ): Result<TransactionData> = runCatching {
+            val decoded = base64UrlNoPadding.decodeToByteString(value)
+            val deserialized = jsonSupport.decodeFromString<JsonObject>(decoded.decodeToString())
+
+            val type = TransactionDataType(deserialized.requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE))
+            val supportedType = supportedTypes.firstOrNull { it.type == type }
+            requireNotNull(supportedType) { "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
+
+            val requestedCredentialIds = when (query) {
+                is PresentationQuery.ByPresentationDefinition -> query.value.inputDescriptors.map {
+                    TransactionDataCredentialId(
+                        it.id.value,
+                    )
+                }
+                is PresentationQuery.ByDigitalCredentialsQuery -> query.value.credentials.map { TransactionDataCredentialId(it.id.value) }
+            }
+            val credentialIds = deserialized.requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
+                .map { TransactionDataCredentialId(it) }
+            require(requestedCredentialIds.containsAll(credentialIds)) {
+                "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
+            }
+
+            val supportedHashAlgorithms = supportedType.hashAlgorithms
+            val hashAlgorithms = deserialized.optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
+                ?.map { HashAlgorithm(it) }
+                ?.toSet()
+                ?: setOf(HashAlgorithm.SHA_256)
+            require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
+                "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
+            }
+
+            TransactionData(Base64URL.from(value))
+        }
+    }
 }
 
 /**
@@ -152,7 +212,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val jarmRequirement: JarmRequirement?,
         val vpFormats: VpFormats,
         val presentationQuery: PresentationQuery,
-        val transactionData: List<ResolvedTransactionData>?,
+        val transactionData: List<TransactionData>?,
     ) : ResolvedRequestObject
 
     /**
@@ -169,7 +229,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
         val presentationQuery: PresentationQuery,
-        val transactionData: List<ResolvedTransactionData>?,
+        val transactionData: List<TransactionData>?,
     ) : ResolvedRequestObject
 }
 

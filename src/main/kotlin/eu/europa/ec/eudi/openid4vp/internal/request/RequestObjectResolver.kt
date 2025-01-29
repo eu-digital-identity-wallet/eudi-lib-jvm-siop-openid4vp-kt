@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.TransactionData
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
@@ -128,46 +127,12 @@ internal class RequestObjectResolver(
             clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
         }
 
-    private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<ResolvedTransactionData> {
-        fun PresentationQuery.transactionDataCredentialIds(): List<TransactionDataCredentialId> =
-            when (this) {
-                is PresentationQuery.ByPresentationDefinition -> value.inputDescriptors.map { TransactionDataCredentialId(it.id.value) }
-                is PresentationQuery.ByDigitalCredentialsQuery -> value.credentials.map { TransactionDataCredentialId(it.id.value) }
-            }
-
-        return runCatching {
-            val supportedTransactionDataTypes = siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes.associateBy { it.type }
-            val transactionDataCredentialIdsInQuery = query.transactionDataCredentialIds()
-
-            unresolvedTransactionData.map { encoded ->
-                val value = TransactionData(encoded).getOrThrow()
-
-                val type = TransactionDataType(value.type)
-                val supportedTransactionDataType = supportedTransactionDataTypes[type]
-                requireNotNull(supportedTransactionDataType) {
-                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'"
-                }
-
-                val transactionDataCredentialIds = value.credentialIds.map { TransactionDataCredentialId(it) }
-                require(transactionDataCredentialIdsInQuery.containsAll(transactionDataCredentialIds)) {
-                    "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '${value.credentialIds}'"
-                }
-
-                val hashAlgorithms = value.hashAlgorithms?.map(::HashAlgorithm)?.toSet() ?: setOf(HashAlgorithm.SHA_256)
-                val supportedHashAlgorithms = supportedTransactionDataType.hashAlgorithms.intersect(hashAlgorithms)
-                require(supportedHashAlgorithms.isNotEmpty()) {
-                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
-                }
-
-                ResolvedTransactionData(
-                    type = type,
-                    credentialIds = transactionDataCredentialIds,
-                    hashAlgorithms = supportedHashAlgorithms,
-                    value = value,
-                )
+    private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<TransactionData> =
+        runCatching {
+            unresolvedTransactionData.map { unresolved ->
+                TransactionData(unresolved, siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes, query).getOrThrow()
             }
         }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
-    }
 }
 
 private fun AuthenticatedClient.toClient(): Client =

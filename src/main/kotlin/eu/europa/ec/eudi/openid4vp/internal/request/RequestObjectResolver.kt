@@ -16,14 +16,10 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
-import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
+import eu.europa.ec.eudi.openid4vp.internal.TransactionData
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
-import kotlinx.io.bytestring.decodeToByteString
-import kotlinx.io.bytestring.decodeToString
-import kotlinx.serialization.*
 
 internal class RequestObjectResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
@@ -161,28 +157,27 @@ internal class RequestObjectResolver(
             val walletSupportedTransactionDataTypes = siopOpenId4VPConfig.supportedTransactionDataTypes.associateBy { it.type }
 
             unresolvedTransactionData.map { encoded ->
-                val decoded = base64UrlNoPadding.decodeToByteString(encoded)
-                val serialized = decoded.decodeToString()
-                val deserialized = jsonSupport.decodeFromString<BaseTransactionData>(serialized)
+                val value = TransactionData(encoded).getOrThrow()
 
-                val walletSupportedTransactionDataType = walletSupportedTransactionDataTypes[deserialized.type]
-                require(walletSupportedTransactionDataType != null) {
-                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '${deserialized.type}'"
+                val type = TransactionDataType(value.type)
+                val supportedTransactionDataType = walletSupportedTransactionDataTypes[type]
+                requireNotNull(supportedTransactionDataType) {
+                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'"
                 }
 
-                val transactionDataCredentialIds = resolveTransactionDataCredentialIds(deserialized.credentialIds)
+                val transactionDataCredentialIds = resolveTransactionDataCredentialIds(value.credentialIds)
 
-                val verifierSupportedHashAlgorithms = deserialized.hashAlgorithms ?: setOf(HashAlgorithm.SHA_256)
-                val commonHashAlgorithms = walletSupportedTransactionDataType.hashAlgorithms.intersect(verifierSupportedHashAlgorithms)
-                require(commonHashAlgorithms.isNotEmpty()) {
-                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$verifierSupportedHashAlgorithms'"
+                val hashAlgorithms = value.hashAlgorithms?.map(::HashAlgorithm)?.toSet() ?: setOf(HashAlgorithm.SHA_256)
+                val supportedHashAlgorithms = supportedTransactionDataType.hashAlgorithms.intersect(hashAlgorithms)
+                require(supportedHashAlgorithms.isNotEmpty()) {
+                    "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
                 }
 
                 ResolvedTransactionData(
-                    type = deserialized.type,
+                    type = type,
                     credentialIds = transactionDataCredentialIds,
-                    hashAlgorithms = commonHashAlgorithms,
-                    value = encoded,
+                    hashAlgorithms = supportedHashAlgorithms,
+                    value = value,
                 )
             }
         }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
@@ -202,23 +197,3 @@ private fun AuthenticatedClient.toClient(): Client =
         is AuthenticatedClient.DIDClient -> Client.DIDClient(client.uri)
         is AuthenticatedClient.Attested -> Client.Attested(clientId)
     }
-
-@Serializable
-private data class BaseTransactionData(
-
-    @SerialName(OpenId4VPSpec.TRANSACTION_DATA_TYPE)
-    @Required
-    val type: TransactionDataType,
-
-    @SerialName(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
-    @Required
-    val credentialIds: List<String>,
-
-    @SerialName(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
-    val hashAlgorithms: Set<HashAlgorithm>? = null,
-
-) {
-    init {
-        require(credentialIds.isNotEmpty()) { "'${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}' must not be empty" }
-    }
-}

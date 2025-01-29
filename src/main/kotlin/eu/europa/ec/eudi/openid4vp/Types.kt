@@ -24,6 +24,8 @@ import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.prex.InputDescriptorId
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.Serializable
 import java.net.URI
 import java.net.URL
@@ -300,7 +302,7 @@ sealed interface EncryptionParameters : Serializable {
  */
 @kotlinx.serialization.Serializable
 @JvmInline
-value class HashAlgorithm(val name: String) {
+value class HashAlgorithm(val name: String) : Serializable {
     companion object {
         val SHA_256: HashAlgorithm get() = HashAlgorithm("sha-256")
     }
@@ -308,13 +310,37 @@ value class HashAlgorithm(val name: String) {
 
 @kotlinx.serialization.Serializable
 @JvmInline
-value class TransactionDataType(val value: String)
+value class TransactionDataType(val value: String) : Serializable
 
-sealed interface TransactionDataCredentialId {
+sealed interface TransactionDataCredentialId : Serializable {
 
     @JvmInline
     value class PresentationExchange(val value: InputDescriptorId) : TransactionDataCredentialId
 
     @JvmInline
     value class DCQL(val value: QueryId) : TransactionDataCredentialId
+}
+
+data class TransactionData internal constructor(
+    val encoded: Base64URL,
+    val deserialized: JsonObject,
+) : Serializable {
+
+    val type: String
+        get() {
+            val value = requireNotNull(deserialized[OpenId4VPSpec.TRANSACTION_DATA_TYPE])
+            return value.jsonPrimitive.content
+        }
+
+    val credentialIds: List<String>
+        get() {
+            val value = requireNotNull(deserialized[OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS])
+            return value.jsonArray.map { it.jsonPrimitive.content }
+        }
+
+    val hashAlgorithms: List<String>?
+        get() =
+            deserialized[OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS]?.let { value ->
+                value.jsonArray.map { it.jsonPrimitive.content }
+            }
 }

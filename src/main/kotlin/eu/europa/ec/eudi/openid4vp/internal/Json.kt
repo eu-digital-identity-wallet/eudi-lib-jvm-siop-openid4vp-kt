@@ -15,9 +15,35 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal
 
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 
 internal val jsonSupport = Json {
     prettyPrint = false
     ignoreUnknownKeys = true
+}
+
+internal fun JsonObject.requiredString(name: String): String {
+    val value = this[name]
+    requireNotNull(value) { "Missing required property '$name'" }
+    require(value is JsonPrimitive && value.isString) { "Property '$name' is not a string'" }
+    return value.jsonPrimitive.content
+}
+
+internal fun JsonObject.requiredStringArray(name: String): List<String> {
+    val value = this[name]
+    requireNotNull(value) { "Missing required property '$name'" }
+    require(value is JsonArray && value.all { it is JsonPrimitive && it.isString }) {
+        "Property '$name' is not an array or contains non string values"
+    }
+    return value.jsonArray.map { it.jsonPrimitive.content }
+}
+
+internal fun JsonObject.optionalStringArray(name: String): List<String>? {
+    val value = this[name]
+    return value?.let {
+        require(value is JsonArray && value.all { it is JsonPrimitive && it.isString }) {
+            "Property '$name' is not an array or contains non string values"
+        }
+        value.jsonArray.map { it.jsonPrimitive.content }
+    }
 }

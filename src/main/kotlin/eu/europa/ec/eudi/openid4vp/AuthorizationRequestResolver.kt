@@ -21,6 +21,8 @@ import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentica
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.json.Json
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
 import java.io.Serializable
@@ -88,17 +90,22 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
  * @property hashAlgorithms Hash Algorithms supported both by the Verifier and the Wallet, with which the Hash of this Transaction Data can be calculated
  * @property value the original Base64Url encoded value as provided by the Verifier, over which the Transaction Data Hash will be calculated
  */
-data class ResolvedTransactionData(
+data class ResolvedTransactionData internal constructor(
     val type: TransactionDataType,
     val credentialIds: List<TransactionDataCredentialId>,
     val hashAlgorithms: Set<HashAlgorithm>,
-    val value: String,
-) {
+    val value: TransactionData,
+) : Serializable {
     init {
         require(credentialIds.isNotEmpty()) { "credentialIds must not be empty" }
         require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms must not be empty" }
         require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
     }
+
+    inline fun <reified T> decode(
+        deserializer: DeserializationStrategy<T>,
+        json: Json.Default,
+    ): T = json.decodeFromJsonElement(deserializer, value.deserialized)
 }
 
 /**

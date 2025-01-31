@@ -945,7 +945,7 @@ class UnvalidatedRequestResolverTest {
                 }
                 assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                 assertEquals(listOf(TransactionDataCredentialId("bankaccount_input")), resolvedTransactionData.credentialIds)
-                assertEquals(listOf(HashAlgorithm("sha-384"), HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithms)
+                assertEquals(listOf(HashAlgorithm("sha-384")), resolvedTransactionData.hashAlgorithms)
             }
         }
     }

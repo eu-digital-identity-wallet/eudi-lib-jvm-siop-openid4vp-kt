@@ -17,18 +17,13 @@ package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.Client.*
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.serializer
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
 import java.io.Serializable
@@ -117,48 +112,41 @@ data class TransactionData private constructor(val value: Base64URL) : Serializa
     val hashAlgorithms: List<HashAlgorithm>
         get() = jsonObject.optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
             ?.map { HashAlgorithm(it) }
-            ?: listOf(HashAlgorithm.SHA_256)
-
-    /**
-     * Converts this Transaction Data to an instance of [T].
-     */
-    inline fun <reified T> decode(
-        deserializer: DeserializationStrategy<T> = serializer(),
-        json: Json = Json.Default,
-    ): T = json.decodeFromJsonElement(deserializer, jsonObject)
+            ?: listOf(DefaultHashAlgorithm)
 
     companion object {
+
+        private val DefaultHashAlgorithm: HashAlgorithm get() = HashAlgorithm.SHA_256
+
         internal operator fun invoke(
             value: String,
             supportedTypes: List<SupportedTransactionDataType>,
             query: PresentationQuery,
         ): Result<TransactionData> = runCatching {
             val decoded = base64UrlNoPadding.decodeToByteString(value)
-            val deserialized = jsonSupport.decodeFromString<JsonObject>(decoded.decodeToString())
+            val json = jsonSupport.decodeFromString<JsonObject>(decoded.decodeToString())
 
-            val type = TransactionDataType(deserialized.requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE))
+            val type = TransactionDataType(json.requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE))
             val supportedType = supportedTypes.firstOrNull { it.type == type }
-            requireNotNull(supportedType) { "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
+            requireNotNull(supportedType) { "Unsupported transaction_data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
 
             val requestedCredentialIds = when (query) {
-                is PresentationQuery.ByPresentationDefinition -> query.value.inputDescriptors.map {
-                    TransactionDataCredentialId(
-                        it.id.value,
-                    )
-                }
-                is PresentationQuery.ByDigitalCredentialsQuery -> query.value.credentials.map { TransactionDataCredentialId(it.id.value) }
+                is PresentationQuery.ByPresentationDefinition ->
+                    query.value.inputDescriptors.map { TransactionDataCredentialId(it.id.value) }
+                is PresentationQuery.ByDigitalCredentialsQuery ->
+                    query.value.credentials.map { TransactionDataCredentialId(it.id.value) }
             }
-            val credentialIds = deserialized.requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
+            val credentialIds = json.requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
                 .map { TransactionDataCredentialId(it) }
             require(requestedCredentialIds.containsAll(credentialIds)) {
                 "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
             }
 
             val supportedHashAlgorithms = supportedType.hashAlgorithms
-            val hashAlgorithms = deserialized.optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
+            val hashAlgorithms = json.optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
                 ?.map { HashAlgorithm(it) }
                 ?.toSet()
-                ?: setOf(HashAlgorithm.SHA_256)
+                ?: setOf(DefaultHashAlgorithm)
             require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
                 "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
             }

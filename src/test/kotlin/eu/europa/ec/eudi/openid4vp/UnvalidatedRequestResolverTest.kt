@@ -654,7 +654,7 @@ class UnvalidatedRequestResolverTest {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
                 val cause = assertIs<IllegalArgumentException>(error.cause)
                 assertEquals(
-                    "Unsupported 'type': 'unsupported'",
+                    "Unsupported transaction_data 'type': 'unsupported'",
                     cause.message,
                 )
             }

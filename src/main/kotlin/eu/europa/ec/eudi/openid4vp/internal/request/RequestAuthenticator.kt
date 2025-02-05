@@ -341,19 +341,20 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
     return with(jwtClaimsSet) {
         UnvalidatedRequestObject(
             responseType = getStringClaim("response_type"),
-            presentationDefinition = getJSONObjectClaim("presentation_definition")?.asJsonObject(),
-            presentationDefinitionUri = getStringClaim("presentation_definition_uri"),
-            dcqlQuery = getJSONObjectClaim("dcql_query")?.asJsonObject(),
+            presentationDefinition = getJSONObjectClaim(OpenId4VPSpec.PRESENTATION_DEFINITION)?.asJsonObject(),
+            presentationDefinitionUri = getStringClaim(OpenId4VPSpec.PRESENTATION_DEFINITION_URI),
+            dcqlQuery = getJSONObjectClaim(OpenId4VPSpec.DCQL_QUERY)?.asJsonObject(),
             scope = getStringClaim("scope"),
             nonce = getStringClaim("nonce"),
             responseMode = getStringClaim("response_mode"),
             clientMetaData = getJSONObjectClaim("client_metadata")?.asJsonObject(),
             clientId = getStringClaim("client_id"),
-            responseUri = getStringClaim("response_uri"),
+            responseUri = getStringClaim(OpenId4VPSpec.RESPONSE_URI),
             redirectUri = getStringClaim("redirect_uri"),
             state = getStringClaim("state"),
             supportedAlgorithm = getStringClaim("supported_algorithm"),
             idTokenType = getStringClaim("id_token_type"),
+            transactionData = getStringListClaim(OpenId4VPSpec.TRANSACTION_DATA),
         )
     }
 }

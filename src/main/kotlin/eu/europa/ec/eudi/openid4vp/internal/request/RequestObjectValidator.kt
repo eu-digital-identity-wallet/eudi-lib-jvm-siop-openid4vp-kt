@@ -20,10 +20,10 @@ import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.MalformedURLException
 import java.net.URI
@@ -101,6 +101,7 @@ internal sealed interface ValidatedRequestObject {
         override val nonce: String,
         override val responseMode: ResponseMode,
         override val state: String?,
+        val transactionData: List<String>?,
     ) : ValidatedRequestObject
 
     /**
@@ -115,10 +116,9 @@ internal sealed interface ValidatedRequestObject {
         val scope: Scope,
         override val responseMode: ResponseMode,
         override val state: String?,
+        val transactionData: List<String>?,
     ) : ValidatedRequestObject
 }
-
-private val jsonSupport: Json = Json { ignoreUnknownKeys = true }
 
 /**
  * Validates that the given [request] represents a valid and supported [ValidatedRequestObject]
@@ -138,6 +138,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     val responseMode = requiredResponseMode(client, requestObject)
     val clientMetaData = optionalClientMetaData(responseMode, requestObject)
     val idTokenType = optionalIdTokenType(requestObject)
+    val transactionData = requestObject.transactionData
 
     fun idAndVpToken(): SiopOpenId4VPAuthentication {
         val querySource = parseQuerySource(requestObject, nonOpenIdScope)
@@ -150,6 +151,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
             scope.getOrThrow(),
             responseMode,
             state,
+            transactionData,
         )
     }
 
@@ -172,6 +174,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
             nonce,
             responseMode,
             state,
+            transactionData,
         )
     }
 
@@ -340,7 +343,7 @@ private fun parseQuerySource(
         checkNotNull(unvalidated.presentationDefinitionUri)
         val pdUri = unvalidated.presentationDefinitionUri.asURL().getOrThrow()
         QuerySource.ByPresentationDefinitionSource(PresentationDefinitionSource.ByReference(pdUri))
-    } catch (t: MalformedURLException) {
+    } catch (_: MalformedURLException) {
         throw InvalidPresentationDefinitionUri.asException()
     }
 

@@ -17,10 +17,10 @@ package eu.europa.ec.eudi.openid4vp.dcql
 
 import eu.europa.ec.eudi.openid4vp.Format
 import eu.europa.ec.eudi.openid4vp.OpenId4VPSpec
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -140,7 +140,7 @@ data class CredentialQuery(
             claims: List<ClaimsQuery>? = null,
             claimSets: List<ClaimSet>? = null,
         ): CredentialQuery {
-            val meta = sdJwtVcMeta?.let { JsonSupport.encodeToJsonElement(it).jsonObject }
+            val meta = sdJwtVcMeta?.let { jsonSupport.encodeToJsonElement(it).jsonObject }
             return CredentialQuery(id, Format.SdJwtVc, meta, claims, claimSets)
         }
 
@@ -150,7 +150,7 @@ data class CredentialQuery(
             claims: List<ClaimsQuery>? = null,
             claimSets: List<ClaimSet>? = null,
         ): CredentialQuery {
-            val meta = msoMdocMeta?.let { JsonSupport.encodeToJsonElement(it).jsonObject }
+            val meta = msoMdocMeta?.let { jsonSupport.encodeToJsonElement(it).jsonObject }
             return CredentialQuery(id, Format.MsoMdoc, meta, claims, claimSets)
         }
 
@@ -190,7 +190,7 @@ data class CredentialQuery(
 
 val CredentialQuery.metaMsoMdoc: DCQLMetaMsoMdocExtensions? get() = meta.metaAs()
 val CredentialQuery.metaSdJwtVc: DCQLMetaSdJwtVcExtensions? get() = meta.metaAs()
-internal inline fun <reified T> JsonObject?.metaAs(): T? = this?.let { JsonSupport.decodeFromJsonElement(it) }
+internal inline fun <reified T> JsonObject?.metaAs(): T? = this?.let { jsonSupport.decodeFromJsonElement(it) }
 
 @Serializable
 data class CredentialSetQuery(
@@ -374,9 +374,4 @@ internal object DCQLId {
         }
         return value
     }
-}
-
-private val JsonSupport = Json {
-    prettyPrint = false
-    ignoreUnknownKeys = true
 }

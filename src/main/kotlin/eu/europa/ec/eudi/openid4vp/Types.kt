@@ -291,3 +291,39 @@ sealed interface EncryptionParameters : Serializable {
 
     data class DiffieHellman(val apu: Base64URL) : EncryptionParameters
 }
+
+/**
+ * IANA registered Hash Algorithms
+ *
+ * @see <a href="https://www.iana.org/assignments/named-information/named-information.xhtml">https://www.iana.org/assignments/named-information/named-information.xhtml</a>
+ */
+@JvmInline
+value class HashAlgorithm(val name: String) : Serializable {
+    init {
+        require(name.isNotEmpty())
+    }
+
+    override fun toString(): String = name
+
+    companion object {
+        val SHA_256: HashAlgorithm get() = HashAlgorithm("sha-256")
+    }
+}
+
+@JvmInline
+value class TransactionDataType(val value: String) : Serializable {
+    init {
+        require(value.isNotEmpty())
+    }
+
+    override fun toString(): String = value
+}
+
+@JvmInline
+value class TransactionDataCredentialId(val value: String) : Serializable {
+    init {
+        require(value.isNotEmpty())
+    }
+
+    override fun toString(): String = value
+}

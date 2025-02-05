@@ -26,9 +26,7 @@ import io.ktor.client.plugins.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import java.net.URL
 
 /**
@@ -43,15 +41,16 @@ internal data class UnvalidatedRequestObject(
     @SerialName("client_id") val clientId: String? = null,
     @SerialName("response_type") val responseType: String? = null,
     @SerialName("response_mode") val responseMode: String? = null,
-    @SerialName("response_uri") val responseUri: String? = null,
-    @SerialName("presentation_definition") val presentationDefinition: JsonObject? = null,
-    @SerialName("presentation_definition_uri") val presentationDefinitionUri: String? = null, // Not utilized from ISO-23330-4
-    @SerialName("dcql_query") val dcqlQuery: JsonObject? = null,
+    @SerialName(OpenId4VPSpec.RESPONSE_URI) val responseUri: String? = null,
+    @SerialName(OpenId4VPSpec.PRESENTATION_DEFINITION) val presentationDefinition: JsonObject? = null,
+    @SerialName(OpenId4VPSpec.PRESENTATION_DEFINITION_URI) val presentationDefinitionUri: String? = null,
+    @SerialName(OpenId4VPSpec.DCQL_QUERY) val dcqlQuery: JsonObject? = null,
     @SerialName("redirect_uri") val redirectUri: String? = null,
-    val scope: String? = null,
+    @SerialName("scope") val scope: String? = null,
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
-    val state: String? = null, // OpenId4VP specific, not utilized from ISO-23330-4
+    @SerialName("state") val state: String? = null,
     @SerialName("id_token_type") val idTokenType: String? = null,
+    @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: List<String>? = null,
 )
 
 enum class RequestUriMethod {
@@ -138,20 +137,24 @@ internal sealed interface UnvalidatedRequest {
             fun jsonObject(p: String): JsonObject? =
                 uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
 
+            fun jsonArray(p: String): JsonArray? =
+                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonArray }
+
             return Plain(
                 UnvalidatedRequestObject(
                     responseType = uri.getQueryParameter("response_type"),
-                    presentationDefinition = jsonObject("presentation_definition"),
-                    presentationDefinitionUri = uri.getQueryParameter("presentation_definition_uri"),
-                    dcqlQuery = jsonObject("dcql_query"),
+                    presentationDefinition = jsonObject(OpenId4VPSpec.PRESENTATION_DEFINITION),
+                    presentationDefinitionUri = uri.getQueryParameter(OpenId4VPSpec.PRESENTATION_DEFINITION_URI),
+                    dcqlQuery = jsonObject(OpenId4VPSpec.DCQL_QUERY),
                     scope = uri.getQueryParameter("scope"),
                     nonce = uri.getQueryParameter("nonce"),
                     responseMode = uri.getQueryParameter("response_mode"),
                     clientMetaData = jsonObject("client_metadata"),
                     clientId = uri.getQueryParameter("client_id"),
-                    responseUri = uri.getQueryParameter("response_uri"),
+                    responseUri = uri.getQueryParameter(OpenId4VPSpec.RESPONSE_URI),
                     redirectUri = uri.getQueryParameter("redirect_uri"),
                     state = uri.getQueryParameter("state"),
+                    transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.map { it.jsonPrimitive.content },
                 ),
             )
         }

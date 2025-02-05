@@ -15,14 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import eu.europa.ec.eudi.openid4vp.Client
-import eu.europa.ec.eudi.openid4vp.PresentationQuery
-import eu.europa.ec.eudi.openid4vp.ResolutionError
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject
-import eu.europa.ec.eudi.openid4vp.Scope
-import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
-import eu.europa.ec.eudi.openid4vp.VpFormats
-import eu.europa.ec.eudi.openid4vp.asException
+import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
@@ -33,6 +26,7 @@ internal class RequestObjectResolver(
 ) {
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
     private val clientMetaDataValidator = ClientMetaDataValidator(httpClient)
+
     suspend fun resolveRequestObject(validated: ValidatedRequestObject): ResolvedRequestObject {
         val clientMetaData = resolveClientMetaData(validated)
         return when (validated) {
@@ -47,6 +41,7 @@ internal class RequestObjectResolver(
         clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject = coroutineScope {
         val presentationQuery = query(request.querySource)
+        val transactionData = request.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
             client = request.client.toClient(),
             responseMode = request.responseMode,
@@ -58,6 +53,7 @@ internal class RequestObjectResolver(
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
             presentationQuery = presentationQuery,
+            transactionData = transactionData,
         )
     }
 
@@ -66,6 +62,7 @@ internal class RequestObjectResolver(
         clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject {
         val presentationQuery = query(authorization.querySource)
+        val transactionData = authorization.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         return ResolvedRequestObject.OpenId4VPAuthorization(
             client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
@@ -74,6 +71,7 @@ internal class RequestObjectResolver(
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
             vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
             presentationQuery = presentationQuery,
+            transactionData = transactionData,
         )
     }
 
@@ -128,6 +126,13 @@ internal class RequestObjectResolver(
         validated.clientMetaData?.let { unvalidated ->
             clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
         }
+
+    private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<TransactionData> =
+        runCatching {
+            unresolvedTransactionData.map { unresolved ->
+                TransactionData(unresolved, siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes, query).getOrThrow()
+            }
+        }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
 }
 
 private fun AuthenticatedClient.toClient(): Client =

@@ -16,9 +16,17 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.hashAlgorithms
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
+import kotlinx.io.bytestring.decodeToByteString
+import kotlinx.io.bytestring.decodeToString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
 import java.io.Serializable
@@ -79,6 +87,122 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
 }
 
 /**
+ * Represents resolved (i.e., supported by the Wallet) Transaction Data.
+ *
+ * @property json this Transaction Data as a generic JsonObject
+ * @property type the type of the Transaction Data
+ * @property credentialIds identifiers of the requested Credentials this Transaction Data is applicable to
+ * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
+ */
+data class TransactionData private constructor(val value: String) : Serializable {
+
+    val json: JsonObject by lazy {
+        decode(value)
+    }
+
+    init {
+        json.type()
+        json.hashAlgorithms()
+        json.credentialIds()
+    }
+
+    val type: TransactionDataType
+        get() = json.type()
+
+    val credentialIds: List<TransactionDataCredentialId>
+        get() = json.credentialIds()
+
+    val hashAlgorithms: List<HashAlgorithm>
+        get() = json.hashAlgorithms()
+
+    companion object {
+
+        private val DefaultHashAlgorithm: HashAlgorithm get() = HashAlgorithm.SHA_256
+        private fun decode(s: String): JsonObject {
+            val decoded = base64UrlNoPadding.decodeToByteString(s)
+            return jsonSupport.decodeFromString(decoded.decodeToString())
+        }
+
+        internal fun parse(s: String): Result<TransactionData> = runCatching {
+            TransactionData(s)
+        }
+
+        private fun JsonObject.type(): TransactionDataType =
+            TransactionDataType(requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE))
+
+        private fun JsonObject.hashAlgorithms(): List<HashAlgorithm> =
+            optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
+                ?.map { HashAlgorithm(it) }
+                ?: listOf(DefaultHashAlgorithm)
+
+        private fun JsonObject.credentialIds(): List<TransactionDataCredentialId> =
+            requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS).map { TransactionDataCredentialId(it) }
+
+        private fun TransactionData.isSupported(supportedTypes: List<SupportedTransactionDataType>) {
+            val type = this.type
+            val supportedType = supportedTypes.firstOrNull { it.type == type }
+            requireNotNull(supportedType) { "Unsupported transaction_data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
+
+            val hashAlgorithms = hashAlgorithms.toSet()
+            val supportedHashAlgorithms = supportedType.hashAlgorithms
+            require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
+                "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
+            }
+        }
+
+        private fun TransactionData.hasCorrectIds(query: PresentationQuery) {
+            val requestedCredentialIds = query.requestedCredentialIds()
+            require(requestedCredentialIds.containsAll(credentialIds)) {
+                "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
+            }
+        }
+
+        private fun PresentationQuery.requestedCredentialIds(): List<TransactionDataCredentialId> =
+            when (this) {
+                is PresentationQuery.ByPresentationDefinition ->
+                    value.inputDescriptors.map { TransactionDataCredentialId(it.id.value) }
+
+                is PresentationQuery.ByDigitalCredentialsQuery ->
+                    value.credentials.map { TransactionDataCredentialId(it.id.value) }
+            }
+
+        internal operator fun invoke(
+            type: TransactionDataType,
+            credentialIds: List<TransactionDataCredentialId>,
+            hashAlgorithms: List<HashAlgorithm>? = null,
+            builder: JsonObjectBuilder.() -> Unit = {},
+        ): TransactionData {
+            val json = buildJsonObject {
+                put(OpenId4VPSpec.TRANSACTION_DATA_TYPE, type.value)
+                putJsonArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS) {
+                    credentialIds.forEach { add(it.value) }
+                }
+                if (!hashAlgorithms.isNullOrEmpty()) {
+                    putJsonArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS) {
+                        hashAlgorithms.forEach { add(it.name) }
+                    }
+                }
+                builder()
+            }
+            val serialized = jsonSupport.encodeToString(json)
+            val base64 = base64UrlNoPadding.encode(serialized.encodeToByteArray())
+            return TransactionData(base64)
+        }
+
+        internal operator fun invoke(
+            s: String,
+            supportedTypes: List<SupportedTransactionDataType>,
+            query: PresentationQuery,
+        ): Result<TransactionData> = runCatching {
+            parse(s).getOrThrow().also {
+                it.isSupported(supportedTypes)
+                it.hasCorrectIds(query)
+            }
+        }
+    }
+}
+
+/**
  * Represents an OAUTH2 authorization request. In particular
  * either a [SIOPv2 for id_token][SiopOpenId4VPAuthentication] or
  * a [OpenId4VP for vp_token][OpenId4VPAuthorization] or
@@ -122,6 +246,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val jarmRequirement: JarmRequirement?,
         val vpFormats: VpFormats,
         val presentationQuery: PresentationQuery,
+        val transactionData: List<TransactionData>?,
     ) : ResolvedRequestObject
 
     /**
@@ -138,6 +263,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
         val presentationQuery: PresentationQuery,
+        val transactionData: List<TransactionData>?,
     ) : ResolvedRequestObject
 }
 
@@ -156,11 +282,13 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class InvalidJarJwt(val cause: String) : AuthorizationRequestError
 
     data object InvalidUseOfBothRequestAndRequestUri : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = InvalidUseOfBothRequestAndRequestUri
     }
 
     data class UnsupportedRequestUriMethod(val method: RequestUriMethod) : RequestValidationError
     data object InvalidRequestUriMethod : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = InvalidRequestUriMethod
     }
 
@@ -170,6 +298,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class UnsupportedResponseType(val value: String) : RequestValidationError
 
     data object MissingResponseType : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingResponseType
     }
 
@@ -182,98 +311,120 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     // Query source errors
     //
     data object MissingQuerySource : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingQuerySource
     }
 
     data object MultipleQuerySources : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MultipleQuerySources
     }
 
     data object InvalidClientId : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = InvalidClientId
     }
 
     data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
 
     data object InvalidPresentationDefinitionUri : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = InvalidPresentationDefinitionUri
     }
 
     data class InvalidDigitalCredentialsQuery(val cause: Throwable) : RequestValidationError
 
     data object InvalidRedirectUri : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = InvalidRedirectUri
     }
 
     data object MissingRedirectUri : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingRedirectUri
     }
 
     data object MissingResponseUri : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingResponseUri
     }
 
     data object InvalidResponseUri : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = InvalidResponseUri
     }
 
     data object ResponseUriMustNotBeProvided : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = ResponseUriMustNotBeProvided
     }
 
     data object RedirectUriMustNotBeProvided : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = RedirectUriMustNotBeProvided
     }
 
     data object MissingNonce : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingNonce
     }
 
     data object MissingScope : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingScope
     }
 
     data object MissingClientId : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingClientId
     }
 
     data object UnsupportedClientIdScheme : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = UnsupportedClientIdScheme
     }
 
     data class UnsupportedClientMetaData(val value: String) : RequestValidationError
 
     data object OneOfClientMedataOrUri : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = OneOfClientMedataOrUri
     }
 
     data class InvalidClientMetaData(val cause: String) : RequestValidationError
 
     data object SubjectSyntaxTypesNoMatch : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = SubjectSyntaxTypesNoMatch
     }
 
     data object MissingClientMetadataJwksSource : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = MissingClientMetadataJwksSource
     }
 
     data object BothJwkUriAndInlineJwks : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = BothJwkUriAndInlineJwks
     }
 
     data object SubjectSyntaxTypesWrongSyntax : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = SubjectSyntaxTypesWrongSyntax
     }
 
     data object IdTokenSigningAlgMissing : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = IdTokenSigningAlgMissing
     }
 
     data object IdTokenEncryptionAlgMissing : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = IdTokenEncryptionAlgMissing
     }
 
     data object IdTokenEncryptionMethodMissing : RequestValidationError {
+        @Suppress("unused")
         private fun readResolve(): Any = IdTokenEncryptionMethodMissing
     }
 
@@ -292,6 +443,7 @@ sealed interface ResolutionError : AuthorizationRequestError {
         ResolutionError
 
     data object FetchingPresentationDefinitionNotSupported : ResolutionError {
+        @Suppress("unused")
         private fun readResolve(): Any = FetchingPresentationDefinitionNotSupported
     }
 
@@ -299,6 +451,7 @@ sealed interface ResolutionError : AuthorizationRequestError {
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkUriUnparsable(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
+    data class InvalidTransactionData(val cause: Throwable) : ResolutionError
 }
 
 /**

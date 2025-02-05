@@ -529,6 +529,7 @@ class DefaultDispatcherTest {
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
                 state = genState(),
+                transactionData = null,
             )
         }
 
@@ -553,6 +554,7 @@ class DefaultDispatcherTest {
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
                 state = genState(),
+                transactionData = null,
             )
         }
 
@@ -580,6 +582,7 @@ class DefaultDispatcherTest {
                         ),
                     ),
                 ),
+                transactionData = null,
             )
         }
 

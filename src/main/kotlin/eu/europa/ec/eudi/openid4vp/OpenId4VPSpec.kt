@@ -17,6 +17,11 @@ package eu.europa.ec.eudi.openid4vp
 
 object OpenId4VPSpec {
 
+    const val RESPONSE_URI = "response_uri"
+    const val PRESENTATION_DEFINITION = "presentation_definition"
+    const val PRESENTATION_DEFINITION_URI = "presentation_definition_uri"
+    const val DCQL_QUERY = "dcql_query"
+
     const val CLIENT_ID_SCHEME_SEPARATOR = ':'
     const val CLIENT_ID_SCHEME_PRE_REGISTERED = "pre-registered"
     const val CLIENT_ID_SCHEME_REDIRECT_URI = "redirect_uri"
@@ -55,6 +60,11 @@ object OpenId4VPSpec {
     const val DCQL_MSO_MDOC_DOCTYPE_VALUE: String = "doctype_value"
     const val DCQL_MSO_MDOC_NAMESPACE: String = "namespace"
     const val DCQL_MSO_MDOC_CLAIM_NAME: String = "claim_name"
+
+    const val TRANSACTION_DATA: String = "transaction_data"
+    const val TRANSACTION_DATA_TYPE: String = "type"
+    const val TRANSACTION_DATA_CREDENTIAL_IDS: String = "credential_ids"
+    const val TRANSACTION_DATA_HASH_ALGORITHMS: String = "transaction_data_hashes_alg"
 }
 
 object SIOPv2

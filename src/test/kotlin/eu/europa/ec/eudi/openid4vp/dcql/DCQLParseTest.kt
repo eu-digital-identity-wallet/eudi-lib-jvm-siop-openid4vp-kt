@@ -15,7 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.dcql
 
-import kotlinx.serialization.json.Json
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,11 +23,6 @@ import kotlin.test.assertIs
 import kotlin.test.fail
 
 class DCQLParseTest {
-
-    private val jsonSupport = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = false
-    }
 
     @Test
     fun whenMsoMdocNamespaceMissesAnExceptionIsRaised() {

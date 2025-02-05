@@ -159,6 +159,7 @@ class AuthorizationResponseBuilderTest {
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
+                    transactionData = null,
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(

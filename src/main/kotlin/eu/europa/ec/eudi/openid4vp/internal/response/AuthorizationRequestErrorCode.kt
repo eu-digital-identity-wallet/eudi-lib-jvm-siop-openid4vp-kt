@@ -31,6 +31,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
     VP_FORMATS_NOT_SUPPORTED("vp_formats_not_supported"),
     INVALID_PRESENTATION_DEFINITION_URI("invalid_presentation_definition_uri"),
     INVALID_PRESENTATION_DEFINITION_REFERENCE("invalid_presentation_definition_reference"),
+    INVALID_TRANSACTION_DATA("invalid_transaction_data"),
 
     /**
      * SIOPv2 Error Codes
@@ -103,6 +104,8 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is UnableToFetchRequestObject,
                 is DIDResolutionFailed,
                 -> PROCESSING_FAILURE
+
+                is InvalidTransactionData -> INVALID_TRANSACTION_DATA
             }
         }
     }

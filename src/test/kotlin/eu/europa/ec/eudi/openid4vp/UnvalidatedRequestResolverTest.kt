@@ -644,7 +644,7 @@ class UnvalidatedRequestResolverTest {
             val transactionData = JsonArray(
                 listOf(
                     TransactionData(TransactionDataType("unsupported"), listOf(TransactionDataCredentialId("foo"))),
-                ).map { JsonPrimitive(it.base64()) },
+                ).map { JsonPrimitive(it.value) },
             )
             testAndThen(transactionData) {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
@@ -811,7 +811,7 @@ class UnvalidatedRequestResolverTest {
                         listOf(TransactionDataCredentialId("my_credential")),
                         listOf(HashAlgorithm("sha-512")),
                     ),
-                ).map { JsonPrimitive(it.base64()) },
+                ).map { JsonPrimitive(it.value) },
             )
             testAndThen(transactionData, dcqlQuery) {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()

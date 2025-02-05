@@ -25,6 +25,7 @@ import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
@@ -93,7 +94,12 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
  * @property credentialIds identifiers of the requested Credentials this Transaction Data is applicable to
  * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
  */
-data class TransactionData private constructor(val json: JsonObject) : Serializable {
+data class TransactionData private constructor(val value: String) : Serializable {
+
+    val json: JsonObject by lazy {
+        decode(value)
+    }
+
     init {
         json.type()
         json.hashAlgorithms()
@@ -109,9 +115,6 @@ data class TransactionData private constructor(val json: JsonObject) : Serializa
     val hashAlgorithms: List<HashAlgorithm>
         get() = json.hashAlgorithms()
 
-    fun base64(): String =
-        base64UrlNoPadding.encode(json.toString().encodeToByteArray())
-
     companion object {
 
         private val DefaultHashAlgorithm: HashAlgorithm get() = HashAlgorithm.SHA_256
@@ -121,8 +124,7 @@ data class TransactionData private constructor(val json: JsonObject) : Serializa
         }
 
         internal fun parse(s: String): Result<TransactionData> = runCatching {
-            val json = decode(s)
-            TransactionData(json)
+            TransactionData(s)
         }
 
         private fun JsonObject.type(): TransactionDataType =
@@ -169,8 +171,8 @@ data class TransactionData private constructor(val json: JsonObject) : Serializa
             credentialIds: List<TransactionDataCredentialId>,
             hashAlgorithms: List<HashAlgorithm>? = null,
             builder: JsonObjectBuilder.() -> Unit = {},
-        ): TransactionData = TransactionData(
-            buildJsonObject {
+        ): TransactionData {
+            val json = buildJsonObject {
                 put(OpenId4VPSpec.TRANSACTION_DATA_TYPE, type.value)
                 putJsonArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS) {
                     credentialIds.forEach { add(it.value) }
@@ -181,8 +183,11 @@ data class TransactionData private constructor(val json: JsonObject) : Serializa
                     }
                 }
                 builder()
-            },
-        )
+            }
+            val serialized = jsonSupport.encodeToString(json)
+            val base64 = base64UrlNoPadding.encode(serialized.encodeToByteArray())
+            return TransactionData(base64)
+        }
 
         internal operator fun invoke(
             s: String,

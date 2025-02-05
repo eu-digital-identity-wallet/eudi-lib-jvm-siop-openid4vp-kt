@@ -17,6 +17,11 @@ package eu.europa.ec.eudi.openid4vp
 
 object OpenId4VPSpec {
 
+    const val RESPONSE_URI = "response_uri"
+    const val PRESENTATION_DEFINITION = "presentation_definition"
+    const val PRESENTATION_DEFINITION_URI = "presentation_definition_uri"
+    const val DCQL_QUERY = "dcql_query"
+
     const val CLIENT_ID_SCHEME_SEPARATOR = ':'
     const val CLIENT_ID_SCHEME_PRE_REGISTERED = "pre-registered"
     const val CLIENT_ID_SCHEME_REDIRECT_URI = "redirect_uri"

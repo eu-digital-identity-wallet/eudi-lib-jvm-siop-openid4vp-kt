@@ -92,7 +92,7 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
  * @property credentialIds identifiers of the requested Credentials this Transaction Data is applicable to
  * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
  */
-data class TransactionData private constructor(val value: Base64URL) : Serializable {
+data class TransactionData private constructor(private val value: Base64URL) : Serializable {
     init {
         require(value.toString().isNotBlank())
     }

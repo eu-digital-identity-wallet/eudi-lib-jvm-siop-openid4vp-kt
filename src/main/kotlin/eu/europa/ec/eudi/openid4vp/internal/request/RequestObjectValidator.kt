@@ -343,7 +343,7 @@ private fun parseQuerySource(
         checkNotNull(unvalidated.presentationDefinitionUri)
         val pdUri = unvalidated.presentationDefinitionUri.asURL().getOrThrow()
         QuerySource.ByPresentationDefinitionSource(PresentationDefinitionSource.ByReference(pdUri))
-    } catch (t: MalformedURLException) {
+    } catch (_: MalformedURLException) {
         throw InvalidPresentationDefinitionUri.asException()
     }
 

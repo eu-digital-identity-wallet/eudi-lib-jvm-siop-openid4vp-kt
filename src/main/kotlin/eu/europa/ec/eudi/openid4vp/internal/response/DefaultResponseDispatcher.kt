@@ -135,9 +135,6 @@ internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig
     with(redirectUri.toUri().buildUpon()) {
         val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
         appendQueryParameter("response", jarmJwt)
-        data.state?.let {
-            appendQueryParameter("state", it)
-        }
         build()
     }.toURI()
 
@@ -158,9 +155,6 @@ internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPCon
         val encodedFragment =
             buildMap {
                 put("response", jarmJwt)
-                data.state?.let {
-                    put("state", it)
-                }
             }.map { (key, value) ->
                 val encodedKey = UriCodec.encode(key, null)
                 val encodedValue = UriCodec.encodeOrNull(value, null)

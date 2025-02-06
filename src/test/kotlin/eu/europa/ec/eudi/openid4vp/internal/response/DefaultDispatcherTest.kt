@@ -717,7 +717,7 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
+        fun `when response mode is query_jwt, redirect_uri must contain a 'response' query parameter`() {
             fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.SiopAuthentication(
                     "dummy",
@@ -742,7 +742,7 @@ class DefaultDispatcherTest {
                 }
             }
 
-            genState().let { state -> test(state) { assertQueryURIContainsStateAnd(state, it) } }
+            test(genState()) { assertQueryURIDoesNotContainStateAnd(it) }
             test { assertQueryURIDoesNotContainStateAnd(it) }
         }
 
@@ -862,7 +862,7 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `when response mode is query_jwt, redirect_uri must contain a 'response' and a 'state' query parameter`() {
+        fun `when response mode is query_jwt, redirect_uri must contain a 'response' query parameter`() {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.SiopAuthentication(
                     "dummy",
@@ -879,7 +879,6 @@ class DefaultDispatcherTest {
                     )
                 response.encodeRedirectURI(Wallet.config)
                     .asserter { fragmentData ->
-                        assertEquals(data.state, fragmentData["state"])
                         val responseParameter = fragmentData["response"]
                         assertNotNull(responseParameter)
                         val jwtClaimsSet = responseParameter.assertIsJwtSignedByWallet()
@@ -888,7 +887,7 @@ class DefaultDispatcherTest {
                     }
             }
 
-            genState().let { state -> test(state) { assertFragmentURIContainsStateAnd(state, it) } }
+            test(genState()) { assertFragmentURIDoesNotContainStateAnd(it) }
             test { assertFragmentURIDoesNotContainStateAnd(it) }
         }
 

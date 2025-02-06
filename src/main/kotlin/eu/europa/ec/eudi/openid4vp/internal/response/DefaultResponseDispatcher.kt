@@ -70,7 +70,7 @@ internal class DefaultDispatcher(
 
             is DirectPostJwt -> {
                 val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
-                val parameters = DirectPostJwtForm.parametersOf(jarmJwt, response.data.state)
+                val parameters = DirectPostJwtForm.parametersOf(jarmJwt)
                 response.responseUri to parameters
             }
 
@@ -99,7 +99,7 @@ internal class DefaultDispatcher(
                             ?.takeIf { it is JsonPrimitive }
                             ?.jsonPrimitive?.contentOrNull
                             ?.let { URI.create(it) }
-                    } catch (t: NoTransformationFoundException) {
+                    } catch (_: NoTransformationFoundException) {
                         null
                     }
                 DispatchOutcome.VerifierResponse.Accepted(redirectUri)
@@ -135,9 +135,6 @@ internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig
     with(redirectUri.toUri().buildUpon()) {
         val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
         appendQueryParameter("response", jarmJwt)
-        data.state?.let {
-            appendQueryParameter("state", it)
-        }
         build()
     }.toURI()
 
@@ -158,9 +155,6 @@ internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPCon
         val encodedFragment =
             buildMap {
                 put("response", jarmJwt)
-                data.state?.let {
-                    put("state", it)
-                }
             }.map { (key, value) ->
                 val encodedKey = UriCodec.encode(key, null)
                 val encodedValue = UriCodec.encodeOrNull(value, null)
@@ -279,12 +273,9 @@ internal fun VerifiablePresentation.asJson(): JsonElement {
 }
 
 internal object DirectPostJwtForm {
-    fun parametersOf(jarmJwt: Jwt, state: String?): Parameters =
+    fun parametersOf(jarmJwt: Jwt): Parameters =
         Parameters.build {
             append("response", jarmJwt)
-            state?.let {
-                append("state", it)
-            }
         }
 }
 

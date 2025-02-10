@@ -83,8 +83,8 @@ fun main(): Unit = runBlocking {
     }
 
     runUseCase(Transaction.SIOP)
-    runUseCase(Transaction.PidRequest)
-    runUseCase(Transaction.DcqlRequest)
+    runUseCase(Transaction.PregExPidRequest)
+    runUseCase(Transaction.DcqlPidRequest)
 }
 
 @Serializable
@@ -155,7 +155,7 @@ class Verifier private constructor(
                                 initOpenId4VpTransaction(client, verifierApi, nonce, presentationQuery)
                             },
                         )
-                        val presentationId = initTransactionResponse["presentation_id"]!!.jsonPrimitive.content
+                        val presentationId = initTransactionResponse["transaction_id"]!!.jsonPrimitive.content
                         val uri = formatAuthorizationRequest(initTransactionResponse)
                         Verifier(verifierApi, walletPublicKey, presentationId, uri).also {
                             verifierPrintln("Initialized $it")
@@ -254,8 +254,8 @@ sealed interface Transaction {
     data class OpenId4VP(val presentationQuery: PresentationQuery) : Transaction
 
     companion object {
-        val PidRequest = OpenId4VP(PresentationQuery.PresentationExchange(PidPresentationDefinition))
-        val DcqlRequest = OpenId4VP(PresentationQuery.DCQL(DcqlQuery))
+        val PregExPidRequest = OpenId4VP(PresentationQuery.PresentationExchange(PidPresentationDefinition))
+        val DcqlPidRequest = OpenId4VP(PresentationQuery.DCQL(DcqlQuery))
     }
 }
 
@@ -327,19 +327,17 @@ private class Wallet(
     }
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
-        val presentationQuery = request.presentationQuery
-        return when (presentationQuery) {
+        return when (request.presentationQuery) {
             is PresentationQuery.ByPresentationDefinition -> {
-                val inputDescriptor = presentationQuery.value.inputDescriptors.first()
                 Consensus.PositiveConsensus.VPTokenConsensus(
                     vpContent = VpContent.PresentationExchange(
-                        verifiablePresentations = listOf(VerifiablePresentation.Generic("foo")),
+                        verifiablePresentations = listOf(VerifiablePresentation.Generic(DeviceResponse)),
                         presentationSubmission = PresentationSubmission(
-                            id = Id("pid-res"),
-                            definitionId = presentationQuery.value.id,
+                            id = Id("028b39fd-33b6-46a1-8887-2ef654771d7f"),
+                            definitionId = Id("c64dd05a-b8b4-42dd-892e-7bb49ee06069"),
                             listOf(
                                 DescriptorMap(
-                                    id = inputDescriptor.id,
+                                    id = InputDescriptorId("eu.europa.ec.eudi.pid.1"),
                                     format = "mso_mdoc",
                                     path = JsonPath.jsonPath("$")!!,
                                 ),
@@ -351,7 +349,9 @@ private class Wallet(
             is PresentationQuery.ByDigitalCredentialsQuery -> {
                 Consensus.PositiveConsensus.VPTokenConsensus(
                     vpContent = VpContent.DCQL(
-                        verifiablePresentations = mapOf(QueryId("my_query") to VerifiablePresentation.Generic("foo")),
+                        verifiablePresentations = mapOf(
+                            QueryId("eu_europa_ec_eudi_pid_1") to VerifiablePresentation.Generic(DeviceResponse),
+                        ),
                     ),
                 )
             }
@@ -412,220 +412,167 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
         clock = Clock.systemDefaultZone(),
     )
 
-val PidPresentationDefinition = """
+private val PidPresentationDefinition = """
 {
-  "id": "pid-request",
-  "input_descriptors": [
-    {
-      "id": "eu.europa.ec.eudiw.pid.1",
-      "format": {
-        "mso_mdoc": {
-          "alg": [
-            "ES256",
-            "ES384",
-            "ES512",
-            "EdDSA"
-          ]
+    "id": "c64dd05a-b8b4-42dd-892e-7bb49ee06069",
+    "input_descriptors": [
+        {
+            "id": "eu.europa.ec.eudi.pid.1",
+            "name": "Person Identification Data (PID)",
+            "purpose": "",
+            "format": {
+                "mso_mdoc": {
+                    "alg": [
+                        "ES256",
+                        "ES384",
+                        "ES512"
+                    ]
+                }
+            },
+            "constraints": {
+                "fields": [
+                    {
+                        "path": [
+                            "$['eu.europa.ec.eudi.pid.1']['family_name']"
+                        ],
+                        "intent_to_retain": false
+                    }
+                ]
+            }
         }
-      },
-      "name": "EUDI PID",
-      "purpose": "We need to verify your identity",
-      "constraints": {
-        "fields": [
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['family_name']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['given_name']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['birth_date']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['age_over_18']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['age_in_years']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['age_birth_year']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['family_name_birth']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['given_name_birth']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['birth_place']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['birth_country']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['birth_state']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['birth_city']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['resident_address']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['resident_country']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['resident_state']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['resident_city']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['resident_postal_code']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['resident_street']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['resident_house_number']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['gender']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['nationality']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['issuance_date']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['expiry_date']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['issuing_authority']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['document_number']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['administrative_number']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['issuing_country']"
-            ],
-            "intent_to_retain": false
-          },
-          {
-            "path": [
-              "$['eu.europa.ec.eudiw.pid.1']['issuing_jurisdiction']"
-            ],
-            "intent_to_retain": false
-          }
-        ]
-      }
-    }
-  ]
+    ]
 }
 """.trimIndent()
 
-val DcqlQuery = """
-    {
-      "credentials": [
+// DeviceResponse that contains a PID and mDL
+private const val DeviceResponse =
+    "o2d2ZXJzaW9uYzEuMGlkb2N1bWVudHOCo2dkb2NUeXBld2V1LmV1cm9wYS5l" +
+        "Yy5ldWRpLnBpZC4xbGlzc3VlclNpZ25lZKJqbmFtZVNwYWNlc6F3ZXUuZXVy" +
+        "b3BhLmVjLmV1ZGkucGlkLjGB2BhYU6RoZGlnZXN0SUQBZnJhbmRvbVDLOKt7" +
+        "d-Qv5sfsfZLl6ZY_cWVsZW1lbnRJZGVudGlmaWVya2ZhbWlseV9uYW1lbGVs" +
+        "ZW1lbnRWYWx1ZWROZWFsamlzc3VlckF1dGiEQ6EBJqEYIVkDMTCCAy0wggKy" +
+        "oAMCAQICFC_LOU7Ot-ZOjoa0RTJbEkQEmKOmMAoGCCqGSM49BAMCMFwxHjAc" +
+        "BgNVBAMMFVBJRCBJc3N1ZXIgQ0EgLSBVVCAwMTEtMCsGA1UECgwkRVVESSBX" +
+        "YWxsZXQgUmVmZXJlbmNlIEltcGxlbWVudGF0aW9uMQswCQYDVQQGEwJVVDAe" +
+        "Fw0yNDExMjkxMTI4MzVaFw0yNjExMjkxMTI4MzRaMGkxHTAbBgNVBAMMFEVV" +
+        "REkgUmVtb3RlIFZlcmlmaWVyMQwwCgYDVQQFEwMwMDExLTArBgNVBAoMJEVV" +
+        "REkgV2FsbGV0IFJlZmVyZW5jZSBJbXBsZW1lbnRhdGlvbjELMAkGA1UEBhMC" +
+        "VVQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQFmvVGq-6D9WWxhW7BQOIN" +
+        "9T8zRmXMIdr0ezwpJNGIgC-HIa7JYPXI9ZAcp8mYu52a2IDzie8dGrURXZMX" +
+        "147Qo4IBQzCCAT8wDAYDVR0TAQH_BAIwADAfBgNVHSMEGDAWgBSzbLiRFxzX" +
+        "pBpmMYdC4YvAQMyVGzAnBgNVHREEIDAeghxkZXYuaXNzdWVyLWJhY2tlbmQu" +
+        "ZXVkaXcuZGV2MBIGA1UdJQQLMAkGByiBjF0FAQYwQwYDVR0fBDwwOjA4oDag" +
+        "NIYyaHR0cHM6Ly9wcmVwcm9kLnBraS5ldWRpdy5kZXYvY3JsL3BpZF9DQV9V" +
+        "VF8wMS5jcmwwHQYDVR0OBBYEFPHhwPzF75MgheENYqLlz9LKYjFIMA4GA1Ud" +
+        "DwEB_wQEAwIHgDBdBgNVHRIEVjBUhlJodHRwczovL2dpdGh1Yi5jb20vZXUt" +
+        "ZGlnaXRhbC1pZGVudGl0eS13YWxsZXQvYXJjaGl0ZWN0dXJlLWFuZC1yZWZl" +
+        "cmVuY2UtZnJhbWV3b3JrMAoGCCqGSM49BAMCA2kAMGYCMQCYykgNwO5GDgWM" +
+        "CQjjnK3GkQg3lU33L2GAkfAI8p1ItuSP7ZLAwhQOfpmgi35pFCkCMQDlYxrI" +
+        "JbkMEzedKPe1popR25VuDfPqgK5rAQvI0yLrZyn3OMmd7uUNbmWCJW7Skq5Z" +
+        "BM_YGFkEyqZndmVyc2lvbmMxLjBvZGlnZXN0QWxnb3JpdGhtZ1NIQS0yNTZs" +
+        "dmFsdWVEaWdlc3RzoXdldS5ldXJvcGEuZWMuZXVkaS5waWQuMbgZAFggOhcW" +
+        "Gq5FFshUpShyf_v7d8LYVx6hQCdnxqhpPYHXptEBWCBhxi-7MIUyIEf9eXsm" +
+        "tpb6bS3WMlvb1IKVfJDGL-E3cAJYICXP8ZyU3U_4e51NAohWDbqmeGabjj93" +
+        "_FA6Q7_KxPKwA1ggHEMoLXvCT6RW1CVMeMU47-rwRMj7wVjbJ0_UBQ_sZ-wE" +
+        "WCDT9-SwKjha0nna10diAO9IxPB46svGBKkNiXAR77IdyAVYIMjjf2tii5oc" +
+        "W3XHKUmvtaIje4jpQz0AuL7Twe33abktBlggKhhf9sCpvmndwAAKW4umOxWk" +
+        "Ltz4Kyv1h5zcAEwNUvAHWCDp6NsFQJmpb9Jatz_dBayRv14x2Qffl4AxCOzR" +
+        "ouFWsQhYIEOC_EaY5ww8qW60NZ_cYfn40xgFSZKjxzReZuqxWMx8CVggHuln" +
+        "1oLn-ZOufRheOmtSHxAxl4acTxZ52w2_QbUYiFgKWCB9i5tS8oKFUb55BroS" +
+        "RVPs1siu1VH5XVV-kt1vUGlhAAtYIB0ta7Hoc4HGgDVL-cLCo7wJ-fOzaXTs" +
+        "faLc5V56a0GsDFggHSDNQdsvGKwx4pvXJ9zVcwlbUds_6uSwNKiRqBa-QgEN" +
+        "WCCA18f0ek8765otJdOkDu-NhvxuKVaRG9YZKPpjARSyWA5YIOzd-VzaPIJP" +
+        "nJTEgkl13Wx8vaZ0JN2roUyyXxQJ19dBD1ggo7HAuf1bjEPAvB_QsPoNGk82" +
+        "qUxifiYfc-clTFQGjs4QWCCV9sgpz0Pwiu9tGxApqWyDc1LtD_Fu5AZ4Gk4A" +
+        "l0TQDhFYIBirH7jbqqpXrh4r0kzLEeut0u8wkIpanFk0TzliVmwnElggTpMB" +
+        "OhEWHDOMUXV2DTBDYtUIcO5j94bZAxZIFfWNsGMTWCCtRqkcGgnf-L4qexXf" +
+        "_bS2I32qfG_tCTUaSSjLBkQibxRYIPrvcdGkjj7uH31FoWjM4aoo7mCwH6TD" +
+        "2FklUg-GfRbtFVgglAIC8TTTc6JW5azcNzrm3DTujvKvb1fT2bOfMnC0ZasW" +
+        "WCAn1cdYJ8UFyYHiG5ZhdJkntNNrtS5ZVSdLfqKZo866QBdYIP3SPKdiReOR" +
+        "5XVI3mP-JIekpQQTFHVCJmhMr8JAuFhcGBhYIIz9kkhORpqu7260xaPkzHBm" +
+        "-T92zcYOcWA0yjGhYU3JbWRldmljZUtleUluZm-haWRldmljZUtleaQBAiAB" +
+        "IVggJ0AUWqVTHQCZLfZ9l6etiocOFUDMiwOA9NdRMlnEdNUiWCDQqWiJYDFx" +
+        "5WrF3iWOF_eyDwMlb2lwwbr8vJH9QsEtpmdkb2NUeXBld2V1LmV1cm9wYS5l" +
+        "Yy5ldWRpLnBpZC4xbHZhbGlkaXR5SW5mb6Nmc2lnbmVkwHgeMjAyNS0wMi0w" +
+        "N1QxNDoxNDoxNC4yNTQxMzU5MzRaaXZhbGlkRnJvbcB4HjIwMjUtMDItMDdU" +
+        "MTQ6MTQ6MTQuMjU0MTM1OTM0Wmp2YWxpZFVudGlswHgeMjAyNy0wMi0wN1Qx" +
+        "NDoxNDoxNC4yNTQxMzU5MzRaWEDTbHm2IyQEZlx3sywuYiw3qICbikVdUtya" +
+        "HceDdV4qIAQdpOScsTAWTH9GVvh1FiPWE2qdQCTdl8O9_wGQpth3bGRldmlj" +
+        "ZVNpZ25lZKJqbmFtZVNwYWNlc9gYQaBqZGV2aWNlQXV0aKFvZGV2aWNlU2ln" +
+        "bmF0dXJlhEOhASag9lhA0Cu_ymkje1B5BkBExIvyYCaFQqItzzaB8Mr1UPkS" +
+        "j86gWYjvKRhwmPKDEP0BoxZbwDqdmP0z1Q5BFGfIHLFqaqNnZG9jVHlwZXVv" +
+        "cmcuaXNvLjE4MDEzLjUuMS5tRExsaXNzdWVyU2lnbmVkompuYW1lU3BhY2Vz" +
+        "oXFvcmcuaXNvLjE4MDEzLjUuMYHYGFhXpGhkaWdlc3RJRABmcmFuZG9tUG79" +
+        "RwEsn9sSFymhhWnyeqZxZWxlbWVudElkZW50aWZpZXJrZmFtaWx5X25hbWVs" +
+        "ZWxlbWVudFZhbHVlaEdlb3JnaW91amlzc3VlckF1dGiEQ6EBJqEYIVkDMTCC" +
+        "Ay0wggKyoAMCAQICFC_LOU7Ot-ZOjoa0RTJbEkQEmKOmMAoGCCqGSM49BAMC" +
+        "MFwxHjAcBgNVBAMMFVBJRCBJc3N1ZXIgQ0EgLSBVVCAwMTEtMCsGA1UECgwk" +
+        "RVVESSBXYWxsZXQgUmVmZXJlbmNlIEltcGxlbWVudGF0aW9uMQswCQYDVQQG" +
+        "EwJVVDAeFw0yNDExMjkxMTI4MzVaFw0yNjExMjkxMTI4MzRaMGkxHTAbBgNV" +
+        "BAMMFEVVREkgUmVtb3RlIFZlcmlmaWVyMQwwCgYDVQQFEwMwMDExLTArBgNV" +
+        "BAoMJEVVREkgV2FsbGV0IFJlZmVyZW5jZSBJbXBsZW1lbnRhdGlvbjELMAkG" +
+        "A1UEBhMCVVQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQFmvVGq-6D9WWx" +
+        "hW7BQOIN9T8zRmXMIdr0ezwpJNGIgC-HIa7JYPXI9ZAcp8mYu52a2IDzie8d" +
+        "GrURXZMX147Qo4IBQzCCAT8wDAYDVR0TAQH_BAIwADAfBgNVHSMEGDAWgBSz" +
+        "bLiRFxzXpBpmMYdC4YvAQMyVGzAnBgNVHREEIDAeghxkZXYuaXNzdWVyLWJh" +
+        "Y2tlbmQuZXVkaXcuZGV2MBIGA1UdJQQLMAkGByiBjF0FAQYwQwYDVR0fBDww" +
+        "OjA4oDagNIYyaHR0cHM6Ly9wcmVwcm9kLnBraS5ldWRpdy5kZXYvY3JsL3Bp" +
+        "ZF9DQV9VVF8wMS5jcmwwHQYDVR0OBBYEFPHhwPzF75MgheENYqLlz9LKYjFI" +
+        "MA4GA1UdDwEB_wQEAwIHgDBdBgNVHRIEVjBUhlJodHRwczovL2dpdGh1Yi5j" +
+        "b20vZXUtZGlnaXRhbC1pZGVudGl0eS13YWxsZXQvYXJjaGl0ZWN0dXJlLWFu" +
+        "ZC1yZWZlcmVuY2UtZnJhbWV3b3JrMAoGCCqGSM49BAMCA2kAMGYCMQCYykgN" +
+        "wO5GDgWMCQjjnK3GkQg3lU33L2GAkfAI8p1ItuSP7ZLAwhQOfpmgi35pFCkC" +
+        "MQDlYxrIJbkMEzedKPe1popR25VuDfPqgK5rAQvI0yLrZyn3OMmd7uUNbmWC" +
+        "JW7Skq5ZBOvYGFkE5qZndmVyc2lvbmMxLjBvZGlnZXN0QWxnb3JpdGhtZ1NI" +
+        "QS0yNTZsdmFsdWVEaWdlc3RzoXFvcmcuaXNvLjE4MDEzLjUuMbgaAFggMB0u" +
+        "LEYoIneUL0kereEYCwIDPhFlzG8CRz8mhaOAjqYBWCDeL02NKHTFMnNnvQhi" +
+        "CvqpTol-KZsWotcrp0qQZX5d5QJYIEe49kmpXoF28fhJp_mmyvaJ9_DWptgc" +
+        "iOwNDLjvGG3vA1ggwS9c7Pgo_bVTGX6_kKL6b_S_XdFpJeZrNPIzztOfIiYE" +
+        "WCAewkcL6ERlKhMrKfRcIc6kk4686GEw9391vK-1DqC3OAVYICjzEaK6wNF3" +
+        "xg2ihweQATbQe3NWUevjQJA6UE7qgKxBBlgg3HBSVgWY5xeur7rNraq3xyiL" +
+        "9nUWMGU5aOJsSc8tspcHWCAb4P2vyc0Y5AaqLTtupspXYNYOadmK6xPBSlf9" +
+        "CTB6DQhYIIi6l_O69bNVfXPwXmyTIDNGgWUCgasiNr3Py4vtd8lgCVggm_9U" +
+        "faiuFMpyG5Wk25RMt_NRsRyo_hX1NR1PqzTMeeEKWCCGP-XEprUyt6azpavK" +
+        "itGk-A1uv3_SrJuXqm4MAlZHvAtYIHdyYg5YZxq_Zu5g7ERaw3LytEpihtNT" +
+        "_oXk2eKXsNXBDFgg_5GNWEZH0tJQ_Yd12HuMQCKg0cx2KthoMznsTj3wxeUN" +
+        "WCBU8driwLnS1IB97lWGJ2J79P-tg8FjIZ5CvFIBJ6FACg5YIIIJZd7HfHi0" +
+        "6lFp0IbKCcrsVz86mIt39RxTR-603zCgD1ggE20AVA9nIp5-ttQ9i6CU8UD3" +
+        "U3GrH-L-FNoYSlZ_j_0QWCAy6d3Q8GMFj_I_m2KLaw-X-S4eMRBmE7O2Ou_J" +
+        "_H09mxFYIGxt_8sVd3BoMRZiu-uBJovSmstMIgFXSM2FaMmXSydnElggxQJZ" +
+        "bssCwVYRnv2ZdAa1eNkFdvgalLNfMEhxpTnNiIsTWCB_u8P7WHe8ll2-OxbM" +
+        "2UXLxNNDPJUQaXo4438QLdSunBRYIMcUaKm2dLv44pOSZvwwTw7y1c3pRiLh" +
+        "S0Or4EQp1ozIFVgg2qZd8xExSL5Ypu6JigV2F3IzdAGCqNq109RVDAHpwsUW" +
+        "WCAfpZrVbcpvXhUwrXewy0LMWpWW8ZmbUiGkM8UARkKEMBdYIIRZ3sDbFWF1" +
+        "31NYO2ATE3BrFJLY_2cTzk_UrJ9Vm84RGBhYIG29wGNAT-5IBorJLIin3-bg" +
+        "AYOXW6G_fSa2zFh0J1zFGBlYIAummtqcnzwR_AjgluEA9xb8ClHXm7nDFArD" +
+        "_uyNnpkHbWRldmljZUtleUluZm-haWRldmljZUtleaQBAiABIVgglui92Ffs" +
+        "uUU1Q0Sq1ZYIrAOxLzzPS4674eae1vRHoRwiWCAJJtjfLV3LGzfmoBLuCw_y" +
+        "3Nv1fmCd_YRby0hzYn8Tnmdkb2NUeXBldW9yZy5pc28uMTgwMTMuNS4xLm1E" +
+        "TGx2YWxpZGl0eUluZm-jZnNpZ25lZMB4HjIwMjUtMDItMDdUMTQ6MTQ6MTQu" +
+        "NTgxNjk3NDM2Wml2YWxpZEZyb23AeB4yMDI1LTAyLTA3VDE0OjE0OjE0LjU4" +
+        "MTY5NzQzNlpqdmFsaWRVbnRpbMB4HjIwMjctMDItMDdUMTQ6MTQ6MTQuNTgx" +
+        "Njk3NDM2WlhAGmdQqmiiBzUJkYj_dUzBwGjjwWMdO_qC_MmEvP-ni6il-VTB" +
+        "kJe2952j87Oa9v-a-HbfTcAKgX7w0BFb46iAs2xkZXZpY2VTaWduZWSiam5h" +
+        "bWVTcGFjZXPYGEGgamRldmljZUF1dGihb2RldmljZVNpZ25hdHVyZYRDoQEm" +
+        "oPZYQOsoPictwMbFLFsbHRyS7GnPn9nHYogN-xkLYjJv0DGs0YU7LhAHRpqL" +
+        "GFe1ira5MD7ryABhUSUeoNth94vr3W1mc3RhdHVzAA"
+
+private val DcqlQuery = """
+{
+    "credentials": [
         {
-          "id": "my_query",
-          "format": "dc+sd-jwt",
-          "meta": {
-            "vct_values": [
-              "https://credentials.example.com/identity_credential"
+            "id": "eu_europa_ec_eudi_pid_1",
+            "format": "mso_mdoc",
+            "meta": {
+                "doctype_value": "eu.europa.ec.eudi.pid.1"
+            },
+            "claims": [
+                {
+                    "namespace": "eu.europa.ec.eudi.pid.1",
+                    "claim_name": "family_name"
+                }
             ]
-          },
-          "claims": [
-            {
-              "path": [
-                "family_name"
-              ]
-            }
-          ]
         }
-      ]
-    }
+    ]
+}
 """.trimIndent()

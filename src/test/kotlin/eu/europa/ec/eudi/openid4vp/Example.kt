@@ -285,7 +285,6 @@ sealed interface Transaction {
             val transactionData = TransactionData(
                 TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                 listOf(TransactionDataCredentialId(inputDescriptorId.value)),
-                listOf(HashAlgorithm.SHA_256),
             ) {
                 put("purpose", "We must verify your Family Name")
             }
@@ -299,7 +298,6 @@ sealed interface Transaction {
             val transactionData = TransactionData(
                 TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                 listOf(TransactionDataCredentialId(queryId.value)),
-                listOf(HashAlgorithm.SHA_256),
             ) {
                 put("purpose", "We must verify your Family Name")
             }

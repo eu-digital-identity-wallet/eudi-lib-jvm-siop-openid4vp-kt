@@ -36,11 +36,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
@@ -154,8 +150,8 @@ class Verifier private constructor(
                             ifSiop = {
                                 initSiopTransaction(client, verifierApi, nonce)
                             },
-                            ifOpenId4VP = { presentationQuery ->
-                                initOpenId4VpTransaction(client, verifierApi, nonce, presentationQuery)
+                            ifOpenId4VP = { presentationQuery, transactionData ->
+                                initOpenId4VpTransaction(client, verifierApi, nonce, presentationQuery, transactionData)
                             },
                         )
                         val presentationId = initTransactionResponse["transaction_id"]!!.jsonPrimitive.content
@@ -169,17 +165,14 @@ class Verifier private constructor(
 
         private suspend fun initSiopTransaction(client: HttpClient, verifierApi: URL, nonce: String): JsonObject {
             verifierPrintln("Placing to verifier endpoint  SIOP authentication request ...")
-            val request =
-                """
-                    {
-                        "type": "id_token",
-                        "nonce": "$nonce",
-                        "id_token_type": "subject_signed_id_token",
-                        "response_mode": "direct_post.jwt",
-                        "jar_mode": "by_reference",
-                        "wallet_response_redirect_uri_template":"https://foo?response_code={RESPONSE_CODE}"    
-                    }
-                """.trimIndent()
+            val request = buildJsonObject {
+                put("type", "id_token")
+                put("nonce", nonce)
+                put("id_token_type", "subject_signed_id_token")
+                put("response_mode", "direct_post.jwt")
+                put("jar_mode", "by_reference")
+                put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
+            }
             return initTransaction(client, verifierApi, request)
         }
 
@@ -188,27 +181,28 @@ class Verifier private constructor(
             verifierApi: URL,
             nonce: String,
             presentationQuery: Transaction.PresentationQuery,
+            transactionData: List<TransactionData>?,
         ): JsonObject {
             verifierPrintln("Placing to verifier endpoint OpenId4Vp authorization request  ...")
-
-            val (key, value) = when (presentationQuery) {
-                is Transaction.PresentationQuery.PresentationExchange ->
-                    "presentation_definition" to jsonSupport.encodeToString(presentationQuery.presentationDefinition)
-                is Transaction.PresentationQuery.DCQL -> "dcql_query" to jsonSupport.encodeToString(presentationQuery.query)
-            }
-            val request =
-                """
-                    {
-                        "type": "vp_token",
-                        "nonce": "$nonce",
-                        "$key": $value,
-                        "response_mode": "direct_post.jwt",
-                        "presentation_definition_mode": "by_reference"
-                        "jar_mode": "by_reference",
-                        "wallet_response_redirect_uri_template":"https://foo?response_code={RESPONSE_CODE}"       
+            val request = buildJsonObject {
+                put("type", "vp_token")
+                put("nonce", nonce)
+                when (presentationQuery) {
+                    is Transaction.PresentationQuery.PresentationExchange ->
+                        put("presentation_definition", jsonSupport.encodeToJsonElement(presentationQuery.presentationDefinition))
+                    is Transaction.PresentationQuery.DCQL ->
+                        put("dcql_query", jsonSupport.encodeToJsonElement(presentationQuery.query))
+                }
+                put("response_mode", "direct_post.jwt")
+                put("presentation_definition_mode", "by_reference")
+                put("jar_mode", "by_reference")
+                put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
+                if (!transactionData.isNullOrEmpty()) {
+                    putJsonArray("transaction_data") {
+                        addAll(transactionData.map { it.json })
                     }
-                """.trimIndent()
-
+                }
+            }
             return initTransaction(client, verifierApi, request)
         }
 
@@ -254,7 +248,16 @@ sealed interface Transaction {
     }
 
     data object SIOP : Transaction
-    data class OpenId4VP(val presentationQuery: PresentationQuery) : Transaction
+    data class OpenId4VP(
+        val presentationQuery: PresentationQuery,
+        val transactionData: List<TransactionData>? = null,
+    ) : Transaction {
+        init {
+            transactionData?.let {
+                require(it.isNotEmpty()) { "transactionData must not be empty if provided" }
+            }
+        }
+    }
 
     companion object {
         val PregExMsoMdocPidRequest = OpenId4VP(
@@ -273,10 +276,10 @@ sealed interface Transaction {
 
 suspend fun <T> Transaction.fold(
     ifSiop: suspend () -> T,
-    ifOpenId4VP: suspend (Transaction.PresentationQuery) -> T,
+    ifOpenId4VP: suspend (Transaction.PresentationQuery, List<TransactionData>?) -> T,
 ): T = when (this) {
     Transaction.SIOP -> ifSiop()
-    is Transaction.OpenId4VP -> ifOpenId4VP(presentationQuery)
+    is Transaction.OpenId4VP -> ifOpenId4VP(presentationQuery, transactionData)
 }
 
 private class Wallet(

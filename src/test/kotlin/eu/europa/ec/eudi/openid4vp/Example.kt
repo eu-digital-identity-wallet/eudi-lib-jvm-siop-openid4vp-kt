@@ -15,15 +15,17 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.*
+import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64URL
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.X509SanDns
+import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.prex.*
 import io.ktor.client.*
@@ -40,6 +42,7 @@ import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.time.Clock
@@ -82,8 +85,10 @@ fun main(): Unit = runBlocking {
     }
 
     runUseCase(Transaction.SIOP)
-    runUseCase(Transaction.PregExMsoMdocPidRequest)
-    runUseCase(Transaction.DcqlMsoMdocPidRequest)
+    runUseCase(Transaction.MsoMdocPidPresentationExchange)
+    runUseCase(Transaction.MsoMdocPidDcql)
+    runUseCase(Transaction.SdJwtVcPidPresentationExchange)
+    runUseCase(Transaction.SdJwtVcPidDcql)
 }
 
 @Serializable
@@ -260,17 +265,47 @@ sealed interface Transaction {
     }
 
     companion object {
-        val PregExMsoMdocPidRequest = OpenId4VP(
+        val MsoMdocPidPresentationExchange = OpenId4VP(
             PresentationQuery.PresentationExchange(
                 jsonSupport.decodeFromString(loadResource("/example/mso_mdoc-pid-presentation-definition.json")),
             ),
         )
 
-        val DcqlMsoMdocPidRequest = OpenId4VP(
+        val MsoMdocPidDcql = OpenId4VP(
             PresentationQuery.DCQL(
                 jsonSupport.decodeFromString(loadResource("/example/mso_mdoc-pid-dcql-query.json")),
             ),
         )
+
+        val SdJwtVcPidPresentationExchange = run {
+            val presentationDefinition = jsonSupport.decodeFromString<PresentationDefinition>(
+                loadResource("/example/sd-jwt-vc-pid-presentation-definition.json"),
+            )
+            val inputDescriptorId = presentationDefinition.inputDescriptors.first().id
+            val transactionData = TransactionData(
+                TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
+                listOf(TransactionDataCredentialId(inputDescriptorId.value)),
+                listOf(HashAlgorithm.SHA_256),
+            ) {
+                put("purpose", "We must verify your Family Name")
+            }
+
+            OpenId4VP(PresentationQuery.PresentationExchange(presentationDefinition), listOf(transactionData))
+        }
+
+        val SdJwtVcPidDcql = run {
+            val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-pid-dcql-query.json"))
+            val queryId = dcql.credentials.first().id
+            val transactionData = TransactionData(
+                TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
+                listOf(TransactionDataCredentialId(queryId.value)),
+                listOf(HashAlgorithm.SHA_256),
+            ) {
+                put("purpose", "We must verify your Family Name")
+            }
+
+            OpenId4VP(PresentationQuery.DCQL(dcql), listOf(transactionData))
+        }
     }
 }
 
@@ -347,21 +382,30 @@ private class Wallet(
                 val presentationDefinition = presentationQuery.value
                 check(1 == presentationDefinition.inputDescriptors.size) { "found more than 1 input descriptors" }
                 val inputDescriptor = presentationDefinition.inputDescriptors.first()
-                val format = checkNotNull(inputDescriptor.format ?: presentationDefinition.format) { "format not defined" }
-                check("mso_mdoc" in format.jsonObject()) { "'mso_mdoc' not a supported format" }
+                val requestedFormats =
+                    checkNotNull(
+                        inputDescriptor.format?.jsonObject()?.keys
+                            ?: presentationDefinition.format?.jsonObject()?.keys,
+                    ) { "formats not defined" }
+                check(1 == requestedFormats.size) { "found more than 1 formats" }
+
+                val format = requestedFormats.first()
+                val verifiablePresentation = when (format) {
+                    "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
+                    "vc+sd-jwt" -> prepareSdJwtVcVerifiablePresentation(request.client, request.nonce, request.transactionData)
+                    else -> error("unsupported format $format")
+                }
 
                 Consensus.PositiveConsensus.VPTokenConsensus(
                     vpContent = VpContent.PresentationExchange(
-                        verifiablePresentations = listOf(
-                            VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt")),
-                        ),
+                        verifiablePresentations = listOf(verifiablePresentation),
                         presentationSubmission = PresentationSubmission(
                             id = Id(UUID.randomUUID().toString()),
                             definitionId = presentationDefinition.id,
                             listOf(
                                 DescriptorMap(
                                     id = inputDescriptor.id,
-                                    format = "mso_mdoc",
+                                    format = format,
                                     path = JsonPath.jsonPath("$")!!,
                                 ),
                             ),
@@ -373,17 +417,67 @@ private class Wallet(
                 val query = presentationQuery.value
                 check(1 == query.credentials.size) { "found more than 1 credentials" }
                 val credential = query.credentials.first()
-                check("mso_mdoc" == credential.format.value) { "'mso_mdoc' not a supported format" }
+
+                val verifiablePresentation = when (val format = credential.format.value) {
+                    "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
+                    "vc+sd-jwt" -> prepareSdJwtVcVerifiablePresentation(request.client, request.nonce, request.transactionData)
+                    else -> error("unsupported format $format")
+                }
 
                 Consensus.PositiveConsensus.VPTokenConsensus(
                     vpContent = VpContent.DCQL(
                         verifiablePresentations = mapOf(
-                            credential.id to VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt")),
+                            credential.id to verifiablePresentation,
                         ),
                     ),
                 )
             }
         }
+    }
+
+    private fun prepareSdJwtVcVerifiablePresentation(
+        audience: Client,
+        nonce: String,
+        transactionData: List<TransactionData>?,
+    ): VerifiablePresentation.Generic {
+        val sdJwtVc = loadResource("/example/sd-jwt-vc-pid.txt")
+        val sdHash = run {
+            val digest = MessageDigest.getInstance("SHA3-256")
+            digest.update(sdJwtVc.encodeToByteArray())
+            base64UrlNoPadding.encode(digest.digest())
+        }
+        val keyBindingJwt = run {
+            val key = RSAKey.parse(loadResource("/example/sd-jwt-vc-pid-key.json"))
+                .also {
+                    check(it.isPrivate) { "a private key is required" }
+                }
+            val header = JWSHeader.Builder(JWSAlgorithm.RS256)
+                .type(JOSEObjectType("kb+jwt"))
+                .keyID(key.keyID)
+                .build()
+            val claims = JWTClaimsSet.Builder()
+                .audience(audience.id.clientId)
+                .claim("nonce", nonce)
+                .issueTime(Date.from(walletConfig.clock.instant()))
+                .claim("sd_hash", sdHash)
+                .apply {
+                    if (!transactionData.isNullOrEmpty()) {
+                        check(transactionData.all { HashAlgorithm.SHA_256 in it.hashAlgorithms })
+
+                        val transactionDataHashes = transactionData.map {
+                            val digest = MessageDigest.getInstance("SHA-256")
+                            digest.update(it.value.encodeToByteArray())
+                            base64UrlNoPadding.encode(digest.digest())
+                        }
+
+                        claim("transaction_data_hashes_alg", HashAlgorithm.SHA_256.name)
+                        claim("transaction_data_hashes", transactionDataHashes)
+                    }
+                }
+                .build()
+            SignedJWT(header, claims).apply { sign(RSASSASigner(key)) }
+        }
+        return VerifiablePresentation.Generic("$sdJwtVc${keyBindingJwt.serialize()}")
     }
 
     companion object {
@@ -431,7 +525,15 @@ object SslSettings {
 
 private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
-        vpConfiguration = VPConfiguration(vpFormats = VpFormats(VpFormat.MsoMdoc)),
+        vpConfiguration = VPConfiguration(
+            vpFormats = VpFormats(VpFormat.MsoMdoc),
+            supportedTransactionDataTypes = listOf(
+                SupportedTransactionDataType(
+                    TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
+                    setOf(HashAlgorithm.SHA_256),
+                ),
+            ),
+        ),
         jarmConfiguration = JarmConfiguration.Encryption(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
             supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),

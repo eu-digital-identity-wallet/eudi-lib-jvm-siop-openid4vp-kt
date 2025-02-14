@@ -1,0 +1,47 @@
+{
+  "id": "0ebdb6a3-3016-4897-a563-15bb549fc71b",
+  "input_descriptors": [
+    {
+      "id": "63638937-054f-4762-9351-72b378fef741",
+      "name": "Person Identification Data (PID)",
+      "purpose": "",
+      "format": {
+        "vc+sd-jwt": {
+          "sd-jwt_alg_values": [
+            "ES256",
+            "ES384",
+            "RS256",
+            "RS384",
+            "RS512"
+          ],
+          "kb-jwt_alg_values": [
+            "ES256",
+            "ES384",
+            "RS256",
+            "RS384",
+            "RS512"
+          ]
+        }
+      },
+      "constraints": {
+        "fields": [
+          {
+            "path": [
+              "$.vct"
+            ],
+            "filter": {
+              "type": "string",
+              "const": "urn:eu.europa.ec.eudi:pid:1"
+            }
+          },
+          {
+            "path": [
+              "$.family_name"
+            ],
+            "intent_to_retain": false
+          }
+        ]
+      }
+    }
+  ]
+}

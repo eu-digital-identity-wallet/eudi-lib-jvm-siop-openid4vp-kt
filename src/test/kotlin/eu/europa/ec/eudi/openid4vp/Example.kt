@@ -524,7 +524,7 @@ object SslSettings {
 private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
     SiopOpenId4VPConfig(
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(VpFormat.MsoMdoc),
+            vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
             supportedTransactionDataTypes = listOf(
                 SupportedTransactionDataType(
                     TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),

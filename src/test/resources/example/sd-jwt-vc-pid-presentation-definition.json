@@ -10,9 +10,7 @@
           "sd-jwt_alg_values": [
             "ES256",
             "ES384",
-            "RS256",
-            "RS384",
-            "RS512"
+            "ES512"
           ],
           "kb-jwt_alg_values": [
             "ES256",

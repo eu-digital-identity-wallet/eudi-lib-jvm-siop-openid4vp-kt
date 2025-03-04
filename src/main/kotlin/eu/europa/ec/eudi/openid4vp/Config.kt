@@ -148,21 +148,29 @@ sealed interface SupportedClientIdScheme {
     }
 }
 
-@JvmInline
-value class VpFormats(val values: List<VpFormat>) {
-
-    constructor(vararg formats: VpFormat) : this(formats.toList())
-
+data class VpFormats(
+    val sdJwtVc: VpFormat.SdJwtVc? = null,
+    val msoMdoc: VpFormat.MsoMdoc? = null,
+) {
     init {
-        ensureUniquePerFormat(values)
+        require(sdJwtVc != null || msoMdoc != null) {
+            "At least one format must be specified."
+        }
     }
 
-    operator fun contains(that: VpFormat) = that in values
-
     companion object {
-        val Empty: VpFormats = VpFormats(emptyList())
 
-        internal fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
+        operator fun invoke(vararg formats: VpFormat) = VpFormats(formats.toList())
+
+        operator fun invoke(formats: List<VpFormat>) {
+            require(formats.isNotEmpty()) { "At least one format must be specified." }
+            ensureUniquePerFormat(formats)
+            val sdJwt = formats.filterIsInstance<VpFormat.SdJwtVc>().firstOrNull()
+            val msoMdoc = formats.filterIsInstance<VpFormat.MsoMdoc>().firstOrNull()
+            VpFormats(sdJwt, msoMdoc)
+        }
+
+        private fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
             formats
                 .groupBy { it.formatName() }
                 .forEach { (formatName, instances) ->
@@ -176,7 +184,7 @@ value class VpFormats(val values: List<VpFormat>) {
             MSO_MDOC, SD_JWT_VC
         }
         private fun VpFormat.formatName() = when (this) {
-            VpFormat.MsoMdoc -> FormatName.MSO_MDOC
+            is VpFormat.MsoMdoc -> FormatName.MSO_MDOC
             is VpFormat.SdJwtVc -> FormatName.SD_JWT_VC
         }
     }
@@ -328,13 +336,14 @@ sealed interface VpFormat : java.io.Serializable {
         }
     }
 
-    data object MsoMdoc : VpFormat {
-        private fun readResolve(): Any = MsoMdoc
-    }
+    data class MsoMdoc(val algorithms: List<JWSAlgorithm>) : VpFormat {
+        init {
+            require(algorithms.isNotEmpty()) { "Mso-doc algorithms cannot be empty" }
+        }
 
-    companion object {
-        fun sdJwtVc(sdJwtAlgorithms: List<JWSAlgorithm>, kbJwtAlgorithms: List<JWSAlgorithm>): SdJwtVc =
-            SdJwtVc(sdJwtAlgorithms, kbJwtAlgorithms)
+        companion object {
+            val ES256 = MsoMdoc(listOf(JWSAlgorithm.ES256))
+        }
     }
 }
 

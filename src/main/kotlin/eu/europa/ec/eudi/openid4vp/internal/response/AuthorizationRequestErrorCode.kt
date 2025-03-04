@@ -106,6 +106,8 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 -> PROCESSING_FAILURE
 
                 is InvalidTransactionData -> INVALID_TRANSACTION_DATA
+
+                ClientVpFormatsNotSupportedFromWallet -> VP_FORMATS_NOT_SUPPORTED
             }
         }
     }

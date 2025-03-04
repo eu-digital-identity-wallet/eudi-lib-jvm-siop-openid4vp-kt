@@ -42,13 +42,14 @@ internal class RequestObjectResolver(
     ): ResolvedRequestObject = coroutineScope {
         val presentationQuery = query(request.querySource)
         val transactionData = request.transactionData?.let { resolveTransactionData(presentationQuery, it) }
+        val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
             client = request.client.toClient(),
             responseMode = request.responseMode,
             state = request.state,
             nonce = request.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
-            vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
+            vpFormats = vpFormatsCommonGround,
             idTokenType = request.idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
@@ -63,16 +64,44 @@ internal class RequestObjectResolver(
     ): ResolvedRequestObject {
         val presentationQuery = query(authorization.querySource)
         val transactionData = authorization.transactionData?.let { resolveTransactionData(presentationQuery, it) }
+        val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
         return ResolvedRequestObject.OpenId4VPAuthorization(
             client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
             state = authorization.state,
             nonce = authorization.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
-            vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
+            vpFormats = vpFormatsCommonGround,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
         )
+    }
+
+    private fun resolveVpFormatsCommonGround(clientVpFormats: VpFormats): VpFormats {
+        val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.vpFormats
+        val scg = (walletSupportedVpFormats.sdJwtVc to clientVpFormats.sdJwtVc).commonGround()
+        val mcg = (walletSupportedVpFormats.msoMdoc to clientVpFormats.msoMdoc).commonGround()
+        return if (scg != null || mcg != null)
+            VpFormats(scg, mcg)
+        else
+            throw ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+    }
+
+    private fun Pair<VpFormat.SdJwtVc?, VpFormat.SdJwtVc?>.commonGround(): VpFormat.SdJwtVc? {
+        val kbJwtAlgs = first?.kbJwtAlgorithms?.intersect((second?.kbJwtAlgorithms?.toSet() ?: emptySet()).toSet())
+        val sdJwtAlgs = first?.sdJwtAlgorithms?.intersect((second?.sdJwtAlgorithms?.toSet() ?: emptySet()).toSet())
+        return if (!kbJwtAlgs.isNullOrEmpty() && !sdJwtAlgs.isNullOrEmpty()) {
+            VpFormat.SdJwtVc(sdJwtAlgs.toList(), kbJwtAlgs.toList())
+        } else
+            null
+    }
+
+    private fun Pair<VpFormat.MsoMdoc?, VpFormat.MsoMdoc?>.commonGround(): VpFormat.MsoMdoc? {
+        val algs = first?.algorithms?.intersect((second?.algorithms?.toSet() ?: emptySet()).toSet())
+        return if (!algs.isNullOrEmpty()) {
+            VpFormat.MsoMdoc(algs.toList())
+        } else
+            null
     }
 
     private fun resolveIdTokenRequest(

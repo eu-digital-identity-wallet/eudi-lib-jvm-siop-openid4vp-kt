@@ -59,7 +59,7 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
 
     private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
         try {
-            VpFormats(unvalidated.vpFormats?.formats().orEmpty())
+            unvalidated.vpFormats.toDomain()
         } catch (e: IllegalArgumentException) {
             throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
         }
@@ -108,7 +108,7 @@ private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData, responseMode:
         ?: throw RequestValidationError.InvalidClientMetaData("Invalid signing algorithm $unvalidatedAlg").asException()
 }
 
-private fun String.signingAlg(): JWSAlgorithm? =
+internal fun String.signingAlg(): JWSAlgorithm? =
     JWSAlgorithm.parse(this).takeIf { JWSAlgorithm.Family.SIGNATURE.contains(it) }
 
 private fun String.encAlg(): JWEAlgorithm? = JWEAlgorithm.parse(this)
@@ -172,20 +172,20 @@ private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
     }
 }
 
-private fun VpFormatsTO.formats(): List<VpFormat> {
-    fun VcSdJwtTO.format(): VpFormat.SdJwtVc {
-        fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
-        return VpFormat.SdJwtVc(
-            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
-            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
-        )
-    }
-
-    return buildList {
-        msoMdoc?.let { add(VpFormat.MsoMdoc) }
-        vcSdJwt?.let { sdJwtVc -> add(sdJwtVc.format()) }
-    }
-}
+// private fun VpFormatsTO.formats(): List<VpFormat> {
+//    fun VcSdJwtTO.format(): VpFormat.SdJwtVc {
+//        fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
+//        return VpFormat.SdJwtVc(
+//            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
+//            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
+//        )
+//    }
+//
+//    return buildList {
+//        msoMdoc?.let { add(VpFormat.MsoMdoc) }
+//        vcSdJwt?.let { sdJwtVc -> add(sdJwtVc.format()) }
+//    }
+// }
 
 private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { test ->
     when (test(left) to test(right)) {

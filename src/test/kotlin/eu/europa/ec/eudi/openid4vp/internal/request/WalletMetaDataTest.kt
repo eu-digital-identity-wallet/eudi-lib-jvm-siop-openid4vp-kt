@@ -34,11 +34,8 @@ class WalletMetaDataTest {
                 presentationDefinitionUriSupported = false,
                 knownPresentationDefinitionsPerScope = emptyMap(),
                 vpFormats = VpFormats(
-                    VpFormat.MsoMdoc,
-                    VpFormat.sdJwtVc(
-                        sdJwtAlgorithms = listOf(JWSAlgorithm.ES256),
-                        kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
-                    ),
+                    VpFormat.SdJwtVc.ES256,
+                    VpFormat.MsoMdoc.ES256,
                 ),
             ),
             jarmConfiguration = JarmConfiguration.Encryption(
@@ -57,8 +54,8 @@ class WalletMetaDataTest {
                 presentationDefinitionUriSupported = false,
                 knownPresentationDefinitionsPerScope = emptyMap(),
                 vpFormats = VpFormats(
-                    VpFormat.MsoMdoc,
                     VpFormat.SdJwtVc.ES256,
+                    VpFormat.MsoMdoc.ES256,
                 ),
             ),
             jarmConfiguration = JarmConfiguration.NotSupported,
@@ -165,13 +162,12 @@ private fun assertExpectedVpFormats(
         walletMetaData["vp_formats_supported"],
         "Missing vp_formats_supported",
     )
-    assertEquals(vpFormats.size, vpFormats.size)
-    if (VpFormat.MsoMdoc in expectedVpFormats) {
+    if (expectedVpFormats.msoMdoc != null) {
         val msoMdoc = assertNotNull(vpFormats["mso_mdoc"])
         assertIs<JsonObject>(msoMdoc)
-        assertTrue { msoMdoc.isEmpty() }
+        assertTrue { msoMdoc.isNotEmpty() }
     }
-    val sdJwtVcSupport = expectedVpFormats.values.filterIsInstance<VpFormat.SdJwtVc>().firstOrNull()
+    val sdJwtVcSupport = expectedVpFormats.sdJwtVc
     if (sdJwtVcSupport != null) {
         val sdJwtVc = assertNotNull(vpFormats["vc+sd-jwt"])
         assertIs<JsonObject>(sdJwtVc)

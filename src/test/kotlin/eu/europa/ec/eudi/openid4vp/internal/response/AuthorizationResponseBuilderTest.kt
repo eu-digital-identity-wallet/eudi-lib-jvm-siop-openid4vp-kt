@@ -28,6 +28,7 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
 import eu.europa.ec.eudi.prex.Id
@@ -55,7 +56,7 @@ class AuthorizationResponseBuilderTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -77,12 +78,18 @@ class AuthorizationResponseBuilderTest {
                 "did:example",
                 "did:key",
             ),
+            vpFormats = VpFormatsTO.make(
+                VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+            ),
         )
 
         val metaDataRequestingEncryptedResponse = UnvalidatedClientMetaData(
             jwks = JWKSet(jarmEncryptionKeyPair).toJsonObject(true),
             authorizationEncryptedResponseAlg = jarmEncryptionKeyPair.algorithm.name,
             authorizationEncryptedResponseEnc = EncryptionMethod.A256GCM.name,
+            vpFormats = VpFormatsTO.make(
+                VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+            ),
         )
 
         private fun JWKSet.toJsonObject(publicKeysOnly: Boolean = true): JsonObject =
@@ -154,7 +161,7 @@ class AuthorizationResponseBuilderTest {
                         ),
                     ),
                     jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
-                    vpFormats = VpFormats(VpFormat.MsoMdoc),
+                    vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

@@ -148,21 +148,37 @@ sealed interface SupportedClientIdScheme {
     }
 }
 
-@JvmInline
-value class VpFormats(val values: List<VpFormat>) {
-
-    constructor(vararg formats: VpFormat) : this(formats.toList())
-
+data class VpFormats(
+    val sdJwtVc: VpFormat.SdJwtVc? = null,
+    val msoMdoc: VpFormat.MsoMdoc? = null,
+) {
     init {
-        ensureUniquePerFormat(values)
+        require(sdJwtVc != null || msoMdoc != null) {
+            "At least one format must be specified."
+        }
     }
 
-    operator fun contains(that: VpFormat) = that in values
-
     companion object {
-        val Empty: VpFormats = VpFormats(emptyList())
 
-        internal fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
+        operator fun invoke(vararg formats: VpFormat) = VpFormats(formats.toList())
+
+        operator fun invoke(formats: List<VpFormat>) {
+            require(formats.isNotEmpty()) { "At least one format must be specified." }
+            ensureUniquePerFormat(formats)
+            val sdJwt = formats.filterIsInstance<VpFormat.SdJwtVc>().firstOrNull()
+            val msoMdoc = formats.filterIsInstance<VpFormat.MsoMdoc>().firstOrNull()
+            VpFormats(sdJwt, msoMdoc)
+        }
+
+        fun intersect(thiz: VpFormats, that: VpFormats): VpFormats? {
+            val scg = thiz.sdJwtVc?.intersect(that.sdJwtVc)
+            val mcg = thiz.msoMdoc?.intersect(that.msoMdoc)
+            return if (scg != null || mcg != null) {
+                VpFormats(scg, mcg)
+            } else null
+        }
+
+        private fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
             formats
                 .groupBy { it.formatName() }
                 .forEach { (formatName, instances) ->
@@ -176,7 +192,7 @@ value class VpFormats(val values: List<VpFormat>) {
             MSO_MDOC, SD_JWT_VC
         }
         private fun VpFormat.formatName() = when (this) {
-            VpFormat.MsoMdoc -> FormatName.MSO_MDOC
+            is VpFormat.MsoMdoc -> FormatName.MSO_MDOC
             is VpFormat.SdJwtVc -> FormatName.SD_JWT_VC
         }
     }
@@ -323,18 +339,38 @@ sealed interface VpFormat : java.io.Serializable {
             require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
         }
 
+        fun intersect(that: SdJwtVc?): SdJwtVc? {
+            if (that == null) return null
+
+            val kbJwtAlgs = kbJwtAlgorithms.intersect(that.kbJwtAlgorithms.toSet())
+            val sdJwtAlgs = sdJwtAlgorithms.intersect(that.sdJwtAlgorithms.toSet())
+            return if (sdJwtAlgs.isNotEmpty() && kbJwtAlgs.isNotEmpty())
+                SdJwtVc(sdJwtAlgs.toList(), kbJwtAlgs.toList())
+            else null
+        }
+
         companion object {
             val ES256 = SdJwtVc(listOf(JWSAlgorithm.ES256), listOf(JWSAlgorithm.ES256))
         }
     }
 
-    data object MsoMdoc : VpFormat {
-        private fun readResolve(): Any = MsoMdoc
-    }
+    data class MsoMdoc(val algorithms: List<JWSAlgorithm>) : VpFormat {
+        init {
+            require(algorithms.isNotEmpty()) { "Mso-doc algorithms cannot be empty" }
+        }
 
-    companion object {
-        fun sdJwtVc(sdJwtAlgorithms: List<JWSAlgorithm>, kbJwtAlgorithms: List<JWSAlgorithm>): SdJwtVc =
-            SdJwtVc(sdJwtAlgorithms, kbJwtAlgorithms)
+        fun intersect(that: MsoMdoc?): MsoMdoc? {
+            if (that == null) return null
+
+            val algs = algorithms.intersect(that.algorithms.toSet())
+            return if (algs.isNotEmpty())
+                MsoMdoc(algs.toList())
+            else null
+        }
+
+        companion object {
+            val ES256 = MsoMdoc(listOf(JWSAlgorithm.ES256))
+        }
     }
 }
 

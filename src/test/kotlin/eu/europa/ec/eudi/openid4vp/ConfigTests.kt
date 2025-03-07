@@ -25,7 +25,7 @@ class ConfigTests {
     @Test
     fun `vp_format with at most one instance per format is ok`() {
         assertDoesNotThrow {
-            VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256)
+            VpFormats(VpFormat.MsoMdoc.ES256, VpFormat.SdJwtVc.ES256)
         }
     }
 
@@ -33,18 +33,18 @@ class ConfigTests {
     fun `vp_format with multiple format instances for a given format is not allowed`() {
         assertThrows<IllegalArgumentException> {
             VpFormats(
-                VpFormat.MsoMdoc,
-                VpFormat.MsoMdoc,
+                VpFormat.MsoMdoc(listOf(JWSAlgorithm.ES384)),
+                VpFormat.MsoMdoc(listOf(JWSAlgorithm.ES384)),
             )
         }
 
         assertThrows<IllegalArgumentException> {
             VpFormats(
-                VpFormat.sdJwtVc(
+                VpFormat.SdJwtVc(
                     sdJwtAlgorithms = listOf(JWSAlgorithm.ES384),
                     kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
                 ),
-                VpFormat.sdJwtVc(
+                VpFormat.SdJwtVc(
                     sdJwtAlgorithms = listOf(JWSAlgorithm.RS256),
                     kbJwtAlgorithms = listOf(JWSAlgorithm.RS256),
                 ),

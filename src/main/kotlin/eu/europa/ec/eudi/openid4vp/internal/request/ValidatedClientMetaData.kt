@@ -24,7 +24,7 @@ import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaD
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.*
 
 @Serializable
 internal data class UnvalidatedClientMetaData(
@@ -34,26 +34,26 @@ internal data class UnvalidatedClientMetaData(
     @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
     @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
-    @SerialName("vp_formats") val vpFormats: VpFormatsTO? = null,
+    @SerialName("vp_formats") val vpFormats: VpFormatsTO,
 )
 
 @Serializable
 internal class VpFormatsTO(
     @SerialName("vc+sd-jwt") val vcSdJwt: VcSdJwtTO? = null,
-    @SerialName("mso_mdoc") val msoMdoc: JsonObject? = null,
+    @SerialName("mso_mdoc") val msoMdoc: MsoMdocTO? = null,
 ) {
+
+    fun toDomain(): VpFormats {
+        return VpFormats(vcSdJwt?.toDomain(), msoMdoc?.toDomain())
+    }
+
     companion object {
 
         fun make(fs: VpFormats): VpFormatsTO {
-            val vcSdJwt = fs.values.filterIsInstance<VpFormat.SdJwtVc>().run {
-                check(size <= 1)
-                firstOrNull()?.let { VcSdJwtTO.make(it) }
-            }
-            val msdMdoc = fs.values.filterIsInstance<VpFormat.MsoMdoc>().run {
-                check(size <= 1)
-                firstOrNull()?.let { JsonObject(emptyMap()) }
-            }
-            return VpFormatsTO(vcSdJwt, msdMdoc)
+            return VpFormatsTO(
+                vcSdJwt = fs.sdJwtVc?.let { VcSdJwtTO.make(it) },
+                msoMdoc = fs.msoMdoc?.let { MsoMdocTO.make(it) },
+            )
         }
     }
 }
@@ -63,6 +63,13 @@ internal class VcSdJwtTO(
     @SerialName("sd-jwt_alg_values") val sdJwtAlgorithms: List<String>? = null,
     @SerialName("kb-jwt_alg_values") val kdJwtAlgorithms: List<String>? = null,
 ) {
+    fun toDomain(): VpFormat.SdJwtVc {
+        return VpFormat.SdJwtVc(
+            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
+            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
+        )
+    }
+
     companion object {
         fun make(f: VpFormat.SdJwtVc): VcSdJwtTO {
             return VcSdJwtTO(
@@ -73,13 +80,31 @@ internal class VcSdJwtTO(
     }
 }
 
+@Serializable
+internal class MsoMdocTO(
+    @SerialName("alg") val alg: List<String>? = null,
+) {
+    fun toDomain(): VpFormat.MsoMdoc {
+        return VpFormat.MsoMdoc(alg.algs())
+    }
+
+    companion object {
+
+        fun make(f: VpFormat.MsoMdoc): MsoMdocTO {
+            return MsoMdocTO(f.algorithms.map { it.name })
+        }
+    }
+}
+
+internal fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
+
 internal data class ValidatedClientMetaData(
     val jwkSet: JWKSet? = null,
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType> = emptyList(),
     val authorizationSignedResponseAlg: JWSAlgorithm? = null,
     val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
     val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
-    val vpFormats: VpFormats = VpFormats(emptyList()),
+    val vpFormats: VpFormats,
 )
 
 @Throws(AuthorizationRequestException::class)

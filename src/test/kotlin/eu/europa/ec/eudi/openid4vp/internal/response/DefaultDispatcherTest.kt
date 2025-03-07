@@ -36,6 +36,7 @@ import eu.europa.ec.eudi.openid4vp.dcql.*
 import eu.europa.ec.eudi.openid4vp.dcql.ClaimPathElement.Claim
 import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier.assertIsJwtEncryptedWithVerifiersPubKey
@@ -82,6 +83,9 @@ class DefaultDispatcherTest {
             jwks = JWKSet(jarmEncryptionKeyPair).toJsonObject(true),
             authorizationEncryptedResponseAlg = jarmEncryptionKeyPair.algorithm.name,
             authorizationEncryptedResponseEnc = EncryptionMethod.A256GCM.name,
+            vpFormats = VpFormatsTO.make(
+                VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+            ),
         )
 
         val metaDataRequestingSignedAndEncryptedResponse = metaDataRequestingEncryptedResponse.copy(
@@ -121,7 +125,7 @@ class DefaultDispatcherTest {
                 supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -343,6 +347,9 @@ class DefaultDispatcherTest {
             suspend fun test(redirectUri: URI? = null) {
                 val verifierMetaData = UnvalidatedClientMetaData(
                     authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
+                    vpFormats = VpFormatsTO.make(
+                        VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                    ),
                 )
                 val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
 
@@ -385,6 +392,9 @@ class DefaultDispatcherTest {
             suspend fun test(vpContent: VpContent, redirectUri: URI? = null) {
                 val verifierMetaData = UnvalidatedClientMetaData(
                     authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
+                    vpFormats = VpFormatsTO.make(
+                        VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                    ),
                 )
                 val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
 
@@ -450,6 +460,9 @@ class DefaultDispatcherTest {
 
             val verifierMetaData = UnvalidatedClientMetaData(
                 authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
+                vpFormats = VpFormatsTO.make(
+                    VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                ),
             )
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
 
@@ -524,7 +537,7 @@ class DefaultDispatcherTest {
                     ),
                 ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
-                vpFormats = VpFormats(VpFormat.MsoMdoc),
+                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -549,7 +562,7 @@ class DefaultDispatcherTest {
                     ),
                 ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
-                vpFormats = VpFormats(VpFormat.MsoMdoc),
+                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -571,7 +584,7 @@ class DefaultDispatcherTest {
                 state = genState(),
                 nonce = "0S6_WzA2Mj",
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
-                vpFormats = VpFormats(VpFormat.MsoMdoc),
+                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
                 scope = Scope.OpenId,

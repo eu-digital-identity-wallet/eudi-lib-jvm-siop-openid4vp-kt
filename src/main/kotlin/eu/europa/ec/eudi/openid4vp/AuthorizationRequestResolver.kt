@@ -16,9 +16,6 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
-import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
-import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.hashAlgorithms
-import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
@@ -237,6 +234,10 @@ sealed interface ResolvedRequestObject : Serializable {
 
     /**
      * OpenId4VP Authorization request for presenting a vp_token
+     *
+     * @param vpFormats Populated when client metadata are provided along with the request or null otherwise. It is the list of formats
+     *   that both wallet and requester support. It is calculated by comparing wallet's configuration (@see [SiopOpenId4VPConfig].vpConfiguration)
+     *   and the formats passed in request's client metadata.
      */
     data class OpenId4VPAuthorization(
         override val client: Client,
@@ -244,13 +245,17 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
-        val vpFormats: VpFormats,
+        val vpFormats: VpFormats?,
         val presentationQuery: PresentationQuery,
         val transactionData: List<TransactionData>?,
     ) : ResolvedRequestObject
 
     /**
      * OpenId4VP combined with SIOPv2 request for presenting an id_token & vp_token
+     *
+     * @param vpFormats Populated when client metadata are provided along with the request or null otherwise. It is the list of formats
+     *   that both wallet and requester support. It is calculated by comparing wallet's configuration (@see [SiopOpenId4VPConfig].vpConfiguration)
+     *   and the formats passed in request's client metadata.
      */
     data class SiopOpenId4VPAuthentication(
         override val client: Client,
@@ -258,7 +263,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
-        val vpFormats: VpFormats,
+        val vpFormats: VpFormats?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
@@ -452,6 +457,11 @@ sealed interface ResolutionError : AuthorizationRequestError {
     data class ClientMetadataJwkUriUnparsable(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
     data class InvalidTransactionData(val cause: Throwable) : ResolutionError
+
+    data object ClientVpFormatsNotSupportedFromWallet : ResolutionError {
+        @Suppress("unused")
+        private fun readResolve(): Any = ClientVpFormatsNotSupportedFromWallet
+    }
 }
 
 /**

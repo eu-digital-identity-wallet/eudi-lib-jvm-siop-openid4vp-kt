@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
@@ -42,13 +43,14 @@ internal class RequestObjectResolver(
     ): ResolvedRequestObject = coroutineScope {
         val presentationQuery = query(request.querySource)
         val transactionData = request.transactionData?.let { resolveTransactionData(presentationQuery, it) }
+        val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
             client = request.client.toClient(),
             responseMode = request.responseMode,
             state = request.state,
             nonce = request.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
-            vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
+            vpFormats = vpFormatsCommonGround,
             idTokenType = request.idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = request.scope,
@@ -63,16 +65,25 @@ internal class RequestObjectResolver(
     ): ResolvedRequestObject {
         val presentationQuery = query(authorization.querySource)
         val transactionData = authorization.transactionData?.let { resolveTransactionData(presentationQuery, it) }
+        val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
         return ResolvedRequestObject.OpenId4VPAuthorization(
             client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
             state = authorization.state,
             nonce = authorization.nonce,
             jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
-            vpFormats = clientMetaData?.vpFormats ?: VpFormats.Empty,
+            vpFormats = vpFormatsCommonGround,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
         )
+    }
+
+    private fun resolveVpFormatsCommonGround(clientVpFormats: VpFormats): VpFormats {
+        val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.vpFormats
+        val commonGround = VpFormats.intersect(walletSupportedVpFormats, clientVpFormats)
+        return ensureNotNull(commonGround) {
+            ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+        }
     }
 
     private fun resolveIdTokenRequest(

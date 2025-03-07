@@ -52,7 +52,7 @@ class ClientAuthenticatorTest {
                 SupportedClientIdScheme.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -88,7 +88,7 @@ class ClientAuthenticatorTest {
                 SupportedClientIdScheme.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -132,7 +132,7 @@ class ClientAuthenticatorTest {
                 },
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -237,7 +237,7 @@ class ClientAuthenticatorTest {
                 SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.MsoMdoc, VpFormat.SdJwtVc.ES256),
+                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )

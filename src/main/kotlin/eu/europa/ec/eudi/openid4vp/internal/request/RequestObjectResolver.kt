@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
@@ -79,29 +80,10 @@ internal class RequestObjectResolver(
 
     private fun resolveVpFormatsCommonGround(clientVpFormats: VpFormats): VpFormats {
         val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.vpFormats
-        val scg = (walletSupportedVpFormats.sdJwtVc to clientVpFormats.sdJwtVc).commonGround()
-        val mcg = (walletSupportedVpFormats.msoMdoc to clientVpFormats.msoMdoc).commonGround()
-        return if (scg != null || mcg != null)
-            VpFormats(scg, mcg)
-        else
-            throw ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
-    }
-
-    private fun Pair<VpFormat.SdJwtVc?, VpFormat.SdJwtVc?>.commonGround(): VpFormat.SdJwtVc? {
-        val kbJwtAlgs = first?.kbJwtAlgorithms?.intersect((second?.kbJwtAlgorithms?.toSet() ?: emptySet()).toSet())
-        val sdJwtAlgs = first?.sdJwtAlgorithms?.intersect((second?.sdJwtAlgorithms?.toSet() ?: emptySet()).toSet())
-        return if (!kbJwtAlgs.isNullOrEmpty() && !sdJwtAlgs.isNullOrEmpty()) {
-            VpFormat.SdJwtVc(sdJwtAlgs.toList(), kbJwtAlgs.toList())
-        } else
-            null
-    }
-
-    private fun Pair<VpFormat.MsoMdoc?, VpFormat.MsoMdoc?>.commonGround(): VpFormat.MsoMdoc? {
-        val algs = first?.algorithms?.intersect((second?.algorithms?.toSet() ?: emptySet()).toSet())
-        return if (!algs.isNullOrEmpty()) {
-            VpFormat.MsoMdoc(algs.toList())
-        } else
-            null
+        val commonGround = VpFormats.intersect(walletSupportedVpFormats, clientVpFormats)
+        return ensureNotNull(commonGround) {
+            ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+        }
     }
 
     private fun resolveIdTokenRequest(

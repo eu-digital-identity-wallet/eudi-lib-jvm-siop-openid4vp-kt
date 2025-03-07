@@ -170,6 +170,14 @@ data class VpFormats(
             VpFormats(sdJwt, msoMdoc)
         }
 
+        fun intersect(thiz: VpFormats, that: VpFormats): VpFormats? {
+            val scg = thiz.sdJwtVc?.intersect(that.sdJwtVc)
+            val mcg = thiz.msoMdoc?.intersect(that.msoMdoc)
+            return if (scg != null || mcg != null) {
+                VpFormats(scg, mcg)
+            } else null
+        }
+
         private fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
             formats
                 .groupBy { it.formatName() }
@@ -331,6 +339,16 @@ sealed interface VpFormat : java.io.Serializable {
             require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
         }
 
+        fun intersect(that: SdJwtVc?): SdJwtVc? {
+            if (that == null) return null
+
+            val kbJwtAlgs = kbJwtAlgorithms.intersect(that.kbJwtAlgorithms.toSet())
+            val sdJwtAlgs = sdJwtAlgorithms.intersect(that.sdJwtAlgorithms.toSet())
+            return if (sdJwtAlgs.isNotEmpty() && kbJwtAlgs.isNotEmpty())
+                SdJwtVc(sdJwtAlgs.toList(), kbJwtAlgs.toList())
+            else null
+        }
+
         companion object {
             val ES256 = SdJwtVc(listOf(JWSAlgorithm.ES256), listOf(JWSAlgorithm.ES256))
         }
@@ -339,6 +357,15 @@ sealed interface VpFormat : java.io.Serializable {
     data class MsoMdoc(val algorithms: List<JWSAlgorithm>) : VpFormat {
         init {
             require(algorithms.isNotEmpty()) { "Mso-doc algorithms cannot be empty" }
+        }
+
+        fun intersect(that: MsoMdoc?): MsoMdoc? {
+            if (that == null) return null
+
+            val algs = algorithms.intersect(that.algorithms.toSet())
+            return if (algs.isNotEmpty())
+                MsoMdoc(algs.toList())
+            else null
         }
 
         companion object {

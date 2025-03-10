@@ -281,7 +281,7 @@ class UnvalidatedRequestResolverTest {
 
     @Test
     fun `JAR auth request, request passed as JWT, verified with pre-registered client scheme`() = runBlocking {
-        suspend fun test(typ: JOSEObjectType? = null) {
+        suspend fun test(typ: JOSEObjectType? = null, assertions: (Resolution) -> Unit) {
             val jwkSet = JWKSet(signingKey)
             val unvalidatedClientMetaData = UnvalidatedClientMetaData(
                 jwks = Json.parseToJsonElement(jwkSet.toPublicJWKSet().toString()).jsonObject,
@@ -307,19 +307,24 @@ class UnvalidatedRequestResolverTest {
                 """.trimIndent()
 
             val resolution = resolver.resolveRequestUri(authRequest)
-
-            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            assertions(resolution)
         }
 
-        test()
-        test(JOSEObjectType(""))
-        test(JOSEObjectType("oauth-authz-req+jwt"))
-        test(JOSEObjectType("jwt"))
+        test(JOSEObjectType("oauth-authz-req+jwt")) {
+            it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        listOf(null, JOSEObjectType(""), JOSEObjectType("jwt"))
+            .forEach { type ->
+                test(type) {
+                    it.validateInvalid<RequestValidationError.InvalidJarJwt>()
+                }
+            }
     }
 
     @Test
     fun `JAR auth request, request passed as JWT, verified with x509_san_dns scheme`() = runTest {
-        suspend fun test(typ: JOSEObjectType? = null) {
+        suspend fun test(typ: JOSEObjectType? = null, assertions: (Resolution) -> Unit) {
             val keyStore = KeyStore.getInstance("JKS")
             keyStore.load(
                 load("certificates/certificates.jks"),
@@ -345,18 +350,24 @@ class UnvalidatedRequestResolverTest {
             val authRequest = "http://localhost:8080/public_url?client_id=$clientId&request=$signedJwt"
 
             val resolution = resolver.resolveRequestUri(authRequest)
-            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            assertions(resolution)
         }
 
-        test()
-        test(JOSEObjectType(""))
-        test(JOSEObjectType("oauth-authz-req+jwt"))
-        test(JOSEObjectType("jwt"))
+        test(JOSEObjectType("oauth-authz-req+jwt")) {
+            it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        listOf(null, JOSEObjectType(""), JOSEObjectType("jwt"))
+            .forEach { type ->
+                test(type) {
+                    it.validateInvalid<RequestValidationError.InvalidJarJwt>()
+                }
+            }
     }
 
     @Test
     fun `JAR auth request, request passed as JWT, verified with x509_san_uri scheme`() = runTest {
-        suspend fun test(typ: JOSEObjectType? = null) {
+        suspend fun test(typ: JOSEObjectType? = null, assertions: (Resolution) -> Unit) {
             val keyStore = KeyStore.getInstance("JKS")
             keyStore.load(
                 load("certificates/certificates.jks"),
@@ -384,13 +395,19 @@ class UnvalidatedRequestResolverTest {
             val authRequest = "http://localhost:8080/public_url?client_id=$clientIdEncoded&request=$signedJwt"
 
             val resolution = resolver.resolveRequestUri(authRequest)
-            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            assertions(resolution)
         }
 
-        test()
-        test(JOSEObjectType(""))
-        test(JOSEObjectType("oauth-authz-req+jwt"))
-        test(JOSEObjectType("jwt"))
+        test(JOSEObjectType("oauth-authz-req+jwt")) {
+            it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        }
+
+        listOf(null, JOSEObjectType(""), JOSEObjectType("jwt"))
+            .forEach { type ->
+                test(type) {
+                    it.validateInvalid<RequestValidationError.InvalidJarJwt>()
+                }
+            }
     }
 
     @Test

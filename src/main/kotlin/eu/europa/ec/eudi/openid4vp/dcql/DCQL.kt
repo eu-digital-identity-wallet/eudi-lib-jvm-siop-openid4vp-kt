@@ -21,12 +21,7 @@ import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 
 typealias Credentials = List<CredentialQuery>
 typealias CredentialSets = List<CredentialSetQuery>
@@ -158,9 +153,8 @@ data class CredentialQuery(
             require(isNotEmpty()) { "At least one claim must be defined" }
             ensureUniqueIds()
             when (format) {
-                Format.MsoMdoc -> {
-                    forEach { ClaimsQuery.ensureMsoMdoc(it) }
-                }
+                Format.MsoMdoc -> forEach { ClaimsQuery.ensureMsoMdoc(it) }
+                else -> forEach { ClaimsQuery.ensureNotMsoMdoc(it) }
             }
         }
 
@@ -241,21 +235,30 @@ data class ClaimsQuery(
     @SerialName(OpenId4VPSpec.DCQL_ID) val id: ClaimId? = null,
     @Required @SerialName(OpenId4VPSpec.DCQL_PATH) val path: ClaimPath,
     @SerialName(OpenId4VPSpec.DCQL_VALUES) val values: JsonArray? = null,
-) {
+    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN) override val intentToRetain: Boolean? = null,
+) : MsoMdocClaimsQueryExtension {
 
     companion object {
         fun sdJwtVc(
             id: ClaimId? = null,
             path: ClaimPath,
             values: JsonArray? = null,
-        ): ClaimsQuery = ClaimsQuery(id, path, values)
+        ): ClaimsQuery = ClaimsQuery(id, path, values, null)
 
         fun mdoc(
             id: ClaimId? = null,
+            path: ClaimPath,
             values: JsonArray? = null,
+            intentToRetain: Boolean? = null,
+        ): ClaimsQuery = ClaimsQuery(id, path, values, intentToRetain).also { ensureMsoMdoc(it) }
+
+        fun mdoc(
+            id: ClaimId? = null,
             namespace: String,
             claimName: String,
-        ): ClaimsQuery = ClaimsQuery(id = id, path = ClaimPath.claim(namespace).claim(claimName), values = values)
+            values: JsonArray? = null,
+            intentToRetain: Boolean? = null,
+        ): ClaimsQuery = mdoc(id, ClaimPath.claim(namespace).claim(claimName), values, intentToRetain)
 
         fun ensureMsoMdoc(claimsQuery: ClaimsQuery) {
             require(2 == claimsQuery.path.value.size) {
@@ -263,6 +266,12 @@ data class ClaimsQuery(
             }
             require(claimsQuery.path.value.all { it is ClaimPathElement.Claim }) {
                 "ClaimPaths for MSO MDoc based formats must contain only Claim ClaimPathElements"
+            }
+        }
+
+        fun ensureNotMsoMdoc(claimsQuery: ClaimsQuery) {
+            require(null == claimsQuery.intentToRetain) {
+                "'${OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN}' can be used only with MSO MDoc based formats"
             }
         }
     }
@@ -302,12 +311,25 @@ value class MsoMdocDocType(val value: String) {
  */
 @Serializable
 data class DCQLMetaMsoMdocExtensions(
+
     /**
      * Specifies an allowed value for the doctype of the requested Verifiable Credential.
      * It MUST be a valid doctype identifier as defined
      */
     @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_DOCTYPE_VALUE) val doctypeValue: MsoMdocDocType?,
 )
+
+/**
+ * The following are ISO mdoc specific parameters to be used in a [Claims Query][ClaimsQuery]
+ */
+interface MsoMdocClaimsQueryExtension {
+
+    /**
+     * OPTIONAL. A boolean that is equivalent to IntentToRetain variable defined in Section 8.3.2.1.2.1 of [ISO.18013-5].
+     */
+    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN)
+    val intentToRetain: Boolean?
+}
 
 internal object DCQLId {
     const val REGEX: String = "^[a-zA-Z0-9_-]+$"

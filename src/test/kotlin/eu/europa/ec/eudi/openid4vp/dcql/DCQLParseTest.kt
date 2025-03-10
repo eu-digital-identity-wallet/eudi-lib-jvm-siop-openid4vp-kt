@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.dcql
 
+import eu.europa.ec.eudi.openid4vp.OpenId4VPSpec
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -86,6 +87,36 @@ class DCQLParseTest {
     }
 
     @Test
+    fun whenIntentToRetainIsUsedWithNonMsoMdocFormatsAnExceptionIsRaised() {
+        val json = """
+            {
+              "credentials": [
+                {
+                  "id": "my_credential",
+                  "format": "dc+sd-jwt",
+                  "meta": {
+                    "vct_values": [ "https://credentials.example.com/identity_credential" ]
+                  },
+                  "claims": [
+                    {
+                      "path": ["first_name"],
+                      "intent_to_retain": true
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        try {
+            jsonSupport.decodeFromString<DCQL>(json)
+            fail("'${OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN}' cannot be used with non MSO MDoc formats")
+        } catch (e: Throwable) {
+            assertIs<IllegalArgumentException>(e)
+        }
+    }
+
+    @Test
     fun test01() = assertEqualsDCQL(
         json = """
             {
@@ -98,10 +129,12 @@ class DCQLParseTest {
                   },
                   "claims": [
                     {
-                      "path": ["org.iso.7367.1", "vehicle_holder"]
+                      "path": ["org.iso.7367.1", "vehicle_holder"],
+                      "intent_to_retain": true
                     },
                     {
-                      "path": ["org.iso.18013.5.1", "first_name"]
+                      "path": ["org.iso.18013.5.1", "first_name"],
+                      "intent_to_retain": false
                     }
                   ]
                 }
@@ -117,10 +150,12 @@ class DCQLParseTest {
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.7367.1",
                             claimName = "vehicle_holder",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.18013.5.1",
                             claimName = "first_name",
+                            intentToRetain = false,
                         ),
                     ),
 
@@ -154,7 +189,8 @@ class DCQLParseTest {
                   },
                   "claims": [
                     {
-                      "path": ["org.iso.7367.1", "vehicle_holder"] 
+                      "path": ["org.iso.7367.1", "vehicle_holder"],
+                      "intent_to_retain": true
                     },
                     {
                       "path": ["org.iso.18013.5.1", "first_name"] 
@@ -182,6 +218,7 @@ class DCQLParseTest {
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.7367.1",
                             claimName = "vehicle_holder",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.18013.5.1",
@@ -357,15 +394,17 @@ class DCQLParseTest {
                   "claims": [
                     {
                       "id": "given_name",
-                      "path": ["org.iso.18013.5.1", "given_name"] 
+                      "path": ["org.iso.18013.5.1", "given_name"]
                     },
                     {
                       "id": "family_name",
-                      "path": ["org.iso.18013.5.1", "family_name"]
+                      "path": ["org.iso.18013.5.1", "family_name"],
+                      "intent_to_retain": true
                     },
                     {
                       "id": "portrait",
-                      "path": ["org.iso.18013.5.1", "portrait"]
+                      "path": ["org.iso.18013.5.1", "portrait"],
+                      "intent_to_retain": false
                     }
                   ]
                 },
@@ -399,11 +438,13 @@ class DCQLParseTest {
                     },
                     {
                       "id": "family_name",
-                      "path": ["org.iso.23220.1", "family_name"]
+                      "path": ["org.iso.23220.1", "family_name"],
+                      "intent_to_retain": true
                     },
                     {
                       "id": "portrait",
-                      "path": ["org.iso.23220.1", "portrait"]
+                      "path": ["org.iso.23220.1", "portrait"],
+                      "intent_to_retain": false
                     }
                   ]
                 },
@@ -459,11 +500,13 @@ class DCQLParseTest {
                             id = ClaimId("family_name"),
                             namespace = "org.iso.18013.5.1",
                             claimName = "family_name",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("portrait"),
                             namespace = "org.iso.18013.5.1",
                             claimName = "portrait",
+                            intentToRetain = false,
                         ),
                     ),
                 ),
@@ -496,11 +539,13 @@ class DCQLParseTest {
                             id = ClaimId("family_name"),
                             namespace = "org.iso.23220.1",
                             claimName = "family_name",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("portrait"),
                             namespace = "org.iso.23220.1",
                             claimName = "portrait",
+                            intentToRetain = false,
                         ),
                     ),
                 ),

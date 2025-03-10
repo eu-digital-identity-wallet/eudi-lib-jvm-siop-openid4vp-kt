@@ -261,7 +261,7 @@ private class JarJwtSignatureVerifier(
     suspend fun verifySignature(client: AuthenticatedClient, signedJwt: SignedJWT) {
         try {
             val jwtProcessor = DefaultJWTProcessor<SecurityContext>().apply {
-                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType("oauth-authz-req+jwt"))
+                jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE))
                 jwsKeySelector = jwsKeySelector(client)
                 jwtClaimsSetVerifier = TimeChecks(siopOpenId4VPConfig.clock, siopOpenId4VPConfig.jarClockSkew.toKotlinDuration())
             }

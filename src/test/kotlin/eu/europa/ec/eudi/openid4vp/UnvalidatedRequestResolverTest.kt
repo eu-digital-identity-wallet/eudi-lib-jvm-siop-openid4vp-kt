@@ -310,7 +310,7 @@ class UnvalidatedRequestResolverTest {
             assertions(resolution)
         }
 
-        test(JOSEObjectType("oauth-authz-req+jwt")) {
+        test(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE)) {
             it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
         }
 
@@ -353,7 +353,7 @@ class UnvalidatedRequestResolverTest {
             assertions(resolution)
         }
 
-        test(JOSEObjectType("oauth-authz-req+jwt")) {
+        test(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE)) {
             it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
         }
 
@@ -398,7 +398,7 @@ class UnvalidatedRequestResolverTest {
             assertions(resolution)
         }
 
-        test(JOSEObjectType("oauth-authz-req+jwt")) {
+        test(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE)) {
             it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
         }
 

@@ -31,6 +31,8 @@ object OpenId4VPSpec {
     const val CLIENT_ID_SCHEME_X509_SAN_DNS = "x509_san_dns"
     const val CLIENT_ID_SCHEME_VERIFIER_ATTESTATION = "verifier_attestation"
 
+    const val AUTHORIZATION_REQUEST_OBJECT_TYPE = "oauth-authz-req+jwt"
+
     const val RM_DIRECT_POST: String = "direct_post"
     const val RM_DIRECT_POST_JWT: String = "direct_post.jwt"
 

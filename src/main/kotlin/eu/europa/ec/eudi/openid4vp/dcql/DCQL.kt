@@ -159,7 +159,7 @@ data class CredentialQuery(
             ensureUniqueIds()
             when (format) {
                 Format.MsoMdoc -> {
-                    forEach { ClaimsQuery.ensureMsoMdocExtensions(it) }
+                    forEach { ClaimsQuery.ensureMsoMdoc(it) }
                 }
             }
         }
@@ -239,24 +239,11 @@ value class ClaimId(val value: String) {
 @Serializable
 data class ClaimsQuery(
     @SerialName(OpenId4VPSpec.DCQL_ID) val id: ClaimId? = null,
-    @SerialName(OpenId4VPSpec.DCQL_PATH) val path: ClaimPath? = null,
+    @Required @SerialName(OpenId4VPSpec.DCQL_PATH) val path: ClaimPath,
     @SerialName(OpenId4VPSpec.DCQL_VALUES) val values: JsonArray? = null,
-    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_NAMESPACE) override val namespace: MsoMdocNamespace? = null,
-    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_CLAIM_NAME) override val claimName: MsoMdocClaimName? = null,
-) : MsoMdocClaimsQueryExtension {
-
-    init {
-        val isJson = path != null && namespace == null && claimName == null
-        val isMdoc = path == null && namespace != null && claimName != null
-
-        require(isJson xor isMdoc) {
-            "Either '${OpenId4VPSpec.DCQL_PATH}', or '${OpenId4VPSpec.DCQL_MSO_MDOC_NAMESPACE}' " +
-                "and '${OpenId4VPSpec.DCQL_MSO_MDOC_CLAIM_NAME}' must be provided"
-        }
-    }
+) {
 
     companion object {
-
         fun sdJwtVc(
             id: ClaimId? = null,
             path: ClaimPath,
@@ -266,16 +253,16 @@ data class ClaimsQuery(
         fun mdoc(
             id: ClaimId? = null,
             values: JsonArray? = null,
-            namespace: MsoMdocNamespace,
-            claimName: MsoMdocClaimName,
-        ): ClaimsQuery = ClaimsQuery(id = id, path = null, values = values, namespace = namespace, claimName = claimName)
+            namespace: String,
+            claimName: String,
+        ): ClaimsQuery = ClaimsQuery(id = id, path = ClaimPath.claim(namespace).claim(claimName), values = values)
 
-        fun ensureMsoMdocExtensions(claimsQuery: ClaimsQuery) {
-            requireNotNull(claimsQuery.namespace) {
-                "Namespace is required if the credential format is based on the mdoc format "
+        fun ensureMsoMdoc(claimsQuery: ClaimsQuery) {
+            require(2 == claimsQuery.path.value.size) {
+                "ClaimPaths for MSO MDoc based formats must have exactly two elements"
             }
-            requireNotNull(claimsQuery.claimName) {
-                "Claim name is required if the credential format is based on the mdoc format "
+            require(claimsQuery.path.value.all { it is ClaimPathElement.Claim }) {
+                "ClaimPaths for MSO MDoc based formats must contain only Claim ClaimPathElements"
             }
         }
     }
@@ -321,49 +308,6 @@ data class DCQLMetaMsoMdocExtensions(
      */
     @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_DOCTYPE_VALUE) val doctypeValue: MsoMdocDocType?,
 )
-
-@Serializable
-@JvmInline
-value class MsoMdocNamespace(val value: String) {
-    init {
-        require(value.isNotBlank()) { "Namespace must not be blank" }
-    }
-
-    override fun toString(): String = value
-}
-
-@Serializable
-@JvmInline
-value class MsoMdocClaimName(val value: String) {
-    init {
-        require(value.isNotBlank()) { "Claim name must not be blank" }
-    }
-
-    override fun toString(): String = value
-}
-
-/**
- * The following are ISO mdoc specific parameters to be used in a [Claims Query][ClaimsQuery]
- */
-interface MsoMdocClaimsQueryExtension {
-
-    /**
-     * Required if the Credential Format is based on the mdoc format.
-     * Must not be present otherwise.
-     * The namespace of the data element within the mdoc
-     */
-    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_NAMESPACE)
-    val namespace: MsoMdocNamespace?
-
-    /**
-     * REQUIRED if the Credential Format is based on mdoc format
-     * Must not be present otherwise.
-     * Specifies the data element identifier of the data element
-     * within the provided [namespace] in the mdoc
-     */
-    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_CLAIM_NAME)
-    val claimName: MsoMdocClaimName?
-}
 
 internal object DCQLId {
     const val REGEX: String = "^[a-zA-Z0-9_-]+$"

@@ -94,6 +94,7 @@ private fun jweHeader(
     encryptionMethod: EncryptionMethod,
     jweKey: JWK,
     data: AuthorizationResponsePayload,
+    builderAction: JWEHeader.Builder.() -> Unit = {},
 ): JWEHeader {
     if (jweAlgorithm in Family.ECDH_ES) {
         require(data.encryptionParameters is EncryptionParameters.DiffieHellman) {
@@ -108,6 +109,7 @@ private fun jweHeader(
 
     return JWEHeader.Builder(jweAlgorithm, encryptionMethod)
         .apply {
+            builderAction()
             apv?.let(::agreementPartyVInfo)
             apu?.let(::agreementPartyUInfo)
             jweKey.toPublicJWK().keyID?.let(::keyID)
@@ -126,7 +128,9 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
     val signedJwt = sign(requirement.signed, data)
     val (jweAlgorithm, encryptionMethod, encryptionKeySet) = requirement.encryptResponse
     val (jweKey, jweEncrypter) = keyAndEncryptor(jweAlgorithm, encryptionKeySet)
-    val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, jweKey, data)
+    val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, jweKey, data) {
+        contentType("JWT")
+    }
 
     return JWEObject(jweHeader, Payload(signedJwt)).apply { encrypt(jweEncrypter) }
 }

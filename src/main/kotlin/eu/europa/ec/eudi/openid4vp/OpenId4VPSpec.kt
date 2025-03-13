@@ -31,6 +31,8 @@ object OpenId4VPSpec {
     const val CLIENT_ID_SCHEME_X509_SAN_DNS = "x509_san_dns"
     const val CLIENT_ID_SCHEME_VERIFIER_ATTESTATION = "verifier_attestation"
 
+    const val AUTHORIZATION_REQUEST_OBJECT_TYPE = "oauth-authz-req+jwt"
+
     const val RM_DIRECT_POST: String = "direct_post"
     const val RM_DIRECT_POST_JWT: String = "direct_post.jwt"
 
@@ -58,8 +60,7 @@ object OpenId4VPSpec {
     const val DCQL_VALUES: String = "values"
     const val DCQL_SD_JWT_VC_VCT_VALUES: String = "vct_values"
     const val DCQL_MSO_MDOC_DOCTYPE_VALUE: String = "doctype_value"
-    const val DCQL_MSO_MDOC_NAMESPACE: String = "namespace"
-    const val DCQL_MSO_MDOC_CLAIM_NAME: String = "claim_name"
+    const val DCQL_MSO_MDOC_INTENT_TO_RETAIN = "intent_to_retain"
 
     const val TRANSACTION_DATA: String = "transaction_data"
     const val TRANSACTION_DATA_TYPE: String = "type"

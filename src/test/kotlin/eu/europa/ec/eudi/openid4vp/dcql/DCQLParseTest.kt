@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.dcql
 
+import eu.europa.ec.eudi.openid4vp.OpenId4VPSpec
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -25,7 +26,7 @@ import kotlin.test.fail
 class DCQLParseTest {
 
     @Test
-    fun whenMsoMdocNamespaceMissesAnExceptionIsRaised() {
+    fun whenMsoMdocNamespaceMissingAnExceptionIsRaised() {
         val json = """
             {
               "credentials": [
@@ -37,11 +38,10 @@ class DCQLParseTest {
                   },
                   "claims": [
                     {
-                      "claim_name": "vehicle_holder"
+                      "path": ["vehicle_holder"]
                     },
                     {
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "first_name"
+                      "path": ["org.iso.18013.5.1", "first_name"]
                     }
                   ]
                 }
@@ -58,7 +58,7 @@ class DCQLParseTest {
     }
 
     @Test
-    fun whenMsoMdocClaimNameMissesAnExceptionIsRaised() {
+    fun whenMsoMdocClaimNameMissingAnExceptionIsRaised() {
         val json = """
             {
               "credentials": [
@@ -70,7 +70,7 @@ class DCQLParseTest {
                   },
                   "claims": [
                     {
-                      "namespace": "org.iso.18013.5.1",
+                      "path": ["org.iso.18013.5.1"]
                     }
                   ]
                 }
@@ -80,7 +80,37 @@ class DCQLParseTest {
 
         try {
             jsonSupport.decodeFromString<DCQL>(json)
-            fail("An MsoMdoc query missing claim_name was processed")
+            fail("An MsoMdoc query missing claim name was processed")
+        } catch (e: Throwable) {
+            assertIs<IllegalArgumentException>(e)
+        }
+    }
+
+    @Test
+    fun whenIntentToRetainIsUsedWithNonMsoMdocFormatsAnExceptionIsRaised() {
+        val json = """
+            {
+              "credentials": [
+                {
+                  "id": "my_credential",
+                  "format": "dc+sd-jwt",
+                  "meta": {
+                    "vct_values": [ "https://credentials.example.com/identity_credential" ]
+                  },
+                  "claims": [
+                    {
+                      "path": ["first_name"],
+                      "intent_to_retain": true
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        try {
+            jsonSupport.decodeFromString<DCQL>(json)
+            fail("'${OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN}' cannot be used with non MSO MDoc formats")
         } catch (e: Throwable) {
             assertIs<IllegalArgumentException>(e)
         }
@@ -99,12 +129,12 @@ class DCQLParseTest {
                   },
                   "claims": [
                     {
-                      "namespace": "org.iso.7367.1",
-                      "claim_name": "vehicle_holder"
+                      "path": ["org.iso.7367.1", "vehicle_holder"],
+                      "intent_to_retain": true
                     },
                     {
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "first_name"
+                      "path": ["org.iso.18013.5.1", "first_name"],
+                      "intent_to_retain": false
                     }
                   ]
                 }
@@ -118,12 +148,14 @@ class DCQLParseTest {
                     msoMdocMeta = DCQLMetaMsoMdocExtensions(MsoMdocDocType("org.iso.7367.1.mVRC")),
                     claims = listOf(
                         ClaimsQuery.mdoc(
-                            namespace = MsoMdocNamespace("org.iso.7367.1"),
-                            claimName = MsoMdocClaimName("vehicle_holder"),
+                            namespace = "org.iso.7367.1",
+                            claimName = "vehicle_holder",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
-                            namespace = MsoMdocNamespace("org.iso.18013.5.1"),
-                            claimName = MsoMdocClaimName("first_name"),
+                            namespace = "org.iso.18013.5.1",
+                            claimName = "first_name",
+                            intentToRetain = false,
                         ),
                     ),
 
@@ -157,12 +189,11 @@ class DCQLParseTest {
                   },
                   "claims": [
                     {
-                      "namespace": "org.iso.7367.1",
-                      "claim_name": "vehicle_holder"
+                      "path": ["org.iso.7367.1", "vehicle_holder"],
+                      "intent_to_retain": true
                     },
                     {
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "first_name"
+                      "path": ["org.iso.18013.5.1", "first_name"] 
                     }
                   ]
                 }
@@ -185,12 +216,13 @@ class DCQLParseTest {
                     msoMdocMeta = DCQLMetaMsoMdocExtensions(MsoMdocDocType("org.iso.7367.1.mVRC")),
                     claims = listOf(
                         ClaimsQuery.mdoc(
-                            namespace = MsoMdocNamespace("org.iso.7367.1"),
-                            claimName = MsoMdocClaimName("vehicle_holder"),
+                            namespace = "org.iso.7367.1",
+                            claimName = "vehicle_holder",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
-                            namespace = MsoMdocNamespace("org.iso.18013.5.1"),
-                            claimName = MsoMdocClaimName("first_name"),
+                            namespace = "org.iso.18013.5.1",
+                            claimName = "first_name",
                         ),
                     ),
                 ),
@@ -362,18 +394,17 @@ class DCQLParseTest {
                   "claims": [
                     {
                       "id": "given_name",
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "given_name"
+                      "path": ["org.iso.18013.5.1", "given_name"]
                     },
                     {
                       "id": "family_name",
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "family_name"
+                      "path": ["org.iso.18013.5.1", "family_name"],
+                      "intent_to_retain": true
                     },
                     {
                       "id": "portrait",
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "portrait"
+                      "path": ["org.iso.18013.5.1", "portrait"],
+                      "intent_to_retain": false
                     }
                   ]
                 },
@@ -386,13 +417,11 @@ class DCQLParseTest {
                   "claims": [
                     {
                       "id": "resident_address",
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "resident_address"
+                      "path": ["org.iso.18013.5.1", "resident_address"]
                     },
                     {
                       "id": "resident_country",
-                      "namespace": "org.iso.18013.5.1",
-                      "claim_name": "resident_country"
+                      "path": ["org.iso.18013.5.1", "resident_country"]
                     }
                   ]
                 },
@@ -405,18 +434,17 @@ class DCQLParseTest {
                   "claims": [
                     {
                       "id": "given_name",
-                      "namespace": "org.iso.23220.1",
-                      "claim_name": "given_name"
+                      "path": ["org.iso.23220.1", "given_name"]
                     },
                     {
                       "id": "family_name",
-                      "namespace": "org.iso.23220.1",
-                      "claim_name": "family_name"
+                      "path": ["org.iso.23220.1", "family_name"],
+                      "intent_to_retain": true
                     },
                     {
                       "id": "portrait",
-                      "namespace": "org.iso.23220.1",
-                      "claim_name": "portrait"
+                      "path": ["org.iso.23220.1", "portrait"],
+                      "intent_to_retain": false
                     }
                   ]
                 },
@@ -429,13 +457,11 @@ class DCQLParseTest {
                   "claims": [
                     {
                       "id": "resident_address",
-                      "namespace": "org.iso.23220.1",
-                      "claim_name": "resident_address"
+                      "path": ["org.iso.23220.1", "resident_address"]
                     },
                     {
                       "id": "resident_country",
-                      "namespace": "org.iso.23220.1",
-                      "claim_name": "resident_country"
+                      "path": ["org.iso.23220.1", "resident_country"]
                     }
                   ]
                 }
@@ -467,18 +493,20 @@ class DCQLParseTest {
                     claims = listOf(
                         ClaimsQuery.mdoc(
                             id = ClaimId("given_name"),
-                            namespace = MsoMdocNamespace("org.iso.18013.5.1"),
-                            claimName = MsoMdocClaimName("given_name"),
+                            namespace = "org.iso.18013.5.1",
+                            claimName = "given_name",
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("family_name"),
-                            namespace = MsoMdocNamespace("org.iso.18013.5.1"),
-                            claimName = MsoMdocClaimName("family_name"),
+                            namespace = "org.iso.18013.5.1",
+                            claimName = "family_name",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("portrait"),
-                            namespace = MsoMdocNamespace("org.iso.18013.5.1"),
-                            claimName = MsoMdocClaimName("portrait"),
+                            namespace = "org.iso.18013.5.1",
+                            claimName = "portrait",
+                            intentToRetain = false,
                         ),
                     ),
                 ),
@@ -488,13 +516,13 @@ class DCQLParseTest {
                     claims = listOf(
                         ClaimsQuery.mdoc(
                             id = ClaimId("resident_address"),
-                            namespace = MsoMdocNamespace("org.iso.18013.5.1"),
-                            claimName = MsoMdocClaimName("resident_address"),
+                            namespace = "org.iso.18013.5.1",
+                            claimName = "resident_address",
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("resident_country"),
-                            namespace = MsoMdocNamespace("org.iso.18013.5.1"),
-                            claimName = MsoMdocClaimName("resident_country"),
+                            namespace = "org.iso.18013.5.1",
+                            claimName = "resident_country",
                         ),
                     ),
                 ),
@@ -504,18 +532,20 @@ class DCQLParseTest {
                     claims = listOf(
                         ClaimsQuery.mdoc(
                             id = ClaimId("given_name"),
-                            namespace = MsoMdocNamespace("org.iso.23220.1"),
-                            claimName = MsoMdocClaimName("given_name"),
+                            namespace = "org.iso.23220.1",
+                            claimName = "given_name",
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("family_name"),
-                            namespace = MsoMdocNamespace("org.iso.23220.1"),
-                            claimName = MsoMdocClaimName("family_name"),
+                            namespace = "org.iso.23220.1",
+                            claimName = "family_name",
+                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("portrait"),
-                            namespace = MsoMdocNamespace("org.iso.23220.1"),
-                            claimName = MsoMdocClaimName("portrait"),
+                            namespace = "org.iso.23220.1",
+                            claimName = "portrait",
+                            intentToRetain = false,
                         ),
                     ),
                 ),
@@ -525,13 +555,13 @@ class DCQLParseTest {
                     claims = listOf(
                         ClaimsQuery.mdoc(
                             id = ClaimId("resident_address"),
-                            namespace = MsoMdocNamespace("org.iso.23220.1"),
-                            claimName = MsoMdocClaimName("resident_address"),
+                            namespace = "org.iso.23220.1",
+                            claimName = "resident_address",
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("resident_country"),
-                            namespace = MsoMdocNamespace("org.iso.23220.1"),
-                            claimName = MsoMdocClaimName("resident_country"),
+                            namespace = "org.iso.23220.1",
+                            claimName = "resident_country",
                         ),
                     ),
                 ),

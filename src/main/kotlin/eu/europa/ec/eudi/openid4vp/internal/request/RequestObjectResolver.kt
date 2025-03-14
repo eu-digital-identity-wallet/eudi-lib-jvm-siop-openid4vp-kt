@@ -26,7 +26,6 @@ internal class RequestObjectResolver(
     httpClient: HttpClient,
 ) {
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
-    private val clientMetaDataValidator = ClientMetaDataValidator(httpClient)
 
     suspend fun resolveRequestObject(validated: ValidatedRequestObject, clientMetaData: ValidatedClientMetaData?): ResolvedRequestObject {
         return when (validated) {
@@ -131,11 +130,6 @@ internal class RequestObjectResolver(
         }
         throw ResolutionError.UnknownScope(scope).asException()
     }
-
-    private suspend fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
-        validated.clientMetaData?.let { unvalidated ->
-            clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
-        }
 
     private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<TransactionData> =
         runCatching {

@@ -194,6 +194,8 @@ internal class DefaultAuthorizationRequestResolver(
                 authenticateRequest(fetchedRequest)
             } catch (e: AuthorizationRequestException) {
                 return resolution(fetchedRequest, e.error)
+            } catch (e: ClientRequestException) {
+                return resolution(fetchedRequest, HttpError(e))
             }
 
         val validatedRequestObject =
@@ -208,12 +210,17 @@ internal class DefaultAuthorizationRequestResolver(
                 resolveClientMetaData(validatedRequestObject)
             } catch (e: AuthorizationRequestException) {
                 return resolution(validatedRequestObject, null, e.error)
+            } catch (e: ClientRequestException) {
+                return resolution(validatedRequestObject, null, HttpError(e))
             }
+
         val resolved =
             try {
                 resolveRequestObject(validatedRequestObject, clientMetaData)
             } catch (e: AuthorizationRequestException) {
                 return resolution(validatedRequestObject, clientMetaData, e.error)
+            } catch (e: ClientRequestException) {
+                return resolution(validatedRequestObject, clientMetaData, HttpError(e))
             }
 
         return Resolution.Success(resolved)

@@ -22,6 +22,8 @@ import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.ensure
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
+import eu.europa.ec.eudi.openid4vp.internal.response.EncrypterFactory
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -148,7 +150,11 @@ internal fun JarmConfiguration.jarmRequirement(metaData: ValidatedClientMetaData
             ensure(enc in encryptionCfg.supportedMethods) {
                 UnsupportedClientMetaData("Wallet doesn't support $enc ").asException()
             }
-            metaData.jwkSet?.let { set -> JarmRequirement.Encrypted(alg, enc, set) }
+            val clientKey = metaData.jwkSet?.keys?.firstOrNull { EncrypterFactory.canBeUsed(alg, it) }
+            ensureNotNull(clientKey) {
+                RequestValidationError.InvalidClientMetaData("Client doesn't provide a suitable encryption key for $alg").asException()
+            }
+            JarmRequirement.Encrypted(alg, enc, clientKey)
         }
     }
     return when {

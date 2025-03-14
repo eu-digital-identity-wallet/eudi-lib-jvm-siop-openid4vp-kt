@@ -27,6 +27,7 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import java.net.URI
 import java.net.URL
 
 /**
@@ -121,6 +122,7 @@ internal sealed interface UnvalidatedRequest {
                     }
                     PassByValue(clientId(), requestValue)
                 }
+
                 !requestUriValue.isNullOrEmpty() -> {
                     val requestUri = requestUriValue.asURL().getOrThrow()
                     PassByReference(clientId(), requestUri, requestUriMethod)
@@ -173,25 +175,239 @@ internal class DefaultAuthorizationRequestResolver(
 
     override suspend fun resolveRequestUri(uri: String): Resolution =
         httpKtorHttpClientFactory().use { httpClient ->
-            resolveRequestUri(httpClient, uri)
+            with(httpClient) {
+                resolveRequestUri(uri)
+            }
         }
 
-    private suspend fun resolveRequestUri(httpClient: HttpClient, uri: String): Resolution {
-        val requestFetcher = RequestFetcher(httpClient, siopOpenId4VPConfig)
-        val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, httpClient)
-        val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, httpClient)
+    private suspend fun HttpClient.resolveRequestUri(uri: String): Resolution {
+        val fetchedRequest =
+            try {
+                fetchRequest(uri)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(uri, e.error)
+            } catch (e: ClientRequestException) {
+                return resolution(uri, HttpError(e))
+            }
 
-        return try {
-            val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
-            val fetchedRequest = requestFetcher.fetchRequest(unvalidatedRequest)
-            val authenticatedRequest = requestAuthenticator.authenticate(fetchedRequest)
-            val validatedRequestObject = validateRequestObject(authenticatedRequest)
-            val resolved = requestObjectResolver.resolveRequestObject(validatedRequestObject)
-            Resolution.Success(resolved)
-        } catch (e: AuthorizationRequestException) {
-            Resolution.Invalid(e.error)
-        } catch (e: ClientRequestException) {
-            Resolution.Invalid(HttpError(e))
+        val authenticatedRequest =
+            try {
+                authenticateRequest(fetchedRequest)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(fetchedRequest, e.error)
+            } catch (e: ClientRequestException) {
+                return resolution(fetchedRequest, HttpError(e))
+            }
+
+        val validatedRequestObject =
+            try {
+                validateRequestObject(authenticatedRequest)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(authenticatedRequest, e.error)
+            }
+
+        val clientMetaData =
+            try {
+                resolveClientMetaData(validatedRequestObject)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(validatedRequestObject, null, e.error, siopOpenId4VPConfig)
+            } catch (e: ClientRequestException) {
+                return resolution(validatedRequestObject, null, HttpError(e), siopOpenId4VPConfig)
+            }
+
+        val resolved =
+            try {
+                resolveRequestObject(validatedRequestObject, clientMetaData)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(validatedRequestObject, clientMetaData, e.error, siopOpenId4VPConfig)
+            } catch (e: ClientRequestException) {
+                return resolution(validatedRequestObject, clientMetaData, HttpError(e), siopOpenId4VPConfig)
+            }
+
+        return Resolution.Success(resolved)
+    }
+
+    private suspend fun HttpClient.fetchRequest(uri: String): FetchedRequest {
+        val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
+        val requestFetcher = RequestFetcher(this, siopOpenId4VPConfig)
+        return requestFetcher.fetchRequest(unvalidatedRequest)
+    }
+
+    private suspend fun HttpClient.authenticateRequest(fetchedRequest: FetchedRequest): AuthenticatedRequest {
+        val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, this)
+        return requestAuthenticator.authenticate(fetchedRequest)
+    }
+
+    private suspend fun HttpClient.resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
+        validated.clientMetaData?.let { unvalidated ->
+            val clientMetaDataValidator = ClientMetaDataValidator(this)
+            clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
         }
+
+    private suspend fun HttpClient.resolveRequestObject(
+        validatedRequestObject: ValidatedRequestObject,
+        clientMetaData: ValidatedClientMetaData?,
+    ): ResolvedRequestObject {
+        val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, this)
+        return requestObjectResolver.resolveRequestObject(validatedRequestObject, clientMetaData)
     }
 }
+
+/**
+ * Creates an invalid resolution for errors that manifested either because the Authorization Request URI was malformed,
+ * or because we failed to fetch the Authorization Request Object when passed by reference.
+ *
+ * Such errors are not dispatchable.
+ */
+private fun resolution(uri: String, error: AuthorizationRequestError): Resolution.Invalid = Resolution.Invalid(error, null)
+
+/**
+ * Creates an invalid resolution for errors that manifested while trying to authenticate a Client.
+ *
+ * Such errors are dispatchable:
+ * 1. if JAR was not used (at this point the JAR's signature has not yet been validated, and as
+ * such its data cannot be trusted)
+ * 2. A response mode can be constructed from the unvalidated request object
+ * 3. The response mode does not require JARM (at this point the metadata of the Client have not been fetched or validated yet)
+ */
+private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationRequestError): Resolution.Invalid {
+    val dispatchDetails = when (fetchedRequest) {
+        is FetchedRequest.JwtSecured -> null
+        is FetchedRequest.Plain -> fetchedRequest.requestObject.responseMode()
+            ?.takeIf { !it.requiresJarm() }
+            ?.let { responseMode ->
+                ErrorDispatchDetails(
+                    responseMode = responseMode,
+                    nonce = fetchedRequest.requestObject.nonce,
+                    state = fetchedRequest.requestObject.state,
+                    clientId = fetchedRequest.requestObject.clientId(),
+                    jarmRequirement = null,
+                )
+            }
+    }
+
+    return Resolution.Invalid(error, dispatchDetails)
+}
+
+/**
+ * Creates an invalid resolution for errors that manifested while trying to validate the Authorization Request.
+ *
+ * Such errors are dispatchable:
+ * 1. A response mode can be constructed from the unvalidated request object
+ * 2. The response mode does not require JARM (at this point the metadata of the Client could not be fetched/validated)
+ */
+private fun resolution(
+    authenticatedRequest: AuthenticatedRequest,
+    error: AuthorizationRequestError,
+): Resolution.Invalid {
+    val dispatchDetails = authenticatedRequest.requestObject.responseMode()
+        ?.takeIf { !it.requiresJarm() }
+        ?.let { responseMode ->
+            ErrorDispatchDetails(
+                responseMode = responseMode,
+                nonce = authenticatedRequest.requestObject.nonce,
+                state = authenticatedRequest.requestObject.state,
+                clientId = authenticatedRequest.client.clientId,
+                jarmRequirement = null,
+            )
+        }
+
+    return Resolution.Invalid(error, dispatchDetails)
+}
+
+/**
+ * Creates an invalid resolution for errors that manifested while trying to resolve the metadata of the Client or while
+ * trying to resolve the Authorization Request.
+ *
+ * Such errors are dispatchable when:
+ * * the response mode does not require JARM
+ * * the response mode requires JARM and we have resolved Client metadata that contain JARM parameters compatible with
+ * the configuration of the Wallet
+ */
+private fun resolution(
+    validatedRequestObject: ValidatedRequestObject,
+    clientMetaData: ValidatedClientMetaData?,
+    error: AuthorizationRequestError,
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+): Resolution.Invalid {
+    val dispatchDetails = run {
+        val responseMode = validatedRequestObject.responseMode
+        if (!responseMode.requiresJarm()) {
+            ErrorDispatchDetails(
+                responseMode = responseMode,
+                nonce = validatedRequestObject.nonce,
+                state = validatedRequestObject.state,
+                clientId = validatedRequestObject.client.clientId,
+                jarmRequirement = null,
+            )
+        } else {
+            clientMetaData?.let {
+                runCatching {
+                    siopOpenId4VPConfig.jarmRequirement(it)
+                }.map { jarmRequirement ->
+                    jarmRequirement?.let {
+                        ErrorDispatchDetails(
+                            responseMode = responseMode,
+                            nonce = validatedRequestObject.nonce,
+                            state = validatedRequestObject.state,
+                            clientId = validatedRequestObject.client.clientId,
+                            jarmRequirement = it,
+                        )
+                    }
+                }.getOrNull()
+            }
+        }
+    }
+
+    return Resolution.Invalid(error, dispatchDetails)
+}
+
+private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
+    fun UnvalidatedRequestObject.responseUri(): URL? =
+        responseUri?.let {
+            runCatching { URL(it) }.getOrNull()
+        }
+
+    fun UnvalidatedRequestObject.redirectUri(): URI? =
+        redirectUri?.let {
+            runCatching { URI.create(it) }.getOrNull()
+        }
+
+    return when (responseMode) {
+        "direct_post" -> responseUri()?.let { ResponseMode.DirectPost(it) }
+        "direct_post.jwt" -> responseUri()?.let { ResponseMode.DirectPostJwt(it) }
+        "query" -> redirectUri()?.let { ResponseMode.Query(it) }
+        "query.jwt" -> redirectUri()?.let { ResponseMode.QueryJwt(it) }
+        null, "fragment" -> redirectUri()?.let { ResponseMode.Fragment(it) }
+        "fragment.jwt" -> redirectUri()?.let { ResponseMode.FragmentJwt(it) }
+        else -> null
+    }
+}
+
+private fun UnvalidatedRequestObject.clientId(): VerifierId? =
+    clientId?.let {
+        VerifierId.parse(it).getOrNull()
+    }
+
+private fun ResponseMode.requiresJarm(): Boolean =
+    when (this) {
+        is ResponseMode.Query,
+        is ResponseMode.Fragment,
+        is ResponseMode.DirectPost,
+        -> false
+
+        is ResponseMode.QueryJwt,
+        is ResponseMode.FragmentJwt,
+        is ResponseMode.DirectPostJwt,
+        -> true
+    }
+
+private val AuthenticatedClient.clientId: VerifierId
+    get() = when (this) {
+        is AuthenticatedClient.Attested -> VerifierId(ClientIdScheme.VERIFIER_ATTESTATION, clientId)
+        is AuthenticatedClient.DIDClient -> VerifierId(ClientIdScheme.DID, client.toString())
+        is AuthenticatedClient.Preregistered -> VerifierId(ClientIdScheme.PreRegistered, preregisteredClient.clientId)
+        is AuthenticatedClient.RedirectUri -> VerifierId(ClientIdScheme.RedirectUri, clientId.toString())
+        is AuthenticatedClient.X509SanDns -> VerifierId(ClientIdScheme.X509_SAN_DNS, clientId)
+        is AuthenticatedClient.X509SanUri -> VerifierId(ClientIdScheme.X509_SAN_URI, clientId.toString())
+    }

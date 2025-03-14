@@ -121,6 +121,7 @@ internal sealed interface UnvalidatedRequest {
                     }
                     PassByValue(clientId(), requestValue)
                 }
+
                 !requestUriValue.isNullOrEmpty() -> {
                     val requestUri = requestUriValue.asURL().getOrThrow()
                     PassByReference(clientId(), requestUri, requestUriMethod)
@@ -173,25 +174,97 @@ internal class DefaultAuthorizationRequestResolver(
 
     override suspend fun resolveRequestUri(uri: String): Resolution =
         httpKtorHttpClientFactory().use { httpClient ->
-            resolveRequestUri(httpClient, uri)
+            with(httpClient) {
+                resolveRequestUri(uri)
+            }
         }
 
-    private suspend fun resolveRequestUri(httpClient: HttpClient, uri: String): Resolution {
-        val requestFetcher = RequestFetcher(httpClient, siopOpenId4VPConfig)
-        val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, httpClient)
-        val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, httpClient)
+    private suspend fun HttpClient.resolveRequestUri(uri: String): Resolution {
 
-        return try {
-            val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
-            val fetchedRequest = requestFetcher.fetchRequest(unvalidatedRequest)
-            val authenticatedRequest = requestAuthenticator.authenticate(fetchedRequest)
-            val validatedRequestObject = validateRequestObject(authenticatedRequest)
-            val resolved = requestObjectResolver.resolveRequestObject(validatedRequestObject)
-            Resolution.Success(resolved)
-        } catch (e: AuthorizationRequestException) {
-            Resolution.Invalid(e.error)
-        } catch (e: ClientRequestException) {
-            Resolution.Invalid(HttpError(e))
-        }
+        val fetchedRequest =
+            try {
+                fetchRequest(uri)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(uri, e.error)
+            } catch (e: ClientRequestException) {
+                return resolution(uri, HttpError(e))
+            }
+
+        val authenticatedRequest =
+            try {
+                authenticateRequest(fetchedRequest)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(fetchedRequest, e.error)
+            }
+
+        val validatedRequestObject =
+            try {
+                validateRequestObject(authenticatedRequest)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(authenticatedRequest, e.error)
+            }
+
+
+        val clientMetaData =
+            try {
+                resolveClientMetaData(validatedRequestObject)
+            } catch (e: AuthorizationRequestException) {
+                return resolution(validatedRequestObject, null, e.error)
+            }
+        val resolved =
+            try {
+                resolveRequestObject(validatedRequestObject, clientMetaData)
+            } catch (e: AuthorizationRequestException) {
+               return resolution(validatedRequestObject, clientMetaData,  e.error)
+            }
+
+        return Resolution.Success(resolved)
     }
+
+
+    private suspend fun HttpClient.fetchRequest(uri: String): FetchedRequest {
+        val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
+        val requestFetcher = RequestFetcher(this, siopOpenId4VPConfig)
+        return requestFetcher.fetchRequest(unvalidatedRequest)
+    }
+
+    private suspend fun HttpClient.authenticateRequest(fetchedRequest: FetchedRequest): AuthenticatedRequest {
+        val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, this)
+        return requestAuthenticator.authenticate(fetchedRequest)
+    }
+
+    private suspend fun HttpClient.resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
+        validated.clientMetaData?.let { unvalidated ->
+            val clientMetaDataValidator = ClientMetaDataValidator(this)
+            clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
+        }
+
+    private suspend fun HttpClient.resolveRequestObject(
+        validatedRequestObject: ValidatedRequestObject,
+        clientMetaData: ValidatedClientMetaData?
+    ): ResolvedRequestObject {
+        val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, this)
+        return requestObjectResolver.resolveRequestObject(validatedRequestObject, clientMetaData)
+    }
+
+}
+
+
+private fun resolution(uri: String, error: AuthorizationRequestError): Resolution.Invalid {
+   return Resolution.Invalid(error, null)
+}
+
+private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationRequestError): Resolution.Invalid {
+
+}
+
+private fun resolution(authenticatedRequest: AuthenticatedRequest, error: AuthorizationRequestError): Resolution.Invalid {
+    TODO()
+}
+
+private fun resolution(validatedRequestObject: ValidatedRequestObject,
+                       clientMetaData: ValidatedClientMetaData?,
+                       error: AuthorizationRequestError
+): Resolution.Invalid {
+    TODO()
 }

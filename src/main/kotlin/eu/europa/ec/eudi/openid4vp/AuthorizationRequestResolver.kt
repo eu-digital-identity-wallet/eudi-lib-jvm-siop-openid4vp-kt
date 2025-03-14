@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
@@ -503,8 +505,7 @@ data class ErrorDispatchDetails(
     val state: String?,
     val clientId: VerifierId?,
     val jarmRequirement: JarmRequirement?,
-): Serializable
-
+) : Serializable
 
 /**
  * An interface that describes a service

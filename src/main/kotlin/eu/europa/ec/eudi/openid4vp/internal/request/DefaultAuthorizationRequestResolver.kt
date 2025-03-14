@@ -180,7 +180,6 @@ internal class DefaultAuthorizationRequestResolver(
         }
 
     private suspend fun HttpClient.resolveRequestUri(uri: String): Resolution {
-
         val fetchedRequest =
             try {
                 fetchRequest(uri)
@@ -204,7 +203,6 @@ internal class DefaultAuthorizationRequestResolver(
                 return resolution(authenticatedRequest, e.error)
             }
 
-
         val clientMetaData =
             try {
                 resolveClientMetaData(validatedRequestObject)
@@ -215,12 +213,11 @@ internal class DefaultAuthorizationRequestResolver(
             try {
                 resolveRequestObject(validatedRequestObject, clientMetaData)
             } catch (e: AuthorizationRequestException) {
-               return resolution(validatedRequestObject, clientMetaData,  e.error)
+                return resolution(validatedRequestObject, clientMetaData, e.error)
             }
 
         return Resolution.Success(resolved)
     }
-
 
     private suspend fun HttpClient.fetchRequest(uri: String): FetchedRequest {
         val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
@@ -241,30 +238,29 @@ internal class DefaultAuthorizationRequestResolver(
 
     private suspend fun HttpClient.resolveRequestObject(
         validatedRequestObject: ValidatedRequestObject,
-        clientMetaData: ValidatedClientMetaData?
+        clientMetaData: ValidatedClientMetaData?,
     ): ResolvedRequestObject {
         val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, this)
         return requestObjectResolver.resolveRequestObject(validatedRequestObject, clientMetaData)
     }
-
 }
 
-
 private fun resolution(uri: String, error: AuthorizationRequestError): Resolution.Invalid {
-   return Resolution.Invalid(error, null)
+    return Resolution.Invalid(error, null)
 }
 
 private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationRequestError): Resolution.Invalid {
-
+    return Resolution.Invalid(error, null)
 }
 
 private fun resolution(authenticatedRequest: AuthenticatedRequest, error: AuthorizationRequestError): Resolution.Invalid {
-    TODO()
+    return Resolution.Invalid(error, null)
 }
 
-private fun resolution(validatedRequestObject: ValidatedRequestObject,
-                       clientMetaData: ValidatedClientMetaData?,
-                       error: AuthorizationRequestError
+private fun resolution(
+    validatedRequestObject: ValidatedRequestObject,
+    clientMetaData: ValidatedClientMetaData?,
+    error: AuthorizationRequestError,
 ): Resolution.Invalid {
-    TODO()
+    return Resolution.Invalid(error, null)
 }

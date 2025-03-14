@@ -28,8 +28,7 @@ internal class RequestObjectResolver(
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
     private val clientMetaDataValidator = ClientMetaDataValidator(httpClient)
 
-    suspend fun resolveRequestObject(validated: ValidatedRequestObject): ResolvedRequestObject {
-        val clientMetaData = resolveClientMetaData(validated)
+    suspend fun resolveRequestObject(validated: ValidatedRequestObject, clientMetaData: ValidatedClientMetaData?): ResolvedRequestObject {
         return when (validated) {
             is SiopAuthentication -> resolveIdTokenRequest(validated, clientMetaData)
             is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, clientMetaData)

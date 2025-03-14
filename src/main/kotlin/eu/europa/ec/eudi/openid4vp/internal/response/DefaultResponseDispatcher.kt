@@ -61,7 +61,7 @@ internal class DefaultDispatcher(
         request: ResolvedRequestObject,
         consensus: Consensus,
         encryptionParameters: EncryptionParameters?,
-    ) =
+    ): Pair<URL, Parameters> =
         when (val response = request.responseWith(consensus, encryptionParameters)) {
             is DirectPost -> {
                 val parameters = DirectPostForm.parametersOf(response.data)

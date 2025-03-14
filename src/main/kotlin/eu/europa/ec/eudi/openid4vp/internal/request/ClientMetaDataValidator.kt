@@ -172,21 +172,6 @@ private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
     }
 }
 
-// private fun VpFormatsTO.formats(): List<VpFormat> {
-//    fun VcSdJwtTO.format(): VpFormat.SdJwtVc {
-//        fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
-//        return VpFormat.SdJwtVc(
-//            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
-//            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
-//        )
-//    }
-//
-//    return buildList {
-//        msoMdoc?.let { add(VpFormat.MsoMdoc) }
-//        vcSdJwt?.let { sdJwtVc -> add(sdJwtVc.format()) }
-//    }
-// }
-
 private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { test ->
     when (test(left) to test(right)) {
         true to true -> true

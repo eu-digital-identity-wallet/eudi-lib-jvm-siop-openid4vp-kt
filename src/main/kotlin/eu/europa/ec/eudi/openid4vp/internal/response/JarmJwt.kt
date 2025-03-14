@@ -21,7 +21,6 @@ import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.crypto.RSAEncrypter
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.EncryptedJWT
@@ -81,8 +80,8 @@ private fun SiopOpenId4VPConfig.encrypt(
     val encryptionCfg = jarmConfiguration.encryptionConfig()
     checkNotNull(encryptionCfg) { "Wallet doesn't support encrypted JARM" }
 
-    val (jweAlgorithm, encryptionMethod, verifierEncryptionKeySet) = requirement
-    val (verifierKey, jweEncrypter) = selectVerifierKeyAndGenerateEncrypter(jweAlgorithm, verifierEncryptionKeySet)
+    val (jweAlgorithm, encryptionMethod, verifierKey) = requirement
+    val jweEncrypter = generateEncrypter(jweAlgorithm, verifierKey)
     val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, verifierKey, data)
 
     val claimSet = JwtPayloadFactory.encryptedJwtClaimSet(data)
@@ -126,8 +125,8 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
     }
 
     val signedJwt = sign(requirement.signed, data)
-    val (jweAlgorithm, encryptionMethod, verifierEncryptionKeySet) = requirement.encryptResponse
-    val (verifierKey, jweEncrypter) = selectVerifierKeyAndGenerateEncrypter(jweAlgorithm, verifierEncryptionKeySet)
+    val (jweAlgorithm, encryptionMethod, verifierKey) = requirement.encryptResponse
+    val jweEncrypter = generateEncrypter(jweAlgorithm, verifierKey)
     val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, verifierKey, data) {
         contentType("JWT")
     }
@@ -135,11 +134,10 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
     return JWEObject(jweHeader, Payload(signedJwt)).apply { encrypt(jweEncrypter) }
 }
 
-private fun selectVerifierKeyAndGenerateEncrypter(
+private fun generateEncrypter(
     jweAlgorithm: JWEAlgorithm,
-    verifierEncryptionKeySet: JWKSet,
-): Pair<JWK, JWEEncrypter> = EncrypterFactory.findEncrypters(jweAlgorithm, verifierEncryptionKeySet)
-    .firstNotNullOfOrNull { (key, encrypter) -> key to encrypter }
+    verifierKey: JWK,
+): JWEEncrypter = EncrypterFactory.createEncrypter(jweAlgorithm, verifierKey)
     ?: error("Cannot find appropriate encryption key for ${jweAlgorithm.name}")
 
 private object JwtPayloadFactory {
@@ -244,24 +242,11 @@ internal fun List<VerifiablePresentation>.toJson(): JsonElement {
         }
     }
 }
-private object EncrypterFactory {
-
-    fun findEncrypters(
-        algorithm: JWEAlgorithm,
-        recipientCandidateKeys: JWKSet,
-    ): Map<JWK, JWEEncrypter> {
-        fun encrypter(recipientKey: JWK) = runCatching {
-            createEncrypter(recipientKey, algorithm)
-        }.getOrNull()
-
-        return recipientCandidateKeys.keys.mapNotNull { key ->
-            encrypter(key)?.let { encrypter -> key to encrypter }
-        }.toMap()
-    }
+internal object EncrypterFactory {
 
     fun createEncrypter(
-        recipientKey: JWK,
         algorithm: JWEAlgorithm,
+        recipientKey: JWK,
     ): JWEEncrypter? =
         familyOf(algorithm)?.let { family ->
             when {
@@ -270,6 +255,15 @@ private object EncrypterFactory {
                 else -> null
             }
         }
+    fun canBeUsed(algorithm: JWEAlgorithm, candidateRecipientKey: JWK): Boolean {
+        return familyOf(algorithm)?.let { family ->
+            when {
+                family == Family.ECDH_ES && candidateRecipientKey is ECKey -> true
+                family == Family.RSA && candidateRecipientKey is RSAKey -> true
+                else -> false
+            }
+        } == true
+    }
 
     private val SupportedFamilies = listOf(Family.ECDH_ES, Family.RSA)
     private fun familyOf(algorithm: JWEAlgorithm): Family? =

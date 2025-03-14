@@ -18,7 +18,7 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -271,12 +271,12 @@ sealed interface JarmRequirement : Serializable {
     /**
      * Client requires JARM encrypted response using the
      * provided [algorithm][responseEncryptionAlg], [encoding method][responseEncryptionEnc]
-     * and [encryption key][encryptionKeySet]
+     * and [encryption key][verifierKey]
      */
     data class Encrypted(
         val responseEncryptionAlg: JWEAlgorithm,
         val responseEncryptionEnc: EncryptionMethod,
-        val encryptionKeySet: JWKSet,
+        val verifierKey: JWK,
     ) : JarmRequirement
 
     /**

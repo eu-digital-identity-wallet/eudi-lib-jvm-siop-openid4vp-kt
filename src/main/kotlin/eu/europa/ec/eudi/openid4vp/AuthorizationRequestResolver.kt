@@ -496,16 +496,24 @@ sealed interface Resolution {
      * Represents the failure of validating or resolving an authorization request
      * due to [error]
      */
-    data class Invalid(val error: AuthorizationRequestError, val di: ErrorDispatchDetails?) : Resolution
+    data class Invalid(
+        val error: AuthorizationRequestError,
+        val dispatchDetails: ErrorDispatchDetails?,
+    ) : Resolution
 }
 
+/**
+ * Information required for an [AuthorizationRequestError] to be dispatchable.
+ */
 data class ErrorDispatchDetails(
     val responseMode: ResponseMode,
     val nonce: String?,
     val state: String?,
     val clientId: VerifierId?,
     val jarmRequirement: JarmRequirement?,
-) : Serializable
+) : Serializable {
+    companion object
+}
 
 /**
  * An interface that describes a service

@@ -25,12 +25,14 @@ import java.net.URL
  */
 internal sealed interface AuthorizationResponsePayload : Serializable {
 
-    val nonce: String
+    val nonce: String?
     val state: String?
-    val clientId: VerifierId
     val encryptionParameters: EncryptionParameters?
 
-    sealed interface Success : AuthorizationResponsePayload
+    sealed interface Positive : AuthorizationResponsePayload {
+        override val nonce: String
+        val clientId: VerifierId
+    }
 
     /**
      * In response to a [ResolvedRequestObject.SiopAuthentication]
@@ -45,7 +47,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Success
+    ) : Positive
 
     /**
      * In response to a [ResolvedRequestObject.OpenId4VPAuthorization]
@@ -62,7 +64,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Success
+    ) : Positive
 
     /**
      * In response to a [ResolvedRequestObject.SiopOpenId4VPAuthentication]
@@ -81,22 +83,12 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Success
+    ) : Positive
 
-    sealed interface Failed : AuthorizationResponsePayload
-
-    /**
-     * In response of an [Resolution.Invalid] authorization request
-     * @param error the cause
-     * @param state the state of the request
-     */
-    data class InvalidRequest(
-        val error: AuthorizationRequestError,
-        override val nonce: String,
-        override val state: String?,
-        override val clientId: VerifierId,
-        override val encryptionParameters: EncryptionParameters? = null,
-    ) : Failed
+    sealed interface Negative : AuthorizationResponsePayload {
+        override val nonce: String
+        val clientId: VerifierId
+    }
 
     /**
      * In response of a [ResolvedRequestObject] and
@@ -108,7 +100,21 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Failed
+    ) : Negative
+
+    sealed interface Error : AuthorizationResponsePayload
+
+    /**
+     * In response of an [Resolution.Invalid] authorization request
+     * @param error the cause
+     * @param state the state of the request
+     */
+    data class InvalidRequest(
+        val error: AuthorizationRequestError,
+        override val nonce: String?,
+        override val state: String?,
+        override val encryptionParameters: EncryptionParameters? = null,
+    ) : Error
 }
 
 /**

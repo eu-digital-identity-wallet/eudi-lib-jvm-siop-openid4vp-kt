@@ -44,25 +44,36 @@ import java.net.URL
 internal class DefaultDispatcher(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
-) : Dispatcher {
+) : Dispatcher, ErrorDispatcher {
 
     override suspend fun post(
         request: ResolvedRequestObject,
         consensus: Consensus,
         encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.VerifierResponse {
-        val (responseUri, parameters) = formParameters(request, consensus, encryptionParameters)
+        val response = request.responseWith(consensus, encryptionParameters)
+        val (responseUri, parameters) = formParameters(response)
+        return httpClientFactory().use { httpClient ->
+            submitForm(httpClient, responseUri, parameters)
+        }
+    }
+
+    override suspend fun post(
+        error: AuthorizationRequestError,
+        di: ErrorDispatchDetails,
+        encryptionParameters: EncryptionParameters?
+    ): DispatchOutcome.VerifierResponse {
+        val response = error.responseWith(di, encryptionParameters)
+        val (responseUri, parameters) = formParameters(response)
         return httpClientFactory().use { httpClient ->
             submitForm(httpClient, responseUri, parameters)
         }
     }
 
     private fun formParameters(
-        request: ResolvedRequestObject,
-        consensus: Consensus,
-        encryptionParameters: EncryptionParameters?,
+        response: AuthorizationResponse
     ): Pair<URL, Parameters> =
-        when (val response = request.responseWith(consensus, encryptionParameters)) {
+        when (response) {
             is DirectPost -> {
                 val parameters = DirectPostForm.parametersOf(response.data)
                 response.responseUri to parameters
@@ -114,13 +125,30 @@ internal class DefaultDispatcher(
         consensus: Consensus,
         encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.RedirectURI {
-        val uri = when (val response = request.responseWith(consensus, encryptionParameters)) {
+        val response = request.responseWith(consensus, encryptionParameters)
+        return encodeRedirectURI(response)
+    }
+
+    override suspend fun encodeRedirectURI(
+        error: AuthorizationRequestError,
+        di: ErrorDispatchDetails,
+        encryptionParameters: EncryptionParameters?
+    ): DispatchOutcome.RedirectURI {
+        val response = error.responseWith(di, encryptionParameters)
+        return encodeRedirectURI(response)
+    }
+
+    private fun encodeRedirectURI(
+        response: AuthorizationResponse
+    ): DispatchOutcome.RedirectURI {
+        val uri = when (response) {
             is Fragment -> response.encodeRedirectURI()
             is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             is Query -> response.encodeRedirectURI()
             is QueryJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
             else -> error("Unexpected response $response")
         }
+
         return DispatchOutcome.RedirectURI(uri)
     }
 }

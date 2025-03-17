@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.response
 
-import com.nimbusds.oauth2.sdk.OAuth2Error.REQUEST_URI_NOT_SUPPORTED
 import eu.europa.ec.eudi.openid4vp.AuthorizationRequestError
 import eu.europa.ec.eudi.openid4vp.HttpError
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.*
@@ -88,9 +87,8 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
     INVALID_REQUEST_URI_METHOD("invalid_request_uri_method"),
     INVALID_TRANSACTION_DATA("invalid_transaction_data"),
 
-    /**
-     * SIOPv2 Error Codes
-     */
+    // SIOPv2 Error Codes
+
     USER_CANCELLED("user_cancelled"),
     REGISTRATION_VALUE_NOT_SUPPORTED("registration_value_not_supported"),
     SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED("subject_syntax_types_not_supported"),
@@ -103,6 +101,9 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
      */
     INVALID_REQUEST_URI("invalid_request_uri"),
 
+    /**
+     * The request parameter contains an invalid Request Object
+     */
     INVALID_REQUEST_OBJECT("invalid_request_object"),
 
     /**

@@ -27,7 +27,11 @@ import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingResponseType
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingScope
 import eu.europa.ec.eudi.openid4vp.internal.request.*
+import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.INVALID_REQUEST_URI_METHOD
+import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -281,7 +285,7 @@ class AuthorizationResponseDispatcherTest {
                                         call.request.headers["Content-Type"],
                                     )
                                     assertEquals(state, stateParam)
-                                    assertEquals(AuthorizationRequestErrorCode.INVALID_REQUEST.code, errorTxt)
+                                    assertEquals(AuthorizationRequestErrorCode.INVALID_CLIENT.code, errorTxt)
 
                                     call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
                                 }
@@ -296,7 +300,7 @@ class AuthorizationResponseDispatcherTest {
 
                     val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
-                        RequestValidationError.InvalidJarJwt("invalid jwt"),
+                        RequestValidationError.InvalidClientId,
                         errorDispatchDetails,
                         EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                     )
@@ -333,7 +337,7 @@ class AuthorizationResponseDispatcherTest {
 
                                     val claims = parseJwt(responseJwt)
 
-                                    assertEquals("invalid_request", claims["error"])
+                                    assertEquals(INVALID_REQUEST_URI_METHOD.code, claims["error"])
                                     assertEquals(state, claims["state"])
 
                                     assertEquals(
@@ -354,7 +358,7 @@ class AuthorizationResponseDispatcherTest {
 
                     val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
-                        RequestValidationError.InvalidJarJwt("invalid jwt"),
+                        RequestValidationError.InvalidRequestUriMethod,
                         errorDispatchDetails,
                         EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                     )
@@ -387,14 +391,14 @@ class AuthorizationResponseDispatcherTest {
 
                     val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
-                        RequestValidationError.InvalidJarJwt("invalid jwt"),
+                        RequestValidationError.SubjectSyntaxTypesNoMatch,
                         errorDispatchDetails,
                         EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                     )
                     assertIs<DispatchOutcome.RedirectURI>(outcome)
 
                     val urlParams = Url(outcome.value).parameters
-                    assertEquals("invalid_request", urlParams["error"])
+                    assertEquals(SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED.code, urlParams["error"])
                     assertEquals(state, urlParams["state"])
                 }
             }
@@ -423,7 +427,7 @@ class AuthorizationResponseDispatcherTest {
 
                     val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
-                        RequestValidationError.InvalidJarJwt("invalid jwt"),
+                        MissingScope,
                         errorDispatchDetails,
                         EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                     )
@@ -432,7 +436,7 @@ class AuthorizationResponseDispatcherTest {
                     val responseJwt = urlParams["response"]
                     assertNotNull(responseJwt)
                     val claims = parseJwt(responseJwt)
-                    assertEquals("invalid_request", claims["error"])
+                    assertEquals(AuthorizationRequestErrorCode.INVALID_REQUEST.code, claims["error"])
                     assertEquals(state, claims["state"])
                 }
             }
@@ -461,7 +465,7 @@ class AuthorizationResponseDispatcherTest {
 
                     val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
-                        RequestValidationError.InvalidJarJwt("invalid jwt"),
+                        MissingResponseType,
                         errorDispatchDetails,
                         EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                     )
@@ -496,7 +500,7 @@ class AuthorizationResponseDispatcherTest {
 
                     val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
-                        RequestValidationError.InvalidJarJwt("invalid jwt"),
+                        RequestValidationError.MissingResponseUri,
                         errorDispatchDetails,
                         EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                     )

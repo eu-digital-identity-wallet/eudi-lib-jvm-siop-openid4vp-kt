@@ -27,12 +27,10 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
 
     val nonce: String?
     val state: String?
+    val clientId: VerifierId?
     val encryptionParameters: EncryptionParameters?
 
-    sealed interface Positive : AuthorizationResponsePayload {
-        override val nonce: String
-        val clientId: VerifierId
-    }
+    sealed interface Success : AuthorizationResponsePayload
 
     /**
      * In response to a [ResolvedRequestObject.SiopAuthentication]
@@ -47,7 +45,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Positive
+    ) : Success
 
     /**
      * In response to a [ResolvedRequestObject.OpenId4VPAuthorization]
@@ -64,7 +62,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Positive
+    ) : Success
 
     /**
      * In response to a [ResolvedRequestObject.SiopOpenId4VPAuthentication]
@@ -83,12 +81,9 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Positive
+    ) : Success
 
-    sealed interface Negative : AuthorizationResponsePayload {
-        override val nonce: String
-        val clientId: VerifierId
-    }
+    sealed interface Failed : AuthorizationResponsePayload
 
     /**
      * In response of a [ResolvedRequestObject] and
@@ -100,9 +95,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val state: String?,
         override val clientId: VerifierId,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Negative
-
-    sealed interface Error : AuthorizationResponsePayload
+    ) : Failed
 
     /**
      * In response of an [Resolution.Invalid] authorization request
@@ -113,8 +106,9 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         val error: AuthorizationRequestError,
         override val nonce: String?,
         override val state: String?,
+        override val clientId: VerifierId?,
         override val encryptionParameters: EncryptionParameters? = null,
-    ) : Error
+    ) : Failed
 }
 
 /**

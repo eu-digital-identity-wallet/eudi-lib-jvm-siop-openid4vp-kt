@@ -23,15 +23,15 @@ interface ErrorDispatcher {
 
     suspend fun dispatchError(
         error: AuthorizationRequestError,
-        di: ErrorDispatchDetails,
+        errorDispatchDetails: ErrorDispatchDetails,
         encryptionParameters: EncryptionParameters?,
-    ): DispatchOutcome = when (di.responseMode) {
-        is ResponseMode.DirectPost -> post(error, di, encryptionParameters)
-        is ResponseMode.DirectPostJwt -> post(error, di, encryptionParameters)
-        is ResponseMode.Query -> encodeRedirectURI(error, di, encryptionParameters)
-        is ResponseMode.QueryJwt -> encodeRedirectURI(error, di, encryptionParameters)
-        is ResponseMode.Fragment -> encodeRedirectURI(error, di, encryptionParameters)
-        is ResponseMode.FragmentJwt -> encodeRedirectURI(error, di, encryptionParameters)
+    ): DispatchOutcome = when (errorDispatchDetails.responseMode) {
+        is ResponseMode.DirectPost -> post(error, errorDispatchDetails, encryptionParameters)
+        is ResponseMode.DirectPostJwt -> post(error, errorDispatchDetails, encryptionParameters)
+        is ResponseMode.Query -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
+        is ResponseMode.QueryJwt -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
+        is ResponseMode.Fragment -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
+        is ResponseMode.FragmentJwt -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
     }
 
     /**

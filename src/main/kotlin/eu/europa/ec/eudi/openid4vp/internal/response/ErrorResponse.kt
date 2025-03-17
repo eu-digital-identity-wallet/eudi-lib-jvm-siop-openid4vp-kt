@@ -28,6 +28,7 @@ internal fun AuthorizationRequestError.responseWith(
         error = this,
         state = di.state,
         nonce = di.nonce,
+        clientId = di.clientId,
         encryptionParameters = encryptionParameters,
     )
     return responseWith(di, payload)

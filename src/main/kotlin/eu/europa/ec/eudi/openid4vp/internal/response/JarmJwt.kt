@@ -155,11 +155,7 @@ private object JwtPayloadFactory {
     ): JWTClaimsSet =
         buildJsonObject {
             issuer?.let { put("iss", it.value) }
-            when (data) {
-                is AuthorizationResponsePayload.Positive -> put("aud", data.clientId.toString())
-                is AuthorizationResponsePayload.Negative -> put("aud", data.clientId.toString())
-                is AuthorizationResponsePayload.InvalidRequest -> {}
-            }
+            data.clientId?.let { put("aud", data.clientId.toString()) }
             ttl?.let {
                 val exp = issuedAt.plusMillis(ttl.toMillis()).epochSecond
                 put("exp", exp)

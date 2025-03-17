@@ -692,6 +692,7 @@ class DefaultDispatcherTest {
                         MissingNonce,
                         generateNonce(),
                         state,
+                        VerifierId(ClientIdScheme.PreRegistered, "client_id"),
                     )
                 val response = AuthorizationResponse.Query(redirectUriBase, data)
                 val redirectURI = response.encodeRedirectURI()
@@ -811,6 +812,7 @@ class DefaultDispatcherTest {
                         MissingNonce,
                         generateNonce(),
                         state,
+                        VerifierId(ClientIdScheme.PreRegistered, "client_id"),
                     )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 

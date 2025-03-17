@@ -22,15 +22,41 @@ import eu.europa.ec.eudi.openid4vp.ResolutionError.*
 
 internal enum class AuthorizationRequestErrorCode(val code: String) {
 
+    // OAUTH2
+
+    /**
+     * Requested scope value is invalid, unknown, or malformed
+     */
+    INVALID_SCOPE("invalid_scope"),
+
+    /**
+     * One of the following:
+     *
+     * The request contains more than one out of the following three options to communicate a requested Credential:
+     * a presentation_definition parameter, a presentation_definition_uri parameter,
+     * or a scope value representing a Presentation Definition
+     *
+     * The request uses the vp_token Response Type but does not request a Credential using any of the three options
+     *
+     * Requested Presentation Definition does not conform to the DIF PEv2 specification
+     *
+     * The Wallet does not support the Client Identifier Scheme passed in the Authorization Request
+     *
+     * The Client Identifier passed in the request did not belong to its Client Identifier scheme,
+     * or requirements of a certain scheme was violated,
+     * for example, an unsigned request was sent with Client Identifier scheme https
+     */
+    INVALID_REQUEST("invalid_request"),
+    ACCESS_DENIED("access_denied"),
+
     /**
      * OpenId4VP Error Codes
      */
-    INVALID_SCOPE("invalid_scope"),
-    INVALID_REQUEST("invalid_request"),
     INVALID_CLIENT("invalid_client"),
     VP_FORMATS_NOT_SUPPORTED("vp_formats_not_supported"),
     INVALID_PRESENTATION_DEFINITION_URI("invalid_presentation_definition_uri"),
     INVALID_PRESENTATION_DEFINITION_REFERENCE("invalid_presentation_definition_reference"),
+    INVALID_REQUEST_URI_METHOD("invalid_request_uri_method"),
     INVALID_TRANSACTION_DATA("invalid_transaction_data"),
 
     /**
@@ -52,8 +78,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
          */
         fun fromError(error: AuthorizationRequestError): AuthorizationRequestErrorCode {
             return when (error) {
-                InvalidClientId, UnsupportedClientIdScheme -> INVALID_CLIENT
-
+                is UnknownScope -> INVALID_SCOPE
                 is InvalidJarJwt,
                 is InvalidClientIdScheme,
                 InvalidRedirectUri,
@@ -67,7 +92,6 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 MissingResponseType,
                 MissingResponseUri,
                 MissingScope,
-                OneOfClientMedataOrUri,
                 RedirectUriMustNotBeProvided,
                 ResponseUriMustNotBeProvided,
                 IdTokenSigningAlgMissing,
@@ -79,10 +103,13 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is UnsupportedClientMetaData,
                 is InvalidIdTokenType,
                 is HttpError,
-                InvalidRequestUriMethod,
                 InvalidUseOfBothRequestAndRequestUri,
                 is UnsupportedRequestUriMethod,
                 -> INVALID_REQUEST
+
+                InvalidClientId, UnsupportedClientIdScheme -> INVALID_CLIENT
+
+                is InvalidRequestUriMethod -> INVALID_REQUEST_URI_METHOD
 
                 BothJwkUriAndInlineJwks,
                 MissingClientMetadataJwksSource,
@@ -92,14 +119,12 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 SubjectSyntaxTypesWrongSyntax,
                 -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 
-                is ClientMetadataJwkUriUnparsable,
-                -> INVALID_REGISTRATION_URI
-
+                is ClientMetadataJwkUriUnparsable -> INVALID_REGISTRATION_URI
                 is InvalidPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_REFERENCE
                 InvalidPresentationDefinitionUri -> INVALID_PRESENTATION_DEFINITION_URI
+
                 is ClientMetadataJwkResolutionFailed,
                 FetchingPresentationDefinitionNotSupported,
-                is UnknownScope,
                 is UnableToFetchPresentationDefinition,
                 is UnableToFetchRequestObject,
                 is DIDResolutionFailed,

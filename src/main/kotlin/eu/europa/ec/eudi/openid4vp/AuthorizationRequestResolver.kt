@@ -391,11 +391,6 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class UnsupportedClientMetaData(val value: String) : RequestValidationError
 
-    data object OneOfClientMedataOrUri : RequestValidationError {
-        @Suppress("unused")
-        private fun readResolve(): Any = OneOfClientMedataOrUri
-    }
-
     data class InvalidClientMetaData(val cause: String) : RequestValidationError
 
     data object SubjectSyntaxTypesNoMatch : RequestValidationError {

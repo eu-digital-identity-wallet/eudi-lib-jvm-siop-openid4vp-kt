@@ -676,7 +676,7 @@ class DefaultDispatcherTest {
                 val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
                 response.encodeRedirectURI()
                     .asserter {
-                        assertEquals(AuthorizationRequestErrorCode.USER_CANCELLED.code, getQueryParameter("error"))
+                        assertEquals(AuthorizationRequestErrorCode.ACCESS_DENIED.code, getQueryParameter("error"))
                     }
             }
 
@@ -796,7 +796,7 @@ class DefaultDispatcherTest {
 
                 response.encodeRedirectURI()
                     .asserter { fragmentData ->
-                        assertEquals(AuthorizationRequestErrorCode.USER_CANCELLED.code, fragmentData["error"])
+                        assertEquals(AuthorizationRequestErrorCode.ACCESS_DENIED.code, fragmentData["error"])
                     }
             }
 

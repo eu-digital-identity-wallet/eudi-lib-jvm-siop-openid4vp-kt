@@ -187,7 +187,7 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.NoConsensusResponseData -> {
-                put(ERROR_CLAIM, AuthorizationRequestErrorCode.USER_CANCELLED.code)
+                put(ERROR_CLAIM, AuthorizationRequestErrorCode.ACCESS_DENIED.code)
             }
         }
     }

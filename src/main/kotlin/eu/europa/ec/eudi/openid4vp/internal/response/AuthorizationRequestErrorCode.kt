@@ -22,25 +22,94 @@ import eu.europa.ec.eudi.openid4vp.ResolutionError.*
 
 internal enum class AuthorizationRequestErrorCode(val code: String) {
 
-    /**
-     * OpenId4VP Error Codes
-     */
-    INVALID_SCOPE("invalid_scope"),
-    INVALID_REQUEST("invalid_request"),
-    INVALID_CLIENT("invalid_client"),
-    VP_FORMATS_NOT_SUPPORTED("vp_formats_not_supported"),
-    INVALID_PRESENTATION_DEFINITION_URI("invalid_presentation_definition_uri"),
-    INVALID_PRESENTATION_DEFINITION_REFERENCE("invalid_presentation_definition_reference"),
-    INVALID_TRANSACTION_DATA("invalid_transaction_data"),
+    // OAUTH2 & OpenID4VP
 
     /**
-     * SIOPv2 Error Codes
+     * Requested scope value is invalid, unknown, or malformed
      */
+    INVALID_SCOPE("invalid_scope"),
+
+    /**
+     * One of the following:
+     *
+     * The request contains more than one out of the following three options to communicate a requested Credential:
+     * a presentation_definition parameter, a presentation_definition_uri parameter,
+     * or a scope value representing a Presentation Definition
+     *
+     * The request uses the vp_token Response Type but does not request a Credential using any of the three options
+     *
+     * Requested Presentation Definition does not conform to the DIF PEv2 specification
+     *
+     * The Wallet does not support the Client Identifier Scheme passed in the Authorization Request
+     *
+     * The Client Identifier passed in the request did not belong to its Client Identifier scheme,
+     * or requirements of a certain scheme was violated,
+     * for example, an unsigned request was sent with Client Identifier scheme https
+     */
+    INVALID_REQUEST("invalid_request"),
+
+    /**
+     * The Wallet did not have the requested Credentials to satisfy the Authorization Request.
+     * The End-User did not give consent to share the requested Credentials with the Verifier.
+     * The Wallet failed to authenticate the End-User.
+     */
+    ACCESS_DENIED("access_denied"),
+
+    /**
+     * client_metadata parameter is present, but the Wallet recognizes Client Identifier and
+     * knows metadata associated with it.
+     *
+     * Verifier's pre-registered metadata has been found based on the Client Identifier,
+     * but client_metadata parameter is also present.
+     */
+    INVALID_CLIENT("invalid_client"),
+
+    /**
+     * The Wallet does not support any of the formats requested by the Verifier,
+     * such as those included in the vp_formats registration parameter.
+     */
+    VP_FORMATS_NOT_SUPPORTED("vp_formats_not_supported"),
+
+    /**
+     * The Presentation Definition URL cannot be reached
+     */
+    INVALID_PRESENTATION_DEFINITION_URI("invalid_presentation_definition_uri"),
+
+    /**
+     * The Presentation Definition URL can be reached, but the specified presentation_definition
+     * cannot be found at the URL
+     */
+    INVALID_PRESENTATION_DEFINITION_REFERENCE("invalid_presentation_definition_reference"),
+
+    /**
+     * The value of the request_uri_method request parameter is neither get nor post (case-sensitive).
+     */
+    INVALID_REQUEST_URI_METHOD("invalid_request_uri_method"),
+    INVALID_TRANSACTION_DATA("invalid_transaction_data"),
+
+    // SIOPv2 Error Codes
+
     USER_CANCELLED("user_cancelled"),
     REGISTRATION_VALUE_NOT_SUPPORTED("registration_value_not_supported"),
     SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED("subject_syntax_types_not_supported"),
     INVALID_REGISTRATION_URI("invalid_registration_uri"),
     INVALID_REGISTRATION_OBJECT("invalid_registration_object"),
+
+    // JAR errors
+    /**
+     * The request_uri in the authorization request returns an error or contains invalid data
+     */
+    INVALID_REQUEST_URI("invalid_request_uri"),
+
+    /**
+     * The request parameter contains an invalid Request Object
+     */
+    INVALID_REQUEST_OBJECT("invalid_request_object"),
+
+    /**
+     * The authorization server does not support the use of the request_uri parameter
+     */
+    REQUEST_URI_NOT_SUPPORTED("request_uri_not_supported"),
 
     PROCESSING_FAILURE("processing_error"),
     ;
@@ -52,9 +121,8 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
          */
         fun fromError(error: AuthorizationRequestError): AuthorizationRequestErrorCode {
             return when (error) {
-                InvalidClientId, UnsupportedClientIdScheme -> INVALID_CLIENT
+                is UnknownScope -> INVALID_SCOPE
 
-                is InvalidJarJwt,
                 is InvalidClientIdScheme,
                 InvalidRedirectUri,
                 InvalidResponseUri,
@@ -67,7 +135,6 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 MissingResponseType,
                 MissingResponseUri,
                 MissingScope,
-                OneOfClientMedataOrUri,
                 RedirectUriMustNotBeProvided,
                 ResponseUriMustNotBeProvided,
                 IdTokenSigningAlgMissing,
@@ -79,10 +146,13 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is UnsupportedClientMetaData,
                 is InvalidIdTokenType,
                 is HttpError,
-                InvalidRequestUriMethod,
                 InvalidUseOfBothRequestAndRequestUri,
                 is UnsupportedRequestUriMethod,
                 -> INVALID_REQUEST
+
+                InvalidClientId, UnsupportedClientIdScheme -> INVALID_CLIENT
+
+                is InvalidRequestUriMethod -> INVALID_REQUEST_URI_METHOD
 
                 BothJwkUriAndInlineJwks,
                 MissingClientMetadataJwksSource,
@@ -92,16 +162,15 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 SubjectSyntaxTypesWrongSyntax,
                 -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 
-                is ClientMetadataJwkUriUnparsable,
-                -> INVALID_REGISTRATION_URI
-
-                is InvalidPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_REFERENCE
+                is ClientMetadataJwkUriUnparsable -> INVALID_REGISTRATION_URI
+                is InvalidPresentationDefinition -> INVALID_REQUEST
+                is UnableToFetchPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_URI
                 InvalidPresentationDefinitionUri -> INVALID_PRESENTATION_DEFINITION_URI
+                FetchingPresentationDefinitionNotSupported -> REQUEST_URI_NOT_SUPPORTED
+                is UnableToFetchRequestObject -> INVALID_REQUEST_URI
+                is InvalidJarJwt -> INVALID_REQUEST_OBJECT
+
                 is ClientMetadataJwkResolutionFailed,
-                FetchingPresentationDefinitionNotSupported,
-                is UnknownScope,
-                is UnableToFetchPresentationDefinition,
-                is UnableToFetchRequestObject,
                 is DIDResolutionFailed,
                 -> PROCESSING_FAILURE
 

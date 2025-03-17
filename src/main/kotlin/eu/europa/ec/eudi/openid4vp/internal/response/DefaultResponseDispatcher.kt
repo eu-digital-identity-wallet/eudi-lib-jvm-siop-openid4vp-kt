@@ -230,7 +230,7 @@ internal object DirectPostForm {
             }
 
             is AuthorizationResponsePayload.NoConsensusResponseData -> buildMap {
-                put(ERROR_FORM_PARAM, AuthorizationRequestErrorCode.USER_CANCELLED.code)
+                put(ERROR_FORM_PARAM, AuthorizationRequestErrorCode.ACCESS_DENIED.code)
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }

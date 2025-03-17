@@ -92,7 +92,7 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
     }
 }
 
-private fun ResponseMode.isJarm() = when (this) {
+internal fun ResponseMode.isJarm() = when (this) {
     is ResponseMode.DirectPost -> false
     is ResponseMode.DirectPostJwt -> true
     is ResponseMode.Fragment -> false

@@ -273,7 +273,7 @@ private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationReque
     val dispatchDetails = when (fetchedRequest) {
         is FetchedRequest.JwtSecured -> fetchedRequest.jwt.jwtClaimsSet.errorDispatchDetails()
         is FetchedRequest.Plain -> fetchedRequest.requestObject.responseMode()
-            ?.takeIf { !it.requiresJarm() }
+            ?.takeIf { !it.isJarm() }
             ?.let { responseMode ->
                 ErrorDispatchDetails(
                     responseMode = responseMode,
@@ -300,7 +300,7 @@ private fun resolution(
     error: AuthorizationRequestError,
 ): Resolution.Invalid {
     val dispatchDetails = authenticatedRequest.requestObject.responseMode()
-        ?.takeIf { !it.requiresJarm() }
+        ?.takeIf { !it.isJarm() }
         ?.let { responseMode ->
             ErrorDispatchDetails(
                 responseMode = responseMode,
@@ -331,7 +331,7 @@ private fun resolution(
 ): Resolution.Invalid {
     val dispatchDetails = run {
         val responseMode = validatedRequestObject.responseMode
-        if (!responseMode.requiresJarm()) {
+        if (!responseMode.isJarm()) {
             ErrorDispatchDetails(
                 responseMode = responseMode,
                 nonce = validatedRequestObject.nonce,
@@ -388,19 +388,6 @@ private fun UnvalidatedRequestObject.clientId(): VerifierId? =
         VerifierId.parse(it).getOrNull()
     }
 
-private fun ResponseMode.requiresJarm(): Boolean =
-    when (this) {
-        is ResponseMode.Query,
-        is ResponseMode.Fragment,
-        is ResponseMode.DirectPost,
-        -> false
-
-        is ResponseMode.QueryJwt,
-        is ResponseMode.FragmentJwt,
-        is ResponseMode.DirectPostJwt,
-        -> true
-    }
-
 private val AuthenticatedClient.clientId: VerifierId
     get() = when (this) {
         is AuthenticatedClient.Attested -> VerifierId(ClientIdScheme.VERIFIER_ATTESTATION, clientId)
@@ -430,7 +417,7 @@ private fun JWTClaimsSet.responseMode(): ResponseMode? =
 private fun JWTClaimsSet.errorDispatchDetails(): ErrorDispatchDetails? =
     runCatching {
         responseMode()
-            ?.takeIf { !it.requiresJarm() }
+            ?.takeIf { !it.isJarm() }
             ?.let { responseMode ->
                 ErrorDispatchDetails(
                     responseMode = responseMode,

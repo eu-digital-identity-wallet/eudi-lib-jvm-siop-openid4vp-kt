@@ -29,7 +29,7 @@ import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcher
  * @see AuthorizationRequestResolver
  * @see Dispatcher
  */
-interface SiopOpenId4Vp : AuthorizationRequestResolver, Dispatcher {
+interface SiopOpenId4Vp : AuthorizationRequestResolver, Dispatcher, ErrorDispatcher {
 
     companion object {
 
@@ -52,6 +52,7 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, Dispatcher {
             return object :
                 AuthorizationRequestResolver by requestResolver,
                 Dispatcher by dispatcher,
+                ErrorDispatcher by dispatcher,
                 SiopOpenId4Vp {}
         }
     }

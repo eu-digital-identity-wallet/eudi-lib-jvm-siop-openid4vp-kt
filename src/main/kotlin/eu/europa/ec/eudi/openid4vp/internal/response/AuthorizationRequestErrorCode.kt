@@ -163,7 +163,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 
                 is ClientMetadataJwkUriUnparsable -> INVALID_REGISTRATION_URI
-                is InvalidPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_REFERENCE
+                is InvalidPresentationDefinition -> INVALID_REQUEST
                 is UnableToFetchPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_URI
                 InvalidPresentationDefinitionUri -> INVALID_PRESENTATION_DEFINITION_URI
                 FetchingPresentationDefinitionNotSupported -> REQUEST_URI_NOT_SUPPORTED

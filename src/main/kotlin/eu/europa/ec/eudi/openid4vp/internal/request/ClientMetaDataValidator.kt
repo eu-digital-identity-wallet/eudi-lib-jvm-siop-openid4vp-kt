@@ -60,7 +60,7 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
     private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
         try {
             unvalidated.vpFormats.toDomain()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
         }
 
@@ -171,21 +171,6 @@ private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
         else -> null
     }
 }
-
-// private fun VpFormatsTO.formats(): List<VpFormat> {
-//    fun VcSdJwtTO.format(): VpFormat.SdJwtVc {
-//        fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
-//        return VpFormat.SdJwtVc(
-//            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
-//            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
-//        )
-//    }
-//
-//    return buildList {
-//        msoMdoc?.let { add(VpFormat.MsoMdoc) }
-//        vcSdJwt?.let { sdJwtVc -> add(sdJwtVc.format()) }
-//    }
-// }
 
 private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { test ->
     when (test(left) to test(right)) {

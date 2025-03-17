@@ -195,9 +195,9 @@ internal class DefaultAuthorizationRequestResolver(
             try {
                 authenticateRequest(fetchedRequest)
             } catch (e: AuthorizationRequestException) {
-                return resolution(fetchedRequest, e.error)
+                return resolution(fetchedRequest, e.error, siopOpenId4VPConfig.errorDispatchPolicy)
             } catch (e: ClientRequestException) {
-                return resolution(fetchedRequest, HttpError(e))
+                return resolution(fetchedRequest, HttpError(e), siopOpenId4VPConfig.errorDispatchPolicy)
             }
 
         val validatedRequestObject =
@@ -266,13 +266,21 @@ private fun resolution(uri: String, error: AuthorizationRequestError): Resolutio
  * Creates an invalid resolution for errors that manifested while trying to authenticate a Client.
  *
  * Such errors are dispatchable:
- * 1. A response mode can be constructed from the unvalidated request object
- * 2. The response mode does not require JARM (at this point the metadata of the Client have not been fetched or validated yet)
+ * 1. If [policy] is [ErrorDispatchPolicy.AllClients]
+ * 2. A response mode can be constructed from the unvalidated request object
+ * 3. The response mode does not require JARM (at this point the metadata of the Client have not been fetched or validated yet)
  */
-private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationRequestError): Resolution.Invalid {
-    val dispatchDetails = when (fetchedRequest) {
-        is FetchedRequest.JwtSecured -> fetchedRequest.jwt.jwtClaimsSet.errorDispatchDetails()
-        is FetchedRequest.Plain -> fetchedRequest.requestObject.errorDispatchDetails()
+private fun resolution(
+    fetchedRequest: FetchedRequest,
+    error: AuthorizationRequestError,
+    policy: ErrorDispatchPolicy,
+): Resolution.Invalid {
+    val dispatchDetails = when (policy) {
+        ErrorDispatchPolicy.AllClients -> when (fetchedRequest) {
+            is FetchedRequest.JwtSecured -> fetchedRequest.jwt.jwtClaimsSet.errorDispatchDetails()
+            is FetchedRequest.Plain -> fetchedRequest.requestObject.errorDispatchDetails()
+        }
+        ErrorDispatchPolicy.OnlyAuthenticatedClients -> null
     }
     return Resolution.Invalid(error, dispatchDetails)
 }

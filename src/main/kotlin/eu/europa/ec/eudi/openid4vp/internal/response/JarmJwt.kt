@@ -155,7 +155,7 @@ private object JwtPayloadFactory {
     ): JWTClaimsSet =
         buildJsonObject {
             issuer?.let { put("iss", it.value) }
-            when(data) {
+            when (data) {
                 is AuthorizationResponsePayload.Positive -> put("aud", data.clientId.toString())
                 is AuthorizationResponsePayload.Negative -> put("aud", data.clientId.toString())
                 is AuthorizationResponsePayload.InvalidRequest -> {}

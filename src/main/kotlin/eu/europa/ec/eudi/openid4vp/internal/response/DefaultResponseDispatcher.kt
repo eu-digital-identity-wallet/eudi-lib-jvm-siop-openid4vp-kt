@@ -60,10 +60,10 @@ internal class DefaultDispatcher(
 
     override suspend fun post(
         error: AuthorizationRequestError,
-        di: ErrorDispatchDetails,
-        encryptionParameters: EncryptionParameters?
+        errorDispatchDetails: ErrorDispatchDetails,
+        encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.VerifierResponse {
-        val response = error.responseWith(di, encryptionParameters)
+        val response = error.responseWith(errorDispatchDetails, encryptionParameters)
         val (responseUri, parameters) = formParameters(response)
         return httpClientFactory().use { httpClient ->
             submitForm(httpClient, responseUri, parameters)
@@ -71,7 +71,7 @@ internal class DefaultDispatcher(
     }
 
     private fun formParameters(
-        response: AuthorizationResponse
+        response: AuthorizationResponse,
     ): Pair<URL, Parameters> =
         when (response) {
             is DirectPost -> {
@@ -131,15 +131,15 @@ internal class DefaultDispatcher(
 
     override suspend fun encodeRedirectURI(
         error: AuthorizationRequestError,
-        di: ErrorDispatchDetails,
-        encryptionParameters: EncryptionParameters?
+        errorDispatchDetails: ErrorDispatchDetails,
+        encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.RedirectURI {
-        val response = error.responseWith(di, encryptionParameters)
+        val response = error.responseWith(errorDispatchDetails, encryptionParameters)
         return encodeRedirectURI(response)
     }
 
     private fun encodeRedirectURI(
-        response: AuthorizationResponse
+        response: AuthorizationResponse,
     ): DispatchOutcome.RedirectURI {
         val uri = when (response) {
             is Fragment -> response.encodeRedirectURI()

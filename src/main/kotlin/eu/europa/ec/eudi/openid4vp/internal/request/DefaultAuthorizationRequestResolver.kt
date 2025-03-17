@@ -272,19 +272,8 @@ private fun resolution(uri: String, error: AuthorizationRequestError): Resolutio
 private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationRequestError): Resolution.Invalid {
     val dispatchDetails = when (fetchedRequest) {
         is FetchedRequest.JwtSecured -> fetchedRequest.jwt.jwtClaimsSet.errorDispatchDetails()
-        is FetchedRequest.Plain -> fetchedRequest.requestObject.responseMode()
-            ?.takeIf { !it.isJarm() }
-            ?.let { responseMode ->
-                ErrorDispatchDetails(
-                    responseMode = responseMode,
-                    nonce = fetchedRequest.requestObject.nonce,
-                    state = fetchedRequest.requestObject.state,
-                    clientId = fetchedRequest.requestObject.clientId(),
-                    jarmRequirement = null,
-                )
-            }
+        is FetchedRequest.Plain -> fetchedRequest.requestObject.errorDispatchDetails()
     }
-
     return Resolution.Invalid(error, dispatchDetails)
 }
 
@@ -298,21 +287,7 @@ private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationReque
 private fun resolution(
     authenticatedRequest: AuthenticatedRequest,
     error: AuthorizationRequestError,
-): Resolution.Invalid {
-    val dispatchDetails = authenticatedRequest.requestObject.responseMode()
-        ?.takeIf { !it.isJarm() }
-        ?.let { responseMode ->
-            ErrorDispatchDetails(
-                responseMode = responseMode,
-                nonce = authenticatedRequest.requestObject.nonce,
-                state = authenticatedRequest.requestObject.state,
-                clientId = authenticatedRequest.client.clientId,
-                jarmRequirement = null,
-            )
-        }
-
-    return Resolution.Invalid(error, dispatchDetails)
-}
+): Resolution.Invalid = Resolution.Invalid(error, authenticatedRequest.requestObject.errorDispatchDetails())
 
 /**
  * Creates an invalid resolution for errors that manifested while trying to resolve the metadata of the Client or while
@@ -383,10 +358,20 @@ private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
     }
 }
 
-private fun UnvalidatedRequestObject.clientId(): VerifierId? =
-    clientId?.let {
-        VerifierId.parse(it).getOrNull()
-    }
+private fun UnvalidatedRequestObject.errorDispatchDetails(): ErrorDispatchDetails? =
+    runCatching {
+        responseMode()
+            ?.takeIf { !it.isJarm() }
+            ?.let { responseMode ->
+                ErrorDispatchDetails(
+                    responseMode = responseMode,
+                    nonce = nonce,
+                    state = state,
+                    clientId = clientId?.let { VerifierId.parse(it).getOrNull() },
+                    jarmRequirement = null,
+                )
+            }
+    }.getOrNull()
 
 private val AuthenticatedClient.clientId: VerifierId
     get() = when (this) {

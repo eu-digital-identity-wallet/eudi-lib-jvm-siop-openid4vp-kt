@@ -408,7 +408,7 @@ private fun JWTClaimsSet.errorDispatchDetails(): ErrorDispatchDetails? =
                     responseMode = responseMode,
                     nonce = getStringClaim("nonce"),
                     state = getStringClaim("state"),
-                    clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrThrow() },
+                    clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrNull() },
                     jarmRequirement = null,
                 )
             }

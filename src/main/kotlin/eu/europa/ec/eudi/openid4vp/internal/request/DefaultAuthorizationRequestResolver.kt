@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.eygraber.uri.Uri
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.ensure
@@ -265,14 +266,12 @@ private fun resolution(uri: String, error: AuthorizationRequestError): Resolutio
  * Creates an invalid resolution for errors that manifested while trying to authenticate a Client.
  *
  * Such errors are dispatchable:
- * 1. if JAR was not used (at this point the JAR's signature has not yet been validated, and as
- * such its data cannot be trusted)
- * 2. A response mode can be constructed from the unvalidated request object
- * 3. The response mode does not require JARM (at this point the metadata of the Client have not been fetched or validated yet)
+ * 1. A response mode can be constructed from the unvalidated request object
+ * 2. The response mode does not require JARM (at this point the metadata of the Client have not been fetched or validated yet)
  */
 private fun resolution(fetchedRequest: FetchedRequest, error: AuthorizationRequestError): Resolution.Invalid {
     val dispatchDetails = when (fetchedRequest) {
-        is FetchedRequest.JwtSecured -> null
+        is FetchedRequest.JwtSecured -> fetchedRequest.jwt.jwtClaimsSet.errorDispatchDetails()
         is FetchedRequest.Plain -> fetchedRequest.requestObject.responseMode()
             ?.takeIf { !it.requiresJarm() }
             ?.let { responseMode ->
@@ -411,3 +410,34 @@ private val AuthenticatedClient.clientId: VerifierId
         is AuthenticatedClient.X509SanDns -> VerifierId(ClientIdScheme.X509_SAN_DNS, clientId)
         is AuthenticatedClient.X509SanUri -> VerifierId(ClientIdScheme.X509_SAN_URI, clientId.toString())
     }
+
+private fun JWTClaimsSet.responseMode(): ResponseMode? =
+    runCatching {
+        fun JWTClaimsSet.responseUri(): URL? = getStringClaim(OpenId4VPSpec.RESPONSE_URI)?.let { URL(it) }
+        fun JWTClaimsSet.redirectUri(): URI? = getStringClaim("redirect_uri")?.let { URI.create(it) }
+
+        when (getStringClaim("response_mode")) {
+            "direct_post" -> responseUri()?.let { ResponseMode.DirectPost(it) }
+            "direct_post.jwt" -> responseUri()?.let { ResponseMode.DirectPostJwt(it) }
+            "query" -> redirectUri()?.let { ResponseMode.Query(it) }
+            "query.jwt" -> redirectUri()?.let { ResponseMode.QueryJwt(it) }
+            null, "fragment" -> redirectUri()?.let { ResponseMode.Fragment(it) }
+            "fragment.jwt" -> redirectUri()?.let { ResponseMode.FragmentJwt(it) }
+            else -> null
+        }
+    }.getOrNull()
+
+private fun JWTClaimsSet.errorDispatchDetails(): ErrorDispatchDetails? =
+    runCatching {
+        responseMode()
+            ?.takeIf { !it.requiresJarm() }
+            ?.let { responseMode ->
+                ErrorDispatchDetails(
+                    responseMode = responseMode,
+                    nonce = getStringClaim("nonce"),
+                    state = getStringClaim("state"),
+                    clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrThrow() },
+                    jarmRequirement = null,
+                )
+            }
+    }.getOrNull()

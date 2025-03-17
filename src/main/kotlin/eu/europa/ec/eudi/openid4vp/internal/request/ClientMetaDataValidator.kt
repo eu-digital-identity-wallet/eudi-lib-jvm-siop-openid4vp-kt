@@ -60,7 +60,7 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
     private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
         try {
             unvalidated.vpFormats.toDomain()
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
         }
 

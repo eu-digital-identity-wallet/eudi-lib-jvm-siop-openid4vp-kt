@@ -271,12 +271,12 @@ sealed interface JarmRequirement : Serializable {
     /**
      * Client requires JARM encrypted response using the
      * provided [algorithm][responseEncryptionAlg], [encoding method][responseEncryptionEnc]
-     * and [encryption key][verifierKey]
+     * and [client's encryption key][clientKey]
      */
     data class Encrypted(
         val responseEncryptionAlg: JWEAlgorithm,
         val responseEncryptionEnc: EncryptionMethod,
-        val verifierKey: JWK,
+        val clientKey: JWK,
     ) : JarmRequirement
 
     /**

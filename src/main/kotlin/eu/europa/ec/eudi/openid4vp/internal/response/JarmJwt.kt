@@ -81,7 +81,7 @@ private fun SiopOpenId4VPConfig.encrypt(
     checkNotNull(encryptionCfg) { "Wallet doesn't support encrypted JARM" }
 
     val (jweAlgorithm, encryptionMethod, verifierKey) = requirement
-    val jweEncrypter = generateEncrypter(jweAlgorithm, verifierKey)
+    val jweEncrypter = EncrypterFactory.createEncrypter(jweAlgorithm, verifierKey)
     val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, verifierKey, data)
 
     val claimSet = JwtPayloadFactory.encryptedJwtClaimSet(data)
@@ -126,19 +126,13 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
 
     val signedJwt = sign(requirement.signed, data)
     val (jweAlgorithm, encryptionMethod, verifierKey) = requirement.encryptResponse
-    val jweEncrypter = generateEncrypter(jweAlgorithm, verifierKey)
+    val jweEncrypter = EncrypterFactory.createEncrypter(jweAlgorithm, verifierKey)
     val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, verifierKey, data) {
         contentType("JWT")
     }
 
     return JWEObject(jweHeader, Payload(signedJwt)).apply { encrypt(jweEncrypter) }
 }
-
-private fun generateEncrypter(
-    jweAlgorithm: JWEAlgorithm,
-    verifierKey: JWK,
-): JWEEncrypter = EncrypterFactory.createEncrypter(jweAlgorithm, verifierKey)
-    ?: error("Cannot find appropriate encryption key for ${jweAlgorithm.name}")
 
 private object JwtPayloadFactory {
 
@@ -245,6 +239,13 @@ internal fun List<VerifiablePresentation>.toJson(): JsonElement {
 internal object EncrypterFactory {
 
     fun createEncrypter(
+        algorithm: JWEAlgorithm,
+        recipientKey: JWK,
+    ): JWEEncrypter =
+        createEncrypterOrNull(algorithm, recipientKey)
+            ?: error("Cannot find appropriate encryption key for ${algorithm.name}")
+
+    fun createEncrypterOrNull(
         algorithm: JWEAlgorithm,
         recipientKey: JWK,
     ): JWEEncrypter? =

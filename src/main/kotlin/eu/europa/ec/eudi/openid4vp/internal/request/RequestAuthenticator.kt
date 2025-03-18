@@ -36,6 +36,7 @@ import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.internal.*
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -109,7 +110,8 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
                 ensure(request is FetchedRequest.Plain) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in signed request")
                 }
-                val originalClientIdAsUri = originalClientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
+                val originalClientIdAsUri =
+                    originalClientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.RedirectUri(originalClientIdAsUri)
             }
 
@@ -132,7 +134,8 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
                     val dnsNames = sanOfUniformResourceIdentifier().getOrNull()
                     ensureNotNull(dnsNames) { invalidJarJwt("Certificates misses URI names") }
                 }
-                val originalClientIdAsUri = originalClientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
+                val originalClientIdAsUri =
+                    originalClientId.asURI { RequestValidationError.InvalidClientId.asException() }.getOrThrow()
                 AuthenticatedClient.X509SanUri(originalClientIdAsUri, chain)
             }
 
@@ -151,7 +154,8 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
                 ensure(request is FetchedRequest.JwtSecured) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
-                val attestedClaims = verifierAttestation(siopOpenId4VPConfig.clock, clientIdScheme, request, originalClientId)
+                val attestedClaims =
+                    verifierAttestation(siopOpenId4VPConfig.clock, clientIdScheme, request, originalClientId)
                 AuthenticatedClient.Attested(originalClientId, attestedClaims)
             }
         }
@@ -159,7 +163,8 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
 
     private fun originalClientIdAndScheme(requestObject: UnvalidatedRequestObject): Pair<OriginalClientId, SupportedClientIdScheme> {
         val clientId = ensureNotNull(requestObject.clientId) { RequestValidationError.MissingClientId.asException() }
-        val verifierId = VerifierId.parse(clientId).getOrElse { throw invalidScheme("Invalid client_id: ${it.message}") }
+        val verifierId =
+            VerifierId.parse(clientId).getOrElse { throw invalidScheme("Invalid client_id: ${it.message}") }
         val supportedClientIdScheme = siopOpenId4VPConfig.supportedClientIdScheme(verifierId.scheme)
         ensureNotNull(supportedClientIdScheme) { RequestValidationError.UnsupportedClientIdScheme.asException() }
         return verifierId.originalClientId to supportedClientIdScheme
@@ -270,7 +275,8 @@ private class JarJwtSignatureVerifier(
                         null,
                     )
                 jwsKeySelector = jwsKeySelector(client)
-                jwtClaimsSetVerifier = TimeChecks(siopOpenId4VPConfig.clock, siopOpenId4VPConfig.jarClockSkew.toKotlinDuration())
+                jwtClaimsSetVerifier =
+                    TimeChecks(siopOpenId4VPConfig.clock, siopOpenId4VPConfig.jarClockSkew.toKotlinDuration())
             }
             jwtProcessor.process(signedJwt, null)
         } catch (e: JOSEException) {
@@ -313,9 +319,11 @@ private class JarJwtSignatureVerifier(
         suspend fun getJWKSource(): JWKSource<SecurityContext> {
             val jwkSet = when (jwkSetSource) {
                 is JwkSetSource.ByValue -> JWKSet.parse(jwkSetSource.jwks.toString())
-                is JwkSetSource.ByReference -> {
+                is JwkSetSource.ByReference -> try {
                     val unparsed = httpClient.get(jwkSetSource.jwksUri.toURL()).body<String>()
                     JWKSet.parse(unparsed)
+                } catch (e: ClientRequestException) {
+                    throw HttpError(e).asException()
                 }
             }
             return ImmutableJWKSet(jwkSet)

@@ -191,6 +191,7 @@ data class VpFormats(
         private enum class FormatName {
             MSO_MDOC, SD_JWT_VC
         }
+
         private fun VpFormat.formatName() = when (this) {
             is VpFormat.MsoMdoc -> FormatName.MSO_MDOC
             is VpFormat.SdJwtVc -> FormatName.SD_JWT_VC
@@ -463,6 +464,22 @@ data class JarConfiguration(
 }
 
 /**
+ * Wallets policy regarding error dispatching.
+ */
+enum class ErrorDispatchPolicy : java.io.Serializable {
+
+    /**
+     * Allow dispatching of errors to all clients, regardless of authentication status.
+     */
+    AllClients,
+
+    /**
+     * Allow dispatching of errors only to authenticated clients.
+     */
+    OnlyAuthenticatedClients,
+}
+
+/**
  * Wallet configuration options for SIOP & OpenId4VP protocols.
  *
  * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
@@ -476,6 +493,7 @@ data class JarConfiguration(
  * @param clock the system Clock. If not provided system's default clock will be used.
  * @param jarClockSkew max acceptable skew between wallet and verifier
  * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
+ * @param errorDispatchPolicy wallet's policy regarding error dispatching. Defaults to [ErrorDispatchPolicy.OnlyAuthenticatedClients].
  */
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
@@ -485,6 +503,7 @@ data class SiopOpenId4VPConfig(
     val clock: Clock = Clock.systemDefaultZone(),
     val jarClockSkew: Duration = Duration.ofSeconds(15L),
     val supportedClientIdSchemes: List<SupportedClientIdScheme>,
+    val errorDispatchPolicy: ErrorDispatchPolicy = ErrorDispatchPolicy.OnlyAuthenticatedClients,
 ) {
     init {
         require(supportedClientIdSchemes.isNotEmpty()) { "At least a supported client id scheme must be provided" }
@@ -497,6 +516,7 @@ data class SiopOpenId4VPConfig(
         vpConfiguration: VPConfiguration,
         clock: Clock = Clock.systemDefaultZone(),
         jarClockSkew: Duration = Duration.ofSeconds(15L),
+        errorDispatchPolicy: ErrorDispatchPolicy = ErrorDispatchPolicy.OnlyAuthenticatedClients,
         vararg supportedClientIdSchemes: SupportedClientIdScheme,
     ) : this(
         issuer,
@@ -506,6 +526,7 @@ data class SiopOpenId4VPConfig(
         clock,
         jarClockSkew,
         supportedClientIdSchemes.toList(),
+        errorDispatchPolicy,
     )
 
     companion object {

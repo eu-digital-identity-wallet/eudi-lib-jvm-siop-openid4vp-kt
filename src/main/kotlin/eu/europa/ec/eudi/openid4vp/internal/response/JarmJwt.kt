@@ -155,7 +155,7 @@ private object JwtPayloadFactory {
     ): JWTClaimsSet =
         buildJsonObject {
             issuer?.let { put("iss", it.value) }
-            put("aud", data.clientId.toString())
+            data.clientId?.let { put("aud", data.clientId.toString()) }
             ttl?.let {
                 val exp = issuedAt.plusMillis(ttl.toMillis()).epochSecond
                 put("exp", exp)

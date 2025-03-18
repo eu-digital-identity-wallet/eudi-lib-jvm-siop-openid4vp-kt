@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
@@ -494,7 +496,28 @@ sealed interface Resolution {
      * Represents the failure of validating or resolving an authorization request
      * due to [error]
      */
-    data class Invalid(val error: AuthorizationRequestError) : Resolution
+    data class Invalid(
+        val error: AuthorizationRequestError,
+        val dispatchDetails: ErrorDispatchDetails?,
+    ) : Resolution {
+
+        companion object {
+            fun nonDispatchable(error: AuthorizationRequestError): Invalid = Invalid(error, null)
+        }
+    }
+}
+
+/**
+ * Information required for an [AuthorizationRequestError] to be dispatchable.
+ */
+data class ErrorDispatchDetails(
+    val responseMode: ResponseMode,
+    val nonce: String?,
+    val state: String?,
+    val clientId: VerifierId?,
+    val jarmRequirement: JarmRequirement?,
+) : Serializable {
+    companion object
 }
 
 /**

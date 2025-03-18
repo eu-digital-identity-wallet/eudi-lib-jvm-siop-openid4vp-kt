@@ -27,7 +27,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
-import java.io.IOException
 import java.net.URL
 import java.text.ParseException
 
@@ -77,9 +76,7 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
         suspend fun requiredJwksUri() = try {
             val unparsed = httpClient.get(URL(jwksUri)).body<String>()
             JWKSet.parse(unparsed)
-        } catch (ex: IOException) {
-            throw ClientMetadataJwkResolutionFailed(ex).asException()
-        } catch (ex: ParseException) {
+        } catch (ex: Throwable) {
             throw ClientMetadataJwkResolutionFailed(ex).asException()
         }
 
@@ -92,7 +89,7 @@ internal class ClientMetaDataValidator(private val httpClient: HttpClient) {
     }
 }
 
-private fun ResponseMode.isJarm() = when (this) {
+internal fun ResponseMode.isJarm() = when (this) {
     is ResponseMode.DirectPost -> false
     is ResponseMode.DirectPostJwt -> true
     is ResponseMode.Fragment -> false

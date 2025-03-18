@@ -15,16 +15,28 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.response
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSVerifier
+import com.nimbusds.jose.crypto.RSASSAVerifier
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jose.util.Base64URL
+import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
-import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingResponseType
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingScope
+import eu.europa.ec.eudi.openid4vp.internal.request.*
+import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.INVALID_REQUEST_URI_METHOD
+import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
+import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier
 import eu.europa.ec.eudi.prex.PresentationExchange
 import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -36,16 +48,25 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
 import java.time.Clock
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
+import java.util.*
+import kotlin.test.*
 
 class AuthorizationResponseDispatcherTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
+
+    private val jarmSigningKeyPair: RSAKey by lazy {
+        RSAKeyGenerator(2048)
+            .keyUse(KeyUse.SIGNATURE)
+            .keyID(UUID.randomUUID().toString())
+            .issueTime(Date(System.currentTimeMillis()))
+            .generate()
+    }
 
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
@@ -53,6 +74,11 @@ class AuthorizationResponseDispatcherTest {
             vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
         ),
         clock = Clock.systemDefaultZone(),
+        jarmConfiguration = JarmConfiguration.SigningAndEncryption(
+            signer = JarmSigner(jarmSigningKeyPair),
+            supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
+            supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
+        ),
     )
 
     private val clientMetadataStr =
@@ -225,6 +251,280 @@ class AuthorizationResponseDispatcherTest {
 
         test(genState())
         test()
+    }
+
+    @Nested
+    @DisplayName("Dispatch error")
+    inner class ErrorDispatch {
+
+        @Test
+        fun `with direct post`() = runTest {
+            fun test(state: String? = null) {
+                val errorDispatchDetails = ErrorDispatchDetails(
+                    responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
+                    state = state,
+                    nonce = null,
+                    clientId = null,
+                    jarmRequirement = null,
+                )
+
+                testApplication {
+                    externalServices {
+                        hosts("https://respond.here") {
+                            install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
+                                json()
+                            }
+                            routing {
+                                post("/") {
+                                    val formParameters = call.receiveParameters()
+                                    val errorTxt = formParameters["error"].toString()
+                                    val stateParam = formParameters["state"]
+
+                                    assertEquals(
+                                        "application/x-www-form-urlencoded",
+                                        call.request.headers["Content-Type"],
+                                    )
+                                    assertEquals(state, stateParam)
+                                    assertEquals(AuthorizationRequestErrorCode.INVALID_CLIENT.code, errorTxt)
+
+                                    call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
+                                }
+                            }
+                        }
+                    }
+                    val managedHttpClient = createClient {
+                        install(ContentNegotiation) {
+                            json()
+                        }
+                    }
+
+                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val outcome = dispatcher.dispatchError(
+                        RequestValidationError.InvalidClientId,
+                        errorDispatchDetails,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+                    assertIs<DispatchOutcome.VerifierResponse.Accepted>(outcome)
+                    assertNotNull(outcome.redirectURI)
+                }
+            }
+
+            test(genState())
+            test()
+        }
+
+        @Test
+        fun `with direct post jwt`() = runTest {
+            fun test(state: String? = null) {
+                val errorDispatchDetails = ErrorDispatchDetails(
+                    responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
+                    state = state,
+                    nonce = null,
+                    clientId = null,
+                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
+                )
+
+                testApplication {
+                    externalServices {
+                        hosts("https://respond.here") {
+                            install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
+                                json()
+                            }
+                            routing {
+                                post("/") {
+                                    val formParameters = call.receiveParameters()
+                                    val responseJwt = formParameters["response"].toString()
+
+                                    val claims = parseJwt(responseJwt)
+
+                                    assertEquals(INVALID_REQUEST_URI_METHOD.code, claims["error"])
+                                    assertEquals(state, claims["state"])
+
+                                    assertEquals(
+                                        "application/x-www-form-urlencoded",
+                                        call.request.headers["Content-Type"],
+                                    )
+
+                                    call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
+                                }
+                            }
+                        }
+                    }
+                    val managedHttpClient = createClient {
+                        install(ContentNegotiation) {
+                            json()
+                        }
+                    }
+
+                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val outcome = dispatcher.dispatchError(
+                        RequestValidationError.InvalidRequestUriMethod,
+                        errorDispatchDetails,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+                    assertIs<DispatchOutcome.VerifierResponse.Accepted>(outcome)
+                    assertNotNull(outcome.redirectURI)
+                }
+            }
+
+            test(genState())
+            test()
+        }
+
+        @Test
+        fun `with query`() = runTest {
+            fun test(state: String? = null) {
+                val errorDispatchDetails = ErrorDispatchDetails(
+                    responseMode = ResponseMode.Query("https://respond.here".asURI().getOrThrow()),
+                    state = state,
+                    nonce = null,
+                    clientId = null,
+                    jarmRequirement = null,
+                )
+
+                testApplication {
+                    val managedHttpClient = createClient {
+                        install(ContentNegotiation) {
+                            json()
+                        }
+                    }
+
+                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val outcome = dispatcher.dispatchError(
+                        RequestValidationError.SubjectSyntaxTypesNoMatch,
+                        errorDispatchDetails,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+                    assertIs<DispatchOutcome.RedirectURI>(outcome)
+
+                    val urlParams = Url(outcome.value).parameters
+                    assertEquals(SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED.code, urlParams["error"])
+                    assertEquals(state, urlParams["state"])
+                }
+            }
+
+            test(genState())
+            test()
+        }
+
+        @Test
+        fun `with query jwt`() = runTest {
+            fun test(state: String? = null) {
+                val errorDispatchDetails = ErrorDispatchDetails(
+                    responseMode = ResponseMode.QueryJwt("https://respond.here".asURI().getOrThrow()),
+                    state = state,
+                    nonce = null,
+                    clientId = null,
+                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
+                )
+
+                testApplication {
+                    val managedHttpClient = createClient {
+                        install(ContentNegotiation) {
+                            json()
+                        }
+                    }
+
+                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val outcome = dispatcher.dispatchError(
+                        MissingScope,
+                        errorDispatchDetails,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+                    assertIs<DispatchOutcome.RedirectURI>(outcome)
+                    val urlParams = Url(outcome.value).parameters
+                    val responseJwt = urlParams["response"]
+                    assertNotNull(responseJwt)
+                    val claims = parseJwt(responseJwt)
+                    assertEquals(AuthorizationRequestErrorCode.INVALID_REQUEST.code, claims["error"])
+                    assertEquals(state, claims["state"])
+                }
+            }
+
+            test(genState())
+            test()
+        }
+
+        @Test
+        fun `with fragment`() = runTest {
+            fun test(state: String? = null) {
+                val errorDispatchDetails = ErrorDispatchDetails(
+                    responseMode = ResponseMode.Fragment("https://respond.here".asURI().getOrThrow()),
+                    state = state,
+                    nonce = null,
+                    clientId = null,
+                    jarmRequirement = null,
+                )
+
+                testApplication {
+                    val managedHttpClient = createClient {
+                        install(ContentNegotiation) {
+                            json()
+                        }
+                    }
+
+                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val outcome = dispatcher.dispatchError(
+                        MissingResponseType,
+                        errorDispatchDetails,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+                    assertIs<DispatchOutcome.RedirectURI>(outcome)
+                    val urlParams = Url(outcome.value).fragment.parseUrlEncodedParameters()
+                    assertEquals("invalid_request", urlParams["error"])
+                    assertEquals(state, urlParams["state"])
+                }
+            }
+
+            test(genState())
+            test()
+        }
+
+        @Test
+        fun `with fragment jwt`() = runTest {
+            fun test(state: String? = null) {
+                val errorDispatchDetails = ErrorDispatchDetails(
+                    responseMode = ResponseMode.FragmentJwt("https://respond.here".asURI().getOrThrow()),
+                    state = state,
+                    nonce = null,
+                    clientId = null,
+                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
+                )
+
+                testApplication {
+                    val managedHttpClient = createClient {
+                        install(ContentNegotiation) {
+                            json()
+                        }
+                    }
+
+                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val outcome = dispatcher.dispatchError(
+                        RequestValidationError.MissingResponseUri,
+                        errorDispatchDetails,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+                    assertIs<DispatchOutcome.RedirectURI>(outcome)
+                    val urlParams = Url(outcome.value).fragment.parseUrlEncodedParameters()
+                    val responseJwt = urlParams["response"]
+                    assertNotNull(responseJwt)
+                    val claims = parseJwt(responseJwt)
+                    assertEquals("invalid_request", claims["error"])
+                    assertEquals(state, claims["state"])
+                }
+            }
+
+            test(genState())
+            test()
+        }
+
+        private fun parseJwt(jwt: String): MutableMap<String, Any> {
+            val signedJWT = SignedJWT.parse(jwt)
+
+            val verifier: JWSVerifier = RSASSAVerifier(jarmSigningKeyPair.toRSAPublicKey())
+            assertTrue { signedJWT.verify(verifier) }
+            return signedJWT.jwtClaimsSet.claims
+        }
     }
 
     private fun load(f: String): InputStream? =

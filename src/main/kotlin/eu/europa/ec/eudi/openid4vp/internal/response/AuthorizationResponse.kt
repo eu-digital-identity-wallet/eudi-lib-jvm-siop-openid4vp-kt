@@ -25,9 +25,9 @@ import java.net.URL
  */
 internal sealed interface AuthorizationResponsePayload : Serializable {
 
-    val nonce: String
+    val nonce: String?
     val state: String?
-    val clientId: VerifierId
+    val clientId: VerifierId?
     val encryptionParameters: EncryptionParameters?
 
     sealed interface Success : AuthorizationResponsePayload
@@ -86,19 +86,6 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
     sealed interface Failed : AuthorizationResponsePayload
 
     /**
-     * In response of an [Resolution.Invalid] authorization request
-     * @param error the cause
-     * @param state the state of the request
-     */
-    data class InvalidRequest(
-        val error: AuthorizationRequestError,
-        override val nonce: String,
-        override val state: String?,
-        override val clientId: VerifierId,
-        override val encryptionParameters: EncryptionParameters? = null,
-    ) : Failed
-
-    /**
      * In response of a [ResolvedRequestObject] and
      * holder's [negative consensus][Consensus.NegativeConsensus]
      * @param state the state of the [request][ResolvedRequestObject.state]
@@ -107,6 +94,19 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
+        override val encryptionParameters: EncryptionParameters? = null,
+    ) : Failed
+
+    /**
+     * In response of an [Resolution.Invalid] authorization request
+     * @param error the cause
+     * @param state the state of the request
+     */
+    data class InvalidRequest(
+        val error: AuthorizationRequestError,
+        override val nonce: String?,
+        override val state: String?,
+        override val clientId: VerifierId?,
         override val encryptionParameters: EncryptionParameters? = null,
     ) : Failed
 }

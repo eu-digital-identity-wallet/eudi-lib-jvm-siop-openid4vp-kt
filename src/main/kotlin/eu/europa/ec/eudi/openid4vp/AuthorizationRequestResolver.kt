@@ -499,7 +499,12 @@ sealed interface Resolution {
     data class Invalid(
         val error: AuthorizationRequestError,
         val dispatchDetails: ErrorDispatchDetails?,
-    ) : Resolution
+    ) : Resolution {
+
+        companion object {
+            fun nonDispatchable(error: AuthorizationRequestError): Invalid = Invalid(error, null)
+        }
+    }
 }
 
 /**

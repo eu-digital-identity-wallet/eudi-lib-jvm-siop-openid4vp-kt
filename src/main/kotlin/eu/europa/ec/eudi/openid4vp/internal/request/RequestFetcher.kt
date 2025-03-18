@@ -22,6 +22,7 @@ import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -145,7 +146,11 @@ private const val APPLICATION_JWT = "application/jwt"
 private const val APPLICATION_OAUTH_AUTHZ_REQ_JWT = "application/oauth-authz-req+jwt"
 
 private suspend fun HttpClient.getJAR(requestUri: URL): Jwt =
-    get(requestUri) { addAcceptContentTypeJwt() }.body()
+    try {
+        get(requestUri) { addAcceptContentTypeJwt() }.body()
+    } catch (e: ClientRequestException) {
+        throw ResolutionError.UnableToFetchRequestObject(e).asException()
+    }
 
 private suspend fun HttpClient.postForJAR(
     requestUri: URL,
@@ -157,7 +162,11 @@ private suspend fun HttpClient.postForJAR(
             walletNonce?.let { append(OpenId4VPSpec.WALLET_NONCE, it.toString()) }
             walletMetaData?.let { append(OpenId4VPSpec.WALLET_METADATA, Json.encodeToString(it)) }
         }
-    return submitForm(requestUri.toString(), form) { addAcceptContentTypeJwt() }.body<Jwt>()
+    return try {
+        submitForm(requestUri.toString(), form) { addAcceptContentTypeJwt() }.body<Jwt>()
+    } catch (e: ClientRequestException) {
+        throw ResolutionError.UnableToFetchRequestObject(e).asException()
+    }
 }
 
 private fun HttpRequestBuilder.addAcceptContentTypeJwt() {

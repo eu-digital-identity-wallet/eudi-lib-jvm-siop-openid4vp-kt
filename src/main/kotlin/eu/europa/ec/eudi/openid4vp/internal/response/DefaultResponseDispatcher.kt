@@ -52,10 +52,7 @@ internal class DefaultDispatcher(
         encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.VerifierResponse {
         val response = request.responseWith(consensus, encryptionParameters)
-        val (responseUri, parameters) = formParameters(response)
-        return httpClientFactory().use { httpClient ->
-            submitForm(httpClient, responseUri, parameters)
-        }
+        return doPost(response)
     }
 
     override suspend fun post(
@@ -64,6 +61,10 @@ internal class DefaultDispatcher(
         encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.VerifierResponse {
         val response = error.responseWith(errorDispatchDetails, encryptionParameters)
+        return doPost(response)
+    }
+
+    private suspend fun doPost(response: AuthorizationResponse): DispatchOutcome.VerifierResponse {
         val (responseUri, parameters) = formParameters(response)
         return httpClientFactory().use { httpClient ->
             submitForm(httpClient, responseUri, parameters)

@@ -13,6 +13,7 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
   * [Resolve an authorization request URI](#resolve-an-authorization-request-uri)
   * [Holder's consensus, Handling of a valid authorization request](#holders-consensus-handling-of-a-valid-authorization-request)
   * [Dispatch authorization response to verifier / RP](#dispatch-authorization-response-to-verifier--rp)
+  * [Dispatch authorization error response to verifier / RP](#dispatch-authorization-error-response-to-verifier--rp)
   * [Example](#example)
 * [SIOPv2 & OpenId4VP features supported](#siopv2--openid4vp-features-supported)
 * [How to contribute](#how-to-contribute)
@@ -131,6 +132,54 @@ val idToken : Jwt // provided by wallet
 val consensus =  Consensus.PositiveConsensus.IdTokenConsensus(idToken)
 val dispatchOutcome = siopOpenId4Vp.dispatch(requestObject, consensus)
 ```
+
+### Dispatch authorization error response to verifier / RP
+
+If an error occurs during the resolution of an authorization request URI, either due to the authorization request
+missing required data or being malformed, a Resolution.Invalid is returned. Depending on the type of the
+AuthorizationRequestError that occurred, the library might be able to send an authorization error response to the verifier / RP.
+
+Additionally, wallet can configure a policy regarding error dispatching to unauthenticated clients. Wallet can configure
+via [SiopOpenId4VPConfig.errorDispatchPolicy](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Config.kt) whether to allow
+dispatching of authorization error response to unauthenticated clients, or allow dispatching of authorization error 
+responses only to authenticated clients.
+
+A Resolution.Invalid that contains an AuthorizationRequestError that can be communicated to the verifier / RP via an
+authorization error response also contains ErrorDispatchDetails.
+
+Depending on the `response_mode` that the verifier included in his authorization request, error dispatching is done:
+
+* via a direct post (when `response_mode` is `direct_post` or `direct_post.jwt`)
+* by forming an appropriate `redirect_uri` (when response mode is `fragment`, `fragment.jwt`, `query` or `query.jwt`)
+
+The library tackles error dispatching via [ErrorDispatcher](src/main/kotlin/eu/europa/ec/eudi/openid4vp/ErrorDispatcher.kt)
+
+Please note that in case of `response_mode` `direct_post` or `direct_post.jwt` the library performs the actual HTTP 
+call against the verifier's receiving end-point.
+On the other hand, in case of a `response_mode` which is neither `direct_post` nor `direct_post.jwt` the library
+just forms an appropriate redirect URI.
+It is the caller's responsibility to redirect the user to this URI.
+
+```kotlin
+import eu.europa.ec.eudi.openid4vp.*
+
+val authorizationRequestUri : String // obtained via a deep link or scanning a QR code
+
+val resolution = siopOpenId4Vp.resolveRequestUri(authorizationRequestUri)
+if (resolution is Resolution.Invalid) {
+  val (error, errorDispatchDetails) = resolution.error
+  errorDispatchDetails?.let {
+    val encryptionParameters: EncryptionParameters = TODO()
+    val dispatchOutcome = siopOpenId4Vp.dispatchError(error, it, encryptionParameters)
+    when (dispatchOutcome) {
+      is DispatchOutcome.RedirectURI -> TODO("Caller must redirect the user to '${dispatchOutcome.value}'")
+      is DispatchOutcome.VerifierResponse.Accepted -> TODO("Verifier/RP successfully received authorization error response. Caller must redirect user to '${dispatchOutcome.redirectURI}'")
+      DispatchOutcome.VerifierResponse.Rejected -> TODO("Verifier/RP did not receive or rejected the authorization error response.")
+    }
+  }
+}
+```
+
 ### Example
 
 Project contains an [example](src/test/kotlin/eu/europa/ec/eudi/openid4vp/Example.kt) which

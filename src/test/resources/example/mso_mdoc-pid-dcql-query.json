@@ -8,8 +8,7 @@
       },
       "claims": [
         {
-          "namespace": "eu.europa.ec.eudi.pid.1",
-          "claim_name": "family_name"
+          "path": [ "eu.europa.ec.eudi.pid.1", "family_name" ]
         }
       ]
     }

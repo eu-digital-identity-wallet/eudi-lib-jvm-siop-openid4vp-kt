@@ -355,7 +355,7 @@ private fun UnvalidatedRequestObject.signed(
     clientId = checkNotNull(clientId),
     jwt = run {
         val header = with(JWSHeader.Builder(alg)) {
-            type(JOSEObjectType("oauth-authz-req+jwt"))
+            type(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE))
             headerCustomization()
             build()
         }

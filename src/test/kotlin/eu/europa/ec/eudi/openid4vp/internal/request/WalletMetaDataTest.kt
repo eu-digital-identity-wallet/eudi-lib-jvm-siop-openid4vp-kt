@@ -74,6 +74,7 @@ private fun assertMetadata(config: SiopOpenId4VPConfig) {
     assertClientIdScheme(config.supportedClientIdSchemes, walletMetaData)
     assertPresentationDefinitionUriSupported(config.vpConfiguration, walletMetaData)
     assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
+    assertResponseTypes(walletMetaData)
 }
 
 private fun assertJarSigning(supportedAlgorithms: List<JWSAlgorithm>, walletMetaData: JsonObject) {
@@ -195,4 +196,15 @@ private fun assertExpectedVpFormats(
             assertNull(kbJwtAlgs)
         }
     }
+}
+
+private fun assertResponseTypes(walletMetadata: JsonObject) {
+    val types = assertIs<JsonArray>(walletMetadata["response_types_supported"], "'response_types_supported' is not a json array")
+    assert(types.all { it is JsonPrimitive && it.isString }) { "'response_types_supported' does not contain strings only" }
+
+    val values = types.map { it.jsonPrimitive.content }
+    assertEquals(3, values.size, "'unexpected number of 'response_types_supported'")
+    assert("vp_token" in values) { "'response_types_supported' misses 'vp_token'" }
+    assert("id_token" in values) { "'response_types_supported' misses 'id_token'" }
+    assert("vp_token id_token" in values) { "'response_types_supported' misses 'vp_token id_token'" }
 }

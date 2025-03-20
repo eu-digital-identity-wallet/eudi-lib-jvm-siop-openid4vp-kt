@@ -77,6 +77,7 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig): JsonObject =
         putJsonArray(RESPONSE_TYPES_SUPPOERTED) {
             add("vp_token")
             add("id_token")
+            add("vp_token id_token")
         }
 
         // TODO Investigate is this should be hardcoded, or

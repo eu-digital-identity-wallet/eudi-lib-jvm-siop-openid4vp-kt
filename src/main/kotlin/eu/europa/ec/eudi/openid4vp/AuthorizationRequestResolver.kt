@@ -400,14 +400,9 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = SubjectSyntaxTypesNoMatch
     }
 
-    data object MissingClientMetadataJwksSource : RequestValidationError {
+    data object MissingClientMetadataJwks : RequestValidationError {
         @Suppress("unused")
-        private fun readResolve(): Any = MissingClientMetadataJwksSource
-    }
-
-    data object BothJwkUriAndInlineJwks : RequestValidationError {
-        @Suppress("unused")
-        private fun readResolve(): Any = BothJwkUriAndInlineJwks
+        private fun readResolve(): Any = MissingClientMetadataJwks
     }
 
     data object SubjectSyntaxTypesWrongSyntax : RequestValidationError {
@@ -451,7 +446,7 @@ sealed interface ResolutionError : AuthorizationRequestError {
 
     data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
-    data class ClientMetadataJwkUriUnparsable(val cause: Throwable) : ResolutionError
+    data class ClientMetadataJwksUnparsable(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
     data class InvalidTransactionData(val cause: Throwable) : ResolutionError
 

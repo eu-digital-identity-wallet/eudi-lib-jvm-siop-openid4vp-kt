@@ -154,15 +154,14 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
 
                 is InvalidRequestUriMethod -> INVALID_REQUEST_URI_METHOD
 
-                BothJwkUriAndInlineJwks,
-                MissingClientMetadataJwksSource,
+                MissingClientMetadataJwks,
+                is ClientMetadataJwksUnparsable,
                 -> INVALID_REGISTRATION_OBJECT
 
                 SubjectSyntaxTypesNoMatch,
                 SubjectSyntaxTypesWrongSyntax,
                 -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 
-                is ClientMetadataJwkUriUnparsable -> INVALID_REGISTRATION_URI
                 is InvalidPresentationDefinition -> INVALID_REQUEST
                 is UnableToFetchPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_URI
                 InvalidPresentationDefinitionUri -> INVALID_PRESENTATION_DEFINITION_URI

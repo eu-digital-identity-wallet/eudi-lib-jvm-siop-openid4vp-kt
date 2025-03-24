@@ -26,11 +26,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
-import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
-import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
+import eu.europa.ec.eudi.openid4vp.internal.request.*
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
@@ -60,8 +56,6 @@ class AuthorizationResponseBuilderTest {
             ),
             clock = Clock.systemDefaultZone(),
         )
-
-        val clientMetaDataValidator = ManagedClientMetaValidator(DefaultHttpClientFactory)
     }
 
     internal object Verifier {
@@ -102,8 +96,8 @@ class AuthorizationResponseBuilderTest {
 
     @Test
     fun `id token request should produce a response with id token JWT`(): Unit = runTest {
-        suspend fun test(state: String? = null) {
-            val verifierMetaData = Wallet.clientMetaDataValidator.validate(
+        fun test(state: String? = null) {
+            val verifierMetaData = ClientMetaDataValidator.validateClientMetaData(
                 Verifier.metaDataRequestingNotEncryptedResponse,
                 ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
             )
@@ -146,10 +140,10 @@ class AuthorizationResponseBuilderTest {
 
     @Test
     fun `when direct_post jwt, builder should return DirectPostJwt with JarmSpec of correct type`() = runTest {
-        suspend fun test(state: String? = null) {
+        fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
             val verifierMetaData = assertDoesNotThrow {
-                Wallet.clientMetaDataValidator.validate(Verifier.metaDataRequestingEncryptedResponse, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(Verifier.metaDataRequestingEncryptedResponse, responseMode)
             }
 
             val resolvedRequest =

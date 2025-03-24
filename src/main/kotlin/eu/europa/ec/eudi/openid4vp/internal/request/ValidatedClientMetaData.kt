@@ -30,7 +30,6 @@ import kotlinx.serialization.json.*
 
 @Serializable
 internal data class UnvalidatedClientMetaData(
-    @SerialName("jwks_uri") val jwksUri: String? = null,
     @SerialName("jwks") val jwks: JsonObject? = null,
     @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>? = emptyList(),
     @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,

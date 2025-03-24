@@ -39,7 +39,9 @@ internal object ClientMetaDataValidator {
         val authSgnRespAlg = authSgnRespAlg(unvalidated, responseMode)
         val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated, responseMode)
         val requiresEncryption = responseMode.isJarm() && null != authEncRespAlg && authEncRespEnc != null
-        val jwkSets = if (requiresEncryption) jwkSet(unvalidated) else null
+        val jwkSets = if (requiresEncryption) {
+            jwkSet(unvalidated) ?: throw RequestValidationError.MissingClientMetadataJwks.asException()
+        } else null
         ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
             RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
         }
@@ -61,14 +63,14 @@ internal object ClientMetaDataValidator {
             throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
         }
 
-    private fun jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet {
+    private fun jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet? {
         fun JsonObject.asJWKSet(): JWKSet = try {
             JWKSet.parse(this.toString())
         } catch (ex: ParseException) {
             throw ResolutionError.ClientMetadataJwksUnparsable(ex).asException()
         }
 
-        return clientMetadata.jwks?.asJWKSet() ?: throw RequestValidationError.MissingClientMetadataJwks.asException()
+        return clientMetadata.jwks?.asJWKSet()
     }
 }
 

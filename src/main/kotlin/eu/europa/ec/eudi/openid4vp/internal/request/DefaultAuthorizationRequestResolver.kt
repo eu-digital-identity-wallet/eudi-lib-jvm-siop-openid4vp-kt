@@ -238,10 +238,9 @@ internal class DefaultAuthorizationRequestResolver(
         return requestAuthenticator.authenticate(fetchedRequest)
     }
 
-    private suspend fun HttpClient.resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
+    private fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
         validated.clientMetaData?.let { unvalidated ->
-            val clientMetaDataValidator = ClientMetaDataValidator(this)
-            clientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
+            ClientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
         }
 
     private suspend fun HttpClient.resolveRequestObject(

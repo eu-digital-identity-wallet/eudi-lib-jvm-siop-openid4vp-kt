@@ -93,10 +93,10 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch direct post response`() = runTest {
-        suspend fun test(state: String? = null) {
+        fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode)
             }
 
             val siopAuthRequestObject =
@@ -171,10 +171,10 @@ class AuthorizationResponseDispatcherTest {
 
     @Test
     fun `dispatch vp_token with direct post`() = runTest {
-        suspend fun test(state: String? = null) {
+        fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ManagedClientMetaValidator(DefaultHttpClientFactory).validate(clientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode)
             }
 
             val presentationDefinition =

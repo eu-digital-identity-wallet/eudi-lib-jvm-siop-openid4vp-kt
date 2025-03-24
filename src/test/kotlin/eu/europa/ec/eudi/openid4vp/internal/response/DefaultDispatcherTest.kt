@@ -34,11 +34,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingNonce
 import eu.europa.ec.eudi.openid4vp.dcql.*
 import eu.europa.ec.eudi.openid4vp.dcql.ClaimPathElement.Claim
-import eu.europa.ec.eudi.openid4vp.internal.request.ManagedClientMetaValidator
-import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
-import eu.europa.ec.eudi.openid4vp.internal.request.asURL
-import eu.europa.ec.eudi.openid4vp.internal.request.jarmRequirement
+import eu.europa.ec.eudi.openid4vp.internal.request.*
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier.assertIsJwtEncryptedWithVerifiersPubKey
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Wallet.assertIsJwtSignedByWallet
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Wallet.assertIsSignedByWallet
@@ -178,8 +174,6 @@ class DefaultDispatcherTest {
             return DefaultDispatcher(config) { httpClient }
         }
 
-        val clientMetaDataValidator = ManagedClientMetaValidator(DefaultHttpClientFactory)
-
         fun String.assertIsJwtSignedByWallet(): JWTClaimsSet {
             val signedJWT = SignedJWT.parse(this)
             return signedJWT.assertIsSignedByWallet()
@@ -198,7 +192,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `client metadata does not match with wallet's supported algorithms`(): Unit = runTest {
-            val clientMetaData = Wallet.clientMetaDataValidator.validate(
+            val clientMetaData = ClientMetaDataValidator.validateClientMetaData(
                 Verifier.metaDataRequestingSignedAndEncryptedResponse,
                 ResponseMode.QueryJwt(URI.create("foo://bar")),
             )
@@ -522,12 +516,12 @@ class DefaultDispatcherTest {
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
 
-        private suspend fun createOpenId4VPRequest(
+        private fun createOpenId4VPRequest(
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val clientMetadataValidated =
-                Wallet.clientMetaDataValidator.validate(unvalidatedClientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
                 presentationQuery = PresentationQuery.ByPresentationDefinition(
@@ -546,12 +540,12 @@ class DefaultDispatcherTest {
             )
         }
 
-        private suspend fun createOpenID4VPRequestWithDCQL(
+        private fun createOpenID4VPRequestWithDCQL(
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val clientMetadataValidated =
-                Wallet.clientMetaDataValidator.validate(unvalidatedClientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
                 presentationQuery = PresentationQuery.ByDigitalCredentialsQuery(
@@ -571,12 +565,12 @@ class DefaultDispatcherTest {
             )
         }
 
-        private suspend fun createSiopOpenID4VPRequestWithDCQL(
+        private fun createSiopOpenID4VPRequestWithDCQL(
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.SiopOpenId4VPAuthentication {
             val clientMetadataValidated =
-                Wallet.clientMetaDataValidator.validate(unvalidatedClientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.SiopOpenId4VPAuthentication(
                 client = Verifier.CLIENT,

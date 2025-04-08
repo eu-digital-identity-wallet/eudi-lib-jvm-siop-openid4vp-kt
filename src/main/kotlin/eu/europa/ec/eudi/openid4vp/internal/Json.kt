@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal
 
+import com.nimbusds.jose.util.JSONObjectUtils
 import kotlinx.serialization.json.*
 
 internal val jsonSupport = Json {
@@ -47,3 +48,5 @@ internal fun JsonObject.optionalStringArray(name: String): List<String>? {
         value.jsonArray.map { it.jsonPrimitive.content }
     }
 }
+
+internal fun Map<String, *>.toJsonObject(): JsonObject = jsonSupport.decodeFromString(JSONObjectUtils.toJSONString(this))

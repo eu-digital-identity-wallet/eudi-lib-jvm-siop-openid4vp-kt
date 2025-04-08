@@ -15,11 +15,15 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.nimbusds.jose.JWEObject
+import com.nimbusds.jose.crypto.factories.DefaultJWEDecrypterFactory
+import com.nimbusds.jose.jwk.*
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
+import eu.europa.ec.eudi.openid4vp.internal.ephemeralJwkSet
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -30,6 +34,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
+import java.security.PrivateKey
 import java.text.ParseException
 
 internal class RequestFetcher(
@@ -78,12 +83,21 @@ internal class RequestFetcher(
                         is NonceOption.Use -> Nonce(nonceOption.byteLength)
                         NonceOption.DoNotUse -> null
                     }
+                val ephemeralJarEncryptionJwks = when (val jarEncryption = postOptions.jarEncryption) {
+                    EncryptionRequirement.NotRequired -> null
+                    is EncryptionRequirement.Required -> jarEncryption.ephemeralJwkSet()
+                }
                 val walletMetaData =
                     if (postOptions.includeWalletMetadata) {
-                        walletMetaData(siopOpenId4VPConfig)
+                        walletMetaData(siopOpenId4VPConfig, ephemeralJarEncryptionJwks)
                     } else null
+
                 val jwt = httpClient.postForJAR(requestUri, walletNonce, walletMetaData)
-                jwt to walletNonce
+                val signedJwt = if (null != ephemeralJarEncryptionJwks) {
+                    jwt.decrypt(ephemeralJarEncryptionJwks).getOrThrow()
+                } else jwt
+
+                signedJwt to walletNonce
             }
         }
     }
@@ -172,4 +186,30 @@ private suspend fun HttpClient.postForJAR(
 private fun HttpRequestBuilder.addAcceptContentTypeJwt() {
     accept(ContentType.parse(APPLICATION_OAUTH_AUTHZ_REQ_JWT))
     accept(ContentType.parse(APPLICATION_JWT))
+}
+
+private const val CONTENT_TYPE_JWT = "JWT"
+
+private fun Jwt.decrypt(jwks: JWKSet): Result<Jwt> = runCatching {
+    val jwe = JWEObject.parse(this)
+    require(CONTENT_TYPE_JWT == jwe.header.contentType) { "JWEObject must contain a JWT Payload" }
+
+    val decryptionKeys = JWKMatcher.forJWEHeader(jwe.header).let { matcher -> jwks.keys.filter { matcher.matches(it) } }
+    val decrypterFactory = DefaultJWEDecrypterFactory()
+    val payload = decryptionKeys.firstNotNullOfOrNull { decryptionKey ->
+        runCatching {
+            fun JWK.toPrivateKey(): PrivateKey =
+                when (this) {
+                    is RSAKey -> toRSAPrivateKey()
+                    is ECKey -> toECPrivateKey()
+                    else -> throw IllegalArgumentException("Unsupported JWK type '${this::class.qualifiedName}'")
+                }
+
+            val decrypter = decrypterFactory.createJWEDecrypter(jwe.header, decryptionKey.toPrivateKey())
+            jwe.decrypt(decrypter)
+            jwe.payload
+        }.getOrNull()
+    } ?: throw IllegalStateException("Unable to decrypt JWEObject")
+
+    payload.toString()
 }

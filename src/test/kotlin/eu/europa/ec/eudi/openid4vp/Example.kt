@@ -169,7 +169,7 @@ class Verifier private constructor(
             }
 
         private suspend fun initSiopTransaction(client: HttpClient, verifierApi: URL, nonce: String): JsonObject {
-            verifierPrintln("Placing to verifier endpoint  SIOP authentication request ...")
+            verifierPrintln("Placing to verifier endpoint SIOP authentication request ...")
             val request = buildJsonObject {
                 put("type", "id_token")
                 put("nonce", nonce)
@@ -177,6 +177,7 @@ class Verifier private constructor(
                 put("response_mode", "direct_post.jwt")
                 put("jar_mode", "by_reference")
                 put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
+                put("request_uri_method", "post")
             }
             return initTransaction(client, verifierApi, request)
         }
@@ -207,6 +208,7 @@ class Verifier private constructor(
                         addAll(transactionData.map { it.json })
                     }
                 }
+                put("request_uri_method", "post")
             }
             return initTransaction(client, verifierApi, request)
         }
@@ -225,8 +227,16 @@ class Verifier private constructor(
         private fun formatAuthorizationRequest(iniTransactionResponse: JsonObject): URI {
             fun String.encode() = URLEncoder.encode(this, "UTF-8")
             val clientId = iniTransactionResponse["client_id"]?.jsonPrimitive?.content?.encode()!!
-            val requestUri =
-                iniTransactionResponse["request_uri"]?.jsonPrimitive?.contentOrNull?.encode()?.let { "request_uri=$it" }
+            val requestUri = buildString {
+                iniTransactionResponse["request_uri"]?.jsonPrimitive?.contentOrNull?.encode()?.let { append("request_uri=$it") }
+                iniTransactionResponse["request_uri_method"]?.jsonPrimitive?.contentOrNull?.let {
+                    if (isNotBlank()) {
+                        append("&")
+                        append("request_uri_method=$it")
+                    }
+                }
+            }.takeIf { it.isNotBlank() }
+
             val request = iniTransactionResponse["request"]?.jsonPrimitive?.contentOrNull?.let { "request=$it" }
             require(request != null || requestUri != null)
             val requestPart = requestUri ?: request

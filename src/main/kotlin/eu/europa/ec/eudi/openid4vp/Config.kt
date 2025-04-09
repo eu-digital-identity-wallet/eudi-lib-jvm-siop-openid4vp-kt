@@ -445,7 +445,7 @@ sealed interface SupportedRequestUriMethods {
      */
     data class Post(
         val includeWalletMetadata: Boolean = true,
-        val jarEncryption: EncryptionRequirement = EncryptionRequirement.Required.Default,
+        val jarEncryption: EncryptionRequirement = EncryptionRequirement.NotRequired,
         val useWalletNonce: NonceOption = NonceOption.Use(),
     ) : SupportedRequestUriMethods {
         init {
@@ -474,12 +474,9 @@ sealed interface SupportedRequestUriMethods {
     companion object {
         /**
          * The default option is to support both `get` and `post` and in the later case,
-         * include `wallet_metadata` and `wallet_nonce`, and require JAR be encrypted
+         * include `wallet_metadata` and `wallet_nonce`, and NOT require JAR be encrypted
          */
-        val Default: SupportedRequestUriMethods =
-            Both(
-                post = Post(true, EncryptionRequirement.Required.Default, NonceOption.Use()),
-            )
+        val Default: SupportedRequestUriMethods = Both(post = Post())
     }
 }
 

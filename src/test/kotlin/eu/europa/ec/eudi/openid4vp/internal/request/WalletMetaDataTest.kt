@@ -39,7 +39,10 @@ class WalletMetaDataTest {
                     VpFormat.MsoMdoc.ES256,
                 ),
             ),
-            jarConfiguration = JarConfiguration.Default,
+            jarConfiguration = JarConfiguration(
+                supportedAlgorithms = JarConfiguration.Default.supportedAlgorithms,
+                supportedRequestUriMethods = SupportedRequestUriMethods.Post(jarEncryption = EncryptionRequirement.Required.Default),
+            ),
         )
         assertMetadata(config)
     }

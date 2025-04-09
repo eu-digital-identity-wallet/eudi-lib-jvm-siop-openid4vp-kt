@@ -20,7 +20,6 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.ephemeralJwkSet
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*

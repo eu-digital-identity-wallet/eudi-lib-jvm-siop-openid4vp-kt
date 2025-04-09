@@ -15,15 +15,17 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWEObject
 import com.nimbusds.jose.crypto.factories.DefaultJWEDecrypterFactory
 import com.nimbusds.jose.jwk.*
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
-import eu.europa.ec.eudi.openid4vp.internal.ephemeralJwkSet
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -212,4 +214,26 @@ private fun Jwt.decrypt(jwks: JWKSet): Result<Jwt> = runCatching {
     } ?: throw IllegalStateException("Unable to decrypt JWEObject")
 
     payload.toString()
+}
+
+internal fun EncryptionRequirement.Required.ephemeralJwkSet(): JWKSet {
+    val keys = buildList {
+        if (supportedEncryptionAlgorithms.any { it in JWEAlgorithm.Family.RSA }) {
+            val rsaKey = RSAKeyGenerator(RSAKeyGenerator.MIN_KEY_SIZE_BITS, false)
+                .keyID("eph#0")
+                .keyUse(KeyUse.ENCRYPTION)
+                .generate()
+            add(rsaKey)
+        }
+
+        if (supportedEncryptionAlgorithms.any { it in JWEAlgorithm.Family.ECDH_ES }) {
+            val ecKey = ECKeyGenerator(Curve.P_256)
+                .keyID("eph#1")
+                .keyUse(KeyUse.ENCRYPTION)
+                .generate()
+            add(ecKey)
+        }
+    }
+
+    return JWKSet(keys)
 }

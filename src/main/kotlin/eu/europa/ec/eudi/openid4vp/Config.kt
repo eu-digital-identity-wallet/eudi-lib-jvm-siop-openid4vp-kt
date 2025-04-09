@@ -16,8 +16,10 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.*
+import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.oauth2.sdk.id.Issuer
@@ -404,24 +406,31 @@ sealed interface EncryptionRequirement : java.io.Serializable {
      * @property supportedEncryptionAlgorithms encryption algorithms supported by the Wallet, only asymmetric JWEAlgorithms are supported
      * @property supportedEncryptionMethods encryption methods supported by the Wallet, [EncryptionMethod.XC20P] requires the usage
      * of [com.google.crypto.tink:tink](https://central.sonatype.com/artifact/com.google.crypto.tink/tink)
+     * @property ephemeralEncryptionKeyCurve the [Curve] to use for generating the ephemeral encryption key
      */
     data class Required(
         val supportedEncryptionAlgorithms: List<JWEAlgorithm>,
         val supportedEncryptionMethods: List<EncryptionMethod>,
+        val ephemeralEncryptionKeyCurve: Curve,
     ) : EncryptionRequirement {
         init {
             require(supportedEncryptionAlgorithms.isNotEmpty()) { "supportedEncryptionAlgorithms cannot be empty" }
-            require(JWEAlgorithm.Family.ASYMMETRIC.containsAll(supportedEncryptionAlgorithms)) {
-                "only asymmetric JWEAlgorithms are supported"
+            require(SUPPORTED_ENCRYPTION_ALGORITHMS.containsAll(supportedEncryptionAlgorithms)) {
+                "only the following JWEAlgorithms are supported: $SUPPORTED_ENCRYPTION_ALGORITHMS"
             }
             require(supportedEncryptionMethods.isNotEmpty()) { "supportedEncryptionMethods cannot be empty" }
+            require(SUPPORTED_ENCRYPTION_METHODS.containsAll(supportedEncryptionMethods)) {
+                "only the following EncryptionMethods are supported: $SUPPORTED_ENCRYPTION_METHODS"
+            }
+            require(ephemeralEncryptionKeyCurve in SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES) {
+                "only the following Curves are supported: $SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES"
+            }
         }
 
         companion object {
-            val Default: Required = Required(
-                supportedEncryptionAlgorithms = JWEAlgorithm.Family.ASYMMETRIC.toList(),
-                supportedEncryptionMethods = EncryptionMethod.Family.AES_GCM.toList() + EncryptionMethod.Family.AES_CBC_HMAC_SHA.toList(),
-            )
+            val SUPPORTED_ENCRYPTION_ALGORITHMS: List<JWEAlgorithm> = ECDHDecrypter.SUPPORTED_ALGORITHMS.toList()
+            val SUPPORTED_ENCRYPTION_METHODS: List<EncryptionMethod> = ECDHDecrypter.SUPPORTED_ENCRYPTION_METHODS.toList()
+            val SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES: List<Curve> = ECDHDecrypter.SUPPORTED_ELLIPTIC_CURVES.toList()
         }
     }
 }

@@ -15,12 +15,12 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWEObject
-import com.nimbusds.jose.crypto.factories.DefaultJWEDecrypterFactory
-import com.nimbusds.jose.jwk.*
+import com.nimbusds.jose.crypto.ECDHDecrypter
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vp.*
@@ -36,7 +36,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.net.URL
-import java.security.PrivateKey
 import java.text.ParseException
 
 internal class RequestFetcher(
@@ -85,18 +84,18 @@ internal class RequestFetcher(
                         is NonceOption.Use -> Nonce(nonceOption.byteLength)
                         NonceOption.DoNotUse -> null
                     }
-                val ephemeralJarEncryptionJwks = when (val jarEncryption = postOptions.jarEncryption) {
+                val ephemeralJarEncryptionKey = when (val jarEncryption = postOptions.jarEncryption) {
                     EncryptionRequirement.NotRequired -> null
-                    is EncryptionRequirement.Required -> jarEncryption.ephemeralJwkSet()
+                    is EncryptionRequirement.Required -> jarEncryption.ephemeralEncryptionKey()
                 }
                 val walletMetaData =
                     if (postOptions.includeWalletMetadata) {
-                        walletMetaData(siopOpenId4VPConfig, ephemeralJarEncryptionJwks)
+                        walletMetaData(siopOpenId4VPConfig, ephemeralJarEncryptionKey?.let { JWKSet(it) })
                     } else null
 
                 val jwt = httpClient.postForJAR(requestUri, walletNonce, walletMetaData)
-                val signedJwt = if (null != ephemeralJarEncryptionJwks) {
-                    jwt.decrypt(ephemeralJarEncryptionJwks).getOrThrow()
+                val signedJwt = if (null != ephemeralJarEncryptionKey) {
+                    jwt.decrypt(ephemeralJarEncryptionKey).getOrThrow()
                 } else jwt
 
                 signedJwt to walletNonce
@@ -192,48 +191,18 @@ private fun HttpRequestBuilder.addAcceptContentTypeJwt() {
 
 private const val CONTENT_TYPE_JWT = "JWT"
 
-private fun Jwt.decrypt(jwks: JWKSet): Result<Jwt> = runCatching {
+private fun Jwt.decrypt(decryptionKey: ECKey): Result<Jwt> = runCatching {
     val jwe = JWEObject.parse(this)
     require(CONTENT_TYPE_JWT == jwe.header.contentType) { "JWEObject must contain a JWT Payload" }
 
-    val decryptionKeys = JWKMatcher.forJWEHeader(jwe.header).let { matcher -> jwks.keys.filter { matcher.matches(it) } }
-    val decrypterFactory = DefaultJWEDecrypterFactory()
-    val payload = decryptionKeys.firstNotNullOfOrNull { decryptionKey ->
-        runCatching {
-            fun JWK.toPrivateKey(): PrivateKey =
-                when (this) {
-                    is RSAKey -> toRSAPrivateKey()
-                    is ECKey -> toECPrivateKey()
-                    else -> throw IllegalArgumentException("Unsupported JWK type '${this::class.qualifiedName}'")
-                }
-
-            val decrypter = decrypterFactory.createJWEDecrypter(jwe.header, decryptionKey.toPrivateKey())
-            jwe.decrypt(decrypter)
-            jwe.payload
-        }.getOrNull()
-    } ?: throw IllegalStateException("Unable to decrypt JWEObject")
+    val decrypter = ECDHDecrypter(decryptionKey)
+    jwe.decrypt(decrypter)
+    val payload = jwe.payload
 
     payload.toString()
 }
 
-internal fun EncryptionRequirement.Required.ephemeralJwkSet(): JWKSet {
-    val keys = buildList {
-        if (supportedEncryptionAlgorithms.any { it in JWEAlgorithm.Family.RSA }) {
-            val rsaKey = RSAKeyGenerator(RSAKeyGenerator.MIN_KEY_SIZE_BITS, false)
-                .keyID("eph#0")
-                .keyUse(KeyUse.ENCRYPTION)
-                .generate()
-            add(rsaKey)
-        }
-
-        if (supportedEncryptionAlgorithms.any { it in JWEAlgorithm.Family.ECDH_ES }) {
-            val ecKey = ECKeyGenerator(Curve.P_256)
-                .keyID("eph#1")
-                .keyUse(KeyUse.ENCRYPTION)
-                .generate()
-            add(ecKey)
-        }
-    }
-
-    return JWKSet(keys)
-}
+internal fun EncryptionRequirement.Required.ephemeralEncryptionKey(): ECKey =
+    ECKeyGenerator(ephemeralEncryptionKeyCurve)
+        .keyUse(KeyUse.ENCRYPTION)
+        .generate()

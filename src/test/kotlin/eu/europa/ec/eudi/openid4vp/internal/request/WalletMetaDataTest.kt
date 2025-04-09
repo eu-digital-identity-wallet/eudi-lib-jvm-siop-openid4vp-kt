@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
@@ -41,7 +42,13 @@ class WalletMetaDataTest {
             ),
             jarConfiguration = JarConfiguration(
                 supportedAlgorithms = JarConfiguration.Default.supportedAlgorithms,
-                supportedRequestUriMethods = SupportedRequestUriMethods.Post(jarEncryption = EncryptionRequirement.Required.Default),
+                supportedRequestUriMethods = SupportedRequestUriMethods.Post(
+                    jarEncryption = EncryptionRequirement.Required(
+                        supportedEncryptionAlgorithms = EncryptionRequirement.Required.SUPPORTED_ENCRYPTION_ALGORITHMS,
+                        supportedEncryptionMethods = EncryptionRequirement.Required.SUPPORTED_ENCRYPTION_METHODS,
+                        ephemeralEncryptionKeyCurve = Curve.P_521,
+                    ),
+                ),
             ),
         )
         assertMetadata(config)
@@ -74,7 +81,7 @@ private fun assertMetadata(config: SiopOpenId4VPConfig) {
             ?.let { requestUriMethodPost ->
                 when (val jarEncryption = requestUriMethodPost.jarEncryption) {
                     EncryptionRequirement.NotRequired -> jarEncryption to null
-                    is EncryptionRequirement.Required -> jarEncryption to jarEncryption.ephemeralJwkSet()
+                    is EncryptionRequirement.Required -> jarEncryption to JWKSet(jarEncryption.ephemeralEncryptionKey())
                 }
             } ?: (EncryptionRequirement.NotRequired to null)
 

@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.JWTClaimsSet
@@ -545,7 +546,13 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
         jarConfiguration = JarConfiguration(
             supportedAlgorithms = JWSAlgorithm.Family.EC.toList() - JWSAlgorithm.ES256K,
             supportedRequestUriMethods = SupportedRequestUriMethods.Both(
-                SupportedRequestUriMethods.Post(jarEncryption = EncryptionRequirement.Required.Default),
+                SupportedRequestUriMethods.Post(
+                    jarEncryption = EncryptionRequirement.Required(
+                        supportedEncryptionAlgorithms = EncryptionRequirement.Required.SUPPORTED_ENCRYPTION_ALGORITHMS,
+                        supportedEncryptionMethods = EncryptionRequirement.Required.SUPPORTED_ENCRYPTION_METHODS,
+                        ephemeralEncryptionKeyCurve = Curve.P_521,
+                    ),
+                ),
             ),
         ),
         jarmConfiguration = JarmConfiguration.Encryption(

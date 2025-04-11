@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.EncryptionRequirement
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
@@ -32,7 +33,7 @@ private const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 private const val RESPONSE_TYPES_SUPPOERTED = "response_types_supported"
 private const val RESPONSE_MODES_SUPPORTED = "response_modes_supported"
 
-internal fun walletMetaData(cfg: SiopOpenId4VPConfig, ephemeralJarEncryptionJwkSet: JWKSet?): JsonObject =
+internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObject =
     buildJsonObject {
         //
         // Authorization Request signature and encryption parameters
@@ -48,8 +49,8 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, ephemeralJarEncryptionJwkS
         // Encryption
         cfg.jarConfiguration.supportedRequestUriMethods.isPostSupported()?.let { requestUriMethodPost ->
             val jarEncryption = requestUriMethodPost.jarEncryption
-            if (jarEncryption is EncryptionRequirement.Required && null != ephemeralJarEncryptionJwkSet) {
-                put(JWKS, ephemeralJarEncryptionJwkSet.toJSONObject(true).toJsonObject())
+            if (jarEncryption is EncryptionRequirement.Required && keys.isNotEmpty()) {
+                put(JWKS, JWKSet(keys).toJSONObject(true).toJsonObject())
                 putJsonArray(AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED) {
                     jarEncryption.supportedEncryptionAlgorithms.forEach { alg -> add(alg.name) }
                 }

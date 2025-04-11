@@ -18,7 +18,6 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import com.nimbusds.jose.JWEObject
 import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
@@ -32,6 +31,8 @@ import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -90,7 +91,7 @@ internal class RequestFetcher(
                 }
                 val walletMetaData =
                     if (postOptions.includeWalletMetadata) {
-                        walletMetaData(siopOpenId4VPConfig, ephemeralJarEncryptionKey?.let { JWKSet(it) })
+                        walletMetaData(siopOpenId4VPConfig, listOfNotNull(ephemeralJarEncryptionKey))
                     } else null
 
                 val jwt = httpClient.postForJAR(requestUri, walletNonce, walletMetaData)
@@ -191,18 +192,20 @@ private fun HttpRequestBuilder.addAcceptContentTypeJwt() {
 
 private const val CONTENT_TYPE_JWT = "JWT"
 
-private fun Jwt.decrypt(decryptionKey: ECKey): Result<Jwt> = runCatching {
+private fun Jwt.decrypt(recipientKey: ECKey): Result<Jwt> = runCatching {
     val jwe = JWEObject.parse(this)
     require(CONTENT_TYPE_JWT == jwe.header.contentType) { "JWEObject must contain a JWT Payload" }
 
-    val decrypter = ECDHDecrypter(decryptionKey)
+    val decrypter = ECDHDecrypter(recipientKey)
     jwe.decrypt(decrypter)
     val payload = jwe.payload
 
     payload.toString()
 }
 
-internal fun EncryptionRequirement.Required.ephemeralEncryptionKey(): ECKey =
-    ECKeyGenerator(ephemeralEncryptionKeyCurve)
-        .keyUse(KeyUse.ENCRYPTION)
-        .generate()
+internal suspend fun EncryptionRequirement.Required.ephemeralEncryptionKey(): ECKey =
+    withContext(Dispatchers.IO) {
+        ECKeyGenerator(ephemeralEncryptionKeyCurve)
+            .keyUse(KeyUse.ENCRYPTION)
+            .generate()
+    }

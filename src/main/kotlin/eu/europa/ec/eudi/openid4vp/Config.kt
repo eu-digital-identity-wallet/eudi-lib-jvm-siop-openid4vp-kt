@@ -428,9 +428,9 @@ sealed interface EncryptionRequirement : java.io.Serializable {
         }
 
         companion object {
-            val SUPPORTED_ENCRYPTION_ALGORITHMS: List<JWEAlgorithm> = ECDHDecrypter.SUPPORTED_ALGORITHMS.toList()
-            val SUPPORTED_ENCRYPTION_METHODS: List<EncryptionMethod> = ECDHDecrypter.SUPPORTED_ENCRYPTION_METHODS.toList()
-            val SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES: List<Curve> = ECDHDecrypter.SUPPORTED_ELLIPTIC_CURVES.toList()
+            val SUPPORTED_ENCRYPTION_ALGORITHMS: List<JWEAlgorithm> get() = ECDHDecrypter.SUPPORTED_ALGORITHMS.toList()
+            val SUPPORTED_ENCRYPTION_METHODS: List<EncryptionMethod> get() = ECDHDecrypter.SUPPORTED_ENCRYPTION_METHODS.toList()
+            val SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES: List<Curve> get() = ECDHDecrypter.SUPPORTED_ELLIPTIC_CURVES.toList()
         }
     }
 }

@@ -19,9 +19,11 @@ import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.test.*
@@ -29,7 +31,7 @@ import kotlin.test.*
 class WalletMetaDataTest {
 
     @Test
-    fun `test with jar encryption`() {
+    fun `test with jar encryption`() = runTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
@@ -55,7 +57,7 @@ class WalletMetaDataTest {
     }
 
     @Test
-    fun `test without jar encryption`() {
+    fun `test without jar encryption`() = runTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
@@ -75,17 +77,17 @@ class WalletMetaDataTest {
     }
 }
 
-private fun assertMetadata(config: SiopOpenId4VPConfig) {
+private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
     val (encryptionRequirement, ephemeralJarEncryptionJwks) =
         config.jarConfiguration.supportedRequestUriMethods.isPostSupported()
             ?.let { requestUriMethodPost ->
                 when (val jarEncryption = requestUriMethodPost.jarEncryption) {
                     EncryptionRequirement.NotRequired -> jarEncryption to null
-                    is EncryptionRequirement.Required -> jarEncryption to JWKSet(jarEncryption.ephemeralEncryptionKey())
+                    is EncryptionRequirement.Required -> jarEncryption to jarEncryption.ephemeralEncryptionKey()
                 }
             } ?: (EncryptionRequirement.NotRequired to null)
 
-    val walletMetaData = walletMetaData(config, ephemeralJarEncryptionJwks)
+    val walletMetaData = walletMetaData(config, listOfNotNull(ephemeralJarEncryptionJwks))
         .also {
             println(jsonSupport.encodeToString(it))
         }
@@ -109,22 +111,22 @@ private fun assertJarSigning(supportedAlgorithms: List<JWSAlgorithm>, walletMeta
 
 private fun assertJarEncryption(
     encryptionRequirement: EncryptionRequirement,
-    ephemeralJarEncryptionJwks: JWKSet?,
+    ephemeralJarEncryptionJwk: JWK?,
     walletMetadata: JsonObject,
 ) {
     when (encryptionRequirement) {
         EncryptionRequirement.NotRequired -> {
-            assertNull(ephemeralJarEncryptionJwks)
+            assertNull(ephemeralJarEncryptionJwk)
             assertNull(walletMetadata["jwks"])
             assertNull(walletMetadata["authorization_encryption_alg_values_supported"])
             assertNull(walletMetadata["authorization_encryption_enc_values_supported"])
         }
 
         is EncryptionRequirement.Required -> {
-            assertNotNull(ephemeralJarEncryptionJwks)
+            assertNotNull(ephemeralJarEncryptionJwk)
 
             val jwks = assertIs<JsonObject>(walletMetadata["jwks"]).let { JWKSet.parse(jsonSupport.encodeToString(it)) }
-            assertEquals(ephemeralJarEncryptionJwks.toPublicJWKSet(), jwks)
+            assertEquals(JWKSet(ephemeralJarEncryptionJwk).toPublicJWKSet(), jwks)
 
             val encryptionAlgorithms = assertIs<JsonArray>(walletMetadata["authorization_encryption_alg_values_supported"]).map {
                 JWEAlgorithm.parse(it.jsonPrimitive.content)

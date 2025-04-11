@@ -1,19 +1,19 @@
 [versions]
-coroutines = "1.9.0"
-dependency-check = "12.0.2"
-sonarqube = "6.0.1.5171"
-spotless = "7.0.2"
+java = "17"
 kotlin = "2.0.21"
+coroutines = "1.9.0"
 ktor = "3.0.1"
 presentation-exchange = "0.3.0"
 nimbus-sdk = "11.20.1"
 uri-kmp = "0.0.19"
-java = "17"
-ktlint = "0.50.0"
-dokka = "2.0.0"
-maven-publish = "0.30.0"
 fasterxml-jackson = "2.18.2"
 bouncyCastle = "1.80"
+spotless = "7.0.2"
+ktlint = "0.50.0"
+dokka = "1.9.20"
+maven-publish = "0.30.0"
+kover = "0.9.1"
+dependency-check = "12.0.2"
 
 [libraries]
 fasterxml-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "fasterxml-jackson" }
@@ -32,10 +32,10 @@ ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 bouncy-castle = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncyCastle" }
 
 [plugins]
-dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }
-sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
+dependency-check = { id = "org.owasp.dependencycheck", version.ref = "dependency-check" }

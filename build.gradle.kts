@@ -11,14 +11,13 @@ object Meta {
 plugins {
     base
     `java-library`
-    jacoco
-    alias(libs.plugins.dokka)
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.spotless)
-    alias(libs.plugins.sonarqube)
-    alias(libs.plugins.dependency.check)
+    alias(libs.plugins.kover)
+    alias(libs.plugins.dokka)
     alias(libs.plugins.maven.publish)
+    alias(libs.plugins.dependency.check)
 }
 
 repositories {
@@ -85,12 +84,6 @@ testing {
         val test by getting(JvmTestSuite::class) {
             useJUnitJupiter()
         }
-    }
-}
-
-tasks.jacocoTestReport {
-    reports {
-        xml.required.set(true)
     }
 }
 

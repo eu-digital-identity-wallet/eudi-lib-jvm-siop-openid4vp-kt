@@ -16,8 +16,10 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.*
+import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.oauth2.sdk.id.Issuer
@@ -387,6 +389,53 @@ sealed interface NonceOption {
 }
 
 /**
+ * Wallet articulated encryption requirements.
+ */
+sealed interface EncryptionRequirement : java.io.Serializable {
+
+    /**
+     * Encryption is not required.
+     */
+    data object NotRequired : EncryptionRequirement {
+        private fun readResolve(): Any = NotRequired
+    }
+
+    /**
+     * Encryption is required.
+     *
+     * @property supportedEncryptionAlgorithms encryption algorithms supported by the Wallet, only asymmetric JWEAlgorithms are supported
+     * @property supportedEncryptionMethods encryption methods supported by the Wallet, [EncryptionMethod.XC20P] requires the usage
+     * of [com.google.crypto.tink:tink](https://central.sonatype.com/artifact/com.google.crypto.tink/tink)
+     * @property ephemeralEncryptionKeyCurve the [Curve] to use for generating the ephemeral encryption key
+     */
+    data class Required(
+        val supportedEncryptionAlgorithms: List<JWEAlgorithm>,
+        val supportedEncryptionMethods: List<EncryptionMethod>,
+        val ephemeralEncryptionKeyCurve: Curve,
+    ) : EncryptionRequirement {
+        init {
+            require(supportedEncryptionAlgorithms.isNotEmpty()) { "supportedEncryptionAlgorithms cannot be empty" }
+            require(SUPPORTED_ENCRYPTION_ALGORITHMS.containsAll(supportedEncryptionAlgorithms)) {
+                "only the following JWEAlgorithms are supported: $SUPPORTED_ENCRYPTION_ALGORITHMS"
+            }
+            require(supportedEncryptionMethods.isNotEmpty()) { "supportedEncryptionMethods cannot be empty" }
+            require(SUPPORTED_ENCRYPTION_METHODS.containsAll(supportedEncryptionMethods)) {
+                "only the following EncryptionMethods are supported: $SUPPORTED_ENCRYPTION_METHODS"
+            }
+            require(ephemeralEncryptionKeyCurve in SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES) {
+                "only the following Curves are supported: $SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES"
+            }
+        }
+
+        companion object {
+            val SUPPORTED_ENCRYPTION_ALGORITHMS: List<JWEAlgorithm> get() = ECDHDecrypter.SUPPORTED_ALGORITHMS.toList()
+            val SUPPORTED_ENCRYPTION_METHODS: List<EncryptionMethod> get() = ECDHDecrypter.SUPPORTED_ENCRYPTION_METHODS.toList()
+            val SUPPORTED_EPHEMERAL_ENCRYPTION_KEY_CURVES: List<Curve> get() = ECDHDecrypter.SUPPORTED_ELLIPTIC_CURVES.toList()
+        }
+    }
+}
+
+/**
  * Which of the `request_uri_method` are supported by the wallet
  */
 sealed interface SupportedRequestUriMethods {
@@ -400,12 +449,20 @@ sealed interface SupportedRequestUriMethods {
      * Options related to `request_uri_method` equal to `post`
      *
      * @param includeWalletMetadata whether to include wallet metadata or not
+     * @param jarEncryption whether to request JAR be encrypted or not
      * @param useWalletNonce whether to use wallet_nonce
      */
     data class Post(
         val includeWalletMetadata: Boolean = true,
+        val jarEncryption: EncryptionRequirement = EncryptionRequirement.NotRequired,
         val useWalletNonce: NonceOption = NonceOption.Use(),
-    ) : SupportedRequestUriMethods
+    ) : SupportedRequestUriMethods {
+        init {
+            require(EncryptionRequirement.NotRequired == jarEncryption || includeWalletMetadata) {
+                "Wallet Metadata must be included when JAR encryption is required"
+            }
+        }
+    }
 
     /**
      * Both methods are supported
@@ -425,13 +482,10 @@ sealed interface SupportedRequestUriMethods {
 
     companion object {
         /**
-         * The default option is to support both `get` and `post`
-         * and in the later case, include `wallet_metadata` and `wallet_nonce`
+         * The default option is to support both `get` and `post` and in the later case,
+         * include `wallet_metadata` and `wallet_nonce`, and NOT require JAR be encrypted
          */
-        val Default: SupportedRequestUriMethods =
-            Both(
-                post = Post(true, NonceOption.Use()),
-            )
+        val Default: SupportedRequestUriMethods = Both(post = Post())
     }
 }
 

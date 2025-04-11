@@ -15,6 +15,11 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.nimbusds.jose.JWEObject
+import com.nimbusds.jose.crypto.ECDHDecrypter
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.KeyUse
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
 import eu.europa.ec.eudi.openid4vp.*
@@ -26,6 +31,8 @@ import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -78,12 +85,21 @@ internal class RequestFetcher(
                         is NonceOption.Use -> Nonce(nonceOption.byteLength)
                         NonceOption.DoNotUse -> null
                     }
+                val ephemeralJarEncryptionKey = when (val jarEncryption = postOptions.jarEncryption) {
+                    EncryptionRequirement.NotRequired -> null
+                    is EncryptionRequirement.Required -> jarEncryption.ephemeralEncryptionKey()
+                }
                 val walletMetaData =
                     if (postOptions.includeWalletMetadata) {
-                        walletMetaData(siopOpenId4VPConfig)
+                        walletMetaData(siopOpenId4VPConfig, listOfNotNull(ephemeralJarEncryptionKey))
                     } else null
+
                 val jwt = httpClient.postForJAR(requestUri, walletNonce, walletMetaData)
-                jwt to walletNonce
+                val signedJwt = if (null != ephemeralJarEncryptionKey) {
+                    jwt.decrypt(ephemeralJarEncryptionKey).getOrThrow()
+                } else jwt
+
+                signedJwt to walletNonce
             }
         }
     }
@@ -173,3 +189,23 @@ private fun HttpRequestBuilder.addAcceptContentTypeJwt() {
     accept(ContentType.parse(APPLICATION_OAUTH_AUTHZ_REQ_JWT))
     accept(ContentType.parse(APPLICATION_JWT))
 }
+
+private const val CONTENT_TYPE_JWT = "JWT"
+
+private fun Jwt.decrypt(recipientKey: ECKey): Result<Jwt> = runCatching {
+    val jwe = JWEObject.parse(this)
+    require(CONTENT_TYPE_JWT == jwe.header.contentType) { "JWEObject must contain a JWT Payload" }
+
+    val decrypter = ECDHDecrypter(recipientKey)
+    jwe.decrypt(decrypter)
+    val payload = jwe.payload
+
+    payload.toString()
+}
+
+internal suspend fun EncryptionRequirement.Required.ephemeralEncryptionKey(): ECKey =
+    withContext(Dispatchers.IO) {
+        ECKeyGenerator(ephemeralEncryptionKeyCurve)
+            .keyUse(KeyUse.ENCRYPTION)
+            .generate()
+    }

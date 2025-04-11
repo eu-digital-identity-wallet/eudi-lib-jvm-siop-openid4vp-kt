@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.JWTClaimsSet
@@ -169,7 +170,7 @@ class Verifier private constructor(
             }
 
         private suspend fun initSiopTransaction(client: HttpClient, verifierApi: URL, nonce: String): JsonObject {
-            verifierPrintln("Placing to verifier endpoint  SIOP authentication request ...")
+            verifierPrintln("Placing to verifier endpoint SIOP authentication request ...")
             val request = buildJsonObject {
                 put("type", "id_token")
                 put("nonce", nonce)
@@ -177,6 +178,7 @@ class Verifier private constructor(
                 put("response_mode", "direct_post.jwt")
                 put("jar_mode", "by_reference")
                 put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
+                put("request_uri_method", "post")
             }
             return initTransaction(client, verifierApi, request)
         }
@@ -207,6 +209,7 @@ class Verifier private constructor(
                         addAll(transactionData.map { it.json })
                     }
                 }
+                put("request_uri_method", "post")
             }
             return initTransaction(client, verifierApi, request)
         }
@@ -225,8 +228,16 @@ class Verifier private constructor(
         private fun formatAuthorizationRequest(iniTransactionResponse: JsonObject): URI {
             fun String.encode() = URLEncoder.encode(this, "UTF-8")
             val clientId = iniTransactionResponse["client_id"]?.jsonPrimitive?.content?.encode()!!
-            val requestUri =
-                iniTransactionResponse["request_uri"]?.jsonPrimitive?.contentOrNull?.encode()?.let { "request_uri=$it" }
+            val requestUri = buildString {
+                iniTransactionResponse["request_uri"]?.jsonPrimitive?.contentOrNull?.encode()?.let { append("request_uri=$it") }
+                iniTransactionResponse["request_uri_method"]?.jsonPrimitive?.contentOrNull?.let {
+                    if (isNotBlank()) {
+                        append("&")
+                        append("request_uri_method=$it")
+                    }
+                }
+            }.takeIf { it.isNotBlank() }
+
             val request = iniTransactionResponse["request"]?.jsonPrimitive?.contentOrNull?.let { "request=$it" }
             require(request != null || requestUri != null)
             val requestPart = requestUri ?: request
@@ -529,6 +540,18 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
                 SupportedTransactionDataType(
                     TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                     setOf(HashAlgorithm.SHA_256),
+                ),
+            ),
+        ),
+        jarConfiguration = JarConfiguration(
+            supportedAlgorithms = JWSAlgorithm.Family.EC.toList() - JWSAlgorithm.ES256K,
+            supportedRequestUriMethods = SupportedRequestUriMethods.Both(
+                SupportedRequestUriMethods.Post(
+                    jarEncryption = EncryptionRequirement.Required(
+                        supportedEncryptionAlgorithms = EncryptionRequirement.Required.SUPPORTED_ENCRYPTION_ALGORITHMS,
+                        supportedEncryptionMethods = EncryptionRequirement.Required.SUPPORTED_ENCRYPTION_METHODS,
+                        ephemeralEncryptionKeyCurve = Curve.P_521,
+                    ),
                 ),
             ),
         ),

@@ -15,13 +15,15 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.nimbusds.jose.jwk.JWK
+import com.nimbusds.jose.jwk.JWKSet
+import eu.europa.ec.eudi.openid4vp.EncryptionRequirement
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
-import eu.europa.ec.eudi.openid4vp.encryptionConfig
-import eu.europa.ec.eudi.openid4vp.signingConfig
+import eu.europa.ec.eudi.openid4vp.internal.toJsonObject
 import kotlinx.serialization.json.*
 
 private const val REQUEST_OBJECT_SIGNING_ALG_VALUES_SUPPORTED = "request_object_signing_alg_values_supported"
-private const val AUTHORIZATION_SIGNING_ALG_VALUES_SUPPORTED = "authorization_signing_alg_values_supported"
+private const val JWKS = "jwks"
 private const val AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED = "authorization_encryption_alg_values_supported"
 private const val AUTHORIZATION_ENCRYPTION_ENC_VALUES_SUPPORTED = "authorization_encryption_enc_values_supported"
 
@@ -31,32 +33,29 @@ private const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 private const val RESPONSE_TYPES_SUPPOERTED = "response_types_supported"
 private const val RESPONSE_MODES_SUPPORTED = "response_modes_supported"
 
-internal fun walletMetaData(cfg: SiopOpenId4VPConfig): JsonObject =
+internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObject =
     buildJsonObject {
         //
-        // JAR related
+        // Authorization Request signature and encryption parameters
+        // Uses properties defined in JAR and JARM specs
+        // https://openid.net/specs/openid-4-verifiable-presentations-1_0-23.html#name-request-uri-method-post
         //
+
+        // Signature
         putJsonArray(REQUEST_OBJECT_SIGNING_ALG_VALUES_SUPPORTED) {
             cfg.jarConfiguration.supportedAlgorithms.forEach { alg -> add(alg.name) }
         }
 
-        //
-        // JARM related
-        // https://openid.net/specs/oauth-v2-jarm.html#section-4
-        //
-        cfg.jarmConfiguration.encryptionConfig()?.let { encryptionConfig ->
-            putJsonArray(AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED) {
-                encryptionConfig.supportedAlgorithms.forEach { alg -> add(alg.name) }
-            }
-            putJsonArray(AUTHORIZATION_ENCRYPTION_ENC_VALUES_SUPPORTED) {
-                encryptionConfig.supportedMethods.forEach { method -> add(method.name) }
-            }
-        }
-        cfg.jarmConfiguration.signingConfig()?.let { signingConfig ->
-            val algs = signingConfig.signer.supportedJWSAlgorithms().orEmpty()
-            if (algs.isNotEmpty()) {
-                putJsonArray(AUTHORIZATION_SIGNING_ALG_VALUES_SUPPORTED) {
-                    algs.forEach { alg -> add(alg.name) }
+        // Encryption
+        cfg.jarConfiguration.supportedRequestUriMethods.isPostSupported()?.let { requestUriMethodPost ->
+            val jarEncryption = requestUriMethodPost.jarEncryption
+            if (jarEncryption is EncryptionRequirement.Required && keys.isNotEmpty()) {
+                put(JWKS, JWKSet(keys).toJSONObject(true).toJsonObject())
+                putJsonArray(AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED) {
+                    jarEncryption.supportedEncryptionAlgorithms.forEach { alg -> add(alg.name) }
+                }
+                putJsonArray(AUTHORIZATION_ENCRYPTION_ENC_VALUES_SUPPORTED) {
+                    jarEncryption.supportedEncryptionMethods.forEach { method -> add(method.name) }
                 }
             }
         }

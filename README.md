@@ -24,7 +24,7 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 
 This is a Kotlin library, targeting JVM, that supports 
 the [SIOPv2 (draft 13)](https://openid.github.io/SIOPv2/openid-connect-self-issued-v2-wg-draft.html) 
-and [OpenId4VP (draft 23)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) protocols.
+and [OpenId4VP (draft 24)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html) protocols.
 In particular, the library focus on the wallet's role using those two protocols with constraints
 included in ISO 23220-4 and ISO-18013-7
 
@@ -71,8 +71,8 @@ val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)
 Wallet receives an OAUTH2 Authorization request, formed by the Verifier, that may represent
 
 - a [SIOPv2 authentication request](https://openid.github.io/SIOPv2/openid-connect-self-issued-v2-wg-draft.html#name-self-issued-openid-provider-a), or
-- a [OpenID4VP authorization request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request) or,
-- a combined [SIOP & OpenID4VP request](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-combining-this-specificatio)
+- a [OpenID4VP authorization request](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-authorization-request) or,
+- a combined [SIOP & OpenID4VP request](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-combining-this-specificatio)
 
 In the same device scenario, the aforementioned authorization request reaches the wallet in terms of a deep link.
 Similarly, in the cross-device scenario, the request would be obtained via scanning a QR Code.
@@ -231,7 +231,7 @@ Library requires the presence of a `client_id` using one of the following scheme
 According to OpenID4VP, when the `request_uri` parameter is included in the authorization request wallet must fetch the Authorization Request by following this URI.
 In this case there are two methods to get the request, controlled by the `request_uri_method` communicated by the verifier:
 - Via an HTTP GET: In this case the Wallet MUST send the request to retrieve the Request Object using the HTTP GET method, as defined in [RFC9101](https://www.rfc-editor.org/rfc/rfc9101.html).
-- Via an HTTP POST: In this case a supporting Wallet MUST send the request using the HTTP POST method as detailed in [Section 5.11](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request-uri-method-post).
+- Via an HTTP POST: In this case a supporting Wallet MUST send the request using the HTTP POST method as detailed in [Section 5.11](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-request-uri-method-post).
 
 In the later case, based on the configured [SupportedRequestUriMethods](src/main/kotlin/eu/europa/ec/eudi/openid4vp/Config.kt), Wallet can communicate to the Verifier:
 - A Nonce value to be included in the JWT-Secured Authorization Request (via `wallet_nonce` parameter)
@@ -260,7 +260,7 @@ by reference (using `request_uri`)
 As per OpenId4VP, the Verifier can describe the requirements of the Verifiable Credential(s) to be presented using:
 
 * [Presentation Exchange 2.0.0](https://identity.foundation/presentation-exchange/spec/v2.0.0/)
-* [Digital Credentials Query Language (DCQL)](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-digital-credentials-query-l)
+* [Digital Credentials Query Language (DCQL)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-digital-credentials-query-l)
 
 **Presentation Exchange 2.0.0**:
 
@@ -269,21 +269,21 @@ The Verifier articulated requirements of the Verifiable Credential(s) that are r
 
 According to OpenId4VP, verifier may pass the `presentation_definition` either
 
-* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.4)
-* [by reference](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.5)
-* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.6)
+* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.4)
+* [by reference](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.5)
+* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.6)
 
 Library supports all these options
 
 **DCQL**:
 
 The Verifier articulated requirements of the Verifiable Credential(s) that are requested, are provided using
-the `dcql_query` parameter that contains a [DCQL Query](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6-2) JSON object.
+the `dcql_query` parameter that contains a [DCQL Query](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-6-2) JSON object.
 
 According to OpenId4VP, verifier may pass the `dcql_query` either
 
-* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.1-2.6)
-* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-5.6)
+* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.1-2.6)
+* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.6)
 
 Library supports all these options
 
@@ -295,7 +295,7 @@ Library supports all these options
 
 ### Client metadata in Authorization Request
 
-According to [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-authorization-request) verifier may pass his metadata (client metadata) by value. 
+According to [OpenId4VP](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-authorization-request) verifier may pass his metadata (client metadata) by value. 
 Library parses and validates the verifier metadata. 
 
 ### Supported response types

@@ -148,7 +148,7 @@ typealias OriginalClientId = String
 /**
  * The Client Id of a Verifier as defined by OpenId4Vp.
  *
- * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-scheme-an">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-scheme-an</a>
+ * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-client-identifier-scheme-an">https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-client-identifier-scheme-an</a>
  */
 data class VerifierId(
     val scheme: ClientIdScheme,

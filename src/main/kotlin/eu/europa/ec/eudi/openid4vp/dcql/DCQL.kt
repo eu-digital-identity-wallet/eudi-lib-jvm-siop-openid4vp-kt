@@ -101,7 +101,7 @@ data class CredentialQuery(
      *
      * @see [CredentialQuery.metaMsoMdoc]
      * @see [CredentialQuery.metaSdJwtVc]
-     * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1-3.6">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1-3.6</a>
+     * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-6.1-3.6">https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-6.1-3.6</a>
      */
     @SerialName(OpenId4VPSpec.DCQL_META) val meta: JsonObject? = null,
 

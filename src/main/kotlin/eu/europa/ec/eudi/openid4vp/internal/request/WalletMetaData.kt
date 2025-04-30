@@ -38,7 +38,7 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         // Authorization Request signature and encryption parameters
         // Uses properties defined in JAR and JARM specs
-        // https://openid.net/specs/openid-4-verifiable-presentations-1_0-23.html#name-request-uri-method-post
+        // https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-request-uri-method-post
         //
 
         // Signature

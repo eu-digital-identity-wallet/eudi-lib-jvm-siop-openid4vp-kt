@@ -19,6 +19,7 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
+import io.ktor.client.request.request
 import kotlinx.coroutines.coroutineScope
 
 internal class RequestObjectResolver(
@@ -54,6 +55,7 @@ internal class RequestObjectResolver(
             scope = request.scope,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
+            verifierAttestations = request.verifierAttestations,
         )
     }
 
@@ -73,6 +75,7 @@ internal class RequestObjectResolver(
             vpFormats = vpFormatsCommonGround,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
+            verifierAttestations = authorization.verifierAttestations,
         )
     }
 

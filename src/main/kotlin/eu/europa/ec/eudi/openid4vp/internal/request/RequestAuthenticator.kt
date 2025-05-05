@@ -42,7 +42,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import java.net.URI
 import java.security.PublicKey
@@ -338,6 +340,10 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
         val jsonStr = Gson().toJson(this)
         return Json.parseToJsonElement(jsonStr).jsonObject
     }
+    fun List<Any>.asJsonArray(): JsonArray {
+        val jsonStr = Gson().toJson(this)
+        return Json.parseToJsonElement(jsonStr).jsonArray
+    }
 
     return with(jwtClaimsSet) {
         UnvalidatedRequestObject(
@@ -356,6 +362,7 @@ private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
             supportedAlgorithm = getStringClaim("supported_algorithm"),
             idTokenType = getStringClaim("id_token_type"),
             transactionData = getStringListClaim(OpenId4VPSpec.TRANSACTION_DATA),
+            verifierAttestations = getListClaim("verifier_attestations")?.asJsonArray(),
         )
     }
 }

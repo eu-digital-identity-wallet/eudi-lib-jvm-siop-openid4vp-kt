@@ -195,6 +195,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     presentationQuery = PresentationQuery.ByPresentationDefinition(presentationDefinition),
                     transactionData = null,
+                    verifierAttestations = null
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(

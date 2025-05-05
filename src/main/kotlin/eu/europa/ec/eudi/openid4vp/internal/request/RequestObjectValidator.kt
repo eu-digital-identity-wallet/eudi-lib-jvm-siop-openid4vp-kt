@@ -102,6 +102,7 @@ internal sealed interface ValidatedRequestObject {
         override val responseMode: ResponseMode,
         override val state: String?,
         val transactionData: List<String>?,
+        val verifierAttestations: List<VerifierQueryAttestation>?,
     ) : ValidatedRequestObject
 
     /**
@@ -117,6 +118,7 @@ internal sealed interface ValidatedRequestObject {
         override val responseMode: ResponseMode,
         override val state: String?,
         val transactionData: List<String>?,
+        val verifierAttestations: List<VerifierQueryAttestation>?,
     ) : ValidatedRequestObject
 }
 
@@ -142,6 +144,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
 
     fun idAndVpToken(): SiopOpenId4VPAuthentication {
         val querySource = parseQuerySource(requestObject, nonOpenIdScope)
+        val verifierAttestations = optionalVerifierAttestations(querySource, requestObject)
         return SiopOpenId4VPAuthentication(
             idTokenType,
             querySource,
@@ -152,6 +155,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
             responseMode,
             state,
             transactionData,
+            verifierAttestations,
         )
     }
 
@@ -167,6 +171,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
 
     fun vpToken(): OpenId4VPAuthorization {
         val querySource = parseQuerySource(requestObject, nonOpenIdScope)
+        val verifierAttestations = optionalVerifierAttestations(querySource, requestObject)
         return OpenId4VPAuthorization(
             querySource,
             clientMetaData,
@@ -175,6 +180,7 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
             responseMode,
             state,
             transactionData,
+            verifierAttestations,
         )
     }
 
@@ -367,6 +373,13 @@ private fun parseQuerySource(
         hasScope -> requiredScope()
         else -> throw MissingQuerySource.asException()
     }
+}
+
+private fun optionalVerifierAttestations(
+    querySource: QuerySource,
+    requestObject: UnvalidatedRequestObject,
+): List<VerifierQueryAttestation>? {
+    TODO("Not yet implemented")
 }
 
 private fun optionalClientMetaData(

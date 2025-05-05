@@ -16,14 +16,15 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.OpenId4VPAuthorization
-import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.SiopOpenId4VPAuthentication
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.x500.X500Name
@@ -201,6 +202,13 @@ data class TransactionData private constructor(val value: String) : Serializable
     }
 }
 
+@kotlinx.serialization.Serializable
+data class VerifierQueryAttestation(
+    @SerialName("format") @Required val format: String,
+    @SerialName("data") @Required val data: JsonElement,
+    @SerialName("credential_ids") val queryIds: List<QueryId>?,
+) : Serializable
+
 /**
  * Represents an OAUTH2 authorization request. In particular
  * either a [SIOPv2 for id_token][SiopOpenId4VPAuthentication] or
@@ -250,6 +258,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val vpFormats: VpFormats?,
         val presentationQuery: PresentationQuery,
         val transactionData: List<TransactionData>?,
+        val verifierAttestations: List<VerifierQueryAttestation>?,
     ) : ResolvedRequestObject
 
     /**
@@ -271,6 +280,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val scope: Scope,
         val presentationQuery: PresentationQuery,
         val transactionData: List<TransactionData>?,
+        val verifierAttestations: List<VerifierQueryAttestation>?,
     ) : ResolvedRequestObject
 }
 

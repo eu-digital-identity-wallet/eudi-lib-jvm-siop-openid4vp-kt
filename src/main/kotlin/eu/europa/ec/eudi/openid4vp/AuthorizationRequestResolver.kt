@@ -203,11 +203,22 @@ data class TransactionData private constructor(val value: String) : Serializable
 }
 
 @kotlinx.serialization.Serializable
-data class VerifierQueryAttestation(
-    @SerialName("format") @Required val format: String,
-    @SerialName("data") @Required val data: JsonElement,
-    @SerialName("credential_ids") val queryIds: List<QueryId>?,
-) : Serializable
+@JvmInline
+value class VerifierAttestations(val value: List<Attestation>) : Serializable {
+
+    init {
+        require(value.isNotEmpty()) { "Verifier attestations must not be empty" }
+    }
+
+    override fun toString(): String = value.toString()
+
+    @kotlinx.serialization.Serializable
+    data class Attestation(
+        @SerialName("format") @Required val format: String,
+        @SerialName("data") @Required val data: JsonElement,
+        @SerialName("credential_ids") val queryIds: List<QueryId>?,
+    ) : Serializable
+}
 
 /**
  * Represents an OAUTH2 authorization request. In particular
@@ -258,7 +269,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val vpFormats: VpFormats?,
         val presentationQuery: PresentationQuery,
         val transactionData: List<TransactionData>?,
-        val verifierAttestations: List<VerifierQueryAttestation>?,
+        val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
 
     /**
@@ -280,7 +291,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val scope: Scope,
         val presentationQuery: PresentationQuery,
         val transactionData: List<TransactionData>?,
-        val verifierAttestations: List<VerifierQueryAttestation>?,
+        val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
 }
 
@@ -440,6 +451,8 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class InvalidIdTokenType(val value: String) : RequestValidationError
 
     data class DIDResolutionFailed(val didUrl: String) : RequestValidationError
+
+    data class InvalidVerifierAttestations(val reason: String) : RequestValidationError
 }
 
 /**

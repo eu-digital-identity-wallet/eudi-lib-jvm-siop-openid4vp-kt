@@ -18,12 +18,10 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
-import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.decodeFromJsonElement
 
 internal class RequestObjectResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
@@ -31,7 +29,10 @@ internal class RequestObjectResolver(
 ) {
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
 
-    suspend fun resolveRequestObject(validated: ValidatedRequestObject, clientMetaData: ValidatedClientMetaData?): ResolvedRequestObject {
+    suspend fun resolveRequestObject(
+        validated: ValidatedRequestObject,
+        clientMetaData: ValidatedClientMetaData?,
+    ): ResolvedRequestObject {
         return when (validated) {
             is SiopAuthentication -> resolveIdTokenRequest(validated, clientMetaData)
             is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, clientMetaData)
@@ -147,10 +148,17 @@ internal class RequestObjectResolver(
         throw ResolutionError.UnknownScope(scope).asException()
     }
 
-    private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<TransactionData> =
+    private fun resolveTransactionData(
+        query: PresentationQuery,
+        unresolvedTransactionData: List<String>,
+    ): List<TransactionData> =
         runCatching {
             unresolvedTransactionData.map { unresolved ->
-                TransactionData(unresolved, siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes, query).getOrThrow()
+                TransactionData(
+                    unresolved,
+                    siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes,
+                    query,
+                ).getOrThrow()
             }
         }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
 
@@ -158,23 +166,24 @@ internal class RequestObjectResolver(
         query: PresentationQuery,
         verifierAttestationsArray: JsonArray,
     ): VerifierAttestations {
+        fun invalid(s: String) = RequestValidationError.InvalidVerifierAttestations(s).asException()
         val attestations =
-            runCatching { jsonSupport.decodeFromJsonElement<VerifierAttestations>(verifierAttestationsArray) }
-                .getOrElse { t ->
-                    throw RequestValidationError.InvalidVerifierAttestations(
-                        "Failed to deserialize verifier_attestations. Cause: ${t.message}",
-                    ).asException()
-                }
+            VerifierAttestations.fromJson(verifierAttestationsArray).getOrElse { t ->
+                throw invalid("Failed to deserialize verifier_attestations. Cause: ${t.message}")
+            }
         when (query) {
             is PresentationQuery.ByPresentationDefinition -> {
                 fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
                     queryIds.isNullOrEmpty()
 
                 ensure(attestations.value.all { a -> a.validQueryIds() }) {
-                    val error = "There are verifier attestations credential_id should be empty for presentation_definition queries."
-                    RequestValidationError.InvalidVerifierAttestations(error).asException()
+                    val error =
+                        "There are verifier attestations credential_id should be empty for presentation_definition queries."
+
+                    invalid(error)
                 }
             }
+
             is PresentationQuery.ByDigitalCredentialsQuery -> {
                 val allQueryIds = query.value.credentials.map { it.id }
                 fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
@@ -184,7 +193,7 @@ internal class RequestObjectResolver(
                     }
                 ensure(attestations.value.all { a -> a.validQueryIds() }) {
                     val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
-                    RequestValidationError.InvalidVerifierAttestations(error).asException()
+                    invalid(error)
                 }
             }
         }

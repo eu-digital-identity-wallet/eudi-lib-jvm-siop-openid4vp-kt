@@ -216,8 +216,14 @@ value class VerifierAttestations(val value: List<Attestation>) : Serializable {
     data class Attestation(
         @SerialName("format") @Required val format: String,
         @SerialName("data") @Required val data: JsonElement,
-        @SerialName("credential_ids") val queryIds: List<QueryId>?,
+        @SerialName("credential_ids") val queryIds: List<QueryId>? = null,
     ) : Serializable
+
+    companion object {
+        fun fromJson(json: JsonArray): Result<VerifierAttestations> = runCatching {
+            jsonSupport.decodeFromJsonElement<List<Attestation>>(json).let(::VerifierAttestations)
+        }
+    }
 }
 
 /**

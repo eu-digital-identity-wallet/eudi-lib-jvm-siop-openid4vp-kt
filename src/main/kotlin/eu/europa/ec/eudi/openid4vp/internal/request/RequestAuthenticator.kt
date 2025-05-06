@@ -335,7 +335,7 @@ private fun invalidScheme(cause: String): AuthorizationRequestException =
 private fun invalidJarJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()
 
-private fun SignedJWT.requestObject(): UnvalidatedRequestObject {
+internal fun SignedJWT.requestObject(): UnvalidatedRequestObject {
     fun Map<String, Any?>.asJsonObject(): JsonObject {
         val jsonStr = Gson().toJson(this)
         return Json.parseToJsonElement(jsonStr).jsonObject

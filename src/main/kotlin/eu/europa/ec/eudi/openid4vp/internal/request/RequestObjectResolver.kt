@@ -16,11 +16,14 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
-import io.ktor.client.request.request
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.decodeFromJsonElement
 
 internal class RequestObjectResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
@@ -43,6 +46,11 @@ internal class RequestObjectResolver(
         val presentationQuery = query(request.querySource)
         val transactionData = request.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
+        val verifierAttestations =
+            request.verifierAttestations
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { array -> verifierAttestations(presentationQuery, array) }
+
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
             client = request.client.toClient(),
             responseMode = request.responseMode,
@@ -55,7 +63,7 @@ internal class RequestObjectResolver(
             scope = request.scope,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
-            verifierAttestations = request.verifierAttestations,
+            verifierAttestations = verifierAttestations,
         )
     }
 
@@ -66,6 +74,11 @@ internal class RequestObjectResolver(
         val presentationQuery = query(authorization.querySource)
         val transactionData = authorization.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
+        val verifierAttestations =
+            authorization.verifierAttestations
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { array -> verifierAttestations(presentationQuery, array) }
+
         return ResolvedRequestObject.OpenId4VPAuthorization(
             client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
@@ -75,7 +88,7 @@ internal class RequestObjectResolver(
             vpFormats = vpFormatsCommonGround,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
-            verifierAttestations = authorization.verifierAttestations,
+            verifierAttestations = verifierAttestations,
         )
     }
 
@@ -140,6 +153,43 @@ internal class RequestObjectResolver(
                 TransactionData(unresolved, siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes, query).getOrThrow()
             }
         }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
+
+    private fun verifierAttestations(
+        query: PresentationQuery,
+        verifierAttestationsArray: JsonArray,
+    ): VerifierAttestations {
+        val attestations =
+            runCatching { jsonSupport.decodeFromJsonElement<VerifierAttestations>(verifierAttestationsArray) }
+                .getOrElse { t ->
+                    throw RequestValidationError.InvalidVerifierAttestations(
+                        "Failed to deserialize verifier_attestations. Cause: ${t.message}",
+                    ).asException()
+                }
+        when (query) {
+            is PresentationQuery.ByPresentationDefinition -> {
+                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
+                    queryIds.isNullOrEmpty()
+
+                ensure(attestations.value.all { a -> a.validQueryIds() }) {
+                    val error = "There are verifier attestations credential_id should be empty for presentation_definition queries."
+                    RequestValidationError.InvalidVerifierAttestations(error).asException()
+                }
+            }
+            is PresentationQuery.ByDigitalCredentialsQuery -> {
+                val allQueryIds = query.value.credentials.map { it.id }
+                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
+                    if (queryIds.isNullOrEmpty()) true
+                    else {
+                        queryIds.all { it in allQueryIds }
+                    }
+                ensure(attestations.value.all { a -> a.validQueryIds() }) {
+                    val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
+                    RequestValidationError.InvalidVerifierAttestations(error).asException()
+                }
+            }
+        }
+        return attestations
+    }
 }
 
 private fun AuthenticatedClient.toClient(): Client =

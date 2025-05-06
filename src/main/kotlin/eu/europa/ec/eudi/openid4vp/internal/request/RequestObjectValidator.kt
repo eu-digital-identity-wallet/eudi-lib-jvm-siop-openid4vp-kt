@@ -24,6 +24,7 @@ import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.MalformedURLException
 import java.net.URI
@@ -102,7 +103,7 @@ internal sealed interface ValidatedRequestObject {
         override val responseMode: ResponseMode,
         override val state: String?,
         val transactionData: List<String>?,
-        val verifierAttestations: List<VerifierQueryAttestation>?,
+        val verifierAttestations: JsonArray?,
     ) : ValidatedRequestObject
 
     /**
@@ -118,7 +119,7 @@ internal sealed interface ValidatedRequestObject {
         override val responseMode: ResponseMode,
         override val state: String?,
         val transactionData: List<String>?,
-        val verifierAttestations: List<VerifierQueryAttestation>?,
+        val verifierAttestations: JsonArray?,
     ) : ValidatedRequestObject
 }
 
@@ -141,10 +142,11 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
     val clientMetaData = optionalClientMetaData(responseMode, requestObject)
     val idTokenType = optionalIdTokenType(requestObject)
     val transactionData = requestObject.transactionData
+    val verifierAttestations = requestObject.verifierAttestations
 
     fun idAndVpToken(): SiopOpenId4VPAuthentication {
         val querySource = parseQuerySource(requestObject, nonOpenIdScope)
-        val verifierAttestations = optionalVerifierAttestations(querySource, requestObject)
+
         return SiopOpenId4VPAuthentication(
             idTokenType,
             querySource,
@@ -171,7 +173,6 @@ internal fun validateRequestObject(request: AuthenticatedRequest): ValidatedRequ
 
     fun vpToken(): OpenId4VPAuthorization {
         val querySource = parseQuerySource(requestObject, nonOpenIdScope)
-        val verifierAttestations = optionalVerifierAttestations(querySource, requestObject)
         return OpenId4VPAuthorization(
             querySource,
             clientMetaData,
@@ -373,13 +374,6 @@ private fun parseQuerySource(
         hasScope -> requiredScope()
         else -> throw MissingQuerySource.asException()
     }
-}
-
-private fun optionalVerifierAttestations(
-    querySource: QuerySource,
-    requestObject: UnvalidatedRequestObject,
-): List<VerifierQueryAttestation>? {
-    TODO("Not yet implemented")
 }
 
 private fun optionalClientMetaData(

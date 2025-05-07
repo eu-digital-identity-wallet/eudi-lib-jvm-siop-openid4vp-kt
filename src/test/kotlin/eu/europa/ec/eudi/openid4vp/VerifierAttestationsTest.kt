@@ -16,7 +16,18 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vp.dcql.ClaimPath
+import eu.europa.ec.eudi.openid4vp.dcql.CredentialSets
+import eu.europa.ec.eudi.openid4vp.dcql.Credentials
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.requestObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Required
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
@@ -27,14 +38,124 @@ class VerifierAttestationsTest {
     """.trimIndent()
 
     @Test
-    fun testParsing() {
-        val reqObject = SignedJWT.parse(jar).requestObject()
-        val array = assertNotNull(reqObject.verifierAttestations)
-        val attestations = VerifierAttestations.fromJson(array).getOrThrow()
-        attestations.value.forEach {
-            if (it.format == "jwt") {
-                SignedJWT.parse(it.data.jsonPrimitive.content).jwtClaimsSet.also { println(it) }
+    fun testParsing() = runTest {
+        val unvalidatedRequestObject = SignedJWT.parse(jar).requestObject().also { println(it) }
+        val attestations = run {
+            val verifierAttestationsArray = assertNotNull(unvalidatedRequestObject.verifierAttestations)
+            VerifierAttestations.fromJson(verifierAttestationsArray).getOrThrow()
+        }
+        val funkeAttestations = FunkeVerifierAttestations.parse(attestations).getOrThrow()
+    }
+}
+
+object FunkeVerifierAttestations {
+
+    suspend fun parse(attestations: VerifierAttestations): Result<List<VerifierAttestationPayload>> =
+        coroutineScope {
+            runCatching {
+                attestations.value
+                    .filter { attestations -> attestations.format == "jwt" }
+                    .map { attestation ->
+                        val jwt = attestation.data.jsonPrimitive.content
+                        jwtAttestation(jwt).getOrThrow()
+                    }
             }
         }
-    }
+
+    suspend fun jwtAttestation(jwt: String): Result<VerifierAttestationPayload> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val signedJWT = SignedJWT.parse(jwt)
+                jsonSupport.decodeFromString<VerifierAttestationPayload>(signedJWT.jwtClaimsSet.toString())
+            }
+        }
+
+    @Serializable
+    data class VerifierAttestationPayload(
+        val sub: String,
+        val jti: String,
+        val status: StatusWrapper,
+        @SerialName("privacy_policy") val privacyPolicy: String,
+        @SerialName("purpose") val purpose: List<LocalizedText>,
+        @SerialName("contact") val contact: ContactInfo,
+        @SerialName(OpenId4VPSpec.DCQL_CREDENTIALS) @Required val credentials: Credentials,
+        @SerialName(OpenId4VPSpec.DCQL_CREDENTIAL_SETS) val credentialSets: CredentialSets? = null,
+        @SerialName("public_body") val publicBody: Boolean,
+        @SerialName("entitlements") val entitlements: List<String>,
+        @SerialName("services") val services: List<String>,
+    )
+
+    @Serializable
+    data class LocalizedText(
+        val locale: String,
+        val name: String,
+    )
+
+    @Serializable
+    data class ContactInfo(
+        @SerialName("website") val website: String,
+        @SerialName("e-mail") val email: String, // TODO rename attribute
+        @SerialName("phone") val phone: String,
+    )
+
+    @Serializable
+    data class StatusWrapper(
+        @SerialName("status_list") val statusList: StatusList,
+    )
+
+    @Serializable
+    data class StatusList(
+        val idx: Int,
+        val uri: String,
+    )
+
+    @Serializable
+    data class RelyingPartyInfo(
+        val id: String,
+        val name: String,
+        val EORI: String? = null,
+        val NTR: String? = null,
+        val LEI: String? = null,
+        val VAT: String? = null,
+        val EX: String? = null,
+        val TAX: String? = null,
+        val EUID: String? = null,
+        val distinguishedName: String? = null,
+        val user: String? = null,
+    )
+
+    @Serializable
+    data class AttestationMetadata(
+        val id: String,
+        val jwt: String,
+        val intendedUse: IntendedUse,
+        val revoked: Boolean? = null,
+    )
+
+    @Serializable
+    data class IntendedUse(
+        val purpose: List<LocalizedText>,
+        val credentials: List<Credential>,
+        val credentialSet: List<CredentialSet>,
+    )
+
+    @Serializable
+    data class Credential(
+        val id: String,
+        val format: String,
+        val meta: CredentialMeta,
+        val claims: List<ClaimPath>,
+    )
+
+    @Serializable
+    data class CredentialMeta(
+        val vct_values: List<String>,
+    )
+
+    @Serializable
+    data class CredentialSet(
+        val options: List<List<String>>,
+        val required: Boolean,
+        val purpose: List<LocalizedText>,
+    )
 }

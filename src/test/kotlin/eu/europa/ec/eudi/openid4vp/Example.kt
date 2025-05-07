@@ -502,7 +502,10 @@ private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
 private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
     engine {
         config {
-            sslSocketFactory(SslSettings.sslContext().socketFactory, SslSettings.trustManager())
+            sslSocketFactory(
+                sslSocketFactory = SslSettings.sslContext().socketFactory,
+                trustManager = SslSettings.trustManager(),
+            )
             hostnameVerifier(SslSettings.hostNameVerifier())
         }
     }

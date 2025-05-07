@@ -32,6 +32,7 @@ uri-kmp = { module = "com.eygraber:uri-kmp", version.ref = "uri-kmp" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 bouncy-castle = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncyCastle" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref="ktor"}
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

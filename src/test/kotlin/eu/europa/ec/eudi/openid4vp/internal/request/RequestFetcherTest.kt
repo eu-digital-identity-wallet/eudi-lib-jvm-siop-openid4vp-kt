@@ -129,7 +129,7 @@ internal class RequestFetcherTest {
                     headers = headersOf(HttpHeaders.ContentType to listOf("application/oauth-authz-req+jwt")),
                 )
             }
-        val client = LoggingHttpClientFactory.createLoggingHttpClient(httpEngine = engine)//HttpClient(engine = engine)
+        val client = LoggingHttpClientFactory.createLoggingHttpClient(httpEngine = engine) // HttpClient(engine = engine)
 
         val fetcher = RequestFetcher(client, config)
         val request = UnvalidatedRequest.JwtSecured.PassByReference(

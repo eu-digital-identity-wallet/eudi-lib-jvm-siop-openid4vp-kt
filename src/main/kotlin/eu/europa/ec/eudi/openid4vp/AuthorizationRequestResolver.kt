@@ -212,6 +212,11 @@ value class VerifierAttestations(val value: List<Attestation>) : Serializable {
 
     override fun toString(): String = value.toString()
 
+    fun filterOrNull(predicate: (Attestation) -> Boolean): VerifierAttestations? {
+        val matches = value.filter(predicate)
+        return matches.takeIf { it.isNotEmpty() }?.let { VerifierAttestations(it) }
+    }
+
     @kotlinx.serialization.Serializable
     data class Attestation(
         @SerialName("format") @Required val format: String,

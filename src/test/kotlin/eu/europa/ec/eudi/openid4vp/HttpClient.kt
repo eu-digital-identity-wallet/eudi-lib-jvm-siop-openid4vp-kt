@@ -19,9 +19,9 @@ import io.ktor.client.*
 import io.ktor.client.engine.*
 import io.ktor.client.plugins.logging.*
 
-fun HttpClient(
-    enableLogging: Boolean = false,
+fun createHttpClient(
     httpEngine: HttpClientEngine,
+    enableLogging: Boolean = false,
 ): HttpClient =
     HttpClient(httpEngine) {
         if (enableLogging) {

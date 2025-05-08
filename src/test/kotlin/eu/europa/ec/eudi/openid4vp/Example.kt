@@ -31,11 +31,8 @@ import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.prex.*
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -44,14 +41,9 @@ import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
 import java.security.MessageDigest
-import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.time.Clock
 import java.util.*
-import javax.net.ssl.HostnameVerifier
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL as DCQLQuery
 
 /**
@@ -497,42 +489,6 @@ private class Wallet(
 private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
     println("Warning!! Trusting any certificate. Do not use in production")
     true
-}
-
-private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
-    engine {
-        config {
-            sslSocketFactory(
-                sslSocketFactory = SslSettings.sslContext().socketFactory,
-                trustManager = SslSettings.trustManager(),
-            )
-            hostnameVerifier(SslSettings.hostNameVerifier())
-        }
-    }
-    install(ContentNegotiation) { json() }
-
-    expectSuccess = true
-}
-
-object SslSettings {
-
-    fun sslContext(): SSLContext {
-        val sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(null, arrayOf(trustManager()), SecureRandom())
-        return sslContext
-    }
-
-    fun hostNameVerifier(): HostnameVerifier = TrustAllHosts
-    fun trustManager(): X509TrustManager = TrustAllCerts as X509TrustManager
-
-    private var TrustAllCerts: TrustManager = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> {
-            return arrayOf()
-        }
-    }
-    private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
 }
 
 private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =

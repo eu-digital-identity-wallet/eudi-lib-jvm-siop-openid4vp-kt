@@ -16,10 +16,12 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.request.ValidatedRequestObject.*
 import io.ktor.client.*
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.JsonArray
 
 internal class RequestObjectResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
@@ -27,7 +29,10 @@ internal class RequestObjectResolver(
 ) {
     private val presentationDefinitionResolver = PresentationDefinitionResolver(siopOpenId4VPConfig, httpClient)
 
-    suspend fun resolveRequestObject(validated: ValidatedRequestObject, clientMetaData: ValidatedClientMetaData?): ResolvedRequestObject {
+    suspend fun resolveRequestObject(
+        validated: ValidatedRequestObject,
+        clientMetaData: ValidatedClientMetaData?,
+    ): ResolvedRequestObject {
         return when (validated) {
             is SiopAuthentication -> resolveIdTokenRequest(validated, clientMetaData)
             is OpenId4VPAuthorization -> resolveVpTokenRequest(validated, clientMetaData)
@@ -42,6 +47,11 @@ internal class RequestObjectResolver(
         val presentationQuery = query(request.querySource)
         val transactionData = request.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
+        val verifierAttestations =
+            request.verifierAttestations
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { array -> verifierAttestations(presentationQuery, array) }
+
         ResolvedRequestObject.SiopOpenId4VPAuthentication(
             client = request.client.toClient(),
             responseMode = request.responseMode,
@@ -54,6 +64,7 @@ internal class RequestObjectResolver(
             scope = request.scope,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
+            verifierAttestations = verifierAttestations,
         )
     }
 
@@ -64,6 +75,11 @@ internal class RequestObjectResolver(
         val presentationQuery = query(authorization.querySource)
         val transactionData = authorization.transactionData?.let { resolveTransactionData(presentationQuery, it) }
         val vpFormatsCommonGround = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) }
+        val verifierAttestations =
+            authorization.verifierAttestations
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { array -> verifierAttestations(presentationQuery, array) }
+
         return ResolvedRequestObject.OpenId4VPAuthorization(
             client = authorization.client.toClient(),
             responseMode = authorization.responseMode,
@@ -73,6 +89,7 @@ internal class RequestObjectResolver(
             vpFormats = vpFormatsCommonGround,
             presentationQuery = presentationQuery,
             transactionData = transactionData,
+            verifierAttestations = verifierAttestations,
         )
     }
 
@@ -131,12 +148,57 @@ internal class RequestObjectResolver(
         throw ResolutionError.UnknownScope(scope).asException()
     }
 
-    private fun resolveTransactionData(query: PresentationQuery, unresolvedTransactionData: List<String>): List<TransactionData> =
+    private fun resolveTransactionData(
+        query: PresentationQuery,
+        unresolvedTransactionData: List<String>,
+    ): List<TransactionData> =
         runCatching {
             unresolvedTransactionData.map { unresolved ->
-                TransactionData(unresolved, siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes, query).getOrThrow()
+                TransactionData(
+                    unresolved,
+                    siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes,
+                    query,
+                ).getOrThrow()
             }
         }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
+
+    private fun verifierAttestations(
+        query: PresentationQuery,
+        verifierAttestationsArray: JsonArray,
+    ): VerifierAttestations {
+        fun invalid(s: String) = RequestValidationError.InvalidVerifierAttestations(s).asException()
+        val attestations =
+            VerifierAttestations.fromJson(verifierAttestationsArray).getOrElse { t ->
+                throw invalid("Failed to deserialize verifier_attestations. Cause: ${t.message}")
+            }
+        when (query) {
+            is PresentationQuery.ByPresentationDefinition -> {
+                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
+                    queryIds.isNullOrEmpty()
+
+                ensure(attestations.value.all { a -> a.validQueryIds() }) {
+                    val error =
+                        "There are verifier attestations credential_id should be empty for presentation_definition queries."
+
+                    invalid(error)
+                }
+            }
+
+            is PresentationQuery.ByDigitalCredentialsQuery -> {
+                val allQueryIds = query.value.credentials.map { it.id }
+                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
+                    if (queryIds.isNullOrEmpty()) true
+                    else {
+                        queryIds.all { it in allQueryIds }
+                    }
+                ensure(attestations.value.all { a -> a.validQueryIds() }) {
+                    val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
+                    invalid(error)
+                }
+            }
+        }
+        return attestations
+    }
 }
 
 private fun AuthenticatedClient.toClient(): Client =

@@ -52,6 +52,7 @@ internal data class UnvalidatedRequestObject(
     @SerialName("state") val state: String? = null,
     @SerialName("id_token_type") val idTokenType: String? = null,
     @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: List<String>? = null,
+    @SerialName("verifier_attestations") val verifierAttestations: JsonArray? = null,
 )
 
 enum class RequestUriMethod {
@@ -157,6 +158,7 @@ internal sealed interface UnvalidatedRequest {
                     redirectUri = uri.getQueryParameter("redirect_uri"),
                     state = uri.getQueryParameter("state"),
                     transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.map { it.jsonPrimitive.content },
+                    verifierAttestations = jsonArray("verifier_attestations"),
                 ),
             )
         }

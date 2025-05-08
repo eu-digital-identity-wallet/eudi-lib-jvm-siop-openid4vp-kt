@@ -19,16 +19,15 @@ import io.ktor.client.*
 import io.ktor.client.engine.*
 import io.ktor.client.plugins.logging.*
 
-object LoggingHttpClientFactory {
-    fun createLoggingHttpClient(
-        loggerImpl: Logger = Logger.SIMPLE,
-        loggerLevel: LogLevel = LogLevel.HEADERS,
-        httpEngine: HttpClientEngine,
-    ): HttpClient =
-        HttpClient(httpEngine) {
+fun HttpClient(
+    enableLogging: Boolean = false,
+    httpEngine: HttpClientEngine,
+): HttpClient =
+    HttpClient(httpEngine) {
+        if (enableLogging) {
             install(Logging) {
-                logger = loggerImpl
-                level = loggerLevel
+                logger = Logger.SIMPLE
+                level = LogLevel.HEADERS
             }
         }
-}
+    }

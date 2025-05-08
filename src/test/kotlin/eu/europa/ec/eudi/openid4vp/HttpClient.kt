@@ -26,8 +26,8 @@ fun HttpClient(
     HttpClient(httpEngine) {
         if (enableLogging) {
             install(Logging) {
-                logger = Logger.SIMPLE
-                level = LogLevel.HEADERS
+                logger = Logger.DEFAULT
+                level = LogLevel.ALL
             }
         }
     }

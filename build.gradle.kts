@@ -46,6 +46,7 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.ktor.client.logging)
     testImplementation(libs.fasterxml.jackson.module.kotlin)
+    testImplementation(libs.logback.classic)
     testImplementation(libs.tink) {
         because("Enable usage of EncryptionMethod XC20P in Example")
     }

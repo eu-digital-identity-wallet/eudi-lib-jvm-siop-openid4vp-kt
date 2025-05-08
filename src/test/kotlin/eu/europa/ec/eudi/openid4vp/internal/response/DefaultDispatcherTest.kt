@@ -41,7 +41,6 @@ import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Walle
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
-import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.forms.*
@@ -164,7 +163,7 @@ class DefaultDispatcherTest {
                 )
             }
 
-            val httpClient = HttpClient(mockEngine) {
+            val httpClient = createHttpClient(mockEngine).config {
                 expectSuccess = true
                 install(ContentNegotiation) {
                     json()

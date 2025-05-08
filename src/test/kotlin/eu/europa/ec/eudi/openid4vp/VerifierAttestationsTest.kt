@@ -78,7 +78,7 @@ class VerifierAttestationsTest {
         println(relyingPartyCertificateMetadata)
     }
 
-    @Test
+    @Test @Ignore
     fun funkeVP() = runTest {
         val openIdVp =
             SiopOpenId4Vp.funke(walletCfg, { createHttpClient() }) { dcql, rpMetadata ->
@@ -91,12 +91,13 @@ class VerifierAttestationsTest {
         generateUri(10)
             .mapNotNull { uri ->
                 println("Processing uri: $uri ...")
-                runCatching {  openIdVp.resolveRequestUri(uri) }.recover { println(it.message); null }
+                runCatching { openIdVp.resolveRequestUri(uri) }.recover {
+                    println(it.message)
+                    null
+                }
             }
             .collect { resolution -> println(resolution) }
-
     }
-
 
     private fun generateUri(size: Int): Flow<String> =
 
@@ -112,12 +113,8 @@ class VerifierAttestationsTest {
             }
         }
 
-
     fun doTest(uri: String) = runTest {
-
-
         openIdVp.resolveRequestUri(uri)
-
     }
 
     val openIdVp by lazy {
@@ -160,7 +157,6 @@ class VerifierAttestationsTest {
             ),
             clock = Clock.systemDefaultZone(),
         )
-
 
     private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
         engine {

@@ -87,7 +87,7 @@ fun main(): Unit = runBlocking {
 @Serializable
 data class WalletResponse(
     @SerialName("id_token") val idToken: String? = null,
-    @SerialName("vp_token") val vpToken: JsonArray? = null,
+    @SerialName("vp_token") val vpToken: JsonElement? = null,
     @SerialName("presentation_submission") val presentationSubmission: PresentationSubmission? = null,
     @SerialName("error") val error: String? = null,
 )

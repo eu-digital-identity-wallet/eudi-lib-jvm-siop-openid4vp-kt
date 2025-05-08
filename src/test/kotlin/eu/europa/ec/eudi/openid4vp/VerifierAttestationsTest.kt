@@ -81,7 +81,7 @@ class VerifierAttestationsTest {
     @Test @Ignore
     fun funkeVP() = runTest {
         val openIdVp =
-            SiopOpenId4Vp.funke(walletCfg, { createHttpClient() }) { dcql, rpMetadata ->
+            SiopOpenId4Vp.funke(walletCfg, { createHttpClient(enableLogging = true) }) { dcql, rpMetadata ->
                 // add policy
                 // DCQL is from authorization request
                 // rpMetadata is from funke verifier
@@ -102,7 +102,7 @@ class VerifierAttestationsTest {
     private fun generateUri(size: Int): Flow<String> =
 
         flow {
-            createHttpClient().use { httpClient ->
+            createHttpClient(enableLogging = true).use { httpClient ->
                 (0..size).forEach { _ ->
                     val uri =
                         httpClient.get("https://funke-wallet.de/oid4vp?oid4vp-version=draft-24&request=valid-request&response=uri")
@@ -157,18 +157,6 @@ class VerifierAttestationsTest {
             ),
             clock = Clock.systemDefaultZone(),
         )
-
-    private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
-        engine {
-            config {
-                sslSocketFactory(SslSettings.sslContext().socketFactory, SslSettings.trustManager())
-                hostnameVerifier(SslSettings.hostNameVerifier())
-            }
-        }
-        install(ContentNegotiation) { json() }
-
-        expectSuccess = true
-    }
 }
 
 interface FunkeVerifierAttestations {

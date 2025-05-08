@@ -17,7 +17,16 @@ package eu.europa.ec.eudi.openid4vp
 
 import io.ktor.client.*
 import io.ktor.client.engine.*
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
+import io.ktor.serialization.kotlinx.json.*
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 fun createHttpClient(
     httpEngine: HttpClientEngine,
@@ -31,3 +40,45 @@ fun createHttpClient(
             }
         }
     }
+
+fun createHttpClient(enableLogging: Boolean = false): HttpClient =
+    HttpClient(OkHttp) {
+        engine {
+            config {
+                sslSocketFactory(
+                    sslSocketFactory = SslSettings.sslContext().socketFactory,
+                    trustManager = SslSettings.trustManager(),
+                )
+                hostnameVerifier(SslSettings.hostNameVerifier())
+            }
+        }
+        if (enableLogging) {
+            install(Logging) {
+                logger = Logger.DEFAULT
+                level = LogLevel.ALL
+            }
+        }
+        install(ContentNegotiation) { json() }
+
+        expectSuccess = true
+    }
+private object SslSettings {
+
+    fun sslContext(): SSLContext {
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, arrayOf(trustManager()), SecureRandom())
+        return sslContext
+    }
+
+    fun hostNameVerifier(): HostnameVerifier = TrustAllHosts
+    fun trustManager(): X509TrustManager = TrustAllCerts as X509TrustManager
+
+    private var TrustAllCerts: TrustManager = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+        override fun getAcceptedIssuers(): Array<X509Certificate> {
+            return arrayOf()
+        }
+    }
+    private val TrustAllHosts: HostnameVerifier = HostnameVerifier { _, _ -> true }
+}

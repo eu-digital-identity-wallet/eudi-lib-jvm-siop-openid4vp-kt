@@ -29,8 +29,12 @@ import io.ktor.client.call.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
@@ -53,7 +57,8 @@ class VerifierAttestationsTest {
             openid4vp://?client_id=x509_san_dns%3Afunke-wallet.de&request_uri=https%3A%2F%2Ffunke-wallet.de%2Foid4vp%2Fdraft-24%2Fvalid-request
         """.trimIndent()
 
-    @Test @Ignore
+    @Test
+    @Ignore
     fun testParsing() = runTest {
         val unvalidatedRequestObject = SignedJWT.parse(sampleJarJwt).requestObject().also { println(it) }
         val attestation = run {
@@ -73,7 +78,7 @@ class VerifierAttestationsTest {
         println(relyingPartyCertificateMetadata)
     }
 
-    @Test @Ignore
+    @Test
     fun funkeVP() = runTest {
         val openIdVp =
             SiopOpenId4Vp.funke(walletCfg, { createHttpClient() }) { dcql, rpMetadata ->
@@ -83,10 +88,46 @@ class VerifierAttestationsTest {
                 true
             }
 
-        val resolution = openIdVp.resolveRequestUri(sampleRequestUri)
-        println(resolution)
+        generateUri(10)
+            .mapNotNull { uri ->
+                println("Processing uri: $uri ...")
+                runCatching {  openIdVp.resolveRequestUri(uri) }.recover { println(it.message); null }
+            }
+            .collect { resolution -> println(resolution) }
+
     }
 
+
+    private fun generateUri(size: Int): Flow<String> =
+
+        flow {
+            createHttpClient().use { httpClient ->
+                (0..size).forEach { _ ->
+                    val uri =
+                        httpClient.get("https://funke-wallet.de/oid4vp?oid4vp-version=draft-24&request=valid-request&response=uri")
+                            .body<JsonObject>()["request"]?.jsonPrimitive?.content
+
+                    emit(checkNotNull(uri) { "Oops" })
+                }
+            }
+        }
+
+
+    fun doTest(uri: String) = runTest {
+
+
+        openIdVp.resolveRequestUri(uri)
+
+    }
+
+    val openIdVp by lazy {
+        SiopOpenId4Vp.funke(walletCfg, { createHttpClient() }) { dcql, rpMetadata ->
+            // add policy
+            // DCQL is from authorization request
+            // rpMetadata is from funke verifier
+            true
+        }
+    }
     private val walletCfg =
         SiopOpenId4VPConfig(
             vpConfiguration = VPConfiguration(
@@ -120,6 +161,7 @@ class VerifierAttestationsTest {
             clock = Clock.systemDefaultZone(),
         )
 
+
     private fun createHttpClient(): HttpClient = HttpClient(OkHttp) {
         engine {
             config {
@@ -139,17 +181,17 @@ interface FunkeVerifierAttestations {
 
         @Serializable
         data class VerifierAttestationPayload(
-            val privacy_policy: String,
-            val purpose: List<LocalizedText>,
-            val contact: ContactInfo,
-            @SerialName(OpenId4VPSpec.DCQL_CREDENTIALS) @Required val credentials: Credentials,
-            @SerialName(OpenId4VPSpec.DCQL_CREDENTIAL_SETS) val credentialSets: CredentialSets? = null,
             val sub: String,
             val jti: String,
-            val status: StatusWrapper,
-            val public_body: Boolean,
-            val entitlements: List<String>,
-            val services: List<String>,
+            @SerialName("status") val status: StatusWrapper,
+            @SerialName("privacy_policy") val privatePolicy: String,
+            @SerialName("purpose") val purpose: List<LocalizedText>,
+            @SerialName("contact") val contact: ContactInfo,
+            @SerialName(OpenId4VPSpec.DCQL_CREDENTIALS) @Required val credentials: Credentials,
+            @SerialName(OpenId4VPSpec.DCQL_CREDENTIAL_SETS) val credentialSets: CredentialSets? = null,
+            @SerialName("public_body") val publicBody: Boolean,
+            @SerialName("entitlements") val entitlements: List<String>,
+            @SerialName("services") val services: List<String>,
         )
 
         @Serializable
@@ -160,9 +202,9 @@ interface FunkeVerifierAttestations {
 
         @Serializable
         data class ContactInfo(
-            val website: String,
-            val `e-mail`: String,
-            val phone: String,
+            @SerialName("website") val website: String,
+            @SerialName("e-mail") val email: String,
+            @SerialName("phone") val phone: String,
         )
 
         @Serializable
@@ -246,8 +288,12 @@ interface FunkeVerifierAttestations {
      * This method gets the RP ID using the SUB value of the relying party.
      */
     suspend fun HttpClient.fetchRpIds(sub: String): List<RelyingPartyInfo> {
-        val encodedSub = java.net.URLEncoder.encode(sub.removePrefix("CN="), "UTF-8")
-        val url = "https://funke-wallet.de/relying-parties?name=$encodedSub"
+        val url = buildUrl {
+            protocol = URLProtocol.HTTPS
+            host = "funke-wallet.de"
+            pathSegments = listOf("relying-parties")
+            parameters.append("name", sub.removePrefix("CN="))
+        }
         return get(url).body()
     }
 

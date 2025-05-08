@@ -62,6 +62,7 @@ fun createHttpClient(enableLogging: Boolean = false): HttpClient =
 
         expectSuccess = true
     }
+
 private object SslSettings {
 
     fun sslContext(): SSLContext {

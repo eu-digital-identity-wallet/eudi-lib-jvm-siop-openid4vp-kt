@@ -25,7 +25,6 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
-import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -53,7 +52,7 @@ internal class RequestFetcherTest {
             assertNull(encryptionKey)
             respondBadRequest()
         }
-        val client = HttpClient(engine = engine)
+        val client = createHttpClient(httpEngine = engine)
 
         val fetcher = RequestFetcher(client, config)
         val request = UnvalidatedRequest.JwtSecured.PassByReference(
@@ -87,7 +86,7 @@ internal class RequestFetcherTest {
                 headers = headersOf(HttpHeaders.ContentType to listOf("application/oauth-authz-req+jwt")),
             )
         }
-        val client = HttpClient(engine = engine)
+        val client = createHttpClient(httpEngine = engine)
 
         val fetcher = RequestFetcher(client, config)
         val request = UnvalidatedRequest.JwtSecured.PassByReference(
@@ -172,7 +171,7 @@ internal class RequestFetcherTest {
                     headers = headersOf(HttpHeaders.ContentType to listOf("application/oauth-authz-req+jwt")),
                 )
             }
-        val client = HttpClient(engine = engine)
+        val client = createHttpClient(httpEngine = engine)
 
         val fetcher = RequestFetcher(client, config)
         val request = UnvalidatedRequest.JwtSecured.PassByReference(

@@ -226,7 +226,14 @@ data class SupportedTransactionDataType(
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
 data class VPConfiguration(
-    val presentationDefinitionUriSupported: Boolean = true,
+    @Deprecated(
+        """
+        Don't use this property any more, it will soon be deprecated. 
+        Library will not be supporting presentation_definition_uri from now on.
+        Value of presentation_definition_uri_supported in wallet metadata will be set to false by default
+    """,
+    )
+    val presentationDefinitionUriSupported: Boolean = false,
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormats: VpFormats,

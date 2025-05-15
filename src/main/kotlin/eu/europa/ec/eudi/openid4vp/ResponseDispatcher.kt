@@ -131,11 +131,11 @@ interface Dispatcher {
         encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome =
         when (request.responseMode) {
-            is ResponseMode.DirectPost -> post(request, consensus, encryptionParameters)
+            is ResponseMode.DirectPost -> post(request, consensus, null)
             is ResponseMode.DirectPostJwt -> post(request, consensus, encryptionParameters)
-            is ResponseMode.Query -> encodeRedirectURI(request, consensus, encryptionParameters)
+            is ResponseMode.Query -> encodeRedirectURI(request, consensus, null)
             is ResponseMode.QueryJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
-            is ResponseMode.Fragment -> encodeRedirectURI(request, consensus, encryptionParameters)
+            is ResponseMode.Fragment -> encodeRedirectURI(request, consensus, null)
             is ResponseMode.FragmentJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
         }
 
@@ -154,7 +154,7 @@ interface Dispatcher {
     suspend fun post(
         request: ResolvedRequestObject,
         consensus: Consensus,
-        encryptionParameters: EncryptionParameters?,
+        encryptionParameters: EncryptionParameters? = null,
     ): DispatchOutcome.VerifierResponse
 
     /**
@@ -174,6 +174,6 @@ interface Dispatcher {
     suspend fun encodeRedirectURI(
         request: ResolvedRequestObject,
         consensus: Consensus,
-        encryptionParameters: EncryptionParameters?,
+        encryptionParameters: EncryptionParameters? = null,
     ): DispatchOutcome.RedirectURI
 }

@@ -210,7 +210,14 @@ private fun ResolvedRequestObject.responsePayload(
     consensus: Consensus,
     encryptionParameters: EncryptionParameters?,
 ): AuthorizationResponsePayload = when (consensus) {
-    is Consensus.NegativeConsensus -> AuthorizationResponsePayload.NoConsensusResponseData(nonce, state, client.id)
+    is Consensus.NegativeConsensus ->
+        AuthorizationResponsePayload.NoConsensusResponseData(
+            nonce,
+            state,
+            client.id,
+            encryptionParameters,
+        )
+
     is Consensus.PositiveConsensus -> when (this) {
         is ResolvedRequestObject.SiopAuthentication -> {
             require(consensus is Consensus.PositiveConsensus.IdTokenConsensus) { "IdTokenConsensus expected" }

@@ -41,6 +41,7 @@ import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Walle
 import eu.europa.ec.eudi.prex.Id
 import eu.europa.ec.eudi.prex.PresentationDefinition
 import eu.europa.ec.eudi.prex.PresentationSubmission
+import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.forms.*
@@ -95,6 +96,32 @@ class DefaultDispatcherTest {
             val rsaDecrypter = ECDHDecrypter(jarmEncryptionKeyPair)
             jwt.decrypt(rsaDecrypter)
             return jwt
+        }
+
+        fun createOpenId4VPRequest(
+            unvalidatedClientMetaData: UnvalidatedClientMetaData,
+            responseMode: ResponseMode,
+            state: String? = null,
+        ): ResolvedRequestObject.OpenId4VPAuthorization {
+            val clientMetadataValidated =
+                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
+
+            return ResolvedRequestObject.OpenId4VPAuthorization(
+                presentationQuery = PresentationQuery.ByPresentationDefinition(
+                    PresentationDefinition(
+                        id = Id("pdId"),
+                        inputDescriptors = emptyList(),
+                    ),
+                ),
+                jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
+                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                client = CLIENT,
+                nonce = "0S6_WzA2Mj",
+                responseMode = responseMode,
+                state = state ?: genState(),
+                transactionData = null,
+                verifierAttestations = null,
+            )
         }
     }
 
@@ -204,7 +231,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `if response type direct_post jwt, JWE should be returned if only encryption info specified`() = runTest {
-            val verifierRequest = createOpenId4VPRequest(
+            val verifierRequest = Verifier.createOpenId4VPRequest(
                 Verifier.metaDataRequestingEncryptedResponse,
                 ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
             )
@@ -251,9 +278,36 @@ class DefaultDispatcherTest {
         }
 
         @Test
+        fun `if response direct_post jwt with encryption required, negative consensus must be dispatched in response`() = runTest {
+            val verifierRequest = Verifier.createOpenId4VPRequest(
+                Verifier.metaDataRequestingEncryptedResponse,
+                ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
+            )
+
+            val negativeConsensus = Consensus.NegativeConsensus
+
+            val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
+                val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPubKey()
+                assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
+                assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+
+                val jwtClaimSet = encryptedJwt.jwtClaimsSet
+                val errorClam = jwtClaimSet.getStringClaim("error")
+                assertNotNull(errorClam)
+                assertEquals("access_denied", errorClam)
+            }
+
+            dispatcher.dispatch(
+                verifierRequest,
+                negativeConsensus,
+                EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+            )
+        }
+
+        @Test
         fun `if response type direct_post jwt, JWT should be returned if only signing alg specified`(): Unit = runTest {
             suspend fun test(redirectUri: URI? = null) {
-                val verifiersRequest = createOpenId4VPRequest(
+                val verifiersRequest = Verifier.createOpenId4VPRequest(
                     Verifier.metaDataRequestingSignedAndEncryptedResponse,
                     ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
                 )
@@ -297,7 +351,7 @@ class DefaultDispatcherTest {
         fun `if response type direct_post jwt, JWT should be returned if only signing alg, encryption alg and encryption method are specified and supported by wallet`(): Unit =
             runTest {
                 suspend fun test(redirectUri: URI? = null) {
-                    val verifiersRequest = createOpenId4VPRequest(
+                    val verifiersRequest = Verifier.createOpenId4VPRequest(
                         Verifier.metaDataRequestingSignedAndEncryptedResponse,
                         ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
                     )
@@ -346,7 +400,7 @@ class DefaultDispatcherTest {
                 )
                 val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
 
-                val resolvedRequest = createOpenId4VPRequest(verifierMetaData, responseMode)
+                val resolvedRequest = Verifier.createOpenId4VPRequest(verifierMetaData, responseMode)
 
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
                     VpContent.PresentationExchange(
@@ -391,7 +445,7 @@ class DefaultDispatcherTest {
                 )
                 val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
 
-                val resolvedRequest = createOpenId4VPRequest(verifierMetaData, responseMode)
+                val resolvedRequest = Verifier.createOpenId4VPRequest(verifierMetaData, responseMode)
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
                     vpContent = vpContent,
                 )
@@ -514,31 +568,6 @@ class DefaultDispatcherTest {
                 ),
                 PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
-
-        private fun createOpenId4VPRequest(
-            unvalidatedClientMetaData: UnvalidatedClientMetaData,
-            responseMode: ResponseMode.DirectPostJwt,
-        ): ResolvedRequestObject.OpenId4VPAuthorization {
-            val clientMetadataValidated =
-                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
-
-            return ResolvedRequestObject.OpenId4VPAuthorization(
-                presentationQuery = PresentationQuery.ByPresentationDefinition(
-                    PresentationDefinition(
-                        id = Id("pdId"),
-                        inputDescriptors = emptyList(),
-                    ),
-                ),
-                jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
-                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
-                client = Verifier.CLIENT,
-                nonce = "0S6_WzA2Mj",
-                responseMode = responseMode,
-                state = genState(),
-                transactionData = null,
-                verifierAttestations = null,
-            )
-        }
 
         private fun createOpenID4VPRequestWithDCQL(
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
@@ -755,6 +784,46 @@ class DefaultDispatcherTest {
             test { assertQueryURIDoesNotContainStateAnd(it) }
         }
 
+        @Test
+        fun `when query_jwt with encryption and negative consensus, redirect_uri must contain error ACCESS_DENIED in response`() = runTest {
+            suspend fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+                val verifierRequest = Verifier.createOpenId4VPRequest(
+                    Verifier.metaDataRequestingEncryptedResponse,
+                    ResponseMode.QueryJwt("https://respond.here".asURL().getOrThrow().toURI()),
+                    state,
+                )
+
+                val dispatcher = DefaultDispatcher(Wallet.config, { HttpClient() })
+
+                val outcome =
+                    dispatcher.dispatch(
+                        verifierRequest,
+                        Consensus.NegativeConsensus,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+
+                assertIs<DispatchOutcome.RedirectURI>(outcome)
+
+                outcome.value.asserter {
+                    val responseParameter = getQueryParameter("response")
+                    assertNotNull(responseParameter)
+                    val encryptedJwt = responseParameter.assertIsJwtEncryptedWithVerifiersPubKey()
+                    assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
+                    assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+
+                    val errorClam = encryptedJwt.jwtClaimsSet.getStringClaim("error")
+                    val state = encryptedJwt.jwtClaimsSet.getStringClaim("state")
+
+                    assertNotNull(errorClam)
+                    assertEquals("access_denied", errorClam)
+                    assertEquals(state, errorClam)
+                }
+            }
+
+            genState().let { state -> test(state) {} }
+            test {}
+        }
+
         private fun URI.assertQueryURIContainsStateAnd(expectedState: String, assertions: Uri.() -> Unit) {
             assertQueryURI {
                 assertions(this)
@@ -871,7 +940,7 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `when response mode is query_jwt, redirect_uri must contain a 'response' query parameter`() {
+        fun `when response mode is fragment_jwt, redirect_uri must contain a 'response' query parameter`() {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.SiopAuthentication(
                     "dummy",
@@ -898,6 +967,46 @@ class DefaultDispatcherTest {
 
             test(genState()) { assertFragmentURIDoesNotContainStateAnd(it) }
             test { assertFragmentURIDoesNotContainStateAnd(it) }
+        }
+
+        @Test
+        fun `when fragment_jwt with encryption and negative consensus, redirect_uri must contain ACCESS_DENIED in response`() = runTest {
+            suspend fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+                val verifierRequest = Verifier.createOpenId4VPRequest(
+                    Verifier.metaDataRequestingEncryptedResponse,
+                    ResponseMode.FragmentJwt("https://respond.here".asURL().getOrThrow().toURI()),
+                    state,
+                )
+
+                val dispatcher = DefaultDispatcher(Wallet.config, { HttpClient() })
+
+                val outcome =
+                    dispatcher.dispatch(
+                        verifierRequest,
+                        Consensus.NegativeConsensus,
+                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                    )
+
+                assertIs<DispatchOutcome.RedirectURI>(outcome)
+
+                outcome.value.asserter {
+                    val responseParameter = getQueryParameter("response")
+                    assertNotNull(responseParameter)
+                    val encryptedJwt = responseParameter.assertIsJwtEncryptedWithVerifiersPubKey()
+                    assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
+                    assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+
+                    val errorClam = encryptedJwt.jwtClaimsSet.getStringClaim("error")
+                    val state = encryptedJwt.jwtClaimsSet.getStringClaim("state")
+
+                    assertNotNull(errorClam)
+                    assertEquals("access_denied", errorClam)
+                    assertEquals(state, errorClam)
+                }
+            }
+
+            genState().let { state -> test(state) {} }
+            test {}
         }
 
         private fun URI.assertFragmentURIContainsStateAnd(

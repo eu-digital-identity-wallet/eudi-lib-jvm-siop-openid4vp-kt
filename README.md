@@ -19,15 +19,32 @@ the [EUDI Wallet Reference Implementation project description](https://github.co
 * [How to contribute](#how-to-contribute)
 * [License](#license)
 
-
 ## Overview
 
 This is a Kotlin library, targeting JVM, that supports 
 the [SIOPv2 (draft 13)](https://openid.github.io/SIOPv2/openid-connect-self-issued-v2-wg-draft.html) 
 and [OpenId4VP (draft 24)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html) protocols.
 In particular, the library focus on the wallet's role using those two protocols with constraints
-included in ISO 23220-4 and ISO-18013-7
+included in ISO 23220-4 and ISO-18013-7 and provides the following features:
 
+| Feature                                                                                                                   | Coverage                                                                                                                                |
+|---------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| [Verifiable Presentations Authorization Requests](#resolve-an-authorization-request-uri)                                  | ✅                                                                                                                                       |
+| Self-Issued OpenID Provider Authorization Requests                                                                        | ✅                                                                                                                                       |
+| Client authentication schemes                                                                                             | ✅ pre-registered, ✅ verifier_attestation, ✅ x509_san_dns, ✅ x509_san_uri, ✅ DID, ✅ redirect_uri, ❌ https                                |
+| Attestation query dialect                                                                                                 | ✅ DCQL,  ✅ Presentation Exchange V2                                                                                                     |
+| Signed/encrypted authorization requests (JAR)                                                                             | ✅                                                                                                                                       |
+| Retrieve presenation definition by reference                                                                              | ✅                                                                                                                                       |
+| Scoped authorization requests                                                                                             | ✅                                                                                                                                       |
+| Request URI Methods                                                                                                       | ✅ GET, ✅ POST                                                                                                                           |
+| Wallet metadata                                                                                                           | ✅                                                                                                                                       |
+| [Dispatch positive and negative responses](#dispatch-authorization-response-to-verifier--rp)                              | ✅                                                                                                                                       |
+| [Dispatch authorization error response to verifier when possible](#dispatch-authorization-error-response-to-verifier--rp) | ✅                                                                                                                                       |
+| Signed/Encrypted authorization responses (JARM)                                                                           | ✅                                                                                                                                       |
+| Response modes                                                                                                            | ✅ direct_post, ✅ direct_post.jwt, ✅ query, ✅ query.jwt, ✅ fragment, ✅ fragment.jwt                                                      |
+| Transaction Data                                                                                                          | ✅                                                                                                                                       |
+| Verifier Attestations                                                                                                     | ✅ (early adoption from [OpenID4VP draft 26](https://openid.net/specs/openid-4-verifiable-presentations-1_0-26.html#section-5.1-11.2.1)) |
+| Digital Credential API                                                                                                    | ❌                                                                                                                                       |
 
 ## Disclaimer
 
@@ -226,7 +243,7 @@ Library requires the presence of a `client_id` using one of the following scheme
 > [!NOTE]
 > The Client ID Scheme is encoded as a prefix in `client_id`. Absence of such a prefix, indicates the usage of the `pre-registered` Client ID Scheme.
 
-### Retrieving Authorization Request 
+### Retrieving Authorization Request
 
 According to OpenID4VP, when the `request_uri` parameter is included in the authorization request wallet must fetch the Authorization Request by following this URI.
 In this case there are two methods to get the request, controlled by the `request_uri_method` communicated by the verifier:

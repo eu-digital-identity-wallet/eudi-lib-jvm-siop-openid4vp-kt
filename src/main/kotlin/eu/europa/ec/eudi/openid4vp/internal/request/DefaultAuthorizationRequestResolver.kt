@@ -15,6 +15,10 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.JWSObjectJSON
+import com.nimbusds.jose.util.Base64URL
+import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
@@ -23,10 +27,8 @@ import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
 import io.ktor.client.*
-import io.ktor.http.URLBuilder
-import io.ktor.http.Url
-import io.ktor.http.takeFrom
-import io.ktor.util.toMap
+import io.ktor.http.*
+import io.ktor.util.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -177,6 +179,85 @@ internal sealed interface FetchedRequest {
     data class JwtSecured(val clientId: String, val jwt: SignedJWT) : FetchedRequest
 }
 
+internal sealed interface ReceivedRequest {
+
+    data class Unsigned(val requestObject: UnvalidatedRequestObject) : ReceivedRequest
+
+    data class Signed(
+        val payload: Base64URL,
+        val signatures: List<RequestSignature>,
+    ) : ReceivedRequest {
+
+        init {
+            require(!signatures.isEmpty()) { "At least one signature is required" }
+        }
+
+        companion object {
+
+            /**
+             * Decomposes a Nimbus [SignedJWT] into a [ReceivedRequest.Signed] request.
+             */
+            fun from(signedJwt: SignedJWT): Result<Signed> = runCatching {
+                require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
+                val header = signedJwt.header.toBase64URL()
+                val payload = signedJwt.payload.toBase64URL()
+                val signature = signedJwt.signature
+
+                val signatures = listOf(RequestSignature(Header(header), signature))
+                Signed(payload, signatures)
+            }
+
+            /**
+             * Parses an input [JsonObject] representing a JWS in JSON serialization into a [ReceivedRequest.Signed] request.
+             */
+            fun from(jwsJsonObject: JsonObject): Result<Signed> = runCatching {
+                require(jwsJsonObject.containsKey("payload")) { "No payload found for the passed request" }
+                require(jwsJsonObject.containsKey("signatures") || jwsJsonObject.containsKey("signature")) {
+                    "No signatures found for the passed request"
+                }
+                val parsed = JWSObjectJSON.parse(jwsJsonObject)
+                val signatures = parsed.getSignatures()
+                val requestSignatures = signatures?.map {
+                    val unprotectedHeader = it.unprotectedHeader?.let {
+                        val str = JSONObjectUtils.toJSONString(it.toJSONObject())
+                        jsonSupport.decodeFromString<JsonObject>(str)
+                    }
+                    RequestSignature(
+                        header = Header(it.header.toBase64URL(), unprotectedHeader),
+                        signature = it.signature,
+                    )
+                }
+                require(requestSignatures != null) { "No signatures found for the passed request" }
+
+                Signed(parsed.payload.toBase64URL(), requestSignatures)
+            }
+        }
+    }
+}
+
+internal data class RequestSignature(
+    val header: Header,
+    val signature: Signature,
+)
+
+internal data class Header(
+    val protected: Base64URL,
+    val unProtected: JsonObject? = null,
+)
+
+internal typealias Signature = Base64URL
+
+internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
+    signatures.map {
+        SignedJWT.parse("${it.header.protected}.$payload.${it.signature}")
+    }
+
+internal fun FetchedRequest.toReceivedRequest(): ReceivedRequest =
+    when (this) {
+        is FetchedRequest.Plain -> ReceivedRequest.Unsigned(requestObject)
+        is FetchedRequest.JwtSecured -> ReceivedRequest.Signed.from(jwt).getOrThrow()
+    }
+
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpKtorHttpClientFactory: KtorHttpClientFactory,
@@ -199,7 +280,7 @@ internal class DefaultAuthorizationRequestResolver(
 
         val authenticatedRequest =
             try {
-                authenticateRequest(fetchedRequest)
+                authenticateRequest(fetchedRequest.toReceivedRequest())
             } catch (e: AuthorizationRequestException) {
                 val dispatchDetails =
                     when (siopOpenId4VPConfig.errorDispatchPolicy) {
@@ -231,9 +312,9 @@ internal class DefaultAuthorizationRequestResolver(
         return requestFetcher.fetchRequest(unvalidatedRequest)
     }
 
-    private suspend fun HttpClient.authenticateRequest(fetchedRequest: FetchedRequest): AuthenticatedRequest {
+    private suspend fun HttpClient.authenticateRequest(receivedRequest: ReceivedRequest): AuthenticatedRequest {
         val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, this)
-        return requestAuthenticator.authenticate(fetchedRequest)
+        return requestAuthenticator.authenticate(receivedRequest)
     }
 }
 

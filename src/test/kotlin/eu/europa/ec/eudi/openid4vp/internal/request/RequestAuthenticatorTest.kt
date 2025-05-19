@@ -60,7 +60,7 @@ class ClientAuthenticatorTest {
 
         @Test
         fun `if client_id is missing, authentication fails`() = runTest {
-            val request = UnvalidatedRequestObject(clientId = null).plain()
+            val request = UnvalidatedRequestObject(clientId = null).unsigned()
             assertFailsWithError<RequestValidationError.MissingClientId> {
                 clientAuthenticator.authenticateClient(request)
             }
@@ -71,7 +71,7 @@ class ClientAuthenticatorTest {
             val request = UnvalidatedRequestObject(
                 clientId = "bar:foo",
                 responseMode = "bar",
-            ).plain()
+            ).unsigned()
 
             assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
                 clientAuthenticator.authenticateClient(request)
@@ -98,7 +98,7 @@ class ClientAuthenticatorTest {
             runTest {
                 val request = UnvalidatedRequestObject(
                     clientId = "redirect_uri:$clientId",
-                ).plain()
+                ).unsigned()
 
                 val client = clientAuthenticator.authenticateClient(request)
                 assertEquals(AuthenticatedClient.RedirectUri(clientId), client)
@@ -142,7 +142,7 @@ class ClientAuthenticatorTest {
 
         @Test
         fun `if request is not signed, authentication fails`() = runTest {
-            val request = requestObject.plain()
+            val request = requestObject.unsigned()
 
             val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
                 clientAuthenticator.authenticateClient(request)
@@ -248,7 +248,7 @@ class ClientAuthenticatorTest {
 
         @Test
         fun `if request is unsigned, authentication fails`() = runTest {
-            val request = requestObject.plain()
+            val request = requestObject.unsigned()
 
             val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
                 clientAuthenticator.authenticateClient(request)
@@ -336,14 +336,14 @@ private inline fun <reified E : AuthorizationRequestError> assertFailsWithError(
     return assertIs<E>(exception.error)
 }
 
-private fun UnvalidatedRequestObject.plain(): FetchedRequest.Plain =
-    FetchedRequest.Plain(this)
+private fun UnvalidatedRequestObject.unsigned(): ReceivedRequest.Unsigned =
+    ReceivedRequest.Unsigned(this)
 
 private fun UnvalidatedRequestObject.signedWithAttestation(
     alg: JWSAlgorithm,
     key: JWK,
     attestation: SignedJWT,
-): FetchedRequest.JwtSecured = signed(alg, key) {
+): ReceivedRequest.Signed = signed(alg, key) {
     this.customParam("jwt", attestation.serialize())
 }
 
@@ -351,21 +351,19 @@ private fun UnvalidatedRequestObject.signed(
     alg: JWSAlgorithm,
     key: JWK,
     headerCustomization: (JWSHeader.Builder).() -> Unit = {},
-): FetchedRequest.JwtSecured = FetchedRequest.JwtSecured(
-    clientId = checkNotNull(clientId),
-    jwt = run {
-        val header = with(JWSHeader.Builder(alg)) {
-            type(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE))
-            headerCustomization()
-            build()
-        }
-        val claimsSet = toJWTClaimSet()
-        SignedJWT(header, claimsSet).apply {
-            val signer = DefaultJWSSignerFactory().createJWSSigner(key, alg)
-            sign(signer)
-        }
-    },
-)
+): ReceivedRequest.Signed {
+    val header = with(JWSHeader.Builder(alg)) {
+        type(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE))
+        headerCustomization()
+        build()
+    }
+    val claimsSet = toJWTClaimSet()
+    val jwt = SignedJWT(header, claimsSet).apply {
+        val signer = DefaultJWSSignerFactory().createJWSSigner(key, alg)
+        sign(signer)
+    }
+    return ReceivedRequest.Signed.from(jwt).getOrThrow()
+}
 
 private fun UnvalidatedRequestObject.toJWTClaimSet(): JWTClaimsSet {
     val json = Json.encodeToString(this)

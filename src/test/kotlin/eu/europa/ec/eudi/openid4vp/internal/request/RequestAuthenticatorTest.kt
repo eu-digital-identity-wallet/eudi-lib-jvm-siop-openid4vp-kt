@@ -362,7 +362,7 @@ private fun UnvalidatedRequestObject.signed(
         val signer = DefaultJWSSignerFactory().createJWSSigner(key, alg)
         sign(signer)
     }
-    return ReceivedRequest.Signed.from(jwt).getOrThrow()
+    return ReceivedRequest.Signed(jwt)
 }
 
 private fun UnvalidatedRequestObject.toJWTClaimSet(): JWTClaimsSet {

@@ -17,11 +17,12 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.JWSObjectJSON
-import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.RFC7515Spec
+import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
@@ -32,6 +33,7 @@ import io.ktor.util.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
@@ -174,88 +176,111 @@ internal sealed interface UnvalidatedRequest {
     }
 }
 
-internal sealed interface FetchedRequest {
-    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest
-    data class JwtSecured(val clientId: String, val jwt: SignedJWT) : FetchedRequest
-}
-
 internal sealed interface ReceivedRequest {
-
     data class Unsigned(val requestObject: UnvalidatedRequestObject) : ReceivedRequest
-
-    data class Signed(
-        val payload: Base64URL,
-        val signatures: List<RequestSignature>,
-    ) : ReceivedRequest {
-
-        init {
-            require(!signatures.isEmpty()) { "At least one signature is required" }
-        }
-
+    data class Signed(val jwsSigned: JwsSigned) : ReceivedRequest {
         companion object {
-
-            /**
-             * Decomposes a Nimbus [SignedJWT] into a [ReceivedRequest.Signed] request.
-             */
-            fun from(signedJwt: SignedJWT): Result<Signed> = runCatching {
-                require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
-                val header = signedJwt.header.toBase64URL()
-                val payload = signedJwt.payload.toBase64URL()
-                val signature = signedJwt.signature
-
-                val signatures = listOf(RequestSignature(Header(header), signature))
-                Signed(payload, signatures)
-            }
-
-            /**
-             * Parses an input [JsonObject] representing a JWS in JSON serialization into a [ReceivedRequest.Signed] request.
-             */
-            fun from(jwsJsonObject: JsonObject): Result<Signed> = runCatching {
-                require(jwsJsonObject.containsKey("payload")) { "No payload found for the passed request" }
-                require(jwsJsonObject.containsKey("signatures") || jwsJsonObject.containsKey("signature")) {
-                    "No signatures found for the passed request"
-                }
-                val parsed = JWSObjectJSON.parse(jwsJsonObject)
-                val signatures = parsed.getSignatures()
-                val requestSignatures = signatures?.map {
-                    val unprotectedHeader = it.unprotectedHeader?.let {
-                        val str = JSONObjectUtils.toJSONString(it.toJSONObject())
-                        jsonSupport.decodeFromString<JsonObject>(str)
-                    }
-                    RequestSignature(
-                        header = Header(it.header.toBase64URL(), unprotectedHeader),
-                        signature = it.signature,
-                    )
-                }
-                require(requestSignatures != null) { "No signatures found for the passed request" }
-
-                Signed(parsed.payload.toBase64URL(), requestSignatures)
-            }
+            operator fun invoke(signedJwt: SignedJWT): Signed = Signed(JwsSigned.from(signedJwt).getOrThrow())
         }
     }
 }
 
-internal data class RequestSignature(
+internal data class JwsSigned(
+    val payload: Base64UrlNoPadding,
+    val signatures: List<JWSSignature>,
+) {
+
+    init {
+        require(!signatures.isEmpty()) { "At least one signature is required" }
+    }
+
+    companion object {
+
+        /**
+         * Decomposes a Nimbus [SignedJWT] into [JwsSigned].
+         */
+        fun from(signedJwt: SignedJWT): Result<JwsSigned> = runCatching {
+            require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
+            from(signedJwt.toJwsGeneralJsonObject()).getOrThrow()
+        }
+
+        /**
+         * Parses an input [JsonObject] representing a JWS in JSON serialization (general or flattened) into
+         * a [JwsSigned].
+         */
+        fun from(jwsJsonObject: JsonObject): Result<JwsSigned> = runCatching {
+            require(jwsJsonObject.containsKey("payload")) { "No payload found for the passed request" }
+            require(jwsJsonObject.containsKey("signatures") || jwsJsonObject.containsKey("signature")) {
+                "No signatures found for the passed request"
+            }
+            val jsonObject = JSONObjectUtils.parse(Json.encodeToString(jwsJsonObject))
+            val jwsObjectJson = JWSObjectJSON.parse(jsonObject)
+            val jwsSignatures = jwsObjectJson.signatures?.map {
+                val unprotectedHeader = it.unprotectedHeader?.let {
+                    val str = JSONObjectUtils.toJSONString(it.toJSONObject())
+                    jsonSupport.decodeFromString<JsonObject>(str)
+                }
+                JWSSignature(
+                    header = Header(
+                        protected = Base64UrlNoPadding(it.header.toBase64URL().toString()).getOrThrow(),
+                        unProtected = unprotectedHeader,
+                    ),
+                    signatureValue = Base64UrlNoPadding(it.signature.toString()).getOrThrow(),
+                )
+            }
+            require(jwsSignatures != null) { "No signatures found for the passed request" }
+
+            JwsSigned(
+                payload = Base64UrlNoPadding(jwsObjectJson.payload.toBase64URL().toString()).getOrThrow(),
+                signatures = jwsSignatures,
+            )
+        }
+
+        private fun SignedJWT.toJwsGeneralJsonObject(): JsonObject = buildJsonObject {
+            put(RFC7515Spec.JWS_JSON_SYNTAX_PAYLOAD, payload.toBase64URL().toString())
+            put(
+                RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURES,
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put(RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE_PROTECTED_HEADER, header.toBase64URL().toString())
+                            put(RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE, signature.toString())
+                        },
+                    )
+                },
+            )
+        }
+    }
+}
+
+internal data class JWSSignature(
     val header: Header,
-    val signature: Signature,
+    val signatureValue: Base64UrlNoPadding,
 )
 
 internal data class Header(
-    val protected: Base64URL,
+    val protected: Base64UrlNoPadding,
     val unProtected: JsonObject? = null,
 )
 
-internal typealias Signature = Base64URL
+internal data class Base64UrlNoPadding private constructor(val encoded: String) {
+
+    override fun toString(): String = encoded
+
+    companion object {
+
+        operator fun invoke(value: String): Result<Base64UrlNoPadding> = runCatching {
+            require(value.isNotBlank()) { "Value must not be empty" }
+            // Try to parse the passed value as base64 url encoded no-padding string
+            base64UrlNoPadding.decode(value)
+            Base64UrlNoPadding(value)
+        }
+    }
+}
 
 internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
-    signatures.map {
-        SignedJWT.parse("${it.header.protected}.$payload.${it.signature}")
-    }
-
-internal fun FetchedRequest.toReceivedRequest(): ReceivedRequest =
-    when (this) {
-        is FetchedRequest.Plain -> ReceivedRequest.Unsigned(requestObject)
-        is FetchedRequest.JwtSecured -> ReceivedRequest.Signed.from(jwt).getOrThrow()
+    jwsSigned.signatures.map {
+        SignedJWT.parse("${it.header.protected}.${jwsSigned.payload}.${it.signatureValue}")
     }
 
 internal class DefaultAuthorizationRequestResolver(
@@ -280,7 +305,7 @@ internal class DefaultAuthorizationRequestResolver(
 
         val authenticatedRequest =
             try {
-                authenticateRequest(fetchedRequest.toReceivedRequest())
+                authenticateRequest(fetchedRequest)
             } catch (e: AuthorizationRequestException) {
                 val dispatchDetails =
                     when (siopOpenId4VPConfig.errorDispatchPolicy) {
@@ -306,7 +331,7 @@ internal class DefaultAuthorizationRequestResolver(
         return requestValidator.validateRequestObject(authenticatedRequest)
     }
 
-    private suspend fun HttpClient.fetchRequest(uri: String): FetchedRequest {
+    private suspend fun HttpClient.fetchRequest(uri: String): ReceivedRequest {
         val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
         val requestFetcher = RequestFetcher(this, siopOpenId4VPConfig)
         return requestFetcher.fetchRequest(unvalidatedRequest)
@@ -322,12 +347,12 @@ internal class DefaultAuthorizationRequestResolver(
  * Creates an invalid resolution for errors that manifested while trying to authenticate a Client.
  */
 private fun dispatchDetailsOrNull(
-    fetchedRequest: FetchedRequest,
+    fetchedRequest: ReceivedRequest,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? =
     when (fetchedRequest) {
-        is FetchedRequest.JwtSecured -> fetchedRequest.jwt.jwtClaimsSet.dispatchDetailsOrNull()
-        is FetchedRequest.Plain -> dispatchDetailsOrNull(fetchedRequest.requestObject, siopOpenId4VPConfig)
+        is ReceivedRequest.Signed -> fetchedRequest.toSignedJwts().firstOrNull()?.jwtClaimsSet?.dispatchDetailsOrNull()
+        is ReceivedRequest.Unsigned -> dispatchDetailsOrNull(fetchedRequest.requestObject, siopOpenId4VPConfig)
     }
 
 /**

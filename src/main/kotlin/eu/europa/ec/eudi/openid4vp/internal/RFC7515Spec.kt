@@ -15,7 +15,14 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal
 
-import com.nimbusds.jwt.SignedJWT
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 
 internal object RFC7515Spec {
@@ -27,22 +34,7 @@ internal object RFC7515Spec {
     const val JWS_JSON_SYNTAX_PROTECTED_HEADER = "protected"
 }
 
-internal data class Header(
-    val protected: Base64UrlNoPadding? = null,
-    val unProtected: JsonObject? = null,
-) {
-    init {
-        require(protected != null || unProtected != null) {
-            "At least one of protected or un protected parts of the header must be set"
-        }
-    }
-}
-
-internal data class JWSSignature(
-    val header: Header,
-    val signature: Base64UrlNoPadding,
-)
-
+@Serializable(with = Base64UrlNoPaddingSerializer::class)
 internal data class Base64UrlNoPadding private constructor(val encoded: String) {
 
     override fun toString(): String = encoded
@@ -58,113 +50,84 @@ internal data class Base64UrlNoPadding private constructor(val encoded: String) 
     }
 }
 
-internal data class JwsSigned(
-    val payload: Base64UrlNoPadding,
-    val signatures: List<JWSSignature>,
+@Serializable
+internal data class Signature(
+    val header: JsonObject? = null,
+    val protected: Base64UrlNoPadding? = null,
+    val signature: Base64UrlNoPadding,
 ) {
-
     init {
-        require(!signatures.isEmpty()) { "At least one signature is required" }
+        require(header != null || protected != null) {
+            "At least one of protected or un protected headers must be set."
+        }
+    }
+}
+
+@Serializable(with = JwsJsonSerializer::class)
+internal sealed interface JwsJson {
+
+    val payload: Base64UrlNoPadding
+
+    @Serializable
+    data class General(
+        override val payload: Base64UrlNoPadding,
+        val signatures: List<Signature>,
+    ) : JwsJson {
+        init {
+            require(!signatures.isEmpty()) { "At least one signature is required" }
+        }
+    }
+
+    @Serializable
+    data class Flattened(
+        val header: JsonObject? = null,
+        val protected: Base64UrlNoPadding? = null,
+        override val payload: Base64UrlNoPadding,
+        val signature: Base64UrlNoPadding,
+    ) : JwsJson {
+        init {
+            require(header != null || protected != null) {
+                "At least one of protected or un protected headers must be set."
+            }
+        }
     }
 
     companion object {
 
         /**
-         * Parses an input string representing a JWS in compact form into a [JwsSigned].
+         * Parses an input string representing a JWS in compact form into a [JwsJson.Flattened] object.
          */
-        fun from(compact: String): Result<JwsSigned> = runCatching {
+        fun from(compact: String): Result<JwsJson> = runCatching {
             require(compact.isNotBlank()) { "Input must not be empty" }
             compact.split(".").let { parts ->
                 require(parts.size == 3) { "Input must be a JWS in compact form" }
                 val jwsJsonObject = buildJsonObject {
-                    put(RFC7515Spec.JWS_JSON_SYNTAX_HEADER, parts[0])
+                    put(RFC7515Spec.JWS_JSON_SYNTAX_PROTECTED_HEADER, parts[0])
                     put(RFC7515Spec.JWS_JSON_SYNTAX_PAYLOAD, parts[1])
                     put(RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE, parts[2])
                 }
-                return from(jwsJsonObject)
+                Json.decodeFromJsonElement<JwsJson>(jwsJsonObject)
             }
-        }
-
-        /**
-         * Parses an input [JsonObject] representing a JWS in JSON serialization (general or flattened) into
-         * a [JwsSigned].
-         */
-        fun from(jwsJsonObject: JsonObject): Result<JwsSigned> = runCatching {
-            val maybeSignatures = jwsJsonObject[RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURES]
-            val maybeSignature = jwsJsonObject[RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE]
-            val jwsSignatures = maybeSignature
-                ?.let { listOf(signatureFromFlattened(jwsJsonObject)) }
-                ?: maybeSignatures?.let { signaturesFromGeneral(jwsJsonObject) }
-                ?: throw IllegalArgumentException("No signatures found!")
-
-            val payload = payload(jwsJsonObject)
-
-            JwsSigned(payload, jwsSignatures)
-        }
-
-        private fun payload(jwsJsonObject: JsonObject): Base64UrlNoPadding {
-            val maybePayload = jwsJsonObject[RFC7515Spec.JWS_JSON_SYNTAX_PAYLOAD]
-                .mustBeNotNullString(RFC7515Spec.JWS_JSON_SYNTAX_PAYLOAD)
-            return Base64UrlNoPadding(maybePayload.content).getOrThrow()
-        }
-
-        private fun signatureFromFlattened(jwsJsonObject: JsonObject): JWSSignature {
-            val signature = jwsJsonObject[RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE]
-                .mustBeNotNullString(RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE)
-
-            val maybeProtectedHeader = jwsJsonObject[RFC7515Spec.JWS_JSON_SYNTAX_PROTECTED_HEADER]
-            val maybeHeader = jwsJsonObject[RFC7515Spec.JWS_JSON_SYNTAX_HEADER]
-
-            return JWSSignature(
-                header = Header(
-                    protected = maybeProtectedHeader?.let {
-                        require(it is JsonPrimitive) { "Protected header must be a String" }
-                        Base64UrlNoPadding(it.content).getOrThrow()
-                    },
-                    unProtected = maybeHeader?.let {
-                        require(it is JsonObject) { "Un protected header must be a JSON object" }
-                        it.jsonObject
-                    },
-                ),
-                signature = Base64UrlNoPadding(signature.content).getOrThrow(),
-            )
-        }
-
-        private fun signaturesFromGeneral(jwsJsonObject: JsonObject): List<JWSSignature> {
-            val maybeSignatures = jwsJsonObject["signatures"]
-            require(maybeSignatures != null) { "No signatures found!" }
-            require(maybeSignatures is JsonArray) { "Signatures expected to be an array but was not!" }
-            return maybeSignatures.map { signature ->
-                require(signature is JsonObject) { "Signature expected to be a JSON object but was not!" }
-                signatureFromFlattened(signature)
-            }
-        }
-
-        private fun JsonElement?.mustBeNotNullString(elementName: String): JsonPrimitive {
-            require(this != null) { "No $elementName found!" }
-            require(this is JsonPrimitive && this !is JsonNull) { "$elementName must be a not null string" }
-            return this
         }
     }
 }
 
-internal fun SignedJWT.toJwsFlattenedJsonObject(): JsonObject = buildJsonObject {
-    put(RFC7515Spec.JWS_JSON_SYNTAX_PROTECTED_HEADER, header.toBase64URL().toString())
-    put(RFC7515Spec.JWS_JSON_SYNTAX_PAYLOAD, payload.toBase64URL().toString())
-    put(RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE, signature.toString())
+internal object JwsJsonSerializer : JsonContentPolymorphicSerializer<JwsJson>(JwsJson::class) {
+
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<JwsJson> = when {
+        RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURES in element.jsonObject -> JwsJson.General.serializer()
+        RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE in element.jsonObject -> JwsJson.Flattened.serializer()
+        else -> throw IllegalArgumentException("Unsupported JWS JSON format")
+    }
 }
 
-internal fun SignedJWT.toJwsGeneralJsonObject(): JsonObject = buildJsonObject {
-    put(RFC7515Spec.JWS_JSON_SYNTAX_PAYLOAD, payload.toBase64URL().toString())
-    put(
-        RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURES,
-        buildJsonArray {
-            add(
-                buildJsonObject {
-                    put(RFC7515Spec.JWS_JSON_SYNTAX_PROTECTED_HEADER, header.toBase64URL().toString())
-                    put(RFC7515Spec.JWS_JSON_SYNTAX_SIGNATURE, signature.toString())
-                },
-            )
-        },
-    )
+internal object Base64UrlNoPaddingSerializer : KSerializer<Base64UrlNoPadding> {
+
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): Base64UrlNoPadding =
+        Base64UrlNoPadding(decoder.decodeString()).getOrThrow()
+
+    override fun serialize(encoder: Encoder, value: Base64UrlNoPadding) =
+        encoder.encodeString(value.toString())
 }

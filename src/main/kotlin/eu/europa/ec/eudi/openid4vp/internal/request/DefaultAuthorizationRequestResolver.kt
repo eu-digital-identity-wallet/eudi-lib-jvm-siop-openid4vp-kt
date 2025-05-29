@@ -19,12 +19,11 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.internal.JwsSigned
+import eu.europa.ec.eudi.openid4vp.internal.JwsJson
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
-import eu.europa.ec.eudi.openid4vp.internal.toJwsFlattenedJsonObject
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -175,25 +174,30 @@ internal sealed interface UnvalidatedRequest {
 
 internal sealed interface ReceivedRequest {
     data class Unsigned(val requestObject: UnvalidatedRequestObject) : ReceivedRequest
-    data class Signed(val jwsSigned: JwsSigned) : ReceivedRequest {
+    data class Signed(val jwsJson: JwsJson) : ReceivedRequest {
         companion object {
-            operator fun invoke(signedJwt: SignedJWT): Signed = Signed(JwsSigned.from(signedJwt).getOrThrow())
+            operator fun invoke(signedJwt: SignedJWT): Signed = Signed(JwsJson.from(signedJwt).getOrThrow())
         }
     }
 }
 
 /**
- * Decomposes a Nimbus [SignedJWT] into [JwsSigned].
+ * Decomposes a Nimbus [SignedJWT] into [JwsJson].
  */
-internal fun JwsSigned.Companion.from(signedJwt: SignedJWT): Result<JwsSigned> = runCatching {
+private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runCatching {
     require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
-    JwsSigned.Companion.from(signedJwt.toJwsFlattenedJsonObject()).getOrThrow()
+    val compactFormString = "${signedJwt.header.toBase64URL()}.${signedJwt.payload.toBase64URL()}.${signedJwt.signature}"
+    JwsJson.Companion.from(compactFormString).getOrThrow()
 }
 
-internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
-    jwsSigned.signatures.map {
-        SignedJWT.parse("${it.header.protected}.${jwsSigned.payload}.${it.signature}")
+internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> = when (jwsJson) {
+    is JwsJson.Flattened -> listOf(
+        SignedJWT.parse("${jwsJson.protected}.${jwsJson.payload}.${jwsJson.signature}"),
+    )
+    is JwsJson.General -> jwsJson.signatures.map {
+        SignedJWT.parse("${it.protected}.${jwsJson.payload}.${it.signature}")
     }
+}
 
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,

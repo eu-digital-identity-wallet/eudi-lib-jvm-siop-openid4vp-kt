@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp.internal
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -35,9 +36,9 @@ internal object RFC7515Spec {
 }
 
 @Serializable(with = Base64UrlNoPaddingSerializer::class)
-internal data class Base64UrlNoPadding private constructor(val encoded: String) {
+internal data class Base64UrlNoPadding private constructor(val value: String) {
 
-    override fun toString(): String = encoded
+    override fun toString(): String = value
 
     companion object {
 
@@ -109,6 +110,18 @@ internal sealed interface JwsJson {
                 Json.decodeFromJsonElement<JwsJson>(jwsJsonObject)
             }
         }
+
+        fun JwsJson.flatten(): List<JwsJson.Flattened> = when (this) {
+            is Flattened -> listOf(this)
+            is General -> signatures.map {
+                Flattened(
+                    header = it.header,
+                    protected = it.protected,
+                    payload = payload,
+                    signature = it.signature,
+                )
+            }
+        }
     }
 }
 
@@ -123,10 +136,13 @@ internal object JwsJsonSerializer : JsonContentPolymorphicSerializer<JwsJson>(Jw
 
 internal object Base64UrlNoPaddingSerializer : KSerializer<Base64UrlNoPadding> {
 
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Locale", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Base64UrlNoPadding", PrimitiveKind.STRING)
 
-    override fun deserialize(decoder: Decoder): Base64UrlNoPadding =
+    override fun deserialize(decoder: Decoder): Base64UrlNoPadding = try {
         Base64UrlNoPadding(decoder.decodeString()).getOrThrow()
+    } catch (t: Exception) {
+        throw SerializationException("Unable to decode base64 url-safe", t)
+    }
 
     override fun serialize(encoder: Encoder, value: Base64UrlNoPadding) =
         encoder.encodeString(value.toString())

@@ -20,6 +20,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.JwsJson
+import eu.europa.ec.eudi.openid4vp.internal.JwsJson.Companion.flatten
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
@@ -190,14 +191,10 @@ private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runC
     JwsJson.Companion.from(compactFormString).getOrThrow()
 }
 
-internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> = when (jwsJson) {
-    is JwsJson.Flattened -> listOf(
-        SignedJWT.parse("${jwsJson.protected}.${jwsJson.payload}.${jwsJson.signature}"),
-    )
-    is JwsJson.General -> jwsJson.signatures.map {
-        SignedJWT.parse("${it.protected}.${jwsJson.payload}.${it.signature}")
+internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
+    jwsJson.flatten().map {
+        SignedJWT.parse("${it.protected}.${it.payload}.${it.signature}")
     }
-}
 
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,

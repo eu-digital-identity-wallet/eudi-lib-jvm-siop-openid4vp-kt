@@ -15,11 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.JWSObject
-import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.JwsJson
-import eu.europa.ec.eudi.openid4vp.internal.JwsJson.Companion.flatten
 import eu.europa.ec.eudi.openid4vp.internal.decodePayloadAs
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
@@ -28,7 +25,6 @@ import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecure
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.net.URI
@@ -61,28 +57,6 @@ internal value class TransactionDataTO(val value: JsonArray) {
     val values: List<String>
         get() = value.map { it.jsonPrimitive.content }
 }
-
-/**
- * The data of an OpenID4VP authorization request or SIOP Authentication request
- * or a combined OpenId4VP & SIOP request
- * without any validation and regardless of the way they sent to the wallet
- */
-@Serializable
-internal data class UnvalidatedRequestObject(
-    @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    @SerialName(OpenId4VPSpec.NONCE) val nonce: String? = null,
-    @SerialName("client_id") val clientId: String? = null,
-    @SerialName("response_type") val responseType: String? = null,
-    @SerialName("response_mode") val responseMode: String? = null,
-    @SerialName(OpenId4VPSpec.RESPONSE_URI) val responseUri: String? = null,
-    @SerialName(OpenId4VPSpec.DCQL_QUERY) val dcqlQuery: JsonObject? = null,
-    @SerialName("redirect_uri") val redirectUri: String? = null,
-    @SerialName("scope") val scope: String? = null,
-    @SerialName("state") val state: String? = null,
-    @SerialName("id_token_type") val idTokenType: String? = null,
-    @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: TransactionDataTO? = null,
-    @SerialName(OpenId4VPSpec.VERIFIER_INFO) val verifierInfo: VerifierInfoTO? = null,
-)
 
 enum class RequestUriMethod {
     GET, POST
@@ -195,34 +169,10 @@ internal sealed interface UnvalidatedRequest {
     }
 }
 
-internal sealed interface ReceivedRequest {
-    data class Unsigned(val requestObject: UnvalidatedRequestObject) : ReceivedRequest
-    data class Signed(val jwsJson: JwsJson) : ReceivedRequest {
-        companion object {
-            operator fun invoke(signedJwt: SignedJWT): Signed = Signed(JwsJson.from(signedJwt).getOrThrow())
-        }
-    }
-}
-
-/**
- * Decomposes a Nimbus [SignedJWT] into [JwsJson].
- */
-private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runCatching {
-    require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
-    val compactFormString =
-        "${signedJwt.header.toBase64URL()}.${signedJwt.payload.toBase64URL()}.${signedJwt.signature}"
-    JwsJson.Companion.from(compactFormString).getOrThrow()
-}
-
-internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
-    jwsJson.flatten().map {
-        SignedJWT.parse("${it.protected}.${it.payload}.${it.signature}")
-    }
-
-internal class DefaultAuthorizationRequestResolver(
+internal class DefaultRequestResolverOverHttp(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClient: HttpClient,
-) : AuthorizationRequestResolver {
+) : AuthorizationRequestOverHttpResolver {
 
     override suspend fun resolveRequestUri(uri: String): Resolution =
         with(httpClient) {
@@ -262,7 +212,7 @@ internal class DefaultAuthorizationRequestResolver(
 
     private fun validateRequestObject(authenticatedRequest: AuthenticatedRequest): ResolvedRequestObject {
         val requestValidator = RequestObjectValidator(siopOpenId4VPConfig)
-        return requestValidator.validateRequestObject(authenticatedRequest)
+        return requestValidator.validateHttpRequestObject(authenticatedRequest)
     }
 
     private suspend fun HttpClient.fetchRequest(uri: String): ReceivedRequest {
@@ -273,7 +223,7 @@ internal class DefaultAuthorizationRequestResolver(
 
     private suspend fun HttpClient.authenticateRequest(receivedRequest: ReceivedRequest): AuthenticatedRequest {
         val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, this)
-        return requestAuthenticator.authenticate(receivedRequest)
+        return requestAuthenticator.authenticateRequestOverHttp(receivedRequest)
     }
 }
 

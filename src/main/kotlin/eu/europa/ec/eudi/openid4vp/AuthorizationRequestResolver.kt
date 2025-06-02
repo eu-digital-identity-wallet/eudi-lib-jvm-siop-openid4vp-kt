@@ -47,6 +47,7 @@ sealed interface Client : java.io.Serializable {
     data class VerifierAttestation(val clientId: OriginalClientId) : Client
     data class X509SanDns(val clientId: OriginalClientId, val cert: X509Certificate) : Client
     data class X509Hash(val clientId: OriginalClientId, val cert: X509Certificate) : Client
+    data class Origin(val clientId: OriginalClientId) : Client
 
     /**
      * The id of the client prefixed with the client id prefix.
@@ -59,6 +60,7 @@ sealed interface Client : java.io.Serializable {
             is VerifierAttestation -> VerifierId(ClientIdPrefix.VerifierAttestation, clientId)
             is X509SanDns -> VerifierId(ClientIdPrefix.X509SanDns, clientId)
             is X509Hash -> VerifierId(ClientIdPrefix.X509Hash, clientId)
+            is Origin -> VerifierId(ClientIdPrefix.ORIGIN, clientId)
         }
 }
 
@@ -86,6 +88,7 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
         is VerifierAttestation -> null
         is X509SanDns -> cert.legalName()
         is X509Hash -> cert.legalName()
+        is Origin -> null
     }
 }
 
@@ -519,7 +522,7 @@ fun <T> AuthorizationRequestError.asFailure(): Result<T> =
     Result.failure(asException())
 
 /**
- * The outcome of [validating and resolving][AuthorizationRequestResolver.resolveRequestUri]
+ * The outcome of [validating and resolving][AuthorizationRequestOverHttpResolver.resolveRequestUri]
  * an authorization request.
  */
 sealed interface Resolution {
@@ -563,10 +566,21 @@ data class ErrorDispatchDetails(
  * fetches parts of the authorization request which are provided by reference)
  *
  */
-fun interface AuthorizationRequestResolver {
+fun interface AuthorizationRequestOverHttpResolver {
 
     /**
      * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
     suspend fun resolveRequestUri(uri: String): Resolution
+}
+
+fun interface AuthorizationRequestOverDCApiResolver {
+
+    /**
+     * Tries to validate an authorization request received via the Digital Credential API channel into a [ResolvedRequestObject].
+     *
+     * @param origin The origin of the request
+     * @param requestData The request data as a JsonObject
+     */
+    suspend fun resolveRequestObject(origin: String, requestData: JsonObject): Resolution
 }

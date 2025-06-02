@@ -185,7 +185,7 @@ class AuthorizationResponseDispatcherTest {
                     }
                 }
 
-                val dispatcher = DefaultDispatcher(managedHttpClient)
+                val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                 val outcome = dispatcher.dispatch(
                     siopAuthRequestObject,
                     idTokenConsensus,
@@ -270,7 +270,7 @@ class AuthorizationResponseDispatcherTest {
                     }
                 }
 
-                val dispatcher = DefaultDispatcher(managedHttpClient)
+                val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                 val outcome = dispatcher.dispatch(
                     openId4VPAuthRequestObject,
                     vpTokenConsensus,
@@ -329,7 +329,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(managedHttpClient)
+                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.InvalidClientId,
                         errorDispatchDetails,
@@ -394,7 +394,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(managedHttpClient)
+                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.InvalidRequestUriMethod,
                         errorDispatchDetails,
@@ -427,7 +427,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(managedHttpClient)
+                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.SubjectSyntaxTypesNoMatch,
                         errorDispatchDetails,
@@ -470,7 +470,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(managedHttpClient)
+                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         MissingScope,
                         errorDispatchDetails,
@@ -508,7 +508,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(managedHttpClient)
+                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         MissingResponseType,
                         errorDispatchDetails,
@@ -550,7 +550,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(managedHttpClient)
+                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.MissingResponseUri,
                         errorDispatchDetails,

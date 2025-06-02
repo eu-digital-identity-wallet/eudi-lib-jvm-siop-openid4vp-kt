@@ -33,7 +33,8 @@ import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
-import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
+import eu.europa.ec.eudi.openid4vp.internal.request.DefaultRequestResolverOverDCApi
+import eu.europa.ec.eudi.openid4vp.internal.request.DefaultRequestResolverOverHttp
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -79,8 +80,7 @@ class UnvalidatedRequestResolverTest {
     fun teardown() {
         httpClient.close()
     }
-
-    private fun resolver() = DefaultAuthorizationRequestResolver(walletConfig, httpClient)
+    private fun resolver() = DefaultRequestResolverOverHttp(walletConfig, httpClient)
 
     private val dcqlQuery = readFileAsText("dcql/basic_example.json")
         .replace("\r\n", "")
@@ -760,6 +760,170 @@ class UnvalidatedRequestResolverTest {
             is Resolution.Invalid -> assertIs(error, "${T::class} error expected")
             else -> fail("Success resolution found while expected Invalid")
         }
+
+    @DisplayName("when authorization request comes through DC API channel")
+    @Nested
+    inner class RequestResolutionOverDCApiTest {
+
+        private val dcqlQuery = readFileAsText("dcql/basic_example.json")
+            .replace("\r\n", "")
+            .replace("\r", "")
+            .replace("\n", "")
+            .replace("  ", "")
+
+        private val resolver = DefaultRequestResolverOverDCApi(walletConfig, httpClient)
+
+        private val clientMetadata =
+            """ {
+                 "jwks": $jwkSetJO,
+                 "vp_formats_supported": {
+                     "dc+sd-jwt": {
+                         "sd-jwt_alg_values": ["RS256", "ES512", "ES256", "ES384"],
+                         "kb-jwt_alg_values": ["RS256", "ES512", "ES384"]
+                     }
+                 }    
+               }
+            """.trimIndent()
+
+        @Test
+        fun `nonce is mandatory to exist`() = runTest {
+            val authRequest = """ 
+              { 
+                "response_mode" : "dc_api",                
+                "dcql_query" : $dcqlQuery, 
+                "client_metadata" : $clientMetadata
+              }
+            """.trimIndent()
+
+            val requestData = jsonSupport.decodeFromString<JsonObject>(authRequest)
+
+            val resolution = resolver.resolveRequestObject("test_origin", requestData)
+            assertIs<Resolution.Invalid>(resolution)
+            assertIs<RequestValidationError.MissingNonce>(resolution.error)
+        }
+
+        @Test
+        fun `response_mode must be dc_api or dc_api jwt`() = runTest {
+            val authRequest = """ 
+              { 
+                "response_mode" : "fragment",
+                "nonce" : "n-0S6_WzA2Mj",
+                "dcql_query" : $dcqlQuery,
+                "client_metadata" : $clientMetadata
+              }
+            """.trimIndent()
+
+            val requestData = jsonSupport.decodeFromString<JsonObject>(authRequest)
+
+            val resolution = resolver.resolveRequestObject("test_origin", requestData)
+            val invalid = resolution.validateInvalid<RequestValidationError.UnsupportedResponseMode>()
+            assertEquals("fragment", invalid.value)
+        }
+
+        @Test
+        fun `response_type is ignored if provided in request`() = runTest {
+            val authRequest = """ 
+              {            
+                "response_type" : "id_token",
+                "response_mode" : "dc_api",
+                "nonce" : "n-0S6_WzA2Mj",
+                "dcql_query" : $dcqlQuery, 
+                "client_metadata" : $clientMetadata
+              }
+            """.trimIndent()
+
+            val requestData = jsonSupport.decodeFromString<JsonObject>(authRequest)
+
+            val resolution = resolver.resolveRequestObject("test_origin", requestData)
+            val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            assertIs<Client.Origin>(request.client)
+            assertEquals("test_origin", request.client.clientId)
+        }
+
+        @Test
+        fun `and no presentation query passed resolution fails`() = runTest {
+            val authRequest = """ 
+              {
+                "response_mode" : "dc_api",
+                "nonce" : "n-0S6_WzA2Mj",                
+                "client_metadata" : $clientMetadata
+              }
+            """.trimIndent()
+
+            val requestData = jsonSupport.decodeFromString<JsonObject>(authRequest)
+
+            val resolution = resolver.resolveRequestObject("test_origin", requestData)
+            resolution.validateInvalid<RequestValidationError.MissingQuerySource>()
+        }
+
+        @Test
+        fun `if response_mode is dc_api jwt client metadata must be included in request`() = runTest {
+            val authRequest = """ 
+              {
+                "response_mode" : "dc_api.jwt",
+                "nonce" : "n-0S6_WzA2Mj",    
+                "dcql_query" : $dcqlQuery
+              }
+            """.trimIndent()
+
+            val requestData = jsonSupport.decodeFromString<JsonObject>(authRequest)
+
+            val resolution = resolver.resolveRequestObject("test_origin", requestData)
+            val invalid = resolution.validateInvalid<RequestValidationError.InvalidClientMetaData>()
+            assertEquals("Missing client metadata", invalid.cause)
+        }
+
+        @Test
+        fun `client_id is ignored if provided in request`() = runTest {
+            val authRequest = """ 
+              {            
+                "client_id" : "client_id",
+                "response_mode" : "dc_api",
+                "nonce" : "n-0S6_WzA2Mj",
+                "dcql_query" : $dcqlQuery, 
+                "client_metadata" : $clientMetadata
+              }
+            """.trimIndent()
+
+            val requestData = jsonSupport.decodeFromString<JsonObject>(authRequest)
+
+            val resolution = resolver.resolveRequestObject("test_origin", requestData)
+            val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+            assertIs<Client.Origin>(request.client)
+            assertEquals("test_origin", request.client.clientId)
+        }
+
+        @Test
+        fun `verifier attestations are parsed correctly`() = runTest {
+            val authRequest = """ 
+              {                 
+                "response_mode" : "dc_api",
+                "nonce" : "n-0S6_WzA2Mj",
+                "dcql_query" : $dcqlQuery, 
+                "client_metadata" : $clientMetadata,
+                "verifier_info" : [{
+                    "format": "jwt",
+                    "data": "attestation_data"
+                }, {
+                    "format": "jwt",
+                    "data": "attestation_data_1"
+                }]
+              }
+            """.trimIndent()
+
+            val requestData = jsonSupport.decodeFromString<JsonObject>(authRequest)
+
+            val resolution = resolver.resolveRequestObject("test_origin", requestData)
+            val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+
+            assertNotNull(request.verifierInfo)
+
+            val jwtAttestations = request.verifierInfo.attestations.filter {
+                it.format == VerifierInfo.Attestation.Format.Jwt
+            }.size
+            assertEquals(2, jwtAttestations)
+        }
+    }
 
     @DisplayName("when using transaction_data")
     @Nested

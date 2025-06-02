@@ -16,6 +16,8 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.DCApi
+import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.DCApiJwt
 import java.net.URI
 import java.net.URL
 
@@ -109,6 +111,46 @@ internal sealed interface AuthorizationResponsePayload : java.io.Serializable {
         override val encryptionParameters: EncryptionParameters? = null,
     ) : Failed
 }
+
+internal fun AuthorizationResponsePayload.asMap(): Map<String, String> =
+    when (this) {
+        is AuthorizationResponsePayload.SiopAuthentication -> buildMap {
+            put(OpenId4VPSpec.ID_TOKEN, idToken)
+            state?.let {
+                put(OpenId4VPSpec.STATE, it)
+            }
+        }
+
+        is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
+            put(OpenId4VPSpec.VP_TOKEN, verifiablePresentations.asParam())
+            state?.let {
+                put(OpenId4VPSpec.STATE, it)
+            }
+        }
+
+        is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
+            put(OpenId4VPSpec.ID_TOKEN, idToken)
+            put(OpenId4VPSpec.VP_TOKEN, verifiablePresentations.asParam())
+            state?.let {
+                put(OpenId4VPSpec.STATE, it)
+            }
+        }
+
+        is AuthorizationResponsePayload.InvalidRequest -> buildMap {
+            put(OpenId4VPSpec.ERROR, AuthorizationRequestErrorCode.fromError(error).code)
+            put(OpenId4VPSpec.ERROR_DESCRIPTION, "$error")
+            state?.let {
+                put(OpenId4VPSpec.STATE, it)
+            }
+        }
+
+        is AuthorizationResponsePayload.NoConsensusResponseData -> buildMap {
+            put(OpenId4VPSpec.ERROR, AuthorizationRequestErrorCode.ACCESS_DENIED.code)
+            state?.let {
+                put(OpenId4VPSpec.STATE, it)
+            }
+        }
+    }
 
 /**
  * An OAUTH2 authorization response
@@ -204,6 +246,33 @@ internal sealed interface AuthorizationResponse : java.io.Serializable {
             }
         }
     }
+
+    data class DCApi(
+        val data: AuthorizationResponsePayload,
+    ) : AuthorizationResponse {
+        init {
+            require(
+                data is AuthorizationResponsePayload.Failed ||
+                    data is AuthorizationResponsePayload.OpenId4VPAuthorization,
+            ) {
+                "Response payload in DC API must be either Failed or OpenId4VPAuthorization, but was ${data::class.simpleName} instead"
+            }
+        }
+    }
+
+    data class DCApiJwt(
+        val data: AuthorizationResponsePayload,
+        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    ) : AuthorizationResponse {
+        init {
+            require(
+                data is AuthorizationResponsePayload.Failed ||
+                    data is AuthorizationResponsePayload.OpenId4VPAuthorization,
+            ) {
+                "Response payload in DC API must be either Failed or OpenId4VPAuthorization, but was ${data::class.simpleName} instead"
+            }
+        }
+    }
 }
 
 internal fun ResolvedRequestObject.responseWith(
@@ -273,12 +342,24 @@ private fun ResolvedRequestObject.responseWith(
             data,
             checkNotNull(responseEncryptionSpecification),
         )
+
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
         is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(
             mode.redirectUri,
             data,
             checkNotNull(responseEncryptionSpecification),
         )
+
         is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, checkNotNull(responseEncryptionSpecification))
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(
+            mode.redirectUri,
+            data,
+            checkNotNull(responseEncryptionSpecification),
+        )
+
+        ResponseMode.DCApi -> DCApi(data)
+        ResponseMode.DCApiJwt -> DCApiJwt(
+            data,
+            checkNotNull(responseEncryptionSpecification),
+        )
     }

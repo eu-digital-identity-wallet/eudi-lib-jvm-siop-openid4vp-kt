@@ -155,7 +155,7 @@ class DefaultDispatcherTest {
         )
 
         /**
-         * Creates a [Dispatcher] that mocks the behavior of a Verifier, in case of posting
+         * Creates a [DispatcherOverHttp] that mocks the behavior of a Verifier, in case of posting
          * an authorization response (direct post, or direct post jwt response_mode).
          *
          * The verifier asserts that it receives an HTTP Post, which contains [FormDataContent], having
@@ -168,7 +168,7 @@ class DefaultDispatcherTest {
         fun createDispatcherWithVerifierAsserting(
             responseBodyRedirectUri: URI? = null,
             responseParameterAssertions: (String) -> Unit,
-        ): Dispatcher {
+        ): DispatcherOverHttp {
             val mockEngine = MockEngine { request ->
                 assertEquals(HttpMethod.Post, request.method)
                 request.body.contentType?.let {
@@ -199,7 +199,7 @@ class DefaultDispatcherTest {
                 }
             }
 
-            return DefaultDispatcher(httpClient)
+            return DefaultDispatcherOverHttp(httpClient)
         }
     }
 
@@ -408,7 +408,7 @@ class DefaultDispatcherTest {
                     respondOk()
                 }
                 val httpClient = HttpClient(mockEngine)
-                DefaultDispatcher(httpClient)
+                DefaultDispatcherOverHttp(httpClient)
             }
 
             val dispatchOutcome = errorDispatcher.dispatchError(
@@ -711,7 +711,7 @@ class DefaultDispatcherTest {
                     )
 
                     val outcome = HttpClient().use { httpClient ->
-                        val dispatcher = DefaultDispatcher(httpClient)
+                        val dispatcher = DefaultDispatcherOverHttp(httpClient)
                         dispatcher.dispatch(
                             verifierRequest,
                             Consensus.NegativeConsensus,
@@ -928,7 +928,7 @@ class DefaultDispatcherTest {
                     )
 
                     val outcome = HttpClient().use { httpClient ->
-                        val dispatcher = DefaultDispatcher(httpClient)
+                        val dispatcher = DefaultDispatcherOverHttp(httpClient)
                         dispatcher.dispatch(
                             verifierRequest,
                             Consensus.NegativeConsensus,

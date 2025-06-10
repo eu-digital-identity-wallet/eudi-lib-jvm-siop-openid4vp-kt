@@ -65,7 +65,7 @@ internal class RequestFetcher(
         val (_, requestUri, requestUriMethod) = request
 
         val supportedMethods =
-            siopOpenId4VPConfig.jarConfiguration.supportedRequestUriMethods
+            siopOpenId4VPConfig.signedRequestConfiguration.supportedRequestUriMethods
 
         return when (requestUriMethod) {
             null, RequestUriMethod.GET -> {
@@ -136,7 +136,7 @@ private fun SiopOpenId4VPConfig.ensureSupportedSigningAlgorithm(signedJwt: Signe
     val signingAlg = ensureNotNull(signedJwt.header.algorithm) {
         invalidJwt("JAR is missing alg claim from header")
     }
-    ensure(signingAlg in jarConfiguration.supportedAlgorithms) {
+    ensure(signingAlg in signedRequestConfiguration.supportedAlgorithms) {
         invalidJwt("JAR is signed with ${signingAlg.name} which is not supported")
     }
 }

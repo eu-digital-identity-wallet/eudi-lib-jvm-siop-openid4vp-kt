@@ -189,6 +189,6 @@ interface DispatcherOverDCApi {
     suspend fun assembleResponse(
         request: ResolvedRequestObject,
         consensus: Consensus,
-        encryptionParameters: EncryptionParameters?,
+        encryptionParameters: EncryptionParameters? = null,
     ): JsonObject
 }

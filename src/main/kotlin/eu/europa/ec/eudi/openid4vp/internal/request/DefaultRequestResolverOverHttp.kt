@@ -193,7 +193,7 @@ internal class DefaultRequestResolverOverHttp(
             } catch (e: AuthorizationRequestException) {
                 val dispatchDetails =
                     when (siopOpenId4VPConfig.errorDispatchPolicy) {
-                        ErrorDispatchPolicy.AllClients -> dispatchDetailsOrNull(fetchedRequest, siopOpenId4VPConfig)
+                        ErrorDispatchPolicy.AllClients -> dispatchErrorDetailsOrNull(fetchedRequest, siopOpenId4VPConfig)
                         ErrorDispatchPolicy.OnlyAuthenticatedClients -> null
                     }
                 return Resolution.Invalid(e.error, dispatchDetails)
@@ -203,7 +203,7 @@ internal class DefaultRequestResolverOverHttp(
             try {
                 validateRequestObject(authenticatedRequest)
             } catch (e: AuthorizationRequestException) {
-                val dispatchDetails = dispatchDetailsOrNull(authenticatedRequest.requestObject, siopOpenId4VPConfig)
+                val dispatchDetails = dispatchErrorDetailsOrNull(authenticatedRequest.requestObject, siopOpenId4VPConfig)
                 return Resolution.Invalid(e.error, dispatchDetails)
             }
 
@@ -230,13 +230,13 @@ internal class DefaultRequestResolverOverHttp(
 /**
  * Creates an invalid resolution for errors that manifested while trying to authenticate a Client.
  */
-private fun dispatchDetailsOrNull(
+private fun dispatchErrorDetailsOrNull(
     fetchedRequest: ReceivedRequest,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? =
     when (fetchedRequest) {
-        is ReceivedRequest.Signed -> dispatchDetailsOrNull(fetchedRequest.jwsJson, siopOpenId4VPConfig)
-        is ReceivedRequest.Unsigned -> dispatchDetailsOrNull(fetchedRequest.requestObject, siopOpenId4VPConfig)
+        is ReceivedRequest.Signed -> dispatchErrorDetailsOrNull(fetchedRequest.jwsJson, siopOpenId4VPConfig)
+        is ReceivedRequest.Unsigned -> dispatchErrorDetailsOrNull(fetchedRequest.requestObject, siopOpenId4VPConfig)
     }
 
 /**
@@ -248,7 +248,7 @@ private fun dispatchDetailsOrNull(
  * * the response mode requires encryption, and we have resolved Client metadata that contains encryption parameters compatible with
  * the configuration of the Wallet
  */
-private fun dispatchDetailsOrNull(
+private fun dispatchErrorDetailsOrNull(
     unvalidatedRequest: UnvalidatedRequestObject,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? {
@@ -306,12 +306,12 @@ private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
     }
 }
 
-private fun dispatchDetailsOrNull(
+private fun dispatchErrorDetailsOrNull(
     jwsJson: JwsJson,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? =
     runCatching {
-        dispatchDetailsOrNull(
+        dispatchErrorDetailsOrNull(
             jwsJson.decodePayloadAs<UnvalidatedRequestObject>(),
             siopOpenId4VPConfig,
         )

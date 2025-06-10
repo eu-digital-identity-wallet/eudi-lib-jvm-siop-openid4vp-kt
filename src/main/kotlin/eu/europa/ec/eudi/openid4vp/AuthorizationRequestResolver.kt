@@ -485,6 +485,26 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class DIDResolutionFailed(val didUrl: String) : RequestValidationError
 
     data class InvalidVerifierInfo(val reason: String) : RequestValidationError
+
+    data object MissingExpectedOrigins : RequestValidationError {
+        @Suppress("unused")
+        private fun readResolve(): Any = MissingExpectedOrigins
+    }
+
+    data object UnexpectedOrigin : RequestValidationError {
+        @Suppress("unused")
+        private fun readResolve(): Any = UnexpectedOrigin
+    }
+
+    data object MultiSignedRequestsNotSupported : RequestValidationError {
+        @Suppress("unused")
+        private fun readResolve(): Any = MultiSignedRequestsNotSupported
+    }
+
+    data object NoMatchingPrefixInMultiSignedRequest : RequestValidationError {
+        @Suppress("unused")
+        private fun readResolve(): Any = NoMatchingPrefixInMultiSignedRequest
+    }
 }
 
 /**

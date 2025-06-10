@@ -42,11 +42,11 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
 
         // Signature
         putJsonArray(REQUEST_OBJECT_SIGNING_ALG_VALUES_SUPPORTED) {
-            cfg.jarConfiguration.supportedAlgorithms.forEach { alg -> add(alg.name) }
+            cfg.signedRequestConfiguration.supportedAlgorithms.forEach { alg -> add(alg.name) }
         }
 
         // Encryption
-        cfg.jarConfiguration.supportedRequestUriMethods.isPostSupported()?.let { requestUriMethodPost ->
+        cfg.signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()?.let { requestUriMethodPost ->
             val jarEncryption = requestUriMethodPost.jarEncryption
             if (jarEncryption is EncryptionRequirement.Required && keys.isNotEmpty()) {
                 put(JWKS, JWKSet(keys).toJSONObject(true).toJsonObject())

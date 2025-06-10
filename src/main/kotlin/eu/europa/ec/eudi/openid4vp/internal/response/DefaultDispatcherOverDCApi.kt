@@ -31,9 +31,13 @@ internal class DefaultDispatcherOverDCApi(private val siopOpenId4VPConfig: SiopO
         consensus: Consensus,
         encryptionParameters: EncryptionParameters?,
     ): JsonObject {
+        require(consensus is Consensus.NegativeConsensus || consensus is Consensus.PositiveConsensus.VPTokenConsensus) {
+            "Invalid consensus. Expected either negative consensus or PositiveConsensus.VPTokenConsensus. " +
+                "Actual consensus: ${consensus::class::simpleName}"
+        }
         val response = request.responseWith(consensus, encryptionParameters)
         require(response is AuthorizationResponse.DCApi || response is AuthorizationResponse.DCApiJwt) {
-            "Unsupported response type: ${response::class.simpleName} for request type: ${request::class.simpleName}"
+            "Unsupported response mode: ${response::class.simpleName} for request coming from DC API channel"
         }
         return doAssemble(response)
     }
@@ -41,10 +45,12 @@ internal class DefaultDispatcherOverDCApi(private val siopOpenId4VPConfig: SiopO
     internal fun doAssemble(response: AuthorizationResponse): JsonObject = buildJsonObject {
         when (response) {
             is AuthorizationResponse.DCApi -> {
-                response.data.asMap().entries.forEach { (key, value) -> put(key, value) }
+                response.data.asDispatchingMap().entries.forEach { (key, value) -> put(key, value) }
             }
             is AuthorizationResponse.DCApiJwt -> {
-                val encryptedJwt = response.responseEncryptionSpecification?.encrypt(response.data)
+                val responseEncryptionSpecification = response.responseEncryptionSpecification
+                requireNotNull(responseEncryptionSpecification) { "Response Encryption specification missing" }
+                val encryptedJwt = responseEncryptionSpecification.encrypt(response.data)
                 put("response", JsonPrimitive(encryptedJwt))
             }
             else -> error("Unsupported authorization response ${response::class::simpleName} for dispatching over DC API")

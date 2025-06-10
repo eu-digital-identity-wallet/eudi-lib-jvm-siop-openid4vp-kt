@@ -46,19 +46,6 @@ internal class DefaultRequestResolverOverDCApi(
                 return Resolution.Invalid(e.error, null)
             }
 
-        // When request is signed it MUST contain the expected_origins attribute, and
-        // the 'origin' passed from DC API must be included in the list of expected_origins
-        // When request is not singed expected_origins should be ignored
-        if (receivedRequest is Signed) {
-            val expectedOrigins = authenticatedRequest.requestObject.expectedOrigins
-            requireNotNull(expectedOrigins) {
-                "Received request is signed but expected_origins is missing"
-            }
-            require(origin in expectedOrigins) {
-                "Received request is signed but origin '$origin' is not included in expected_origins"
-            }
-        }
-
         val resolved =
             try {
                 validateRequestObject(authenticatedRequest)

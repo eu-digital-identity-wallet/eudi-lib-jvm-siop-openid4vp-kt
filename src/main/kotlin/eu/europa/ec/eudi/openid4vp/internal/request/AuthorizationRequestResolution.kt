@@ -54,7 +54,6 @@ internal sealed interface ReceivedRequest {
             operator fun invoke(signedJwt: SignedJWT): Signed = Signed(JwsJson.from(signedJwt).getOrThrow())
         }
     }
-
     companion object
 }
 
@@ -66,7 +65,6 @@ private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runC
     JwsJson.from(signedJwt.serialize()).getOrThrow()
 }
 
-internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
-    jwsJson.flatten().map {
-        SignedJWT.parse("${it.protected}.${it.payload}.${it.signature}")
-    }
+internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> = jwsJson.flatten().map { it.toSignedJwt() }
+
+internal fun JwsJson.Flattened.toSignedJwt(): SignedJWT = SignedJWT.parse("$protected.$payload.$signature")

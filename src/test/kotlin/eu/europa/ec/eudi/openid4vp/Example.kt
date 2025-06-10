@@ -463,7 +463,7 @@ private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix
                 ),
             ),
         ),
-        jarConfiguration = JarConfiguration(
+        signedRequestConfiguration = SignedRequestConfiguration(
             supportedAlgorithms = JWSAlgorithm.Family.EC.toList() - JWSAlgorithm.ES256K,
             supportedRequestUriMethods = SupportedRequestUriMethods.Both(
                 SupportedRequestUriMethods.Post(

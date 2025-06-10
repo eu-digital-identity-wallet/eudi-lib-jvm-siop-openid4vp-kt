@@ -119,8 +119,8 @@ enum class ClientIdPrefix {
     X509Hash,
 
     /**
-     * This scheme is intended to be used only when an authorization is performed over the DC API channel.
-     * It is not a scheme accepted in requests and is used to set the audience of the Credential Presentation response.
+     * This prefix is intended to be used only when an authorization is performed over the DC API channel.
+     * It is not a prefix accepted in requests and is used to set the audience of the Credential Presentation response.
      */
     ORIGIN,
 

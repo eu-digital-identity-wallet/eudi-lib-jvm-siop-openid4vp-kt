@@ -43,8 +43,8 @@ class WalletMetaDataTest {
                     ),
                 ),
             ),
-            jarConfiguration = JarConfiguration(
-                supportedAlgorithms = JarConfiguration.Default.supportedAlgorithms,
+            signedRequestConfiguration = SignedRequestConfiguration(
+                supportedAlgorithms = SignedRequestConfiguration.Default.supportedAlgorithms,
                 supportedRequestUriMethods = SupportedRequestUriMethods.Post(
                     jarEncryption = EncryptionRequirement.Required(
                         supportedEncryptionAlgorithms = EncryptionRequirement.Required.SUPPORTED_ENCRYPTION_ALGORITHMS,
@@ -70,8 +70,8 @@ class WalletMetaDataTest {
                     ),
                 ),
             ),
-            jarConfiguration = JarConfiguration(
-                supportedAlgorithms = JarConfiguration.Default.supportedAlgorithms,
+            signedRequestConfiguration = SignedRequestConfiguration(
+                supportedAlgorithms = SignedRequestConfiguration.Default.supportedAlgorithms,
                 supportedRequestUriMethods = SupportedRequestUriMethods.Get,
             ),
         )
@@ -81,7 +81,7 @@ class WalletMetaDataTest {
 
 private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
     val (encryptionRequirement, ephemeralJarEncryptionJwks) =
-        config.jarConfiguration.supportedRequestUriMethods.isPostSupported()
+        config.signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()
             ?.let { requestUriMethodPost ->
                 when (val jarEncryption = requestUriMethodPost.jarEncryption) {
                     EncryptionRequirement.NotRequired -> jarEncryption to null
@@ -97,7 +97,7 @@ private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
     assertExpectedVpFormats(config.vpConfiguration.vpFormatsSupported, walletMetaData)
     assertClientIdPrefix(config.supportedClientIdPrefixes, walletMetaData)
     assertPresentationDefinitionUriSupported(walletMetaData)
-    assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
+    assertJarSigning(config.signedRequestConfiguration.supportedAlgorithms, walletMetaData)
     assertJarEncryption(encryptionRequirement, ephemeralJarEncryptionJwks, walletMetaData)
     assertResponseTypes(walletMetaData)
 }

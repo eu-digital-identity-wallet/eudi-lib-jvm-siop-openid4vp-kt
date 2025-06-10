@@ -184,7 +184,7 @@ internal fun FragmentJwt.encodeRedirectURI(): URI =
  */
 internal object DirectPostForm {
     fun parametersOf(p: AuthorizationResponsePayload): Parameters =
-        p.asMap().let { map ->
+        p.asDispatchingMap().let { map ->
             parameters {
                 map.entries.forEach { (name, value) -> append(name, value) }
             }

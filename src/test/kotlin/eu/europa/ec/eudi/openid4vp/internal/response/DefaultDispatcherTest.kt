@@ -15,8 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.response
 
-import com.eygraber.uri.Uri
-import com.eygraber.uri.toUri
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
@@ -692,7 +690,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when no consensus, redirect_uri must contain an error query parameter`() {
-            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+            fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.NoConsensusResponseData(
                     generateNonce(),
                     state,
@@ -711,7 +709,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when invalid request, redirect_uri must contain an error query parameter`() {
-            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+            fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
                 val data =
                     AuthorizationResponsePayload.InvalidRequest(
                         MissingNonce,
@@ -734,7 +732,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when response for SIOPAuthentication, redirect_uri must contain an id_token query parameter`() {
-            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+            fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.SiopAuthentication(
                     "dummy",
                     generateNonce(),
@@ -756,7 +754,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when response mode is query_jwt, redirect_uri must contain a 'response' query parameter`() {
-            fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+            fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.SiopAuthentication(
                     "dummy",
                     generateNonce(),
@@ -786,7 +784,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when query_jwt with encryption and negative consensus, redirect_uri must contain error ACCESS_DENIED in response`() = runTest {
-            suspend fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+            suspend fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
                 val verifierRequest = Verifier.createOpenId4VPRequest(
                     Verifier.metaDataRequestingEncryptedResponse,
                     ResponseMode.QueryJwt("https://respond.here".asURL().getOrThrow().toURI()),
@@ -824,22 +822,22 @@ class DefaultDispatcherTest {
             test {}
         }
 
-        private fun URI.assertQueryURIContainsStateAnd(expectedState: String, assertions: Uri.() -> Unit) {
+        private fun URI.assertQueryURIContainsStateAnd(expectedState: String, assertions: URI.() -> Unit) {
             assertQueryURI {
                 assertions(this)
                 assertEquals(expectedState, getQueryParameter("state"))
             }
         }
 
-        private fun URI.assertQueryURIDoesNotContainStateAnd(assertions: Uri.() -> Unit) {
+        private fun URI.assertQueryURIDoesNotContainStateAnd(assertions: URI.() -> Unit) {
             assertQueryURI {
                 assertions(this)
                 assertNull(getQueryParameter("state"))
             }
         }
 
-        private fun URI.assertQueryURI(assertions: Uri.() -> Unit) {
-            assertions(toUri())
+        private fun URI.assertQueryURI(assertions: URI.() -> Unit) {
+            assertions(this)
         }
     }
 
@@ -971,7 +969,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `when fragment_jwt with encryption and negative consensus, redirect_uri must contain ACCESS_DENIED in response`() = runTest {
-            suspend fun test(state: String? = null, asserter: URI.(Uri.() -> Unit) -> Unit) {
+            suspend fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
                 val verifierRequest = Verifier.createOpenId4VPRequest(
                     Verifier.metaDataRequestingEncryptedResponse,
                     ResponseMode.FragmentJwt("https://respond.here".asURL().getOrThrow().toURI()),
@@ -1005,7 +1003,7 @@ class DefaultDispatcherTest {
                 }
             }
 
-            genState().let { state -> test(state) {} }
+            test(genState()) {}
             test {}
         }
 
@@ -1031,9 +1029,8 @@ class DefaultDispatcherTest {
         private fun URI.assertFragmentURI(
             assertions: (Map<String, String>) -> Unit,
         ) {
-            val redirectUri = toUri().also { println(it) }
-            assertNotNull(redirectUri.fragment)
-            val map = redirectUri.fragment!!.parseUrlEncodedParameters().toMap().mapValues { it.value.first() }
+            assertNotNull(rawFragment)
+            val map = rawFragment.parseUrlEncodedParameters().toMap().mapValues { it.value.first() }
             map.also(assertions)
         }
     }
@@ -1042,3 +1039,5 @@ class DefaultDispatcherTest {
 private fun genState(): String = State().value
 private fun JWTClaimsSet.vpTokenClaim(): JsonElement? =
     Json.parseToJsonElement(toString()).jsonObject["vp_token"]
+private fun URI.getQueryParameter(name: String): String? =
+    rawQuery.parseUrlEncodedParameters().toMap().mapValues { it.value.first() }[name]

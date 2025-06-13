@@ -65,14 +65,14 @@ class UnvalidatedRequestResolverTest {
         .replace("\r", "")
         .replace("\n", "")
         .replace("  ", "")
-        .also { URLEncoder.encode(it, "UTF-8") }
+        .let { URLEncoder.encode(it, "UTF-8") }
 
     private val dcqlQuery = readFileAsText("dcql/basic_example.json")
         .replace("\r\n", "")
         .replace("\r", "")
         .replace("\n", "")
         .replace("  ", "")
-        .also { URLEncoder.encode(it, "UTF-8") }
+        .let { URLEncoder.encode(it, "UTF-8") }
 
     private val signingKey = RSAKeyGenerator(2048)
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)

@@ -16,8 +16,9 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.*
-import com.nimbusds.jose.crypto.RSASSASigner
+import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.JWTClaimsSet
@@ -448,11 +449,11 @@ private class Wallet(
             base64UrlNoPadding.encode(digest.digest())
         }
         val keyBindingJwt = run {
-            val key = RSAKey.parse(loadResource("/example/sd-jwt-vc-pid-key.json"))
+            val key = ECKey.parse(loadResource("/example/sd-jwt-vc-pid-key.json"))
                 .also {
                     check(it.isPrivate) { "a private key is required" }
                 }
-            val header = JWSHeader.Builder(JWSAlgorithm.RS256)
+            val header = JWSHeader.Builder(JWSAlgorithm.ES256)
                 .type(JOSEObjectType("kb+jwt"))
                 .keyID(key.keyID)
                 .build()
@@ -476,7 +477,7 @@ private class Wallet(
                     }
                 }
                 .build()
-            SignedJWT(header, claims).apply { sign(RSASSASigner(key)) }
+            SignedJWT(header, claims).apply { sign(ECDSASigner(key)) }
         }
         return VerifiablePresentation.Generic("$sdJwtVc${keyBindingJwt.serialize()}")
     }

@@ -32,7 +32,6 @@ repositories {
 dependencies {
     api(libs.presentation.exchange)
     api(libs.nimbus.oauth2.oidc.sdk)
-    implementation(libs.uri.kmp)
     api(libs.ktor.client.core)
     api(libs.ktor.client.content.negotiation)
     api(libs.ktor.client.serialization)

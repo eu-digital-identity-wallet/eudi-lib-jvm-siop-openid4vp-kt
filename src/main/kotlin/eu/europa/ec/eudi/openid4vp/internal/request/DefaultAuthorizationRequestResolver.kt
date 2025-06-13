@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.eygraber.uri.Uri
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
@@ -23,6 +22,10 @@ import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
 import io.ktor.client.*
+import io.ktor.http.URLBuilder
+import io.ktor.http.Url
+import io.ktor.http.takeFrom
+import io.ktor.util.toMap
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -98,15 +101,18 @@ internal sealed interface UnvalidatedRequest {
          * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
          */
         fun make(uriStr: String): Result<UnvalidatedRequest> = runCatching {
-            val uri = Uri.parse(uriStr)
+            val requestParams = with(URI.create(uriStr)) {
+                toKtorUrl().parameters.toMap().mapValues { it.value.first() }
+            }
+
             fun clientId(): String =
-                uri.getQueryParameter("client_id")
+                requestParams["client_id"]
                     ?: throw RequestValidationError.MissingClientId.asException()
 
-            val requestValue = uri.getQueryParameter("request")
-            val requestUriValue = uri.getQueryParameter("request_uri")
+            val requestValue = requestParams["request"]
+            val requestUriValue = requestParams["request_uri"]
             val requestUriMethod =
-                uri.getQueryParameter("request_uri_method")?.let { value ->
+                requestParams["request_uri_method"]?.let { value ->
                     when (value) {
                         "get" -> RequestUriMethod.GET
                         "post" -> RequestUriMethod.POST
@@ -129,34 +135,34 @@ internal sealed interface UnvalidatedRequest {
                     PassByReference(clientId(), requestUri, requestUriMethod)
                 }
 
-                else -> notSecured(uri)
+                else -> notSecured(requestParams)
             }
         }
 
         /**
-         * Populates a [Plain] from the query parameters of the given [uri]
+         * Populates a [Plain] from the request parameters of an authorization request
          */
-        private fun notSecured(uri: Uri): Plain {
+        private fun notSecured(requestParams: Map<String, String?>): Plain {
             fun jsonObject(p: String): JsonObject? =
-                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonObject }
+                requestParams[p]?.let { Json.parseToJsonElement(it).jsonObject }
 
             fun jsonArray(p: String): JsonArray? =
-                uri.getQueryParameter(p)?.let { Json.parseToJsonElement(it).jsonArray }
+                requestParams[p]?.let { Json.parseToJsonElement(it).jsonArray }
 
             return Plain(
                 UnvalidatedRequestObject(
-                    responseType = uri.getQueryParameter("response_type"),
+                    responseType = requestParams["response_type"],
                     presentationDefinition = jsonObject(OpenId4VPSpec.PRESENTATION_DEFINITION),
-                    presentationDefinitionUri = uri.getQueryParameter(OpenId4VPSpec.PRESENTATION_DEFINITION_URI),
+                    presentationDefinitionUri = requestParams[OpenId4VPSpec.PRESENTATION_DEFINITION_URI],
                     dcqlQuery = jsonObject(OpenId4VPSpec.DCQL_QUERY),
-                    scope = uri.getQueryParameter("scope"),
-                    nonce = uri.getQueryParameter("nonce"),
-                    responseMode = uri.getQueryParameter("response_mode"),
+                    scope = requestParams["scope"],
+                    nonce = requestParams["nonce"],
+                    responseMode = requestParams["response_mode"],
                     clientMetaData = jsonObject("client_metadata"),
-                    clientId = uri.getQueryParameter("client_id"),
-                    responseUri = uri.getQueryParameter(OpenId4VPSpec.RESPONSE_URI),
-                    redirectUri = uri.getQueryParameter("redirect_uri"),
-                    state = uri.getQueryParameter("state"),
+                    clientId = requestParams["client_id"],
+                    responseUri = requestParams[OpenId4VPSpec.RESPONSE_URI],
+                    redirectUri = requestParams["redirect_uri"],
+                    state = requestParams["state"],
                     transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.map { it.jsonPrimitive.content },
                     verifierAttestations = jsonArray("verifier_attestations"),
                 ),
@@ -381,3 +387,5 @@ private fun JWTClaimsSet.dispatchDetailsOrNull(): ErrorDispatchDetails? =
                 )
             }
     }.getOrNull()
+
+private fun URI.toKtorUrl(): Url = URLBuilder().takeFrom(this.toString()).build()

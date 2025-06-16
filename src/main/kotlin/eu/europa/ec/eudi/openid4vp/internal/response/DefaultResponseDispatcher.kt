@@ -15,9 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.response
 
-import com.eygraber.uri.UriCodec
-import com.eygraber.uri.toURI
-import com.eygraber.uri.toUri
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.VpContent.DCQL
 import eu.europa.ec.eudi.openid4vp.VpContent.PresentationExchange
@@ -155,43 +152,37 @@ internal class DefaultDispatcher(
 }
 
 internal fun Query.encodeRedirectURI(): URI =
-    with(redirectUri.toUri().buildUpon()) {
-        DirectPostForm.of(data).forEach { (key, value) -> appendQueryParameter(key, value) }
-        build()
-    }.toURI()
+    URLBuilder(redirectUri.toString()).apply {
+        parameters.apply {
+            DirectPostForm.of(data).forEach { (key, value) ->
+                append(key, value)
+            }
+        }
+    }.build().toURI()
 
 internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
-    with(redirectUri.toUri().buildUpon()) {
+    URLBuilder(redirectUri.toString()).apply {
         val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
-        appendQueryParameter("response", jarmJwt)
-        build()
-    }.toURI()
+        parameters.append("response", jarmJwt)
+    }.build().toURI()
 
 internal fun Fragment.encodeRedirectURI(): URI =
-    with(redirectUri.toUri().buildUpon()) {
-        val encodedFragment = DirectPostForm.of(data).map { (key, value) ->
-            val encodedKey = UriCodec.encode(key, null)
-            val encodedValue = UriCodec.encodeOrNull(value, null)
-            "$encodedKey=$encodedValue"
-        }.joinToString(separator = "&")
-        encodedFragment(encodedFragment)
-        build()
-    }.toURI()
+    URLBuilder(redirectUri.toString()).apply {
+        fragment = DirectPostForm.of(data)
+            .map { (key, value) ->
+                "$key=$value"
+            }.joinToString("&")
+    }.build().toURI()
 
 internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
-    with(redirectUri.toUri().buildUpon()) {
+    URLBuilder(redirectUri.toString()).apply {
         val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
-        val encodedFragment =
-            buildMap {
-                put("response", jarmJwt)
-            }.map { (key, value) ->
-                val encodedKey = UriCodec.encode(key, null)
-                val encodedValue = UriCodec.encodeOrNull(value, null)
-                "$encodedKey=$encodedValue"
-            }.joinToString(separator = "&")
-        encodedFragment(encodedFragment)
-        build()
-    }.toURI()
+        fragment = buildMap {
+            put("response", jarmJwt)
+        }.map { (key, value) ->
+            "$key=$value"
+        }.joinToString(separator = "&")
+    }.build().toURI()
 
 /**
  * An object responsible for encoding a [AuthorizationResponsePayload] into

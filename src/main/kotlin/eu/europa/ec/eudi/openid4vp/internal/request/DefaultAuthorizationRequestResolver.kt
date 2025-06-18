@@ -15,17 +15,19 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
+import com.nimbusds.jose.JWSObject
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.internal.JwsJson
+import eu.europa.ec.eudi.openid4vp.internal.JwsJson.Companion.flatten
 import eu.europa.ec.eudi.openid4vp.internal.ensure
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByValue
 import io.ktor.client.*
-import io.ktor.http.URLBuilder
-import io.ktor.http.Url
-import io.ktor.http.takeFrom
-import io.ktor.util.toMap
+import io.ktor.http.*
+import io.ktor.util.*
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -171,10 +173,28 @@ internal sealed interface UnvalidatedRequest {
     }
 }
 
-internal sealed interface FetchedRequest {
-    data class Plain(val requestObject: UnvalidatedRequestObject) : FetchedRequest
-    data class JwtSecured(val clientId: String, val jwt: SignedJWT) : FetchedRequest
+internal sealed interface ReceivedRequest {
+    data class Unsigned(val requestObject: UnvalidatedRequestObject) : ReceivedRequest
+    data class Signed(val jwsJson: JwsJson) : ReceivedRequest {
+        companion object {
+            operator fun invoke(signedJwt: SignedJWT): Signed = Signed(JwsJson.from(signedJwt).getOrThrow())
+        }
+    }
 }
+
+/**
+ * Decomposes a Nimbus [SignedJWT] into [JwsJson].
+ */
+private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runCatching {
+    require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
+    val compactFormString = "${signedJwt.header.toBase64URL()}.${signedJwt.payload.toBase64URL()}.${signedJwt.signature}"
+    JwsJson.Companion.from(compactFormString).getOrThrow()
+}
+
+internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
+    jwsJson.flatten().map {
+        SignedJWT.parse("${it.protected}.${it.payload}.${it.signature}")
+    }
 
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
@@ -202,61 +222,37 @@ internal class DefaultAuthorizationRequestResolver(
             } catch (e: AuthorizationRequestException) {
                 val dispatchDetails =
                     when (siopOpenId4VPConfig.errorDispatchPolicy) {
-                        ErrorDispatchPolicy.AllClients -> dispatchDetailsOrNull(fetchedRequest)
+                        ErrorDispatchPolicy.AllClients -> dispatchDetailsOrNull(fetchedRequest, siopOpenId4VPConfig)
                         ErrorDispatchPolicy.OnlyAuthenticatedClients -> null
                     }
                 return Resolution.Invalid(e.error, dispatchDetails)
             }
 
-        val validatedRequestObject =
+        val resolved =
             try {
                 validateRequestObject(authenticatedRequest)
             } catch (e: AuthorizationRequestException) {
-                val dispatchDetails = dispatchDetailsOrNull(authenticatedRequest.requestObject)
-                return Resolution.Invalid(e.error, dispatchDetails)
-            }
-
-        val clientMetaData =
-            try {
-                resolveClientMetaData(validatedRequestObject)
-            } catch (e: AuthorizationRequestException) {
-                val dispatchDetails = dispatchDetailsOrNull(validatedRequestObject, null, siopOpenId4VPConfig)
-                return Resolution.Invalid(e.error, dispatchDetails)
-            }
-
-        val resolved =
-            try {
-                resolveRequestObject(validatedRequestObject, clientMetaData)
-            } catch (e: AuthorizationRequestException) {
-                val dispatchDetails = dispatchDetailsOrNull(validatedRequestObject, clientMetaData, siopOpenId4VPConfig)
+                val dispatchDetails = dispatchDetailsOrNull(authenticatedRequest.requestObject, siopOpenId4VPConfig)
                 return Resolution.Invalid(e.error, dispatchDetails)
             }
 
         return Resolution.Success(resolved)
     }
 
-    private suspend fun HttpClient.fetchRequest(uri: String): FetchedRequest {
+    private fun validateRequestObject(authenticatedRequest: AuthenticatedRequest): ResolvedRequestObject {
+        val requestValidator = RequestObjectValidator(siopOpenId4VPConfig)
+        return requestValidator.validateRequestObject(authenticatedRequest)
+    }
+
+    private suspend fun HttpClient.fetchRequest(uri: String): ReceivedRequest {
         val unvalidatedRequest = UnvalidatedRequest.make(uri).getOrThrow()
         val requestFetcher = RequestFetcher(this, siopOpenId4VPConfig)
         return requestFetcher.fetchRequest(unvalidatedRequest)
     }
 
-    private suspend fun HttpClient.authenticateRequest(fetchedRequest: FetchedRequest): AuthenticatedRequest {
+    private suspend fun HttpClient.authenticateRequest(receivedRequest: ReceivedRequest): AuthenticatedRequest {
         val requestAuthenticator = RequestAuthenticator(siopOpenId4VPConfig, this)
-        return requestAuthenticator.authenticate(fetchedRequest)
-    }
-
-    private fun resolveClientMetaData(validated: ValidatedRequestObject): ValidatedClientMetaData? =
-        validated.clientMetaData?.let { unvalidated ->
-            ClientMetaDataValidator.validateClientMetaData(unvalidated, validated.responseMode)
-        }
-
-    private suspend fun HttpClient.resolveRequestObject(
-        validatedRequestObject: ValidatedRequestObject,
-        clientMetaData: ValidatedClientMetaData?,
-    ): ResolvedRequestObject {
-        val requestObjectResolver = RequestObjectResolver(siopOpenId4VPConfig, this)
-        return requestObjectResolver.resolveRequestObject(validatedRequestObject, clientMetaData)
+        return requestAuthenticator.authenticate(receivedRequest)
     }
 }
 
@@ -264,11 +260,12 @@ internal class DefaultAuthorizationRequestResolver(
  * Creates an invalid resolution for errors that manifested while trying to authenticate a Client.
  */
 private fun dispatchDetailsOrNull(
-    fetchedRequest: FetchedRequest,
+    fetchedRequest: ReceivedRequest,
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? =
     when (fetchedRequest) {
-        is FetchedRequest.JwtSecured -> fetchedRequest.jwt.jwtClaimsSet.dispatchDetailsOrNull()
-        is FetchedRequest.Plain -> dispatchDetailsOrNull(fetchedRequest.requestObject)
+        is ReceivedRequest.Signed -> fetchedRequest.toSignedJwts().firstOrNull()?.jwtClaimsSet?.dispatchDetailsOrNull()
+        is ReceivedRequest.Unsigned -> dispatchDetailsOrNull(fetchedRequest.requestObject, siopOpenId4VPConfig)
     }
 
 /**
@@ -281,34 +278,32 @@ private fun dispatchDetailsOrNull(
  * the configuration of the Wallet
  */
 private fun dispatchDetailsOrNull(
-    validatedRequestObject: ValidatedRequestObject,
-    clientMetaData: ValidatedClientMetaData?,
+    unvalidatedRequest: UnvalidatedRequestObject,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? {
-    val jarmRequirement by lazy {
-        clientMetaData?.let {
-            runCatching { siopOpenId4VPConfig.jarmRequirement(it) }.getOrNull()
-        }
-    }
-    val responseMode = validatedRequestObject.responseMode
-    return if (responseMode.isJarm()) {
-        jarmRequirement?.let {
-            ErrorDispatchDetails(
-                responseMode = responseMode,
-                nonce = validatedRequestObject.nonce,
-                state = validatedRequestObject.state,
-                clientId = validatedRequestObject.client.clientId,
-                jarmRequirement = it,
-            )
-        }
-    } else {
+    val responseMode = unvalidatedRequest.responseMode()
+    return responseMode?.let {
+        val jarmRequirement = unvalidatedRequest.jarmRequirement(siopOpenId4VPConfig, responseMode)
         ErrorDispatchDetails(
             responseMode = responseMode,
-            nonce = validatedRequestObject.nonce,
-            state = validatedRequestObject.state,
-            clientId = validatedRequestObject.client.clientId,
-            jarmRequirement = null,
+            nonce = unvalidatedRequest.nonce,
+            state = unvalidatedRequest.state,
+            clientId = unvalidatedRequest.clientId?.let { VerifierId.parse(it).getOrNull() },
+            jarmRequirement = jarmRequirement.getOrNull(),
         )
+    }
+}
+
+private fun UnvalidatedRequestObject.jarmRequirement(
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+    responseMode: ResponseMode,
+): Result<JarmRequirement?> = runCatching {
+    clientMetaData?.let {
+        val decodeFromJsonElement = jsonSupport.decodeFromJsonElement<UnvalidatedClientMetaData>(clientMetaData)
+        val resolvedClientMetadata = decodeFromJsonElement.let {
+            ClientMetaDataValidator.validateClientMetaData(it, responseMode)
+        }
+        resolvedClientMetadata.let { siopOpenId4VPConfig.jarmRequirement(it) }
     }
 }
 
@@ -333,29 +328,6 @@ private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
         else -> null
     }
 }
-
-private fun dispatchDetailsOrNull(requestObject: UnvalidatedRequestObject): ErrorDispatchDetails? {
-    val responseMode = requestObject.responseMode()
-    return if (responseMode != null && !responseMode.isJarm()) {
-        ErrorDispatchDetails(
-            responseMode = responseMode,
-            nonce = requestObject.nonce,
-            state = requestObject.state,
-            clientId = requestObject.clientId?.let { VerifierId.parse(it).getOrNull() },
-            jarmRequirement = null,
-        )
-    } else null
-}
-
-private val AuthenticatedClient.clientId: VerifierId
-    get() = when (this) {
-        is AuthenticatedClient.Attested -> VerifierId(ClientIdScheme.VERIFIER_ATTESTATION, clientId)
-        is AuthenticatedClient.DIDClient -> VerifierId(ClientIdScheme.DID, client.toString())
-        is AuthenticatedClient.Preregistered -> VerifierId(ClientIdScheme.PreRegistered, preregisteredClient.clientId)
-        is AuthenticatedClient.RedirectUri -> VerifierId(ClientIdScheme.RedirectUri, clientId.toString())
-        is AuthenticatedClient.X509SanDns -> VerifierId(ClientIdScheme.X509_SAN_DNS, clientId)
-        is AuthenticatedClient.X509SanUri -> VerifierId(ClientIdScheme.X509_SAN_URI, clientId.toString())
-    }
 
 private fun JWTClaimsSet.responseMode(): ResponseMode? =
     runCatching {

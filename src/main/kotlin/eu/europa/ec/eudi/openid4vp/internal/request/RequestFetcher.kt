@@ -46,8 +46,8 @@ internal class RequestFetcher(
     /**
      * Fetches the authorization request, if needed
      */
-    suspend fun fetchRequest(request: UnvalidatedRequest): FetchedRequest = when (request) {
-        is UnvalidatedRequest.Plain -> FetchedRequest.Plain(request.requestObject)
+    suspend fun fetchRequest(request: UnvalidatedRequest): ReceivedRequest = when (request) {
+        is UnvalidatedRequest.Plain -> ReceivedRequest.Unsigned(request.requestObject)
         is UnvalidatedRequest.JwtSecured -> {
             val (jwt, walletNonce) = when (request) {
                 is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt to null
@@ -109,13 +109,13 @@ private fun SiopOpenId4VPConfig.ensureValid(
     expectedClient: String,
     expectedWalletNonce: Nonce?,
     unverifiedJwt: Jwt,
-): FetchedRequest.JwtSecured {
+): ReceivedRequest.Signed {
     val signedJwt = ensureIsSignedJwt(unverifiedJwt).also(::ensureSupportedSigningAlgorithm)
-    val clientId = ensureSameClientId(expectedClient, signedJwt)
+    ensureSameClientId(expectedClient, signedJwt)
     if (expectedWalletNonce != null) {
         ensureSameWalletNonce(expectedWalletNonce, signedJwt)
     }
-    return FetchedRequest.JwtSecured(clientId, signedJwt)
+    return ReceivedRequest.Signed(signedJwt)
 }
 
 private fun ensureIsSignedJwt(unverifiedJwt: Jwt): SignedJWT =

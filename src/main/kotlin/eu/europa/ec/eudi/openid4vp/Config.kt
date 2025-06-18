@@ -225,13 +225,31 @@ data class SupportedTransactionDataType(
  * @param vpFormats The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
-data class VPConfiguration(
-    val presentationDefinitionUriSupported: Boolean = true,
+data class VPConfiguration private constructor(
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormats: VpFormats,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
-)
+) {
+
+    val presentationDefinitionUriSupported: Boolean
+        get() = false
+
+    companion object {
+        operator fun invoke(
+            presentationDefinitionUriSupported: Boolean = false,
+            knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+            knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
+            vpFormats: VpFormats,
+            supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
+        ): VPConfiguration = VPConfiguration(
+            knownPresentationDefinitionsPerScope = knownPresentationDefinitionsPerScope,
+            knownDCQLQueriesPerScope = knownDCQLQueriesPerScope,
+            vpFormats = vpFormats,
+            supportedTransactionDataTypes = supportedTransactionDataTypes,
+        )
+    }
+}
 
 interface JarmSigner : JWSSigner {
     fun getKeyId(): String

@@ -35,8 +35,9 @@ internal object RFC7515Spec {
     const val JWS_JSON_SYNTAX_PROTECTED_HEADER = "protected"
 }
 
+@JvmInline
 @Serializable(with = Base64UrlNoPaddingSerializer::class)
-internal data class Base64UrlNoPadding private constructor(val value: String) {
+internal value class Base64UrlNoPadding private constructor(val value: String) {
 
     override fun toString(): String = value
 
@@ -111,7 +112,7 @@ internal sealed interface JwsJson {
             }
         }
 
-        fun JwsJson.flatten(): List<JwsJson.Flattened> = when (this) {
+        fun JwsJson.flatten(): List<Flattened> = when (this) {
             is Flattened -> listOf(this)
             is General -> signatures.map {
                 Flattened(

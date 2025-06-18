@@ -225,20 +225,31 @@ data class SupportedTransactionDataType(
  * @param vpFormats The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
-data class VPConfiguration(
-    @Deprecated(
-        """
-        Don't use this property any more, it will soon be deprecated. 
-        Library will not be supporting presentation_definition_uri from now on.
-        Value of presentation_definition_uri_supported in wallet metadata will be set to false by default
-    """,
-    )
-    val presentationDefinitionUriSupported: Boolean = false,
+data class VPConfiguration private constructor(
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormats: VpFormats,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
-)
+) {
+
+    val presentationDefinitionUriSupported: Boolean
+        get() = false
+
+    companion object {
+        operator fun invoke(
+            presentationDefinitionUriSupported: Boolean = false,
+            knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+            knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
+            vpFormats: VpFormats,
+            supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
+        ): VPConfiguration = VPConfiguration(
+            knownPresentationDefinitionsPerScope = knownPresentationDefinitionsPerScope,
+            knownDCQLQueriesPerScope = knownDCQLQueriesPerScope,
+            vpFormats = vpFormats,
+            supportedTransactionDataTypes = supportedTransactionDataTypes,
+        )
+    }
+}
 
 interface JarmSigner : JWSSigner {
     fun getKeyId(): String

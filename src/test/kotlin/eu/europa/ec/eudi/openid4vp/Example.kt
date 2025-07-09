@@ -53,7 +53,8 @@ import eu.europa.ec.eudi.openid4vp.dcql.DCQL as DCQLQuery
  * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
  */
 fun main(): Unit = runBlocking {
-    val verifierApi = URL("https://dev.verifier-backend.eudiw.dev")
+//    val verifierApi = URL("https://dev.verifier-backend.eudiw.dev")
+    val verifierApi = URL("http://localhost:8080")
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
         walletKeyPair = walletKeyPair,
@@ -196,7 +197,7 @@ class Verifier private constructor(
                         put("dcql_query", jsonSupport.encodeToJsonElement(presentationQuery.query))
                 }
                 put("response_mode", "direct_post.jwt")
-                put("presentation_definition_mode", "by_reference")
+                put("presentation_definition_mode", "by_value")
                 put("jar_mode", "by_reference")
                 put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
                 if (!transactionData.isNullOrEmpty()) {

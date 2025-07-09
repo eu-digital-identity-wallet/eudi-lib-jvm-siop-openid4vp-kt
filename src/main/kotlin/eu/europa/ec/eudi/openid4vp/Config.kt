@@ -217,21 +217,39 @@ data class SupportedTransactionDataType(
 /**
  * Configurations options for OpenId4VP
  *
- * @param presentationDefinitionUriSupported indicates whether wallet should fetch a presentation definition
- * which is communicated by the verifier by reference using `presentation_definition_uri`.
  * @param knownPresentationDefinitionsPerScope a set of presentation definitions that a verifier may request via
  * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
  * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
  * @param vpFormats The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
-data class VPConfiguration(
-    val presentationDefinitionUriSupported: Boolean = true,
+data class VPConfiguration private constructor(
     val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormats: VpFormats,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
-)
+) {
+
+    val presentationDefinitionUriSupported: Boolean
+        get() = false
+
+    companion object {
+
+        @Deprecated("Use the constructor without presentationDefinitionUriSupported")
+        operator fun invoke(
+            presentationDefinitionUriSupported: Boolean = false,
+            knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+            knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
+            vpFormats: VpFormats,
+            supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
+        ): VPConfiguration = VPConfiguration(
+            knownPresentationDefinitionsPerScope = knownPresentationDefinitionsPerScope,
+            knownDCQLQueriesPerScope = knownDCQLQueriesPerScope,
+            vpFormats = vpFormats,
+            supportedTransactionDataTypes = supportedTransactionDataTypes,
+        )
+    }
+}
 
 interface JarmSigner : JWSSigner {
     fun getKeyId(): String

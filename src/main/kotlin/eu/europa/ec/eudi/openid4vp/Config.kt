@@ -217,8 +217,6 @@ data class SupportedTransactionDataType(
 /**
  * Configurations options for OpenId4VP
  *
- * @param presentationDefinitionUriSupported indicates whether wallet should fetch a presentation definition
- * which is communicated by the verifier by reference using `presentation_definition_uri`.
  * @param knownPresentationDefinitionsPerScope a set of presentation definitions that a verifier may request via
  * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
  * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
@@ -236,6 +234,8 @@ data class VPConfiguration private constructor(
         get() = false
 
     companion object {
+
+        @Deprecated("Use the constructor without presentationDefinitionUriSupported")
         operator fun invoke(
             presentationDefinitionUriSupported: Boolean = false,
             knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),

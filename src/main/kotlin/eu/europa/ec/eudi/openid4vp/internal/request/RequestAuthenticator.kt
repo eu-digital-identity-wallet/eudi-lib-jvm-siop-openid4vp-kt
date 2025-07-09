@@ -73,26 +73,29 @@ internal class RequestAuthenticator(siopOpenId4VPConfig: SiopOpenId4VPConfig, ht
     private val clientAuthenticator = ClientAuthenticator(siopOpenId4VPConfig)
     private val signatureVerifier = JarJwtSignatureVerifier(siopOpenId4VPConfig, httpClient)
 
-    suspend fun authenticate(request: FetchedRequest): AuthenticatedRequest = coroutineScope {
+    suspend fun authenticate(request: ReceivedRequest): AuthenticatedRequest = coroutineScope {
         val client = clientAuthenticator.authenticateClient(request)
         when (request) {
-            is FetchedRequest.Plain -> {
+            is ReceivedRequest.Unsigned -> {
                 AuthenticatedRequest(client, request.requestObject)
             }
 
-            is FetchedRequest.JwtSecured -> {
-                with(signatureVerifier) { verifySignature(client, request.jwt) }
-                AuthenticatedRequest(client, request.jwt.requestObject())
+            is ReceivedRequest.Signed -> {
+                val signedJwt = request.ensureSingleSignedRequest()
+                with(signatureVerifier) { verifySignature(client, signedJwt) }
+                AuthenticatedRequest(client, signedJwt.requestObject())
             }
         }
     }
 }
 
 internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
-    suspend fun authenticateClient(request: FetchedRequest): AuthenticatedClient {
+    suspend fun authenticateClient(request: ReceivedRequest): AuthenticatedClient {
         val requestObject = when (request) {
-            is FetchedRequest.JwtSecured -> request.jwt.requestObject()
-            is FetchedRequest.Plain -> request.requestObject
+            is ReceivedRequest.Signed -> {
+                request.ensureSingleSignedRequest().requestObject()
+            }
+            is ReceivedRequest.Unsigned -> request.requestObject
         }
 
         val (originalClientId, clientIdScheme) = originalClientIdAndScheme(requestObject)
@@ -100,7 +103,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             is Preregistered -> {
                 val registeredClient = clientIdScheme.clients[originalClientId]
                 ensureNotNull(registeredClient) { RequestValidationError.InvalidClientId.asException() }
-                if (request is FetchedRequest.JwtSecured) {
+                if (request is ReceivedRequest.Signed) {
                     ensureNotNull(registeredClient.jarConfig) {
                         invalidScheme("$registeredClient cannot place signed request")
                     }
@@ -109,7 +112,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             SupportedClientIdScheme.RedirectUri -> {
-                ensure(request is FetchedRequest.Plain) {
+                ensure(request is ReceivedRequest.Unsigned) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in signed request")
                 }
                 val originalClientIdAsUri =
@@ -118,7 +121,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             is SupportedClientIdScheme.X509SanDns -> {
-                ensure(request is FetchedRequest.JwtSecured) {
+                ensure(request is ReceivedRequest.Signed) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
                 val chain = x5c(originalClientId, request, clientIdScheme.trust) {
@@ -129,7 +132,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             is SupportedClientIdScheme.X509SanUri -> {
-                ensure(request is FetchedRequest.JwtSecured) {
+                ensure(request is ReceivedRequest.Signed) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
                 val chain = x5c(originalClientId, request, clientIdScheme.trust) {
@@ -142,7 +145,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             is SupportedClientIdScheme.DID -> {
-                ensure(request is FetchedRequest.JwtSecured) {
+                ensure(request is ReceivedRequest.Signed) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
                 val originalClientIdAsDID = ensureNotNull(DID.parse(originalClientId).getOrNull()) {
@@ -153,7 +156,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
             }
 
             is SupportedClientIdScheme.VerifierAttestation -> {
-                ensure(request is FetchedRequest.JwtSecured) {
+                ensure(request is ReceivedRequest.Signed) {
                     invalidScheme("${clientIdScheme.scheme()} cannot be used in unsigned request")
                 }
                 val attestedClaims =
@@ -174,11 +177,12 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
 
     private fun x5c(
         originalClientId: OriginalClientId,
-        request: FetchedRequest.JwtSecured,
+        request: ReceivedRequest.Signed,
         trust: X509CertificateTrust,
         subjectAlternativeNames: X509Certificate.() -> List<String>,
     ): List<X509Certificate> {
-        val x5c = request.jwt.header?.x509CertChain
+        val jwt = request.ensureSingleSignedRequest()
+        val x5c = jwt.header?.x509CertChain
         ensureNotNull(x5c) { invalidJarJwt("Missing x5c") }
         val pubCertChain = x5c.mapNotNull { runCatching { X509CertUtils.parse(it.decode()) }.getOrNull() }
         ensure(pubCertChain.isNotEmpty()) { invalidJarJwt("Invalid x5c") }
@@ -192,13 +196,21 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
     }
 }
 
+private fun ReceivedRequest.Signed.ensureSingleSignedRequest(): SignedJWT {
+    val signedJwts = toSignedJwts()
+    return ensure(signedJwts.size == 1) {
+        invalidJarJwt("Multi-signed authorization requests are not yet supported")
+    }.let { signedJwts[0] }
+}
+
 private suspend fun lookupKeyByDID(
-    request: FetchedRequest.JwtSecured,
+    request: ReceivedRequest.Signed,
     clientId: DID,
     lookupPublicKeyByDIDUrl: LookupPublicKeyByDIDUrl,
 ): PublicKey = withContext(Dispatchers.IO) {
     val keyUrl: AbsoluteDIDUrl = run {
-        val kid = ensureNotNull(request.jwt.header?.keyID) {
+        val jwt = request.ensureSingleSignedRequest()
+        val kid = ensureNotNull(jwt.header?.keyID) {
             invalidJarJwt("Missing kid for client_id $clientId")
         }
         ensureNotNull(AbsoluteDIDUrl.parse(kid).getOrNull()) {
@@ -217,7 +229,7 @@ private suspend fun lookupKeyByDID(
 private fun verifierAttestation(
     clock: Clock,
     supportedScheme: SupportedClientIdScheme.VerifierAttestation,
-    request: FetchedRequest.JwtSecured,
+    request: ReceivedRequest.Signed,
     originalClientId: OriginalClientId,
 ): VerifierAttestationClaims {
     val (trust, skew) = supportedScheme
@@ -225,7 +237,8 @@ private fun verifierAttestation(
         invalidJarJwt("Invalid VerifierAttestation JWT. Details: $cause")
 
     val verifierAttestationJwt = run {
-        val jwtString = request.jwt.header.customParams["jwt"]
+        val jwt = request.ensureSingleSignedRequest()
+        val jwtString = jwt.header.customParams["jwt"]
         ensureNotNull(jwtString) { invalidJarJwt("Missing jwt JOSE Header") }
         ensure(jwtString is String) { invalidJarJwt("jwt JOSE Header doesn't contain a JWT") }
 

@@ -27,6 +27,7 @@ import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
 import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.X509SanDns
+import eu.europa.ec.eudi.openid4vp.dcql.metaSdJwtVc
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.prex.*
@@ -83,6 +84,7 @@ fun main(): Unit = runBlocking {
     runUseCase(Transaction.MsoMdocPidDcql)
     runUseCase(Transaction.SdJwtVcPidPresentationExchange)
     runUseCase(Transaction.SdJwtVcPidDcql)
+    runUseCase(Transaction.SdJwtVcEhicDcql)
 }
 
 @Serializable
@@ -308,6 +310,11 @@ sealed interface Transaction {
 
             OpenId4VP(PresentationQuery.DCQL(dcql), listOf(transactionData))
         }
+
+        val SdJwtVcEhicDcql = run {
+            val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-ehic-dcql-query.json"))
+            OpenId4VP(PresentationQuery.DCQL(dcql))
+        }
     }
 }
 
@@ -415,14 +422,23 @@ private class Wallet(
                     ),
                 )
             }
+
             is PresentationQuery.ByDigitalCredentialsQuery -> {
                 val query = presentationQuery.value
                 check(1 == query.credentials.size) { "found more than 1 credentials" }
                 val credential = query.credentials.first()
-
                 val verifiablePresentation = when (val format = credential.format.value) {
                     "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
-                    "vc+sd-jwt" -> prepareSdJwtVcVerifiablePresentation(request.client, request.nonce, request.transactionData)
+                    "vc+sd-jwt", "dc+sd-jwt" -> {
+                        val vct = credential.metaSdJwtVc?.vctValues?.firstOrNull() ?: error("no vct found")
+                        prepareSdJwtVcVerifiablePresentation(
+                            request.client,
+                            request.nonce,
+                            request.transactionData,
+                            vct = vct,
+                        )
+                    }
+
                     else -> error("unsupported format $format")
                 }
 
@@ -441,21 +457,28 @@ private class Wallet(
         audience: Client,
         nonce: String,
         transactionData: List<TransactionData>?,
+        vct: String? = null,
     ): VerifiablePresentation.Generic {
-        val sdJwtVc = loadResource("/example/sd-jwt-vc-pid.txt")
+        val (sdJwtVc, holderKey) = when (vct) {
+            "urn:eudi:ehic:1" ->
+                loadResource("/example/sd-jwt-vc-ehic.txt") to ECKey.parse(loadResource("/example/sd-jwt-vc-ehic-key.json"))
+            else ->
+                loadResource("/example/sd-jwt-vc-pid.txt") to ECKey.parse(loadResource("/example/sd-jwt-vc-pid-key.json"))
+        }
+        check(holderKey.isPrivate) { "a private key is required" }
+
         val sdHash = run {
-            val digest = MessageDigest.getInstance("SHA3-256")
+            val digest = when (vct) {
+                "urn:eudi:ehic:1" -> MessageDigest.getInstance("SHA-256")
+                else -> MessageDigest.getInstance("SHA3-256")
+            }
             digest.update(sdJwtVc.encodeToByteArray())
             base64UrlNoPadding.encode(digest.digest())
         }
         val keyBindingJwt = run {
-            val key = ECKey.parse(loadResource("/example/sd-jwt-vc-pid-key.json"))
-                .also {
-                    check(it.isPrivate) { "a private key is required" }
-                }
             val header = JWSHeader.Builder(JWSAlgorithm.ES256)
                 .type(JOSEObjectType("kb+jwt"))
-                .keyID(key.keyID)
+                .keyID(holderKey.keyID)
                 .build()
             val claims = JWTClaimsSet.Builder()
                 .audience(audience.id.clientId)
@@ -477,7 +500,7 @@ private class Wallet(
                     }
                 }
                 .build()
-            SignedJWT(header, claims).apply { sign(ECDSASigner(key)) }
+            SignedJWT(header, claims).apply { sign(ECDSASigner(holderKey)) }
         }
         return VerifiablePresentation.Generic("$sdJwtVc${keyBindingJwt.serialize()}")
     }

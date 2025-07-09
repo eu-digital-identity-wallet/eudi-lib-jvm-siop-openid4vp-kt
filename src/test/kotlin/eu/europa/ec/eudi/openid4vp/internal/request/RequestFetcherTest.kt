@@ -95,8 +95,8 @@ internal class RequestFetcherTest {
             requestURIMethod = RequestUriMethod.POST,
         )
 
-        val fetchedRequest = assertIs<FetchedRequest.JwtSecured>(fetcher.fetchRequest(request))
-        assertEquals(signedRequest.serialize(), fetchedRequest.jwt.serialize())
+        val receivedRequest = assertIs<ReceivedRequest.Signed>(fetcher.fetchRequest(request))
+        assertEquals(signedRequest.serialize(), receivedRequest.toSignedJwts()[0].serialize())
     }
 
     @Test
@@ -180,8 +180,8 @@ internal class RequestFetcherTest {
             requestURIMethod = RequestUriMethod.POST,
         )
 
-        val fetchedRequest = assertIs<FetchedRequest.JwtSecured>(fetcher.fetchRequest(request))
-        assertEquals(signedRequest.serialize(), fetchedRequest.jwt.serialize())
+        val receivedRequest = assertIs<ReceivedRequest.Signed>(fetcher.fetchRequest(request))
+        assertEquals(signedRequest.serialize(), receivedRequest.toSignedJwts()[0].serialize())
     }
 }
 

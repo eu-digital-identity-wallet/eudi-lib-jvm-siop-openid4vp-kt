@@ -75,6 +75,21 @@ class WalletMetaDataTest {
         )
         assertMetadata(config)
     }
+
+    @Test
+    fun `assert presentationDefinitionUriSupported = true is ignored `() = runTest {
+        val config = SiopOpenId4VPConfig(
+            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+            vpConfiguration = VPConfiguration(
+                presentationDefinitionUriSupported = true,
+                vpFormats = VpFormats(
+                    VpFormat.SdJwtVc.ES256,
+                    VpFormat.MsoMdoc.ES256,
+                ),
+            ),
+        )
+        assertTrue { !config.vpConfiguration.presentationDefinitionUriSupported }
+    }
 }
 
 private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
@@ -94,7 +109,7 @@ private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
 
     assertExpectedVpFormats(config.vpConfiguration.vpFormats, walletMetaData)
     assertClientIdScheme(config.supportedClientIdSchemes, walletMetaData)
-    assertPresentationDefinitionUriSupported(config.vpConfiguration, walletMetaData)
+    assertPresentationDefinitionUriSupported(walletMetaData)
     assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
     assertJarEncryption(encryptionRequirement, ephemeralJarEncryptionJwks, walletMetaData)
     assertResponseTypes(walletMetaData)
@@ -141,15 +156,10 @@ private fun assertJarEncryption(
     }
 }
 
-private fun assertPresentationDefinitionUriSupported(vpConfiguration: VPConfiguration, walletMetaData: JsonObject) {
+private fun assertPresentationDefinitionUriSupported(walletMetaData: JsonObject) {
     val value = walletMetaData["presentation_definition_uri_supported"]
-    if (vpConfiguration.presentationDefinitionUriSupported) {
-        assertIs<JsonPrimitive>(value)
-        assertTrue { value.boolean }
-    } else {
-        assertTrue {
-            value == null || (value is JsonPrimitive && !value.boolean)
-        }
+    assertTrue {
+        value == null || (value is JsonPrimitive && !value.boolean)
     }
 }
 

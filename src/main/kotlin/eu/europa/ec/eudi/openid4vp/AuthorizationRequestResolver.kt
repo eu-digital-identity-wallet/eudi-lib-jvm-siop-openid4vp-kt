@@ -16,6 +16,9 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.hashAlgorithms
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.*
@@ -464,6 +467,11 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class DIDResolutionFailed(val didUrl: String) : RequestValidationError
 
     data class InvalidVerifierAttestations(val reason: String) : RequestValidationError
+
+    data object PresentationDefinitionByReferenceNotSupported : RequestValidationError {
+        @Suppress("unused")
+        private fun readResolve(): Any = PresentationDefinitionByReferenceNotSupported
+    }
 }
 
 /**

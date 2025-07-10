@@ -197,15 +197,6 @@ internal fun ResolvedRequestObject.responseWith(
     return responseWith(payload)
 }
 
-private fun requireCompatibleVpContent(presentationQuery: PresentationQuery, vpContent: VpContent) =
-    when (presentationQuery) {
-        is PresentationQuery.ByPresentationDefinition ->
-            require(vpContent is VpContent.PresentationExchange) { "PresentationExchange expected" }
-
-        is PresentationQuery.ByDigitalCredentialsQuery ->
-            require(vpContent is VpContent.DCQL) { "DCQL expected" }
-    }
-
 private fun ResolvedRequestObject.responsePayload(
     consensus: Consensus,
     encryptionParameters: EncryptionParameters?,
@@ -232,7 +223,6 @@ private fun ResolvedRequestObject.responsePayload(
 
         is ResolvedRequestObject.OpenId4VPAuthorization -> {
             require(consensus is Consensus.PositiveConsensus.VPTokenConsensus) { "VPTokenConsensus expected" }
-            requireCompatibleVpContent(presentationQuery, consensus.vpContent)
             AuthorizationResponsePayload.OpenId4VPAuthorization(
                 consensus.vpContent,
                 nonce,
@@ -244,7 +234,6 @@ private fun ResolvedRequestObject.responsePayload(
 
         is ResolvedRequestObject.SiopOpenId4VPAuthentication -> {
             require(consensus is Consensus.PositiveConsensus.IdAndVPTokenConsensus) { "IdAndVPTokenConsensus expected" }
-            requireCompatibleVpContent(presentationQuery, consensus.vpContent)
             AuthorizationResponsePayload.SiopOpenId4VPAuthentication(
                 consensus.idToken,
                 consensus.vpContent,

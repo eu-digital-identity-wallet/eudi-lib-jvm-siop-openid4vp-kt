@@ -16,11 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.VpContent.DCQL
-import eu.europa.ec.eudi.openid4vp.VpContent.PresentationExchange
-import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.*
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -190,7 +186,6 @@ internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPCon
  */
 internal object DirectPostForm {
 
-    private const val PRESENTATION_SUBMISSION_FORM_PARAM = "presentation_submission"
     private const val VP_TOKEN_FORM_PARAM = "vp_token"
     private const val STATE_FORM_PARAM = "state"
     private const val ID_TOKEN_FORM_PARAM = "id_token"
@@ -204,21 +199,8 @@ internal object DirectPostForm {
             }
         }
 
-    fun of(p: AuthorizationResponsePayload): Map<String, String> {
-        fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
-
-        fun MutableMap<String, String>.put(vpContent: VpContent) {
-            when (vpContent) {
-                is PresentationExchange -> {
-                    put(VP_TOKEN_FORM_PARAM, vpContent.verifiablePresentations.asParam())
-                    put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(vpContent.presentationSubmission))
-                }
-
-                is DCQL -> put(VP_TOKEN_FORM_PARAM, vpContent.verifiablePresentations.asParam())
-            }
-        }
-
-        return when (p) {
+    fun of(p: AuthorizationResponsePayload): Map<String, String> =
+        when (p) {
             is AuthorizationResponsePayload.SiopAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
                 p.state?.let {
@@ -227,7 +209,7 @@ internal object DirectPostForm {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
-                put(p.vpContent)
+                put(VP_TOKEN_FORM_PARAM, p.vpContent.asParam())
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }
@@ -235,7 +217,7 @@ internal object DirectPostForm {
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
-                put(p.vpContent)
+                put(VP_TOKEN_FORM_PARAM, p.vpContent.asParam())
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }
@@ -256,41 +238,24 @@ internal object DirectPostForm {
                 }
             }
         }
-    }
 }
 
-internal fun Map<QueryId, VerifiablePresentation>.asParam(): String =
+internal fun VpContent.asJsonObject(): JsonObject =
     buildJsonObject {
-        for ((key, value) in iterator()) {
-            put(key.value, value.asParam())
-        }
-    }.run(Json::encodeToString)
-
-internal fun List<VerifiablePresentation>.asParam(): String =
-    when (size) {
-        1 -> this.first().asParam()
-        0 -> error("Not expected")
-        else -> {
-            buildJsonArray {
-                for (vp in iterator()) {
-                    add(vp.asJson())
+        verifiablePresentations.entries
+            .forEach { (queryId, verifiablePresentations) ->
+                putJsonArray(queryId.value) {
+                    verifiablePresentations.forEach { verifiablePresentation ->
+                        when (verifiablePresentation) {
+                            is VerifiablePresentation.Generic -> add(verifiablePresentation.value)
+                            is VerifiablePresentation.JsonObj -> add(verifiablePresentation.value)
+                        }
+                    }
                 }
-            }.run(Json::encodeToString)
-        }
+            }
     }
 
-internal fun VerifiablePresentation.asParam(): String =
-    when (this) {
-        is VerifiablePresentation.Generic -> value
-        is VerifiablePresentation.JsonObj -> Json.encodeToString(value)
-    }
-
-internal fun VerifiablePresentation.asJson(): JsonElement {
-    return when (this) {
-        is VerifiablePresentation.Generic -> JsonPrimitive(value)
-        is VerifiablePresentation.JsonObj -> value
-    }
-}
+internal fun VpContent.asParam(): String = Json.encodeToString(asJsonObject())
 
 internal object DirectPostJwtForm {
     fun parametersOf(jarmJwt: Jwt): Parameters =

@@ -26,10 +26,10 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.dcql.CredentialQuery
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.request.*
-import eu.europa.ec.eudi.prex.Id
-import eu.europa.ec.eudi.prex.PresentationDefinition
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -148,10 +148,14 @@ class AuthorizationResponseBuilderTest {
 
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    presentationQuery = PresentationQuery.ByPresentationDefinition(
-                        PresentationDefinition(
-                            id = Id("pdId"),
-                            inputDescriptors = emptyList(),
+                    presentationQuery = PresentationQuery(
+                        DCQL(
+                            credentials = listOf(
+                                CredentialQuery(
+                                    id = QueryId("pdId"),
+                                    format = Format("foo"),
+                                ),
+                            ),
                         ),
                     ),
                     jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
@@ -165,9 +169,10 @@ class AuthorizationResponseBuilderTest {
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                VpContent.PresentationExchange(
-                    listOf(VerifiablePresentation.Generic("dummy_vp_token")),
-                    PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                VpContent(
+                    mapOf(
+                        QueryId("pdId") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
+                    ),
                 ),
             )
             val response = resolvedRequest.responseWith(vpTokenConsensus, null)

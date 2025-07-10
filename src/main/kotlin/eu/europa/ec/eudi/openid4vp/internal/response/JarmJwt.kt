@@ -28,7 +28,6 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.time.Duration
@@ -136,12 +135,12 @@ private fun SiopOpenId4VPConfig.signAndEncrypt(
 
 private object JwtPayloadFactory {
 
-    private const val PRESENTATION_SUBMISSION_CLAIM = "presentation_submission"
     private const val VP_TOKEN_CLAIM = "vp_token"
     private const val STATE_CLAIM = "state"
     private const val ID_TOKEN_CLAIM = "id_token"
     private const val ERROR_CLAIM = "error"
     private const val ERROR_DESCRIPTION_CLAIM = "error_description"
+
     fun encryptedJwtClaimSet(data: AuthorizationResponsePayload): JWTClaimsSet =
         buildJsonObject {
             payloadClaims(data)
@@ -173,12 +172,12 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                put(data.vpContent)
+                put(VP_TOKEN_CLAIM, data.vpContent.asJsonObject())
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
                 put(ID_TOKEN_CLAIM, data.idToken)
-                put(data.vpContent)
+                put(VP_TOKEN_CLAIM, data.vpContent.asJsonObject())
             }
 
             is AuthorizationResponsePayload.InvalidRequest -> {
@@ -192,50 +191,12 @@ private object JwtPayloadFactory {
         }
     }
 
-    fun JsonObjectBuilder.put(vpContent: VpContent) {
-        when (vpContent) {
-            is VpContent.PresentationExchange -> {
-                put(VP_TOKEN_CLAIM, vpContent.verifiablePresentations.toJson())
-                put(PRESENTATION_SUBMISSION_CLAIM, Json.encodeToJsonElement(vpContent.presentationSubmission))
-            }
-
-            is VpContent.DCQL -> put(VP_TOKEN_CLAIM, vpContent.verifiablePresentations.toJson())
-        }
-    }
-
     private fun JsonObject.asJWTClaimSet(): JWTClaimsSet {
         val jsonStr = Json.encodeToString(this)
         return JWTClaimsSet.parse(jsonStr)
     }
 }
 
-internal fun Map<QueryId, VerifiablePresentation>.toJson() =
-    buildJsonObject {
-        for ((key, value) in iterator()) {
-            put(key.value, value.asJson())
-        }
-    }
-
-internal fun List<VerifiablePresentation>.toJson(): JsonElement {
-    fun VerifiablePresentation.asJson(): JsonElement {
-        return when (this) {
-            is VerifiablePresentation.Generic -> JsonPrimitive(value)
-            is VerifiablePresentation.JsonObj -> value
-        }
-    }
-
-    return when (size) {
-        1 -> first().asJson()
-        0 -> error("Not expected")
-        else -> {
-            buildJsonArray {
-                for (vp in iterator()) {
-                    add(vp.asJson())
-                }
-            }
-        }
-    }
-}
 internal object EncrypterFactory {
 
     fun createEncrypter(

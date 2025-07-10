@@ -22,7 +22,6 @@ import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
-import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -110,7 +109,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
     }
 
     /**
-     * Makes sure that [unvalidated] contains a supported [PresentationDefinitionSource].
+     * Makes sure that [unvalidated] contains a [PresentationQuery].
      *
      * @param unvalidated the request to validate
      */
@@ -118,52 +117,36 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         unvalidated: UnvalidatedRequestObject,
         scope: Scope?,
     ): PresentationQuery {
-        val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
-        val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
         val hasDcqlQuery = !unvalidated.dcqlQuery.isNullOrEmpty()
         val hasScope = scope != null
-
-        fun requiredPd(): PresentationQuery = try {
-            checkNotNull(unvalidated.presentationDefinition)
-            val pd = jsonSupport.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
-            PresentationQuery.ByPresentationDefinition(pd)
-        } catch (t: SerializationException) {
-            throw InvalidPresentationDefinition(t).asException()
-        }
 
         fun requiredDcqlQuery(): PresentationQuery = try {
             checkNotNull(unvalidated.dcqlQuery)
             val dcq = jsonSupport.decodeFromJsonElement<DCQL>(unvalidated.dcqlQuery)
-            PresentationQuery.ByDigitalCredentialsQuery(dcq)
+            PresentationQuery(dcq)
         } catch (t: SerializationException) {
             throw InvalidDigitalCredentialsQuery(t).asException()
         }
 
         fun requiredScope(): PresentationQuery {
             checkNotNull(scope)
-            return lookupKnownPresentationDefinitionsOrDCQLQueries(scope)
+            return lookupKnownDCQLQueries(scope)
         }
 
-        val querySourceCount = listOf(hasPd, hasPdUri, hasDcqlQuery, hasScope).count { it }
+        val querySourceCount = listOf(hasDcqlQuery, hasScope).count { it }
 
         return when {
             querySourceCount > 1 -> throw MultipleQuerySources.asException()
             hasDcqlQuery -> requiredDcqlQuery()
-            hasPd -> requiredPd()
-            hasPdUri -> throw PresentationDefinitionByReferenceNotSupported.asException()
             hasScope -> requiredScope()
             else -> throw MissingQuerySource.asException()
         }
     }
 
-    private fun lookupKnownPresentationDefinitionsOrDCQLQueries(scope: Scope): PresentationQuery {
-        scope.items().forEach { item ->
-            siopOpenId4VPConfig.vpConfiguration.knownPresentationDefinitionsPerScope[item.value]
-                ?.let { return PresentationQuery.ByPresentationDefinition(it) }
-        }
+    private fun lookupKnownDCQLQueries(scope: Scope): PresentationQuery {
         scope.items().forEach { item ->
             siopOpenId4VPConfig.vpConfiguration.knownDCQLQueriesPerScope[item.value]
-                ?.let { return PresentationQuery.ByDigitalCredentialsQuery(it) }
+                ?.let { return PresentationQuery(it) }
         }
         throw ResolutionError.UnknownScope(scope).asException()
     }
@@ -203,32 +186,17 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 throw invalid("Failed to deserialize verifier_attestations. Cause: ${t.message}")
             }
 
-        when (query) {
-            is PresentationQuery.ByPresentationDefinition -> {
-                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
-                    queryIds.isNullOrEmpty()
-
-                ensure(attestations.value.all { a -> a.validQueryIds() }) {
-                    val error =
-                        "There are verifier attestations credential_id should be empty for presentation_definition queries."
-
-                    invalid(error)
-                }
+        val allQueryIds = query.value.credentials.map { it.id }
+        fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
+            if (queryIds.isNullOrEmpty()) true
+            else {
+                queryIds.all { it in allQueryIds }
             }
-
-            is PresentationQuery.ByDigitalCredentialsQuery -> {
-                val allQueryIds = query.value.credentials.map { it.id }
-                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
-                    if (queryIds.isNullOrEmpty()) true
-                    else {
-                        queryIds.all { it in allQueryIds }
-                    }
-                ensure(attestations.value.all { a -> a.validQueryIds() }) {
-                    val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
-                    invalid(error)
-                }
-            }
+        ensure(attestations.value.all { a -> a.validQueryIds() }) {
+            val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
+            invalid(error)
         }
+
         return attestations
     }
 

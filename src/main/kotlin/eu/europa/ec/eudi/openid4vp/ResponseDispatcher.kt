@@ -50,7 +50,7 @@ sealed interface Consensus : Serializable {
 
         /**
          * In response to a [OpenId4VPAuthorization] where the
-         * wallet has claims that fulfill Verifier's presentation definition
+         * wallet has claims that fulfill Verifier's query
          * and holder has chosen the claims to include
          * @param vpContent the VpContent to be included in the authorization response
          */

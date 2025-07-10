@@ -1,0 +1,216 @@
+{
+  "credentials": [
+    {
+      "id": "query_0",
+      "format": "mso_mdoc",
+      "meta": {
+        "doctype_value": "eu.europa.ec.eudi.pid.1"
+      },
+      "claims": [
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "family_name"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "given_name"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "birth_date"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "age_over_18"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "age_in_years"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "age_birth_year"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "family_name_birth"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "given_name_birth"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "birth_place"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "resident_address"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "resident_country"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "resident_state"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "resident_city"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "resident_postal_code"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "resident_street"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "resident_house_number"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "sex"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "nationality"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "issuance_date"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "expiry_date"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "issuing_authority"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "document_number"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "personal_administrative_number"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "issuing_country"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "issuing_jurisdiction"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "portrait"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "email_address"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "mobile_phone_number"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "eu.europa.ec.eudi.pid.1",
+            "trust_anchor"
+          ],
+          "intent_to_retain": false
+        }
+      ]
+    }
+  ]
+}

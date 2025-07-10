@@ -21,7 +21,6 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.net.URI
@@ -231,20 +230,11 @@ sealed interface VerifiablePresentation {
     value class JsonObj(val value: JsonObject) : VerifiablePresentation
 }
 
-sealed interface VpContent {
-    data class PresentationExchange(
-        val verifiablePresentations: List<VerifiablePresentation>,
-        val presentationSubmission: PresentationSubmission,
-    ) : VpContent {
-        init {
-            require(verifiablePresentations.isNotEmpty())
-        }
-    }
-
-    data class DCQL(val verifiablePresentations: Map<QueryId, VerifiablePresentation>) : VpContent {
-        init {
-            require(verifiablePresentations.isNotEmpty())
-        }
+@JvmInline
+value class VpContent(val verifiablePresentations: Map<QueryId, List<VerifiablePresentation>>) {
+    init {
+        require(verifiablePresentations.isNotEmpty())
+        require(verifiablePresentations.values.all { it.isNotEmpty() })
     }
 }
 

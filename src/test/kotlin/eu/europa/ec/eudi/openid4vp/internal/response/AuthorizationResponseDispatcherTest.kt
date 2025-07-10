@@ -187,7 +187,7 @@ class AuthorizationResponseDispatcherTest {
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
-                    presentationQuery = PresentationQuery(dcql),
+                    query = dcql,
                     transactionData = null,
                     verifierAttestations = null,
                 )

@@ -52,7 +52,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * and holder's [Consensus.PositiveConsensus.VPTokenConsensus]
      *
      * @param vpContent the vp related information
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationQuery]
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */
@@ -70,7 +70,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      *
      * @param idToken The id_token produced by the wallet
      * @param vpContent the vp related information
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationQuery]
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */

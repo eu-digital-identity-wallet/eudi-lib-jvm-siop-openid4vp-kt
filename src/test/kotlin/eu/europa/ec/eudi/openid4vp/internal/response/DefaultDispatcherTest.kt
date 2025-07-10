@@ -102,7 +102,7 @@ class DefaultDispatcherTest {
                 ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                presentationQuery = PresentationQuery(
+                query =
                     DCQL(
                         credentials = listOf(
                             CredentialQuery(
@@ -111,7 +111,6 @@ class DefaultDispatcherTest {
                             ),
                         ),
                     ),
-                ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = CLIENT,
@@ -577,13 +576,12 @@ class DefaultDispatcherTest {
                 ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                presentationQuery = PresentationQuery(
+                query =
                     DCQL(
                         credentials = listOf(
                             testCredentialQuery(),
                         ),
                     ),
-                ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = Verifier.CLIENT,
@@ -612,13 +610,12 @@ class DefaultDispatcherTest {
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
                 scope = Scope.OpenId,
-                presentationQuery = PresentationQuery(
+                query =
                     DCQL(
                         credentials = listOf(
                             testCredentialQuery(),
                         ),
                     ),
-                ),
                 transactionData = null,
                 verifierAttestations = null,
             )

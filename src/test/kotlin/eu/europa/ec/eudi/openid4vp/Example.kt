@@ -352,7 +352,7 @@ private class Wallet(
     }
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
-        val query = request.presentationQuery.value
+        val query = request.query
         check(1 == query.credentials.size) { "found more than 1 credentials" }
         val credential = query.credentials.first()
         val verifiablePresentation = when (val format = credential.format.value) {

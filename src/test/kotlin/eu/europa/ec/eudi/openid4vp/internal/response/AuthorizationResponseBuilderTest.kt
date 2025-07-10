@@ -148,7 +148,7 @@ class AuthorizationResponseBuilderTest {
 
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    presentationQuery = PresentationQuery(
+                    query =
                         DCQL(
                             credentials = listOf(
                                 CredentialQuery(
@@ -157,7 +157,6 @@ class AuthorizationResponseBuilderTest {
                                 ),
                             ),
                         ),
-                    ),
                     jarmRequirement = Wallet.config.jarmRequirement(verifierMetaData),
                     vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),

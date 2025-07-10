@@ -152,15 +152,15 @@ data class TransactionData private constructor(val value: String) : Serializable
             }
         }
 
-        private fun TransactionData.hasCorrectIds(query: PresentationQuery) {
+        private fun TransactionData.hasCorrectIds(query: DCQL) {
             val requestedCredentialIds = query.requestedCredentialIds()
             require(requestedCredentialIds.containsAll(credentialIds)) {
                 "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
             }
         }
 
-        private fun PresentationQuery.requestedCredentialIds(): List<TransactionDataCredentialId> =
-            value.credentials.map { TransactionDataCredentialId(it.id.value) }
+        private fun DCQL.requestedCredentialIds(): List<TransactionDataCredentialId> =
+            credentials.map { TransactionDataCredentialId(it.id.value) }
 
         internal operator fun invoke(
             type: TransactionDataType,
@@ -188,7 +188,7 @@ data class TransactionData private constructor(val value: String) : Serializable
         internal operator fun invoke(
             s: String,
             supportedTypes: List<SupportedTransactionDataType>,
-            query: PresentationQuery,
+            query: DCQL,
         ): Result<TransactionData> = runCatching {
             parse(s).getOrThrow().also {
                 it.isSupported(supportedTypes)
@@ -274,7 +274,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
         val vpFormats: VpFormats?,
-        val presentationQuery: PresentationQuery,
+        val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
@@ -296,7 +296,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
-        val presentationQuery: PresentationQuery,
+        val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
@@ -542,6 +542,3 @@ fun interface AuthorizationRequestResolver {
      */
     suspend fun resolveRequestUri(uri: String): Resolution
 }
-
-@JvmInline
-value class PresentationQuery(val value: DCQL)

@@ -23,7 +23,7 @@ Similarly, in the cross-device scenario, the request would be obtained via scann
 Regardless of the scenario, wallet must take the URI (of the deep link or the QR Code) that represents the
 authorization request and ask the SDK to validate the URI (that is to make sure that it represents one of the supported
 requests mentioned aforementioned) and in addition gather from Verifier additional information that may be included by
-reference (such as `presentation_definition_uri`, `client_metadata_uri` etc.)
+reference (such as `client_metadata_uri` etc.)
 
 The interface that captures the aforementioned functionality is
 [AuthorizationRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vp/AuthorizationRequestResolver.kt)
@@ -152,25 +152,7 @@ by reference (using `request_uri`)
 
 ### Verifiable Credentials Requirements
 
-As per OpenId4VP, the Verifier can describe the requirements of the Verifiable Credential(s) to be presented using:
-
-* [Presentation Exchange 2.0.0](https://identity.foundation/presentation-exchange/spec/v2.0.0/)
-* [Digital Credentials Query Language (DCQL)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-digital-credentials-query-l)
-
-**Presentation Exchange 2.0.0**:
-
-The Verifier articulated requirements of the Verifiable Credential(s) that are requested, are provided using
-`presentation_definition` and `presentation_definition_uri` parameters that contain a Presentation Definition JSON object.
-
-According to OpenId4VP, verifier may pass the `presentation_definition` either
-
-* [by value](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.4)
-* [by reference](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.5)
-* [using scope](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-5.6)
-
-Library supports all these options
-
-**DCQL**:
+As per OpenId4VP, the Verifier can describe the requirements of the Verifiable Credential(s) to be presented using [Digital Credentials Query Language (DCQL)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-digital-credentials-query-l):
 
 The Verifier articulated requirements of the Verifiable Credential(s) that are requested, are provided using
 the `dcql_query` parameter that contains a [DCQL Query](https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#section-6-2) JSON object.
@@ -184,9 +166,6 @@ Library supports all these options
 
 > [!NOTE]
 > Passing a DCQL Query by reference is not supported by OpenId4VP.
-
-> [!IMPORTANT]  
-> When scope is used, library tries to match it first to a well known Presentation Definition, and then to a well known DCQL query. 
 
 ### Client metadata in Authorization Request
 

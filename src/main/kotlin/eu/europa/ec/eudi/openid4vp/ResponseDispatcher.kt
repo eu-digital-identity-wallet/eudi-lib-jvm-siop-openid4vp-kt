@@ -52,21 +52,21 @@ sealed interface Consensus : Serializable {
          * In response to a [OpenId4VPAuthorization] where the
          * wallet has claims that fulfill Verifier's query
          * and holder has chosen the claims to include
-         * @param vpContent the VpContent to be included in the authorization response
+         * @param verifiablePresentations the Verifiable Presentations to be included in the authorization response
          */
         data class VPTokenConsensus(
-            val vpContent: VpContent,
+            val verifiablePresentations: VerifiablePresentations,
         ) : PositiveConsensus
 
         /**
          * In response to a [SiopOpenId4VPAuthentication]
          *
          * @param idToken The id_token produced by the wallet
-         * @param vpContent the VpContent to be included in the authorization response
+         * @param verifiablePresentations the Verifiable Presentations to be included in the authorization response
          */
         data class IdAndVPTokenConsensus(
             val idToken: Jwt,
-            val vpContent: VpContent,
+            val verifiablePresentations: VerifiablePresentations,
         ) : PositiveConsensus
     }
 }

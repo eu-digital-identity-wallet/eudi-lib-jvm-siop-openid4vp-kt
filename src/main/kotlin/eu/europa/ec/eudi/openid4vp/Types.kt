@@ -231,10 +231,10 @@ sealed interface VerifiablePresentation {
 }
 
 @JvmInline
-value class VpContent(val verifiablePresentations: Map<QueryId, List<VerifiablePresentation>>) {
+value class VerifiablePresentations(val value: Map<QueryId, List<VerifiablePresentation>>) {
     init {
-        require(verifiablePresentations.isNotEmpty())
-        require(verifiablePresentations.values.all { it.isNotEmpty() })
+        require(value.isNotEmpty())
+        require(value.values.all { it.isNotEmpty() })
     }
 }
 

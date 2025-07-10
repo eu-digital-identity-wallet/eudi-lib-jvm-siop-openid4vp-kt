@@ -172,12 +172,12 @@ private object JwtPayloadFactory {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> {
-                put(VP_TOKEN_CLAIM, data.vpContent.asJsonObject())
+                put(VP_TOKEN_CLAIM, data.verifiablePresentations.asJsonObject())
             }
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> {
                 put(ID_TOKEN_CLAIM, data.idToken)
-                put(VP_TOKEN_CLAIM, data.vpContent.asJsonObject())
+                put(VP_TOKEN_CLAIM, data.verifiablePresentations.asJsonObject())
             }
 
             is AuthorizationResponsePayload.InvalidRequest -> {

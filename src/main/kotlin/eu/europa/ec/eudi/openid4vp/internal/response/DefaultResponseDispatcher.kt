@@ -209,7 +209,7 @@ internal object DirectPostForm {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
-                put(VP_TOKEN_FORM_PARAM, p.vpContent.asParam())
+                put(VP_TOKEN_FORM_PARAM, p.verifiablePresentations.asParam())
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }
@@ -217,7 +217,7 @@ internal object DirectPostForm {
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
-                put(VP_TOKEN_FORM_PARAM, p.vpContent.asParam())
+                put(VP_TOKEN_FORM_PARAM, p.verifiablePresentations.asParam())
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }
@@ -240,9 +240,9 @@ internal object DirectPostForm {
         }
 }
 
-internal fun VpContent.asJsonObject(): JsonObject =
+internal fun VerifiablePresentations.asJsonObject(): JsonObject =
     buildJsonObject {
-        verifiablePresentations.entries
+        value.entries
             .forEach { (queryId, verifiablePresentations) ->
                 putJsonArray(queryId.value) {
                     verifiablePresentations.forEach { verifiablePresentation ->
@@ -255,7 +255,7 @@ internal fun VpContent.asJsonObject(): JsonObject =
             }
     }
 
-internal fun VpContent.asParam(): String = Json.encodeToString(asJsonObject())
+internal fun VerifiablePresentations.asParam(): String = Json.encodeToString(asJsonObject())
 
 internal object DirectPostJwtForm {
     fun parametersOf(jarmJwt: Jwt): Parameters =

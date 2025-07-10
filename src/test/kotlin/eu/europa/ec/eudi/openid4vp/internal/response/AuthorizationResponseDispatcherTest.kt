@@ -193,7 +193,7 @@ class AuthorizationResponseDispatcherTest {
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                VpContent(
+                VerifiablePresentations(
                     mapOf(
                         QueryId("query_0") to listOf(VerifiablePresentation.Generic("vp_token")),
                     ),

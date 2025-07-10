@@ -168,7 +168,7 @@ class AuthorizationResponseBuilderTest {
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                VpContent(
+                VerifiablePresentations(
                     mapOf(
                         QueryId("pdId") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
                     ),

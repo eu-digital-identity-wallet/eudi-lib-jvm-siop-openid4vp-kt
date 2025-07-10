@@ -371,8 +371,8 @@ private class Wallet(
         }
 
         return Consensus.PositiveConsensus.VPTokenConsensus(
-            vpContent = VpContent(
-                verifiablePresentations = mapOf(
+            verifiablePresentations = VerifiablePresentations(
+                value = mapOf(
                     credential.id to listOf(verifiablePresentation),
                 ),
             ),

@@ -51,13 +51,13 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * In response to a [ResolvedRequestObject.OpenId4VPAuthorization]
      * and holder's [Consensus.PositiveConsensus.VPTokenConsensus]
      *
-     * @param vpContent the vp related information
+     * @param verifiablePresentations the vp related information
      * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */
     data class OpenId4VPAuthorization(
-        val vpContent: VpContent,
+        val verifiablePresentations: VerifiablePresentations,
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
@@ -69,14 +69,14 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * and holder's [Consensus.PositiveConsensus.IdAndVPTokenConsensus]
      *
      * @param idToken The id_token produced by the wallet
-     * @param vpContent the vp related information
+     * @param verifiablePresentations the vp related information
      * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */
     data class SiopOpenId4VPAuthentication(
         val idToken: Jwt,
-        val vpContent: VpContent,
+        val verifiablePresentations: VerifiablePresentations,
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
@@ -224,7 +224,7 @@ private fun ResolvedRequestObject.responsePayload(
         is ResolvedRequestObject.OpenId4VPAuthorization -> {
             require(consensus is Consensus.PositiveConsensus.VPTokenConsensus) { "VPTokenConsensus expected" }
             AuthorizationResponsePayload.OpenId4VPAuthorization(
-                consensus.vpContent,
+                consensus.verifiablePresentations,
                 nonce,
                 state,
                 client.id,
@@ -236,7 +236,7 @@ private fun ResolvedRequestObject.responsePayload(
             require(consensus is Consensus.PositiveConsensus.IdAndVPTokenConsensus) { "IdAndVPTokenConsensus expected" }
             AuthorizationResponsePayload.SiopOpenId4VPAuthentication(
                 consensus.idToken,
-                consensus.vpContent,
+                consensus.verifiablePresentations,
                 nonce,
                 state,
                 client.id,

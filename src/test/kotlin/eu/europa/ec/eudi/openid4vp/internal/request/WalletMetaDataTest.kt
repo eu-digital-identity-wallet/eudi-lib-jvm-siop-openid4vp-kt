@@ -35,8 +35,6 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                presentationDefinitionUriSupported = false,
-                knownPresentationDefinitionsPerScope = emptyMap(),
                 vpFormats = VpFormats(
                     VpFormat.SdJwtVc.ES256,
                     VpFormat.MsoMdoc.ES256,
@@ -61,8 +59,6 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                presentationDefinitionUriSupported = false,
-                knownPresentationDefinitionsPerScope = emptyMap(),
                 vpFormats = VpFormats(
                     VpFormat.SdJwtVc.ES256,
                     VpFormat.MsoMdoc.ES256,
@@ -74,21 +70,6 @@ class WalletMetaDataTest {
             ),
         )
         assertMetadata(config)
-    }
-
-    @Test
-    fun `assert presentationDefinitionUriSupported = true is ignored `() = runTest {
-        val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
-            vpConfiguration = VPConfiguration(
-                presentationDefinitionUriSupported = true,
-                vpFormats = VpFormats(
-                    VpFormat.SdJwtVc.ES256,
-                    VpFormat.MsoMdoc.ES256,
-                ),
-            ),
-        )
-        assertTrue { !config.vpConfiguration.presentationDefinitionUriSupported }
     }
 }
 

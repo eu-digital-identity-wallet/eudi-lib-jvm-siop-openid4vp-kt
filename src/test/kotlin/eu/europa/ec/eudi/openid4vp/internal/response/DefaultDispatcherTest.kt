@@ -36,9 +36,6 @@ import eu.europa.ec.eudi.openid4vp.internal.request.*
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier.assertIsJwtEncryptedWithVerifiersPubKey
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Wallet.assertIsJwtSignedByWallet
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Wallet.assertIsSignedByWallet
-import eu.europa.ec.eudi.prex.Id
-import eu.europa.ec.eudi.prex.PresentationDefinition
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -105,12 +102,15 @@ class DefaultDispatcherTest {
                 ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                presentationQuery = PresentationQuery.ByPresentationDefinition(
-                    PresentationDefinition(
-                        id = Id("pdId"),
-                        inputDescriptors = emptyList(),
+                query =
+                    DCQL(
+                        credentials = listOf(
+                            CredentialQuery(
+                                id = QueryId("pdId"),
+                                format = Format("foo"),
+                            ),
+                        ),
                     ),
-                ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = CLIENT,
@@ -239,9 +239,10 @@ class DefaultDispatcherTest {
                 redirectUri: URI? = null,
             ) {
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    VpContent.PresentationExchange(
-                        verifiablePresentations,
-                        PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                    VerifiablePresentations(
+                        mapOf(
+                            QueryId("psId") to verifiablePresentations,
+                        ),
                     ),
                 )
 
@@ -252,8 +253,7 @@ class DefaultDispatcherTest {
 
                     val jwtClaimSet = encryptedJwt.jwtClaimsSet
                     val vpTokenClaim = jwtClaimSet.vpTokenClaim()
-                    val vpContent = assertIs<VpContent.PresentationExchange>(vpTokenConsensus.vpContent)
-                    assertEquals(vpContent.verifiablePresentations.toJson(), vpTokenClaim)
+                    assertEquals(vpTokenConsensus.verifiablePresentations.asJsonObject(), vpTokenClaim)
                 }
 
                 val outcome = dispatcher.dispatch(
@@ -311,9 +311,10 @@ class DefaultDispatcherTest {
                 )
 
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    VpContent.PresentationExchange(
-                        listOf(VerifiablePresentation.Generic("dummy_vp_token")),
-                        PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                    VerifiablePresentations(
+                        mapOf(
+                            QueryId("psId") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
+                        ),
                     ),
                 )
 
@@ -324,9 +325,8 @@ class DefaultDispatcherTest {
                     val jwtClaimsSet = encryptedJwt.payload.toSignedJWT().assertIsSignedByWallet()
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
-                    val vpContent = assertIs<VpContent.PresentationExchange>(vpTokenConsensus.vpContent)
                     assertEquals(
-                        vpContent.verifiablePresentations.toJson(),
+                        vpTokenConsensus.verifiablePresentations.asJsonObject(),
                         jwtClaimsSet.vpTokenClaim(),
                     )
                 }
@@ -355,9 +355,10 @@ class DefaultDispatcherTest {
                     )
 
                     val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                        VpContent.PresentationExchange(
-                            listOf(VerifiablePresentation.Generic("dummy_vp_token")),
-                            PresentationSubmission(Id("psId"), Id("pdId"), emptyList())
+                        VerifiablePresentations(
+                            mapOf(
+                                QueryId("psId") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
+                            )
                         )
                     )
 
@@ -369,8 +370,7 @@ class DefaultDispatcherTest {
                         assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                         assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                         val vpTokenClaim = jwtClaimsSet.vpTokenClaim()
-                        val vpContent = assertIs<VpContent.PresentationExchange>(vpTokenConsensus.vpContent)
-                        val expectedVpToken = vpContent.verifiablePresentations.toJson()
+                        val expectedVpToken = vpTokenConsensus.verifiablePresentations.asJsonObject()
                         assertEquals(expectedVpToken, vpTokenClaim)
 
                     }
@@ -401,9 +401,10 @@ class DefaultDispatcherTest {
                 val resolvedRequest = Verifier.createOpenId4VPRequest(verifierMetaData, responseMode)
 
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    VpContent.PresentationExchange(
-                        listOf(VerifiablePresentation.Generic("dummy_vp_token")),
-                        PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
+                    VerifiablePresentations(
+                        mapOf(
+                            QueryId("psId") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
+                        ),
                     ),
                 )
 
@@ -412,9 +413,8 @@ class DefaultDispatcherTest {
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                     assertNotNull(jwtClaimsSet.expirationTime)
-                    val vpContent = assertIs<VpContent.PresentationExchange>(vpTokenConsensus.vpContent)
                     assertEquals(
-                        vpContent.verifiablePresentations.toJson(),
+                        vpTokenConsensus.verifiablePresentations.asJsonObject(),
                         jwtClaimsSet.vpTokenClaim(),
                     )
                 }
@@ -434,7 +434,7 @@ class DefaultDispatcherTest {
 
         @Test
         fun `support vp_token with multiple verifiable presentations`() = runTest {
-            suspend fun test(vpContent: VpContent, redirectUri: URI? = null) {
+            suspend fun test(verifiablePresentations: VerifiablePresentations, redirectUri: URI? = null) {
                 val verifierMetaData = UnvalidatedClientMetaData(
                     authorizationSignedResponseAlg = JWSAlgorithm.RS256.name,
                     vpFormats = VpFormatsTO.make(
@@ -445,7 +445,7 @@ class DefaultDispatcherTest {
 
                 val resolvedRequest = Verifier.createOpenId4VPRequest(verifierMetaData, responseMode)
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                    vpContent = vpContent,
+                    verifiablePresentations = verifiablePresentations,
                 )
 
                 val dispatcher = Wallet.createDispatcherWithVerifierAsserting(redirectUri) { responseParam ->
@@ -453,9 +453,8 @@ class DefaultDispatcherTest {
                     assertEquals(Wallet.config.issuer?.value, jwtClaimsSet.issuer)
                     assertContains(jwtClaimsSet.audience, Verifier.CLIENT.id.toString())
                     assertNotNull(jwtClaimsSet.expirationTime)
-                    val receivedVpContent = assertIs<VpContent.PresentationExchange>(vpTokenConsensus.vpContent)
                     assertEquals(
-                        receivedVpContent.verifiablePresentations.toJson(),
+                        vpTokenConsensus.verifiablePresentations.asJsonObject(),
                         jwtClaimsSet.vpTokenClaim(),
                     )
                 }
@@ -480,20 +479,20 @@ class DefaultDispatcherTest {
                     assertNotNull(jwtClaimsSet.expirationTime)
                     when (consensus) {
                         is Consensus.PositiveConsensus.VPTokenConsensus -> {
-                            val receivedVpContent = assertIs<VpContent.DCQL>(consensus.vpContent)
                             assertEquals(
-                                receivedVpContent.verifiablePresentations.toJson(),
+                                consensus.verifiablePresentations.asJsonObject(),
                                 jwtClaimsSet.vpTokenClaim(),
                             )
                         }
+
                         is Consensus.PositiveConsensus.IdAndVPTokenConsensus -> {
-                            val receivedVpContent = assertIs<VpContent.DCQL>(consensus.vpContent)
                             assertNotNull(jwtClaimsSet.claims["id_token"], "Expected id_token")
                             assertEquals(
-                                receivedVpContent.verifiablePresentations.toJson(),
+                                consensus.verifiablePresentations.asJsonObject(),
                                 jwtClaimsSet.vpTokenClaim(),
                             )
                         }
+
                         else -> fail("Expected positive consensus")
                     }
                 }
@@ -529,42 +528,44 @@ class DefaultDispatcherTest {
             )
         }
 
-        private fun vpTokenWithMultipleMixedPresentations(): VpContent =
-            VpContent.PresentationExchange(
-                verifiablePresentations = listOf(
-                    VerifiablePresentation.Generic("dummy_vp_token"),
-                    VerifiablePresentation.JsonObj(
-                        buildJsonObject {
-                            put("claimString", JsonPrimitive("claim1_value"))
-                            put(
-                                "claimArray",
-                                buildJsonArray {
-                                    add(JsonPrimitive("array_value_1"))
-                                    add(JsonPrimitive("array_value_2"))
-                                    add(JsonPrimitive("array_value_3"))
-                                },
-                            )
-                            put(
-                                "claimObject",
-                                buildJsonObject {
-                                    put("child_json_obj_1", JsonPrimitive("val1"))
-                                    put("child_json_obj_2", JsonPrimitive("val2"))
-                                },
-                            )
-                        },
+        private fun vpTokenWithMultipleMixedPresentations(): VerifiablePresentations =
+            VerifiablePresentations(
+                mapOf(
+                    QueryId("psId") to listOf(
+                        VerifiablePresentation.Generic("dummy_vp_token"),
+                        VerifiablePresentation.JsonObj(
+                            buildJsonObject {
+                                put("claimString", JsonPrimitive("claim1_value"))
+                                put(
+                                    "claimArray",
+                                    buildJsonArray {
+                                        add(JsonPrimitive("array_value_1"))
+                                        add(JsonPrimitive("array_value_2"))
+                                        add(JsonPrimitive("array_value_3"))
+                                    },
+                                )
+                                put(
+                                    "claimObject",
+                                    buildJsonObject {
+                                        put("child_json_obj_1", JsonPrimitive("val1"))
+                                        put("child_json_obj_2", JsonPrimitive("val2"))
+                                    },
+                                )
+                            },
+                        ),
                     ),
                 ),
-                presentationSubmission = PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
 
-        private fun vpTokenWithMultipleGenericPresentations(): VpContent =
-            VpContent.PresentationExchange(
-                listOf(
-                    VerifiablePresentation.Generic("dummy_vp_token_1"),
-                    VerifiablePresentation.Generic("dummy_vp_token_2"),
-                    VerifiablePresentation.Generic("dummy_vp_token_3"),
+        private fun vpTokenWithMultipleGenericPresentations(): VerifiablePresentations =
+            VerifiablePresentations(
+                mapOf(
+                    QueryId("psId") to listOf(
+                        VerifiablePresentation.Generic("dummy_vp_token_1"),
+                        VerifiablePresentation.Generic("dummy_vp_token_2"),
+                        VerifiablePresentation.Generic("dummy_vp_token_3"),
+                    ),
                 ),
-                PresentationSubmission(Id("psId"), Id("pdId"), emptyList()),
             )
 
         private fun createOpenID4VPRequestWithDCQL(
@@ -575,13 +576,12 @@ class DefaultDispatcherTest {
                 ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData, responseMode)
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                presentationQuery = PresentationQuery.ByDigitalCredentialsQuery(
+                query =
                     DCQL(
                         credentials = listOf(
                             testCredentialQuery(),
                         ),
                     ),
-                ),
                 jarmRequirement = Wallet.config.jarmRequirement(clientMetadataValidated),
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = Verifier.CLIENT,
@@ -610,47 +610,48 @@ class DefaultDispatcherTest {
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
                 scope = Scope.OpenId,
-                presentationQuery = PresentationQuery.ByDigitalCredentialsQuery(
+                query =
                     DCQL(
                         credentials = listOf(
                             testCredentialQuery(),
                         ),
                     ),
-                ),
                 transactionData = null,
                 verifierAttestations = null,
             )
         }
 
-        private fun dcqlVpTokenWithGenericPresentation(): VpContent =
-            VpContent.DCQL(
+        private fun dcqlVpTokenWithGenericPresentation(): VerifiablePresentations =
+            VerifiablePresentations(
                 mapOf(
-                    QueryId("my_credential") to VerifiablePresentation.Generic("dummy_vp_token"),
+                    QueryId("my_credential") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
                 ),
             )
 
-        private fun dcqlVpTokenWithJsonPresentation(): VpContent =
-            VpContent.DCQL(
+        private fun dcqlVpTokenWithJsonPresentation(): VerifiablePresentations =
+            VerifiablePresentations(
                 mapOf(
-                    QueryId("my_credential") to VerifiablePresentation.JsonObj(
-                        buildJsonObject {
-                            put("claimString", JsonPrimitive("claim1_value"))
-                            put(
-                                "claimArray",
-                                buildJsonArray {
-                                    add(JsonPrimitive("array_value_1"))
-                                    add(JsonPrimitive("array_value_2"))
-                                    add(JsonPrimitive("array_value_3"))
-                                },
-                            )
-                            put(
-                                "claimObject",
-                                buildJsonObject {
-                                    put("child_json_obj_1", JsonPrimitive("val1"))
-                                    put("child_json_obj_2", JsonPrimitive("val2"))
-                                },
-                            )
-                        },
+                    QueryId("my_credential") to listOf(
+                        VerifiablePresentation.JsonObj(
+                            buildJsonObject {
+                                put("claimString", JsonPrimitive("claim1_value"))
+                                put(
+                                    "claimArray",
+                                    buildJsonArray {
+                                        add(JsonPrimitive("array_value_1"))
+                                        add(JsonPrimitive("array_value_2"))
+                                        add(JsonPrimitive("array_value_3"))
+                                    },
+                                )
+                                put(
+                                    "claimObject",
+                                    buildJsonObject {
+                                        put("child_json_obj_1", JsonPrimitive("val1"))
+                                        put("child_json_obj_2", JsonPrimitive("val2"))
+                                    },
+                                )
+                            },
+                        ),
                     ),
                 ),
             )
@@ -916,9 +917,9 @@ class DefaultDispatcherTest {
             fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
                 val data = AuthorizationResponsePayload.SiopOpenId4VPAuthentication(
                     "dummy",
-                    VpContent.DCQL(
+                    VerifiablePresentations(
                         mapOf(
-                            QueryId("my_credential") to VerifiablePresentation.Generic("dummy_vp_token"),
+                            QueryId("my_credential") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
                         ),
                     ),
                     generateNonce(),
@@ -1039,5 +1040,6 @@ class DefaultDispatcherTest {
 private fun genState(): String = State().value
 private fun JWTClaimsSet.vpTokenClaim(): JsonElement? =
     Json.parseToJsonElement(toString()).jsonObject["vp_token"]
+
 private fun URI.getQueryParameter(name: String): String? =
     rawQuery.parseUrlEncodedParameters().toMap().mapValues { it.value.first() }[name]

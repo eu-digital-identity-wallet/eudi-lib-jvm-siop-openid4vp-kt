@@ -22,7 +22,6 @@ import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
-import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -62,9 +61,9 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         )
 
         fun vpToken(): OpenId4VPAuthorization {
-            val presentationQuery = requiredPresentationQuery(requestObject, nonOpenIdScope)
-            val transactionData = optionalTransactionData(requestObject, presentationQuery)
-            val verifierAttestations = optionalVerifierAttestations(presentationQuery, requestObject)
+            val query = requiredDcqlQuery(requestObject, nonOpenIdScope)
+            val transactionData = optionalTransactionData(requestObject, query)
+            val verifierAttestations = optionalVerifierAttestations(query, requestObject)
             return OpenId4VPAuthorization(
                 client = client.toClient(),
                 responseMode = responseMode,
@@ -72,16 +71,16 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 nonce = nonce,
                 jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
                 vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
-                presentationQuery = presentationQuery,
+                query = query,
                 transactionData = transactionData,
                 verifierAttestations = verifierAttestations,
             )
         }
 
         fun idAndVpToken(): SiopOpenId4VPAuthentication {
-            val presentationQuery = requiredPresentationQuery(requestObject, nonOpenIdScope)
-            val transactionData = optionalTransactionData(requestObject, presentationQuery)
-            val verifierAttestations = optionalVerifierAttestations(presentationQuery, requestObject)
+            val query = requiredDcqlQuery(requestObject, nonOpenIdScope)
+            val transactionData = optionalTransactionData(requestObject, query)
+            val verifierAttestations = optionalVerifierAttestations(query, requestObject)
             return SiopOpenId4VPAuthentication(
                 client = client.toClient(),
                 responseMode = responseMode,
@@ -92,7 +91,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 idTokenType = idTokenType,
                 subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
                 scope = scope.getOrThrow(),
-                presentationQuery = presentationQuery,
+                query = query,
                 transactionData = transactionData,
                 verifierAttestations = verifierAttestations,
             )
@@ -110,67 +109,50 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
     }
 
     /**
-     * Makes sure that [unvalidated] contains a supported [PresentationDefinitionSource].
+     * Makes sure that [unvalidated] contains a [DCQL] query.
      *
      * @param unvalidated the request to validate
      */
-    private fun requiredPresentationQuery(
+    private fun requiredDcqlQuery(
         unvalidated: UnvalidatedRequestObject,
         scope: Scope?,
-    ): PresentationQuery {
-        val hasPd = !unvalidated.presentationDefinition.isNullOrEmpty()
-        val hasPdUri = !unvalidated.presentationDefinitionUri.isNullOrEmpty()
+    ): DCQL {
         val hasDcqlQuery = !unvalidated.dcqlQuery.isNullOrEmpty()
         val hasScope = scope != null
 
-        fun requiredPd(): PresentationQuery = try {
-            checkNotNull(unvalidated.presentationDefinition)
-            val pd = jsonSupport.decodeFromJsonElement<PresentationDefinition>(unvalidated.presentationDefinition)
-            PresentationQuery.ByPresentationDefinition(pd)
-        } catch (t: SerializationException) {
-            throw InvalidPresentationDefinition(t).asException()
-        }
-
-        fun requiredDcqlQuery(): PresentationQuery = try {
+        fun requiredDcqlQuery(): DCQL = try {
             checkNotNull(unvalidated.dcqlQuery)
-            val dcq = jsonSupport.decodeFromJsonElement<DCQL>(unvalidated.dcqlQuery)
-            PresentationQuery.ByDigitalCredentialsQuery(dcq)
+            jsonSupport.decodeFromJsonElement<DCQL>(unvalidated.dcqlQuery)
         } catch (t: SerializationException) {
             throw InvalidDigitalCredentialsQuery(t).asException()
         }
 
-        fun requiredScope(): PresentationQuery {
+        fun requiredScope(): DCQL {
             checkNotNull(scope)
-            return lookupKnownPresentationDefinitionsOrDCQLQueries(scope)
+            return lookupKnownDCQLQueries(scope)
         }
 
-        val querySourceCount = listOf(hasPd, hasPdUri, hasDcqlQuery, hasScope).count { it }
+        val querySourceCount = listOf(hasDcqlQuery, hasScope).count { it }
 
         return when {
             querySourceCount > 1 -> throw MultipleQuerySources.asException()
             hasDcqlQuery -> requiredDcqlQuery()
-            hasPd -> requiredPd()
-            hasPdUri -> throw PresentationDefinitionByReferenceNotSupported.asException()
             hasScope -> requiredScope()
             else -> throw MissingQuerySource.asException()
         }
     }
 
-    private fun lookupKnownPresentationDefinitionsOrDCQLQueries(scope: Scope): PresentationQuery {
-        scope.items().forEach { item ->
-            siopOpenId4VPConfig.vpConfiguration.knownPresentationDefinitionsPerScope[item.value]
-                ?.let { return PresentationQuery.ByPresentationDefinition(it) }
-        }
+    private fun lookupKnownDCQLQueries(scope: Scope): DCQL {
         scope.items().forEach { item ->
             siopOpenId4VPConfig.vpConfiguration.knownDCQLQueriesPerScope[item.value]
-                ?.let { return PresentationQuery.ByDigitalCredentialsQuery(it) }
+                ?.let { return it }
         }
         throw ResolutionError.UnknownScope(scope).asException()
     }
 
     private fun optionalTransactionData(
         requestObject: UnvalidatedRequestObject,
-        query: PresentationQuery,
+        query: DCQL,
     ): List<TransactionData>? =
         requestObject.transactionData?.let { unresolvedTransactionData ->
             runCatching {
@@ -185,15 +167,15 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         }
 
     private fun optionalVerifierAttestations(
-        presentationQuery: PresentationQuery,
+        query: DCQL,
         unvalidated: UnvalidatedRequestObject,
     ): VerifierAttestations? =
         unvalidated.verifierAttestations
             ?.takeIf { it.isNotEmpty() }
-            ?.let { array -> verifierAttestations(presentationQuery, array) }
+            ?.let { array -> verifierAttestations(query, array) }
 
     private fun verifierAttestations(
-        query: PresentationQuery,
+        query: DCQL,
         verifierAttestationsArray: JsonArray,
     ): VerifierAttestations {
         fun invalid(s: String) = InvalidVerifierAttestations(s).asException()
@@ -203,32 +185,17 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 throw invalid("Failed to deserialize verifier_attestations. Cause: ${t.message}")
             }
 
-        when (query) {
-            is PresentationQuery.ByPresentationDefinition -> {
-                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
-                    queryIds.isNullOrEmpty()
-
-                ensure(attestations.value.all { a -> a.validQueryIds() }) {
-                    val error =
-                        "There are verifier attestations credential_id should be empty for presentation_definition queries."
-
-                    invalid(error)
-                }
+        val allQueryIds = query.credentials.map { it.id }
+        fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
+            if (queryIds.isNullOrEmpty()) true
+            else {
+                queryIds.all { it in allQueryIds }
             }
-
-            is PresentationQuery.ByDigitalCredentialsQuery -> {
-                val allQueryIds = query.value.credentials.map { it.id }
-                fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
-                    if (queryIds.isNullOrEmpty()) true
-                    else {
-                        queryIds.all { it in allQueryIds }
-                    }
-                ensure(attestations.value.all { a -> a.validQueryIds() }) {
-                    val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
-                    invalid(error)
-                }
-            }
+        ensure(attestations.value.all { a -> a.validQueryIds() }) {
+            val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
+            invalid(error)
         }
+
         return attestations
     }
 

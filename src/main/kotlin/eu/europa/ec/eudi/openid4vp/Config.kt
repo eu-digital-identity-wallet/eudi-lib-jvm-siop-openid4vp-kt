@@ -26,7 +26,6 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
-import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.PublicKey
@@ -215,41 +214,17 @@ data class SupportedTransactionDataType(
 }
 
 /**
- * Configurations options for OpenId4VP
+ * Configuration options for OpenId4VP
  *
- * @param knownPresentationDefinitionsPerScope a set of presentation definitions that a verifier may request via
- * a pre-agreed scope (instead of explicitly using presentation_definition or presentation_definition_uri)
  * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
  * @param vpFormats The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
-data class VPConfiguration private constructor(
-    val knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
+data class VPConfiguration(
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormats: VpFormats,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
-) {
-
-    val presentationDefinitionUriSupported: Boolean
-        get() = false
-
-    companion object {
-
-        @Deprecated("Use the constructor without presentationDefinitionUriSupported")
-        operator fun invoke(
-            presentationDefinitionUriSupported: Boolean = false,
-            knownPresentationDefinitionsPerScope: Map<String, PresentationDefinition> = emptyMap(),
-            knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
-            vpFormats: VpFormats,
-            supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
-        ): VPConfiguration = VPConfiguration(
-            knownPresentationDefinitionsPerScope = knownPresentationDefinitionsPerScope,
-            knownDCQLQueriesPerScope = knownDCQLQueriesPerScope,
-            vpFormats = vpFormats,
-            supportedTransactionDataTypes = supportedTransactionDataTypes,
-        )
-    }
-}
+)
 
 interface JarmSigner : JWSSigner {
     fun getKeyId(): String

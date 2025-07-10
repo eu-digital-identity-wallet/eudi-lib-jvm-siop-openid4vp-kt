@@ -23,7 +23,6 @@ import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
-import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.Required
@@ -153,21 +152,15 @@ data class TransactionData private constructor(val value: String) : Serializable
             }
         }
 
-        private fun TransactionData.hasCorrectIds(query: PresentationQuery) {
+        private fun TransactionData.hasCorrectIds(query: DCQL) {
             val requestedCredentialIds = query.requestedCredentialIds()
             require(requestedCredentialIds.containsAll(credentialIds)) {
                 "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
             }
         }
 
-        private fun PresentationQuery.requestedCredentialIds(): List<TransactionDataCredentialId> =
-            when (this) {
-                is PresentationQuery.ByPresentationDefinition ->
-                    value.inputDescriptors.map { TransactionDataCredentialId(it.id.value) }
-
-                is PresentationQuery.ByDigitalCredentialsQuery ->
-                    value.credentials.map { TransactionDataCredentialId(it.id.value) }
-            }
+        private fun DCQL.requestedCredentialIds(): List<TransactionDataCredentialId> =
+            credentials.map { TransactionDataCredentialId(it.id.value) }
 
         internal operator fun invoke(
             type: TransactionDataType,
@@ -195,7 +188,7 @@ data class TransactionData private constructor(val value: String) : Serializable
         internal operator fun invoke(
             s: String,
             supportedTypes: List<SupportedTransactionDataType>,
-            query: PresentationQuery,
+            query: DCQL,
         ): Result<TransactionData> = runCatching {
             parse(s).getOrThrow().also {
                 it.isSupported(supportedTypes)
@@ -281,7 +274,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val nonce: String,
         override val jarmRequirement: JarmRequirement?,
         val vpFormats: VpFormats?,
-        val presentationQuery: PresentationQuery,
+        val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
@@ -303,7 +296,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
-        val presentationQuery: PresentationQuery,
+        val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
@@ -365,13 +358,6 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data object InvalidClientId : RequestValidationError {
         @Suppress("unused")
         private fun readResolve(): Any = InvalidClientId
-    }
-
-    data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
-
-    data object InvalidPresentationDefinitionUri : RequestValidationError {
-        @Suppress("unused")
-        private fun readResolve(): Any = InvalidPresentationDefinitionUri
     }
 
     data class InvalidDigitalCredentialsQuery(val cause: Throwable) : RequestValidationError
@@ -467,31 +453,17 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     data class DIDResolutionFailed(val didUrl: String) : RequestValidationError
 
     data class InvalidVerifierAttestations(val reason: String) : RequestValidationError
-
-    data object PresentationDefinitionByReferenceNotSupported : RequestValidationError {
-        @Suppress("unused")
-        private fun readResolve(): Any = PresentationDefinitionByReferenceNotSupported
-    }
 }
 
 /**
  * Errors that can occur while resolving an authorization request
  */
 sealed interface ResolutionError : AuthorizationRequestError {
-    data class UnknownScope(val scope: Scope) :
-        ResolutionError
-
-    data object FetchingPresentationDefinitionNotSupported : ResolutionError {
-        @Suppress("unused")
-        private fun readResolve(): Any = FetchingPresentationDefinitionNotSupported
-    }
-
-    data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
+    data class UnknownScope(val scope: Scope) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwksUnparsable(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
     data class InvalidTransactionData(val cause: Throwable) : ResolutionError
-
     data object ClientVpFormatsNotSupportedFromWallet : ResolutionError {
         @Suppress("unused")
         private fun readResolve(): Any = ClientVpFormatsNotSupportedFromWallet
@@ -569,13 +541,4 @@ fun interface AuthorizationRequestResolver {
      * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
     suspend fun resolveRequestUri(uri: String): Resolution
-}
-
-sealed interface PresentationQuery {
-
-    @JvmInline
-    value class ByPresentationDefinition(val value: PresentationDefinition) : PresentationQuery
-
-    @JvmInline
-    value class ByDigitalCredentialsQuery(val value: DCQL) : PresentationQuery
 }

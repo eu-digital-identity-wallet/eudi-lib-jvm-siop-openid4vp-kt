@@ -1,0 +1,34 @@
+{
+  "credentials": [
+    {
+      "id": "query_0",
+      "format": "mso_mdoc",
+      "meta": {
+        "doctype_value": "org.iso.18013.5.1.mDL"
+      },
+      "claims": [
+        {
+          "path": [
+            "org.iso.18013.5.1",
+            "family_name"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "org.iso.18013.5.1",
+            "portrait"
+          ],
+          "intent_to_retain": false
+        },
+        {
+          "path": [
+            "org.iso.18013.5.1",
+            "driving_privileges"
+          ],
+          "intent_to_retain": false
+        }
+      ]
+    }
+  ]
+}

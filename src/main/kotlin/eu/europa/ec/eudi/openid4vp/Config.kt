@@ -39,7 +39,7 @@ sealed interface JwkSetSource {
 }
 
 /**
- * The out-of-band knowledge of a Verifier, used in [SupportedClientIdScheme.Preregistered]
+ * The out-of-band knowledge of a Verifier, used in [SupportedClientIdPrefix.Preregistered]
 
  * @param clientId the client id of a trusted verifier
  * @param legalName the name of the trusted verifier
@@ -62,73 +62,41 @@ fun interface LookupPublicKeyByDIDUrl {
 }
 
 /**
- * The Client identifier scheme supported (or trusted) by the wallet.
+ * The Client identifier prefix supported (or trusted) by the wallet.
  */
-sealed interface SupportedClientIdScheme {
+sealed interface SupportedClientIdPrefix {
 
     /**
      * The Client Identifier is known to the Wallet in advance of the Authorization Request.
      */
-    data class Preregistered(val clients: Map<OriginalClientId, PreregisteredClient>) : SupportedClientIdScheme {
+    data class Preregistered(val clients: Map<OriginalClientId, PreregisteredClient>) : SupportedClientIdPrefix {
         constructor(vararg clients: PreregisteredClient) : this(clients.toList().associateBy { it.clientId })
-    }
-
-    /**
-     * Wallet trusts verifiers that are able to present a Client Identifier which is a URI and
-     * match a uniformResourceIdentifier Subject Alternative Name (SAN) RFC5280 entry in the
-     * leaf certificate passed with the request.
-     *
-     * In this scheme, Verifier must always sign his request (JAR)
-     *
-     * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
-     * indicates whether is trusted or not
-     */
-    data class X509SanUri(val trust: X509CertificateTrust) : SupportedClientIdScheme {
-        companion object {
-            internal val NoValidation: X509SanUri = X509SanUri { _ -> true }
-        }
-    }
-
-    /**
-     * Wallet trusts verifiers that are able to present a Client Identifier which is a DNS name and
-     * matches a dNSName Subject Alternative Name (SAN) RFC5280 entry in the
-     * leaf certificate passed with the request.
-     *
-     * In this scheme, Verifier must always sign his request (JAR)
-     *
-     * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
-     * indicates whether is trusted or not
-     */
-    data class X509SanDns(val trust: X509CertificateTrust) : SupportedClientIdScheme {
-        companion object {
-            internal val NoValidation: X509SanDns = X509SanDns { _ -> true }
-        }
     }
 
     /**
      * Wallet trusts verifiers that present an authorization request having a redirect URI
      * equal to the value of the Client Identifier.
      *
-     * In this scheme, Verifier must NOT sign his request
+     * In this prefix, Verifier must NOT sign his request
      */
-    data object RedirectUri : SupportedClientIdScheme
+    data object RedirectUri : SupportedClientIdPrefix
 
     /**
      * Wallet trusts verifiers that are able to present a client identifier which is a DID
      *
-     * In this scheme, Verifier must always sign his request (JAR), signed by a key
+     * In this prefix, Verifier must always sign his request (JAR), signed by a key
      * that can be referenced via the DID
      *
      * @param lookup a function for getting the public key of the verifier by
      * resolving a given DID URL
      */
-    data class DID(val lookup: LookupPublicKeyByDIDUrl) : SupportedClientIdScheme
+    data class DecentralizedIdentifier(val lookup: LookupPublicKeyByDIDUrl) : SupportedClientIdPrefix
 
     /**
      * Wallet trust verifiers that are able to present a signed Verifier Attestation, which
      * is issued by a party trusted by the Wallet
      *
-     * In this scheme, Verifier must always sign his request (JAR), having in its JOSE
+     * In this prefix, Verifier must always sign his request (JAR), having in its JOSE
      * header a Verifier Attestation JWT under `jwt` claim
      *
      * @param trust a function for verifying the digital signature of the Verifier Attestation JWT.
@@ -137,15 +105,42 @@ sealed interface SupportedClientIdScheme {
     data class VerifierAttestation(
         val trust: JWSVerifier,
         val clockSkew: Duration = Duration.ofSeconds(15L),
-    ) : SupportedClientIdScheme
+    ) : SupportedClientIdPrefix
 
-    fun scheme(): ClientIdScheme = when (this) {
-        is DID -> ClientIdScheme.DID
-        is Preregistered -> ClientIdScheme.PreRegistered
-        RedirectUri -> ClientIdScheme.RedirectUri
-        is VerifierAttestation -> ClientIdScheme.VERIFIER_ATTESTATION
-        is X509SanDns -> ClientIdScheme.X509_SAN_DNS
-        is X509SanUri -> ClientIdScheme.X509_SAN_URI
+    /**
+     * Wallet trusts verifiers that are able to present a Client Identifier which is a DNS name and
+     * matches a dNSName Subject Alternative Name (SAN) RFC5280 entry in the
+     * leaf certificate passed with the request.
+     *
+     * In this prefix, Verifier must always sign his request (JAR)
+     *
+     * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
+     * indicates whether is trusted or not
+     */
+    data class X509SanDns(val trust: X509CertificateTrust) : SupportedClientIdPrefix {
+        companion object {
+            internal val NoValidation: X509SanDns = X509SanDns { _ -> true }
+        }
+    }
+
+    /**
+     * Wallet trusts verifiers that are able to present a Client Identifier which is the SHA256 hash of the DER encoded
+     * leaf certificate passed with the request.
+     *
+     * In this prefix, Verifier must always sign his request (JAR)
+     *
+     * @param trust a function that accepts a chain of certificates (contents of `x5c` claim) and
+     * indicates whether is trusted or not
+     */
+    data class X509Hash(val trust: X509CertificateTrust) : SupportedClientIdPrefix
+
+    fun prefix(): ClientIdPrefix = when (this) {
+        is Preregistered -> ClientIdPrefix.PreRegistered
+        RedirectUri -> ClientIdPrefix.RedirectUri
+        is DecentralizedIdentifier -> ClientIdPrefix.DecentralizedIdentifier
+        is VerifierAttestation -> ClientIdPrefix.VerifierAttestation
+        is X509SanDns -> ClientIdPrefix.X509SanDns
+        is X509Hash -> ClientIdPrefix.X509Hash
     }
 }
 
@@ -529,7 +524,7 @@ enum class ErrorDispatchPolicy : java.io.Serializable {
 /**
  * Wallet configuration options for SIOP & OpenId4VP protocols.
  *
- * At minimum, a wallet configuration should define at least a [supportedClientIdSchemes]
+ * At minimum, a wallet configuration should define at least a [supportedClientIdPrefixes]
  *
  * @param issuer an optional id for the wallet. If not provided defaults to [SelfIssued].
  * @param jarConfiguration options related to JWT Secure authorization requests.
@@ -539,7 +534,7 @@ enum class ErrorDispatchPolicy : java.io.Serializable {
  * @param vpConfiguration options about OpenId4VP.
  * @param clock the system Clock. If not provided system's default clock will be used.
  * @param jarClockSkew max acceptable skew between wallet and verifier
- * @param supportedClientIdSchemes the client id schemes that are supported/trusted by the wallet
+ * @param supportedClientIdPrefixes the client id prefixes that are supported/trusted by the wallet
  * @param errorDispatchPolicy wallet's policy regarding error dispatching. Defaults to [ErrorDispatchPolicy.OnlyAuthenticatedClients].
  */
 data class SiopOpenId4VPConfig(
@@ -549,11 +544,11 @@ data class SiopOpenId4VPConfig(
     val vpConfiguration: VPConfiguration,
     val clock: Clock = Clock.systemDefaultZone(),
     val jarClockSkew: Duration = Duration.ofSeconds(15L),
-    val supportedClientIdSchemes: List<SupportedClientIdScheme>,
+    val supportedClientIdPrefixes: List<SupportedClientIdPrefix>,
     val errorDispatchPolicy: ErrorDispatchPolicy = ErrorDispatchPolicy.OnlyAuthenticatedClients,
 ) {
     init {
-        require(supportedClientIdSchemes.isNotEmpty()) { "At least a supported client id scheme must be provided" }
+        require(supportedClientIdPrefixes.isNotEmpty()) { "At least a supported client id prefix must be provided" }
     }
 
     constructor(
@@ -564,7 +559,7 @@ data class SiopOpenId4VPConfig(
         clock: Clock = Clock.systemDefaultZone(),
         jarClockSkew: Duration = Duration.ofSeconds(15L),
         errorDispatchPolicy: ErrorDispatchPolicy = ErrorDispatchPolicy.OnlyAuthenticatedClients,
-        vararg supportedClientIdSchemes: SupportedClientIdScheme,
+        vararg supportedClientIdPrefixes: SupportedClientIdPrefix,
     ) : this(
         issuer,
         jarConfiguration,
@@ -572,7 +567,7 @@ data class SiopOpenId4VPConfig(
         vpConfiguration,
         clock,
         jarClockSkew,
-        supportedClientIdSchemes.toList(),
+        supportedClientIdPrefixes.toList(),
         errorDispatchPolicy,
     )
 
@@ -584,5 +579,5 @@ data class SiopOpenId4VPConfig(
     }
 }
 
-internal fun SiopOpenId4VPConfig.supportedClientIdScheme(scheme: ClientIdScheme): SupportedClientIdScheme? =
-    supportedClientIdSchemes.firstOrNull { it.scheme() == scheme }
+internal fun SiopOpenId4VPConfig.supportedClientIdPrefix(prefix: ClientIdPrefix): SupportedClientIdPrefix? =
+    supportedClientIdPrefixes.firstOrNull { it.prefix() == prefix }

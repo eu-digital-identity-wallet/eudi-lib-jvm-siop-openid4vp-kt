@@ -107,19 +107,19 @@ Library currently supports `response_mode`
 * `query.jwt`
 
 
-### Supported Client ID Schemes
+### Supported Client ID Prefixes
 
-Library requires the presence of a `client_id` using one of the following schemes:
+Library requires the presence of a `client_id` using one of the following prefixes:
 
 - `pre-registered` assuming out of bound knowledge of verifier meta-data. A verifier may send an authorization request signed (JAR) or plain
-- `x509_san_dns` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
-- `x509_san_uri` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
 - `redirect_uri` where verifier must send the authorization request in plain (JAR cannot be used)
-- `did` where verifier must send the authorization request signed (JAR) using a key resolvable via DID URL.
-- `verifier_attestation` where verifier must send the authorization request signed (JAR), witch contains a verifier attestation JWT from a trusted issuer
+- `decentralized_identifier` where verifier must send the authorization request signed (JAR) using a key resolvable via DID URL.
+- `verifier_attestation` where verifier must send the authorization request signed (JAR), which contains a verifier attestation JWT from a trusted issuer
+- `x509_san_dns` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
+- `x509_hash` where verifier must send the authorization request signed (JAR) using by a suitable X509 certificate
 
 > [!NOTE]
-> The Client ID Scheme is encoded as a prefix in `client_id`. Absence of such a prefix, indicates the usage of the `pre-registered` Client ID Scheme.
+> The Client ID Prefix is encoded as a prefix in `client_id`. Absence of such a prefix, indicates the usage of the `pre-registered` Client ID Prefix.
 
 ### Retrieving Authorization Request
 

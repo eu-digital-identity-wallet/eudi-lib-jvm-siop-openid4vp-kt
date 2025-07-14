@@ -39,11 +39,11 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
      *
      * DCQL Query does not conform to the OpenId4VP specification.
      *
-     * The Wallet does not support the Client Identifier Scheme passed in the Authorization Request
+     * The Wallet does not support the Client Identifier Prefix passed in the Authorization Request
      *
-     * The Client Identifier passed in the request did not belong to its Client Identifier scheme,
-     * or requirements of a certain scheme was violated,
-     * for example, an unsigned request was sent with Client Identifier scheme https
+     * The Client Identifier passed in the request did not belong to its Client Identifier prefix,
+     * or requirements of a certain prefix was violated,
+     * for example, an unsigned request was sent with Client Identifier prefix openid_federation
      */
     INVALID_REQUEST("invalid_request"),
 
@@ -111,7 +111,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
             return when (error) {
                 is UnknownScope -> INVALID_SCOPE
 
-                is InvalidClientIdScheme,
+                is InvalidClientIdPrefix,
                 InvalidRedirectUri,
                 InvalidResponseUri,
                 MissingClientId,
@@ -139,7 +139,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is InvalidVerifierAttestations,
                 -> INVALID_REQUEST
 
-                InvalidClientId, UnsupportedClientIdScheme -> INVALID_CLIENT
+                InvalidClientId, UnsupportedClientIdPrefix -> INVALID_CLIENT
 
                 is InvalidRequestUriMethod -> INVALID_REQUEST_URI_METHOD
 

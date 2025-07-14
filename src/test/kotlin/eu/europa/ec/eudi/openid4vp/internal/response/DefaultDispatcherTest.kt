@@ -138,7 +138,7 @@ class DefaultDispatcherTest {
         }
 
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+            supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             jarmConfiguration = JarmConfiguration.SigningAndEncryption(
                 signer = JarmSigner(jarmSigningKeyPair),
                 supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
@@ -695,7 +695,7 @@ class DefaultDispatcherTest {
                 val data = AuthorizationResponsePayload.NoConsensusResponseData(
                     generateNonce(),
                     state,
-                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                 )
                 val response = AuthorizationResponse.Query(redirectUri = redirectUriBase, data = data)
                 response.encodeRedirectURI()
@@ -716,7 +716,7 @@ class DefaultDispatcherTest {
                         MissingNonce,
                         generateNonce(),
                         state,
-                        VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                        VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     )
                 val response = AuthorizationResponse.Query(redirectUriBase, data)
                 val redirectURI = response.encodeRedirectURI()
@@ -738,7 +738,7 @@ class DefaultDispatcherTest {
                     "dummy",
                     generateNonce(),
                     state,
-                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response = AuthorizationResponse.Query(redirectUriBase, data)
@@ -760,7 +760,7 @@ class DefaultDispatcherTest {
                     "dummy",
                     generateNonce(),
                     state,
-                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response = AuthorizationResponse.QueryJwt(
@@ -854,7 +854,7 @@ class DefaultDispatcherTest {
                 val data = AuthorizationResponsePayload.NoConsensusResponseData(
                     generateNonce(),
                     state,
-                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                 )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 
@@ -876,7 +876,7 @@ class DefaultDispatcherTest {
                         MissingNonce,
                         generateNonce(),
                         state,
-                        VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                        VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
 
@@ -898,7 +898,7 @@ class DefaultDispatcherTest {
                     "dummy",
                     generateNonce(),
                     state,
-                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
@@ -924,7 +924,7 @@ class DefaultDispatcherTest {
                     ),
                     generateNonce(),
                     state,
-                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response = AuthorizationResponse.Fragment(redirectUri = redirectUriBase, data = data)
@@ -945,7 +945,7 @@ class DefaultDispatcherTest {
                     "dummy",
                     generateNonce(),
                     state,
-                    VerifierId(ClientIdScheme.PreRegistered, "client_id"),
+                    VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
                 )
                 val response =

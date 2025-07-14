@@ -25,8 +25,8 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.X509SanDns
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdPrefix.Preregistered
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdPrefix.X509SanDns
 import eu.europa.ec.eudi.openid4vp.dcql.metaSdJwtVc
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
@@ -438,7 +438,7 @@ private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
     true
 }
 
-private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
+private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix) =
     SiopOpenId4VPConfig(
         vpConfiguration = VPConfiguration(
             vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
@@ -465,7 +465,7 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
             supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),
         ),
-        supportedClientIdSchemes = supportedClientIdScheme,
+        supportedClientIdPrefixes = supportedClientIdPrefix,
         clock = Clock.systemDefaultZone(),
     )
 

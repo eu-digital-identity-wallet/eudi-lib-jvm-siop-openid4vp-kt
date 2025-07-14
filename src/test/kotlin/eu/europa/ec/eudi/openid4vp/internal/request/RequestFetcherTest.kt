@@ -198,7 +198,7 @@ private fun config(clientId: String, jarEncryptionRequirement: EncryptionRequire
         vpConfiguration = VPConfiguration(
             vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
         ),
-        supportedClientIdSchemes = listOf(SupportedClientIdScheme.Preregistered(PreregisteredClient(clientId, clientId))),
+        supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.Preregistered(PreregisteredClient(clientId, clientId))),
     )
 
 private fun createSignedRequestObject(clientId: String, walletNonce: String): SignedJWT =

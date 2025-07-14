@@ -148,7 +148,7 @@ private fun assertClientIdPrefix(
     supportedClientIdPrefixes: List<SupportedClientIdPrefix>,
     walletMetaData: JsonObject,
 ) {
-    val prefixes = walletMetaData["client_id_prefixes_supported"]
+    val prefixes = walletMetaData[OpenId4VPSpec.CLIENT_ID_PREFIXES_SUPPORTED]
     if (supportedClientIdPrefixes.isNotEmpty()) {
         assertIs<JsonArray>(prefixes)
         assertContentEquals(
@@ -165,8 +165,8 @@ private fun assertExpectedVpFormats(
     walletMetaData: JsonObject,
 ) {
     val vpFormats = assertIs<JsonObject>(
-        walletMetaData["vp_formats_supported"],
-        "Missing vp_formats_supported",
+        walletMetaData[OpenId4VPSpec.VP_FORMATS_SUPPORTED],
+        "Missing ${OpenId4VPSpec.VP_FORMATS_SUPPORTED}",
     )
     if (expectedVpFormats.msoMdoc != null) {
         val msoMdoc = assertNotNull(vpFormats["mso_mdoc"])

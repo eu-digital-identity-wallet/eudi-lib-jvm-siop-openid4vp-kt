@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.EncryptionRequirement
+import eu.europa.ec.eudi.openid4vp.OpenId4VPSpec
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
 import eu.europa.ec.eudi.openid4vp.internal.toJsonObject
 import kotlinx.serialization.json.*
@@ -27,8 +28,6 @@ private const val JWKS = "jwks"
 private const val AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED = "authorization_encryption_alg_values_supported"
 private const val AUTHORIZATION_ENCRYPTION_ENC_VALUES_SUPPORTED = "authorization_encryption_enc_values_supported"
 
-private const val CLIENT_ID_PREFIXES_SUPPORTED = "client_id_prefixes_supported"
-private const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 private const val RESPONSE_TYPES_SUPPOERTED = "response_types_supported"
 private const val RESPONSE_MODES_SUPPORTED = "response_modes_supported"
 
@@ -64,8 +63,8 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         val vpFormats =
             VpFormatsTO.make(cfg.vpConfiguration.vpFormats).let(Json.Default::encodeToJsonElement)
-        put(VP_FORMATS_SUPPORTED, vpFormats)
-        putJsonArray(CLIENT_ID_PREFIXES_SUPPORTED) {
+        put(OpenId4VPSpec.VP_FORMATS_SUPPORTED, vpFormats)
+        putJsonArray(OpenId4VPSpec.CLIENT_ID_PREFIXES_SUPPORTED) {
             cfg.supportedClientIdPrefixes.forEach { supportedClientIdPrefix ->
                 add(supportedClientIdPrefix.prefix().value())
             }

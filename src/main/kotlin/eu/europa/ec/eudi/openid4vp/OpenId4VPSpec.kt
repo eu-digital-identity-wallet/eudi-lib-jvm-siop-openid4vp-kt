@@ -64,6 +64,9 @@ object OpenId4VPSpec {
     const val TRANSACTION_DATA_TYPE: String = "type"
     const val TRANSACTION_DATA_CREDENTIAL_IDS: String = "credential_ids"
     const val TRANSACTION_DATA_HASH_ALGORITHMS: String = "transaction_data_hashes_alg"
+
+    const val CLIENT_ID_PREFIXES_SUPPORTED = "client_id_prefixes_supported"
+    const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 }
 
 object SIOPv2

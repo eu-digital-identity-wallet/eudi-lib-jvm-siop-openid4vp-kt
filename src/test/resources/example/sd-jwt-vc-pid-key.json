@@ -1,11 +1,10 @@
 {
   "kty": "EC",
-  "crv": "P-256",
-  "x": "xr4ZT9WUCKzvsOTAdCU9P_cS3P7eiwIuWVmK88Fd25M",
-  "y": "NvoFcHx9BLO_2vr5EZGfvBig1JXNVYUVvXgyg2oUOdQ",
-  "d": "Th0JJljIOUe08YpuSsXjz9r_a2ouAq4RzM9GoLFF8zk",
+  "d": "vhT-4EHJ_2zrzQK6x0eXP9aSAaSVOq_-aBqi10Oto28",
   "use": "sig",
-  "alg": "ES256",
-  "kid": "cred-key--0",
-  "iat": 1749816461
+  "crv": "P-256",
+  "kid": "46fb9236-7ce1-41eb-8cac-e344e1d8e91e",
+  "x": "GibKbI1emfCELR7rNd_hVN7K7C48pwb8UvADDxV589s",
+  "y": "lzex0g6LbgtWqKZH3JRyUbOJtC8vmDcfX2OXl1L8HaU",
+  "iat": 1752492561
 }

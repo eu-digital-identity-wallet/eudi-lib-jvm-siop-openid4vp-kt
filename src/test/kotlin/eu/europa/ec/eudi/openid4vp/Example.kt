@@ -468,10 +468,7 @@ private class Wallet(
         check(holderKey.isPrivate) { "a private key is required" }
 
         val sdHash = run {
-            val digest = when (vct) {
-                "urn:eudi:ehic:1" -> MessageDigest.getInstance("SHA-256")
-                else -> MessageDigest.getInstance("SHA3-256")
-            }
+            val digest = MessageDigest.getInstance("SHA-256")
             digest.update(sdJwtVc.encodeToByteArray())
             base64UrlNoPadding.encode(digest.digest())
         }

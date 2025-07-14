@@ -27,7 +27,6 @@ private const val JWKS = "jwks"
 private const val AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED = "authorization_encryption_alg_values_supported"
 private const val AUTHORIZATION_ENCRYPTION_ENC_VALUES_SUPPORTED = "authorization_encryption_enc_values_supported"
 
-private const val PRESENTATION_DEFINITION_URI_SUPPORTED = "presentation_definition_uri_supported"
 private const val CLIENT_ID_SCHEMES_SUPPORTED = "client_id_schemes_supported"
 private const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 private const val RESPONSE_TYPES_SUPPOERTED = "response_types_supported"
@@ -38,7 +37,7 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         // Authorization Request signature and encryption parameters
         // Uses properties defined in JAR and JARM specs
-        // https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-request-uri-method-post
+        // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request-uri-method-post
         //
 
         // Signature
@@ -63,8 +62,6 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         // OpenIdVP
         //
-        put(PRESENTATION_DEFINITION_URI_SUPPORTED, false)
-
         val vpFormats =
             VpFormatsTO.make(cfg.vpConfiguration.vpFormats).let(Json.Default::encodeToJsonElement)
         put(VP_FORMATS_SUPPORTED, vpFormats)

@@ -33,7 +33,7 @@ class WalletMetaDataTest {
     @Test
     fun `test with jar encryption`() = runTest {
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+            supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
                 vpFormats = VpFormats(
                     VpFormat.SdJwtVc.ES256,
@@ -57,7 +57,7 @@ class WalletMetaDataTest {
     @Test
     fun `test without jar encryption`() = runTest {
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+            supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
                 vpFormats = VpFormats(
                     VpFormat.SdJwtVc.ES256,
@@ -89,7 +89,7 @@ private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
         }
 
     assertExpectedVpFormats(config.vpConfiguration.vpFormats, walletMetaData)
-    assertClientIdScheme(config.supportedClientIdSchemes, walletMetaData)
+    assertClientIdPrefix(config.supportedClientIdPrefixes, walletMetaData)
     assertPresentationDefinitionUriSupported(walletMetaData)
     assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
     assertJarEncryption(encryptionRequirement, ephemeralJarEncryptionJwks, walletMetaData)
@@ -144,19 +144,19 @@ private fun assertPresentationDefinitionUriSupported(walletMetaData: JsonObject)
     }
 }
 
-private fun assertClientIdScheme(
-    supportedClientIdSchemes: List<SupportedClientIdScheme>,
+private fun assertClientIdPrefix(
+    supportedClientIdPrefixes: List<SupportedClientIdPrefix>,
     walletMetaData: JsonObject,
 ) {
-    val schemes = walletMetaData["client_id_schemes_supported"]
-    if (supportedClientIdSchemes.isNotEmpty()) {
-        assertIs<JsonArray>(schemes)
+    val prefixes = walletMetaData["client_id_prefixes_supported"]
+    if (supportedClientIdPrefixes.isNotEmpty()) {
+        assertIs<JsonArray>(prefixes)
         assertContentEquals(
-            supportedClientIdSchemes.map { it.scheme().value() },
-            schemes.mapNotNull { it.jsonPrimitive.contentOrNull },
+            supportedClientIdPrefixes.map { it.prefix().value() },
+            prefixes.mapNotNull { it.jsonPrimitive.contentOrNull },
         )
     } else {
-        assertNull(schemes)
+        assertNull(prefixes)
     }
 }
 

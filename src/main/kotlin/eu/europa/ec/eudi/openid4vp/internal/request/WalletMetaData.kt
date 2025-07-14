@@ -27,7 +27,7 @@ private const val JWKS = "jwks"
 private const val AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED = "authorization_encryption_alg_values_supported"
 private const val AUTHORIZATION_ENCRYPTION_ENC_VALUES_SUPPORTED = "authorization_encryption_enc_values_supported"
 
-private const val CLIENT_ID_SCHEMES_SUPPORTED = "client_id_schemes_supported"
+private const val CLIENT_ID_PREFIXES_SUPPORTED = "client_id_prefixes_supported"
 private const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 private const val RESPONSE_TYPES_SUPPOERTED = "response_types_supported"
 private const val RESPONSE_MODES_SUPPORTED = "response_modes_supported"
@@ -65,9 +65,9 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         val vpFormats =
             VpFormatsTO.make(cfg.vpConfiguration.vpFormats).let(Json.Default::encodeToJsonElement)
         put(VP_FORMATS_SUPPORTED, vpFormats)
-        putJsonArray(CLIENT_ID_SCHEMES_SUPPORTED) {
-            cfg.supportedClientIdSchemes.forEach { supportedClientIdScheme ->
-                add(supportedClientIdScheme.scheme().value())
+        putJsonArray(CLIENT_ID_PREFIXES_SUPPORTED) {
+            cfg.supportedClientIdPrefixes.forEach { supportedClientIdPrefix ->
+                add(supportedClientIdPrefix.prefix().value())
             }
         }
         putJsonArray(RESPONSE_TYPES_SUPPOERTED) {

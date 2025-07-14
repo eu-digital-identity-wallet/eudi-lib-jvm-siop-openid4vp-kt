@@ -100,8 +100,8 @@ class UnvalidatedRequestResolverTest {
     ).jsonObject
 
     private val walletConfig = SiopOpenId4VPConfig(
-        supportedClientIdSchemes = listOf(
-            SupportedClientIdScheme.Preregistered(
+        supportedClientIdPrefixes = listOf(
+            SupportedClientIdPrefix.Preregistered(
                 PreregisteredClient(
                     clientId = "Verifier",
                     legalName = "Verifier",
@@ -112,9 +112,9 @@ class UnvalidatedRequestResolverTest {
                     ),
                 ),
             ),
-            SupportedClientIdScheme.X509SanDns(::validateChain),
-            SupportedClientIdScheme.X509SanUri(::validateChain),
-            SupportedClientIdScheme.RedirectUri,
+            SupportedClientIdPrefix.RedirectUri,
+            SupportedClientIdPrefix.X509SanDns(::validateChain),
+            SupportedClientIdPrefix.X509Hash(::validateChain),
         ),
         jarConfiguration = JarConfiguration(
             supportedAlgorithms = listOf(JWSAlgorithm.RS256),
@@ -251,7 +251,7 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
-    fun `JAR auth request, request passed as JWT, verified with pre-registered client scheme`() = runBlocking {
+    fun `JAR auth request, request passed as JWT, verified with pre-registered client prefix`() = runBlocking {
         suspend fun test(typ: JOSEObjectType? = null, assertions: (Resolution) -> Unit) {
             val jwkSet = JWKSet(signingKey)
             val unvalidatedClientMetaData = UnvalidatedClientMetaData(
@@ -294,7 +294,7 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
-    fun `JAR auth request, request passed as JWT, verified with x509_san_dns scheme`() = runTest {
+    fun `JAR auth request, request passed as JWT, verified with x509_san_dns prefix`() = runTest {
         suspend fun test(typ: JOSEObjectType? = null, assertions: (Resolution) -> Unit) {
             val keyStore = KeyStore.getInstance("JKS")
             keyStore.load(
@@ -337,7 +337,7 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
-    fun `JAR auth request, request passed as JWT, verified with x509_san_uri scheme`() = runTest {
+    fun `JAR auth request, request passed as JWT, verified with x509_hash prefix`() = runTest {
         suspend fun test(typ: JOSEObjectType? = null, assertions: (Resolution) -> Unit) {
             val keyStore = KeyStore.getInstance("JKS")
             keyStore.load(
@@ -345,7 +345,7 @@ class UnvalidatedRequestResolverTest {
                 "12345".toCharArray(),
 
             )
-            val clientId = "x509_san_uri:https://verifier.example.gr"
+            val clientId = "x509_hash:0Wuix-gyx7KGtmfxusspetyYsnjThtGOpI15s5QVPZQ"
             val clientIdEncoded = URLEncoder.encode(clientId, "UTF-8")
             val jwtClaimsSet = jwtClaimsSet(
                 clientId,

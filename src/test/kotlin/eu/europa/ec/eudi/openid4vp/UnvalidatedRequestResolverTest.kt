@@ -29,13 +29,12 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
-import eu.europa.ec.eudi.prex.PresentationDefinition
-import eu.europa.ec.eudi.prex.PresentationExchange
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -59,13 +58,6 @@ import kotlin.test.*
 class UnvalidatedRequestResolverTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
-
-    private val pd = readFileAsText("presentation-definition/basic_example.json")
-        .replace("\r\n", "")
-        .replace("\r", "")
-        .replace("\n", "")
-        .replace("  ", "")
-        .let { URLEncoder.encode(it, "UTF-8") }
 
     private val dcqlQuery = readFileAsText("dcql/basic_example.json")
         .replace("\r\n", "")
@@ -180,27 +172,6 @@ class UnvalidatedRequestResolverTest {
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
-                    "&presentation_definition=$pd" +
-                    "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
-
-            val resolution = resolver.resolveRequestUri(authRequest)
-            resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
-        }
-
-        test(genState())
-        test()
-    }
-
-    @Test
-    fun `vp token auth request with DCQL query`() = runTest {
-        suspend fun test(state: String? = null) {
-            val authRequest =
-                "https://client.example.org/universal-link?" +
-                    "response_type=vp_token" +
-                    "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
-                    "&nonce=n-0S6_WzA2Mj" +
-                    (state?.let { "&state=$it" } ?: "") +
                     "&dcql_query=$dcqlQuery" +
                     "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
 
@@ -245,7 +216,7 @@ class UnvalidatedRequestResolverTest {
                     "&nonce=n-0S6_WzA2Mj" +
                     "&scope=openid" +
                     (state?.let { "&state=$it" } ?: "") +
-                    "&presentation_definition=$pd" +
+                    "&dcql_query=$dcqlQuery" +
                     "&client_metadata=$clientMetadataJwksInline"
 
             val resolution = resolver.resolveRequestUri(authRequest)
@@ -268,7 +239,7 @@ class UnvalidatedRequestResolverTest {
                     "&response_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&nonce=n-0S6_WzA2Mj" +
                     (state?.let { "&state=$it" } ?: "") +
-                    "&presentation_definition=$pd"
+                    "&dcql_query=$dcqlQuery"
 
             val resolution = resolver.resolveRequestUri(authRequest)
 
@@ -426,7 +397,7 @@ class UnvalidatedRequestResolverTest {
                 "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                 "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                 "&nonce=n-0S6_WzA2Mj" +
-                "&presentation_definition=$pd" +
+                "&dcql_query=$dcqlQuery" +
                 "&client_metadata=$clientMetadataNoVpFormats"
 
         assertFailsWith<MissingFieldException> {
@@ -456,7 +427,7 @@ class UnvalidatedRequestResolverTest {
                 "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                 "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                 "&nonce=n-0S6_WzA2Mj" +
-                "&presentation_definition=$pd" +
+                "&dcql_query=$dcqlQuery" +
                 "&client_metadata=$clientMetadata"
 
         val resolution = resolver.resolveRequestUri(authRequest)
@@ -471,7 +442,7 @@ class UnvalidatedRequestResolverTest {
                 "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                 "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                 "&nonce=n-0S6_WzA2Mj" +
-                "&presentation_definition=$pd"
+                "&dcql_query=$dcqlQuery"
 
         val resolution = resolver.resolveRequestUri(authRequest)
         val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
@@ -501,7 +472,7 @@ class UnvalidatedRequestResolverTest {
                 "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
                 "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                 "&nonce=n-0S6_WzA2Mj" +
-                "&presentation_definition=$pd" +
+                "&dcql_query=$dcqlQuery" +
                 "&client_metadata=$clientMetadata"
 
         val resolution = resolver.resolveRequestUri(authRequest)
@@ -574,10 +545,7 @@ class UnvalidatedRequestResolverTest {
         responseUri: String,
         clientMetadata: UnvalidatedClientMetaData,
     ): JWTClaimsSet {
-        val presentationDefinition =
-            PresentationExchange.jsonParser.decodePresentationDefinition(load("request-object/eudi_pid_presentation_definition.json"))
-                .also { println(it) }
-                .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
+        val query = Json.decodeFromStream<DCQL>(load("dcql/eudi_msomdoc_pid_dcql_query.json"))
 
         return with(JWTClaimsSet.Builder()) {
             audience("https://self-issued.me/v2")
@@ -587,7 +555,7 @@ class UnvalidatedRequestResolverTest {
             claim("response_type", "vp_token")
             claim("nonce", "nonce")
             claim("response_mode", "direct_post")
-            claim("presentation_definition", Jackson.toJsonObject(presentationDefinition))
+            claim(OpenId4VPSpec.DCQL_QUERY, Jackson.toJsonObject(query))
             claim("state", "638JwH0b2jrhGlAZQVa50KysVazkI-YpiFcLj2DLMalJpZK6XC22vAsPqXkpwAwXzfYpK-WLc3GhHYK8lbT6rw")
             claim("client_metadata", Jackson.toJsonObject(clientMetadata))
             build()
@@ -686,7 +654,7 @@ class UnvalidatedRequestResolverTest {
             for (i in chain.indices)
                 if (i > 0) chain[i - 1].verify(chain[i].publicKey)
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -709,14 +677,11 @@ class UnvalidatedRequestResolverTest {
     @DisplayName("when using transaction_data")
     @Nested
     inner class TransactionDataTest {
-
-        private val presentationExchangeQuery =
-            BasicNameValuePair("presentation_definition", readFileAsText("presentation-definition/basic_example.json"))
         private val dcqlQuery = BasicNameValuePair("dcql_query", readFileAsText("dcql/basic_example.json"))
 
         private suspend fun testAndThen(
             transactionData: JsonArray,
-            query: NameValuePair = presentationExchangeQuery,
+            query: NameValuePair = dcqlQuery,
             block: suspend (Resolution) -> Unit,
         ) {
             val state = genState()
@@ -740,7 +705,7 @@ class UnvalidatedRequestResolverTest {
 
         private suspend fun testAndThen(
             transactionData: JsonObject,
-            query: NameValuePair = presentationExchangeQuery,
+            query: NameValuePair = dcqlQuery,
             block: suspend (Resolution) -> Unit,
         ) {
             testAndThen(
@@ -970,10 +935,10 @@ class UnvalidatedRequestResolverTest {
         }
 
         @Test
-        fun `if transaction_data is valid, when using presentationexchange, resolution succeeds`() = runTest {
+        fun `if transaction_data is valid, resolution succeeds`() = runTest {
             val transactionData = TransactionData(
                 TransactionDataType("basic-transaction-data"),
-                listOf(TransactionDataCredentialId("bankaccount_input")),
+                listOf(TransactionDataCredentialId("my_credential")),
                 listOf(HashAlgorithm.SHA_256),
             )
             testAndThen(transactionData.json) {
@@ -985,7 +950,7 @@ class UnvalidatedRequestResolverTest {
                 }
                 assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                 assertEquals(
-                    listOf(TransactionDataCredentialId("bankaccount_input")),
+                    listOf(TransactionDataCredentialId("my_credential")),
                     resolvedTransactionData.credentialIds,
                 )
                 assertEquals(listOf(HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithms)
@@ -997,7 +962,7 @@ class UnvalidatedRequestResolverTest {
             runTest {
                 val transactionData = TransactionData(
                     TransactionDataType("basic-transaction-data"),
-                    listOf(TransactionDataCredentialId("bankaccount_input")),
+                    listOf(TransactionDataCredentialId("my_credential")),
                 )
                 testAndThen(transactionData.json) {
                     val request = it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
@@ -1008,7 +973,7 @@ class UnvalidatedRequestResolverTest {
                     }
                     assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                     assertEquals(
-                        listOf(TransactionDataCredentialId("bankaccount_input")),
+                        listOf(TransactionDataCredentialId("my_credential")),
                         resolvedTransactionData.credentialIds,
                     )
                     assertEquals(listOf(HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithms)
@@ -1020,7 +985,7 @@ class UnvalidatedRequestResolverTest {
             runTest {
                 val transactionData = TransactionData(
                     TransactionDataType("basic-transaction-data"),
-                    listOf(TransactionDataCredentialId(("bankaccount_input"))),
+                    listOf(TransactionDataCredentialId(("my_credential"))),
                     listOf(HashAlgorithm("sha-384")),
                 )
                 testAndThen(transactionData.json) {
@@ -1032,7 +997,7 @@ class UnvalidatedRequestResolverTest {
                     }
                     assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                     assertEquals(
-                        listOf(TransactionDataCredentialId("bankaccount_input")),
+                        listOf(TransactionDataCredentialId("my_credential")),
                         resolvedTransactionData.credentialIds,
                     )
                     assertEquals(listOf(HashAlgorithm("sha-384")), resolvedTransactionData.hashAlgorithms)
@@ -1042,15 +1007,8 @@ class UnvalidatedRequestResolverTest {
 }
 
 object Jackson {
-    private val objectMapper: ObjectMapper by lazy { ObjectMapper() }
+    @PublishedApi
+    internal val objectMapper: ObjectMapper by lazy { ObjectMapper() }
 
-    fun toJsonObject(pd: PresentationDefinition): Any {
-        val jsonStr = with(PresentationExchange.jsonParser) { pd.encode() }
-        return objectMapper.readValue<Any>(jsonStr)
-    }
-
-    internal fun toJsonObject(metadata: UnvalidatedClientMetaData): Any {
-        val jsonStr = Json.encodeToString(metadata)
-        return objectMapper.readValue<Any>(jsonStr)
-    }
+    inline fun <reified T> toJsonObject(value: T): Any = objectMapper.readValue<Any>(Json.encodeToString(value))
 }

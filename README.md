@@ -96,7 +96,7 @@ Similarly, in the cross-device scenario, the request would be obtained via scann
 Regardless of the scenario, wallet must take the URI (of the deep link or the QR Code) that represents the
 authorization request and ask the SDK to validate the URI (that is to make sure that it represents one of the supported
 requests mentioned aforementioned) and in addition gather from Verifier additional information that may be included by
-reference (such as `client_metadata_uri` etc.)
+reference (such as `request_uri` etc.)
 
 The interface that captures the aforementioned functionality is
 [AuthorizationRequestResolver](src/main/kotlin/eu/europa/ec/eudi/openid4vp/AuthorizationRequestResolver.kt)

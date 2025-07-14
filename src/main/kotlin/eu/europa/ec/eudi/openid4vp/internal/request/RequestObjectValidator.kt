@@ -261,21 +261,14 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         val uri = responseMode.uri()
         when (client) {
             is AuthenticatedClient.Preregistered -> Unit
-            is AuthenticatedClient.X509SanDns -> ensure(client.clientId == uri.host) {
-                UnsupportedResponseMode("$responseMode host doesn't match ${client.clientId}").asException()
-            }
-
-            is AuthenticatedClient.X509SanUri -> ensure(client.clientId == uri) {
-                UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
-            }
 
             is AuthenticatedClient.RedirectUri -> ensure(client.clientId == uri) {
                 UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
             }
 
-            is AuthenticatedClient.DIDClient -> Unit
+            is AuthenticatedClient.DecentralizedIdentifier -> Unit
 
-            is AuthenticatedClient.Attested -> {
+            is AuthenticatedClient.VerifierAttestation -> {
                 val allowedUris = when (responseMode) {
                     is ResponseMode.Query,
                     is ResponseMode.QueryJwt,
@@ -293,7 +286,14 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                     }
                 }
             }
+
+            is AuthenticatedClient.X509SanDns -> ensure(client.clientId == uri.host) {
+                UnsupportedResponseMode("$responseMode host doesn't match ${client.clientId}").asException()
+            }
+
+            is AuthenticatedClient.X509Hash -> Unit
         }
+
         return responseMode
     }
 
@@ -377,10 +377,10 @@ private fun AuthenticatedClient.toClient(): Client =
         )
 
         is AuthenticatedClient.RedirectUri -> Client.RedirectUri(clientId)
+        is AuthenticatedClient.DecentralizedIdentifier -> Client.DecentralizedIdentifier(client.uri)
+        is AuthenticatedClient.VerifierAttestation -> Client.VerifierAttestation(clientId)
         is AuthenticatedClient.X509SanDns -> Client.X509SanDns(clientId, chain[0])
-        is AuthenticatedClient.X509SanUri -> Client.X509SanUri(clientId, chain[0])
-        is AuthenticatedClient.DIDClient -> Client.DIDClient(client.uri)
-        is AuthenticatedClient.Attested -> Client.Attested(clientId)
+        is AuthenticatedClient.X509Hash -> Client.X509Hash(clientId, chain[0])
     }
 
 private fun ResponseMode.uri(): URI = when (this) {

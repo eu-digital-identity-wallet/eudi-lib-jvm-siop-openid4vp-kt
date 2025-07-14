@@ -42,22 +42,22 @@ sealed interface Client : Serializable {
 
     data class Preregistered(val clientId: OriginalClientId, val legalName: String) : Client
     data class RedirectUri(val clientId: URI) : Client
+    data class DecentralizedIdentifier(val clientId: URI) : Client
+    data class VerifierAttestation(val clientId: OriginalClientId) : Client
     data class X509SanDns(val clientId: OriginalClientId, val cert: X509Certificate) : Client
-    data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
-    data class DIDClient(val clientId: URI) : Client
-    data class Attested(val clientId: OriginalClientId) : Client
+    data class X509Hash(val clientId: OriginalClientId, val cert: X509Certificate) : Client
 
     /**
-     * The id of the client prefixed with the client id scheme.
+     * The id of the client prefixed with the client id prefix.
      */
     val id: VerifierId
         get() = when (this) {
-            is Preregistered -> VerifierId(ClientIdScheme.PreRegistered, clientId)
-            is RedirectUri -> VerifierId(ClientIdScheme.RedirectUri, clientId.toString())
-            is X509SanDns -> VerifierId(ClientIdScheme.X509_SAN_DNS, clientId)
-            is X509SanUri -> VerifierId(ClientIdScheme.X509_SAN_URI, clientId.toString())
-            is DIDClient -> VerifierId(ClientIdScheme.DID, clientId.toString())
-            is Attested -> VerifierId(ClientIdScheme.VERIFIER_ATTESTATION, clientId)
+            is Preregistered -> VerifierId(ClientIdPrefix.PreRegistered, clientId)
+            is RedirectUri -> VerifierId(ClientIdPrefix.RedirectUri, clientId.toString())
+            is DecentralizedIdentifier -> VerifierId(ClientIdPrefix.DecentralizedIdentifier, clientId.toString())
+            is VerifierAttestation -> VerifierId(ClientIdPrefix.VerifierAttestation, clientId)
+            is X509SanDns -> VerifierId(ClientIdPrefix.X509SanDns, clientId)
+            is X509Hash -> VerifierId(ClientIdPrefix.X509Hash, clientId)
         }
 }
 
@@ -81,10 +81,10 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
     return when (this) {
         is Preregistered -> this.legalName
         is RedirectUri -> null
+        is DecentralizedIdentifier -> null
+        is VerifierAttestation -> null
         is X509SanDns -> cert.legalName()
-        is X509SanUri -> cert.legalName()
-        is DIDClient -> null
-        is Attested -> null
+        is X509Hash -> cert.legalName()
     }
 }
 
@@ -407,9 +407,9 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = MissingClientId
     }
 
-    data object UnsupportedClientIdScheme : RequestValidationError {
+    data object UnsupportedClientIdPrefix : RequestValidationError {
         @Suppress("unused")
-        private fun readResolve(): Any = UnsupportedClientIdScheme
+        private fun readResolve(): Any = UnsupportedClientIdPrefix
     }
 
     data class UnsupportedClientMetaData(val value: String) : RequestValidationError
@@ -446,7 +446,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = IdTokenEncryptionMethodMissing
     }
 
-    data class InvalidClientIdScheme(val value: String) : RequestValidationError
+    data class InvalidClientIdPrefix(val value: String) : RequestValidationError
 
     data class InvalidIdTokenType(val value: String) : RequestValidationError
 

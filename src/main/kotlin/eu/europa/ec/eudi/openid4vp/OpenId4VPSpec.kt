@@ -20,14 +20,14 @@ object OpenId4VPSpec {
     const val RESPONSE_URI = "response_uri"
     const val DCQL_QUERY = "dcql_query"
 
-    const val CLIENT_ID_SCHEME_SEPARATOR = ':'
-    const val CLIENT_ID_SCHEME_PRE_REGISTERED = "pre-registered"
-    const val CLIENT_ID_SCHEME_REDIRECT_URI = "redirect_uri"
-    const val CLIENT_ID_SCHEME_HTTPS = "https"
-    const val CLIENT_ID_SCHEME_DID = "did"
-    const val CLIENT_ID_SCHEME_X509_SAN_URI = "x509_san_uri"
-    const val CLIENT_ID_SCHEME_X509_SAN_DNS = "x509_san_dns"
-    const val CLIENT_ID_SCHEME_VERIFIER_ATTESTATION = "verifier_attestation"
+    const val CLIENT_ID_PREFIX_SEPARATOR = ':'
+    const val CLIENT_ID_PREFIX_PRE_REGISTERED = "pre-registered"
+    const val CLIENT_ID_PREFIX_REDIRECT_URI = "redirect_uri"
+    const val CLIENT_ID_PREFIX_OPENID_FEDERATION = "openid_federation"
+    const val CLIENT_ID_PREFIX_DECENTRALIZED_IDENTIFIER = "decentralized_identifier"
+    const val CLIENT_ID_PREFIX_VERIFIER_ATTESTATION = "verifier_attestation"
+    const val CLIENT_ID_PREFIX_X509_SAN_DNS = "x509_san_dns"
+    const val CLIENT_ID_PREFIX_X509_HASH = "x509_hash"
 
     const val AUTHORIZATION_REQUEST_OBJECT_TYPE = "oauth-authz-req+jwt"
 
@@ -64,6 +64,9 @@ object OpenId4VPSpec {
     const val TRANSACTION_DATA_TYPE: String = "type"
     const val TRANSACTION_DATA_CREDENTIAL_IDS: String = "credential_ids"
     const val TRANSACTION_DATA_HASH_ALGORITHMS: String = "transaction_data_hashes_alg"
+
+    const val CLIENT_ID_PREFIXES_SUPPORTED = "client_id_prefixes_supported"
+    const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 }
 
 object SIOPv2

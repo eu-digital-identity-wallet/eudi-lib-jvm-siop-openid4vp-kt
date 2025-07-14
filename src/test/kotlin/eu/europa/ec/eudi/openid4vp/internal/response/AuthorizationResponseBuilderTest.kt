@@ -46,7 +46,7 @@ class AuthorizationResponseBuilderTest {
     internal object Wallet {
 
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+            supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             jarmConfiguration = JarmConfiguration.Encryption(
                 supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
                 supportedMethods = listOf(EncryptionMethod.A256GCM),

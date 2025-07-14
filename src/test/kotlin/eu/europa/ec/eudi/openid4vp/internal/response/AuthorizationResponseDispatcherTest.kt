@@ -29,12 +29,12 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingResponseType
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingScope
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.request.*
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.INVALID_REQUEST_URI_METHOD
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier
-import eu.europa.ec.eudi.prex.PresentationExchange
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -44,9 +44,9 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -177,13 +177,7 @@ class AuthorizationResponseDispatcherTest {
                 ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode)
             }
 
-            val presentationDefinition =
-                PresentationExchange.jsonParser.decodePresentationDefinition(load("presentation-definition/mDL-example.json")!!)
-                    .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
-
-            val presentationSubmission =
-                PresentationExchange.jsonParser.decodePresentationSubmission(load("presentation-submission/example.json")!!)
-                    .fold(onSuccess = { it }, onFailure = { org.junit.jupiter.api.fail(it) })
+            val dcql = Json.decodeFromStream<DCQL>(load("dcql/mDL-example.json")!!)
 
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
@@ -193,15 +187,16 @@ class AuthorizationResponseDispatcherTest {
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
-                    presentationQuery = PresentationQuery.ByPresentationDefinition(presentationDefinition),
+                    query = dcql,
                     transactionData = null,
                     verifierAttestations = null,
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
-                VpContent.PresentationExchange(
-                    listOf(VerifiablePresentation.Generic("vp_token")),
-                    presentationSubmission,
+                VerifiablePresentations(
+                    mapOf(
+                        QueryId("query_0") to listOf(VerifiablePresentation.Generic("vp_token")),
+                    ),
                 ),
             )
 
@@ -215,7 +210,6 @@ class AuthorizationResponseDispatcherTest {
                             post("/") {
                                 val formParameters = call.receiveParameters()
                                 val vpTokenTxt = formParameters["vp_token"].toString()
-                                val presentationSubmissionStr = formParameters["presentation_submission"].toString()
                                 val stateParam = formParameters["state"]
 
                                 assertEquals(
@@ -223,11 +217,7 @@ class AuthorizationResponseDispatcherTest {
                                     call.request.headers["Content-Type"],
                                 )
                                 assertEquals(state, stateParam)
-                                assertEquals(vpTokenTxt, "vp_token")
-                                assertEquals(
-                                    presentationSubmissionStr,
-                                    Json.encodeToString<PresentationSubmission>(presentationSubmission),
-                                )
+                                assertEquals(vpTokenTxt, "{\"query_0\":[\"vp_token\"]}")
 
                                 call.respond(buildJsonObject { put("redirect_uri", "https://foo") })
                             }

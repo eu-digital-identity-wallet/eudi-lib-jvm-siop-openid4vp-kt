@@ -361,8 +361,6 @@ internal fun SignedJWT.requestObject(): UnvalidatedRequestObject {
     return with(jwtClaimsSet) {
         UnvalidatedRequestObject(
             responseType = getStringClaim("response_type"),
-            presentationDefinition = getJSONObjectClaim(OpenId4VPSpec.PRESENTATION_DEFINITION)?.asJsonObject(),
-            presentationDefinitionUri = getStringClaim(OpenId4VPSpec.PRESENTATION_DEFINITION_URI),
             dcqlQuery = getJSONObjectClaim(OpenId4VPSpec.DCQL_QUERY)?.asJsonObject(),
             scope = getStringClaim("scope"),
             nonce = getStringClaim("nonce"),

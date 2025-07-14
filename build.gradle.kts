@@ -2,7 +2,7 @@ import org.jetbrains.dokka.DokkaConfiguration
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.owasp.dependencycheck.gradle.extension.DependencyCheckExtension
-import java.net.URL
+import java.net.URI
 
 object Meta {
     const val BASE_URL = "https://github.com/eu-digital-identity-wallet/eudi-lib-jvm-siop-openid4vp-kt"
@@ -30,7 +30,6 @@ repositories {
 }
 
 dependencies {
-    api(libs.presentation.exchange)
     api(libs.nimbus.oauth2.oidc.sdk)
     api(libs.ktor.client.core)
     api(libs.ktor.client.content.negotiation)
@@ -113,7 +112,7 @@ tasks.withType<DokkaTask>().configureEach {
 
             documentedVisibilities.set(setOf(DokkaConfiguration.Visibility.PUBLIC, DokkaConfiguration.Visibility.PROTECTED))
 
-            val remoteSourceUrl = System.getenv()["GIT_REF_NAME"]?.let { URL("${Meta.BASE_URL}/tree/$it/src") }
+            val remoteSourceUrl = System.getenv()["GIT_REF_NAME"]?.let { URI("${Meta.BASE_URL}/tree/$it/src").toURL() }
             remoteSourceUrl
                 ?.let {
                     sourceLink {

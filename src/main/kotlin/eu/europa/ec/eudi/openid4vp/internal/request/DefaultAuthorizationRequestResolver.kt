@@ -48,8 +48,6 @@ internal data class UnvalidatedRequestObject(
     @SerialName("response_type") val responseType: String? = null,
     @SerialName("response_mode") val responseMode: String? = null,
     @SerialName(OpenId4VPSpec.RESPONSE_URI) val responseUri: String? = null,
-    @SerialName(OpenId4VPSpec.PRESENTATION_DEFINITION) val presentationDefinition: JsonObject? = null,
-    @SerialName(OpenId4VPSpec.PRESENTATION_DEFINITION_URI) val presentationDefinitionUri: String? = null,
     @SerialName(OpenId4VPSpec.DCQL_QUERY) val dcqlQuery: JsonObject? = null,
     @SerialName("redirect_uri") val redirectUri: String? = null,
     @SerialName("scope") val scope: String? = null,
@@ -154,8 +152,6 @@ internal sealed interface UnvalidatedRequest {
             return Plain(
                 UnvalidatedRequestObject(
                     responseType = requestParams["response_type"],
-                    presentationDefinition = jsonObject(OpenId4VPSpec.PRESENTATION_DEFINITION),
-                    presentationDefinitionUri = requestParams[OpenId4VPSpec.PRESENTATION_DEFINITION_URI],
                     dcqlQuery = jsonObject(OpenId4VPSpec.DCQL_QUERY),
                     scope = requestParams["scope"],
                     nonce = requestParams["nonce"],

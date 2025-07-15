@@ -68,9 +68,8 @@ class UnvalidatedRequestResolverTest {
 
     private val signingKey = RSAKeyGenerator(2048)
         .keyUse(KeyUse.SIGNATURE) // indicate the intended use of the key (optional)
-        .keyID(UUID.randomUUID().toString()) // give the key a unique ID
+        .keyID(UUID.randomUUID().toString()) // give the key a unique ID (optional)
         .issueTime(Date(System.currentTimeMillis())) // issued-at timestamp (optional)
-        .algorithm(JWSAlgorithm.RS256) // add the JWSAlgorithm that is to be used with this key
         .generate()
 
     private val jwkSetJO = Json.parseToJsonElement(
@@ -81,8 +80,7 @@ class UnvalidatedRequestResolverTest {
                       "use": "sig",
                       "kid": "a0779cde-0615-41b3-89b7-aec75faa159d",
                       "iat": 1701436001,
-                      "n": "k4gz8H4Rvuh7ShPHpOwSPN9SWWBUxApgOuBYzDQOa4rXMmUs20egROvtDQYf2C0o-mZEPUXNq8-I79v9j_Uacum2CQWpOPd7Z-kXGZsE7Z9HAqVPqQnMNUU2aQPc8WYbkrXOrFjFIo0GQuVObVMN_1wh2k94JLFoqRAx2TLMrRu-pQUQfN1iTL-2yL3Cn-Ri3W_sxhdLV0uKdviKcU437LdvrpE3eoXePxofmDxG2udX6TSqNvzRZpKR9Vqy9hKaTppAHp_0G1fQ4dSCLpSY9hxGEuTFgFAyvtZZhZrL2OFa6XHPC60uX5-Iir2K0IymSPrVpftxNUACKebkh5FTGw",
-                      "alg": "RS256"
+                      "n": "k4gz8H4Rvuh7ShPHpOwSPN9SWWBUxApgOuBYzDQOa4rXMmUs20egROvtDQYf2C0o-mZEPUXNq8-I79v9j_Uacum2CQWpOPd7Z-kXGZsE7Z9HAqVPqQnMNUU2aQPc8WYbkrXOrFjFIo0GQuVObVMN_1wh2k94JLFoqRAx2TLMrRu-pQUQfN1iTL-2yL3Cn-Ri3W_sxhdLV0uKdviKcU437LdvrpE3eoXePxofmDxG2udX6TSqNvzRZpKR9Vqy9hKaTppAHp_0G1fQ4dSCLpSY9hxGEuTFgFAyvtZZhZrL2OFa6XHPC60uX5-Iir2K0IymSPrVpftxNUACKebkh5FTGw"
                     } ] 
         } 
         """.trimIndent(),

@@ -279,27 +279,27 @@ private fun dispatchDetailsOrNull(
 ): ErrorDispatchDetails? {
     val responseMode = unvalidatedRequest.responseMode()
     return responseMode?.let {
-        val responseEncryptionRequirement = unvalidatedRequest.responseEncryptionRequirement(siopOpenId4VPConfig, responseMode)
+        val responseEncryptionSpecification = unvalidatedRequest.responseEncryptionSpecification(siopOpenId4VPConfig, responseMode)
         ErrorDispatchDetails(
             responseMode = responseMode,
             nonce = unvalidatedRequest.nonce,
             state = unvalidatedRequest.state,
             clientId = unvalidatedRequest.clientId?.let { VerifierId.parse(it).getOrNull() },
-            responseEncryptionRequirement = responseEncryptionRequirement.getOrNull(),
+            responseEncryptionSpecification = responseEncryptionSpecification.getOrNull(),
         )
     }
 }
 
-private fun UnvalidatedRequestObject.responseEncryptionRequirement(
+private fun UnvalidatedRequestObject.responseEncryptionSpecification(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     responseMode: ResponseMode,
-): Result<ResponseEncryptionRequirement?> = runCatching {
+): Result<ResponseEncryptionSpecification?> = runCatching {
     clientMetaData?.let {
         val decodeFromJsonElement = jsonSupport.decodeFromJsonElement<UnvalidatedClientMetaData>(clientMetaData)
         val resolvedClientMetadata = decodeFromJsonElement.let {
             ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
         }
-        resolvedClientMetadata.responseEncryptionRequirement
+        resolvedClientMetadata.responseEncryptionSpecification
     }
 }
 
@@ -351,7 +351,7 @@ private fun JWTClaimsSet.dispatchDetailsOrNull(): ErrorDispatchDetails? =
                     nonce = getStringClaim("nonce"),
                     state = getStringClaim("state"),
                     clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrNull() },
-                    responseEncryptionRequirement = null,
+                    responseEncryptionSpecification = null,
                 )
             }
     }.getOrNull()

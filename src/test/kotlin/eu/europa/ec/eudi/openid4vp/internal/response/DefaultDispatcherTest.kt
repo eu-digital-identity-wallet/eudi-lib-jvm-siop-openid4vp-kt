@@ -109,7 +109,7 @@ class DefaultDispatcherTest {
                             ),
                         ),
                     ),
-                responseEncryptionRequirement = clientMetadataValidated.responseEncryptionRequirement,
+                responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = CLIENT,
                 nonce = "0S6_WzA2Mj",
@@ -423,7 +423,7 @@ class DefaultDispatcherTest {
                             testCredentialQuery(),
                         ),
                     ),
-                responseEncryptionRequirement = clientMetadataValidated.responseEncryptionRequirement,
+                responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
@@ -450,7 +450,7 @@ class DefaultDispatcherTest {
                 responseMode = responseMode,
                 state = genState(),
                 nonce = "0S6_WzA2Mj",
-                responseEncryptionRequirement = clientMetadataValidated.responseEncryptionRequirement,
+                responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
@@ -611,7 +611,7 @@ class DefaultDispatcherTest {
                 val response = AuthorizationResponse.QueryJwt(
                     redirectUriBase,
                     data,
-                    ResponseEncryptionRequirement(
+                    ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
@@ -803,7 +803,7 @@ class DefaultDispatcherTest {
                     AuthorizationResponse.FragmentJwt(
                         redirectUri = redirectUriBase,
                         data = data,
-                        responseEncryptionRequirement = ResponseEncryptionRequirement(
+                        responseEncryptionSpecification = ResponseEncryptionSpecification(
                             encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                             encryptionMethod = EncryptionMethod.parse(
                                 Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),

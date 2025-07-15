@@ -261,7 +261,7 @@ enum class IdTokenType {
 /**
  * The client's (verifier) requirement for authorization response encryption that can be fulfilled by the wallet.
  */
-data class ResponseEncryptionRequirement(
+data class ResponseEncryptionSpecification(
     val encryptionAlgorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
     val clientKey: JWK,

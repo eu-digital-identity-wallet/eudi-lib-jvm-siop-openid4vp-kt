@@ -95,7 +95,7 @@ internal class MsoMdocTO(
 internal fun List<String>?.algs() = this?.mapNotNull { parse(it).takeIf { SIGNATURE.contains(it) } }.orEmpty()
 
 internal data class ValidatedClientMetaData(
-    val responseEncryptionRequirement: ResponseEncryptionRequirement? = null,
+    val responseEncryptionSpecification: ResponseEncryptionSpecification? = null,
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType> = emptyList(),
     val vpFormats: VpFormats,
 )

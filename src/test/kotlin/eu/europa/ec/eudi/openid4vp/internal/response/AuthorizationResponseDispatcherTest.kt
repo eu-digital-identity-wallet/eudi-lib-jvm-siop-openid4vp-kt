@@ -93,7 +93,7 @@ class AuthorizationResponseDispatcherTest {
                 ResolvedRequestObject.SiopAuthentication(
                     idTokenType = listOf(IdTokenType.AttesterSigned),
                     subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
-                    responseEncryptionRequirement = validated.responseEncryptionRequirement,
+                    responseEncryptionSpecification = validated.responseEncryptionSpecification,
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
@@ -170,7 +170,7 @@ class AuthorizationResponseDispatcherTest {
             val dcql = Json.decodeFromStream<DCQL>(load("dcql/mDL-example.json")!!)
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    responseEncryptionRequirement = validated.responseEncryptionRequirement,
+                    responseEncryptionSpecification = validated.responseEncryptionSpecification,
                     vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
@@ -245,7 +245,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    responseEncryptionRequirement = null,
+                    responseEncryptionSpecification = null,
                 )
 
                 testApplication {
@@ -301,7 +301,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    responseEncryptionRequirement = ResponseEncryptionRequirement(
+                    responseEncryptionSpecification = ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
@@ -365,7 +365,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    responseEncryptionRequirement = null,
+                    responseEncryptionSpecification = null,
                 )
 
                 testApplication {
@@ -401,7 +401,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    responseEncryptionRequirement = ResponseEncryptionRequirement(
+                    responseEncryptionSpecification = ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
@@ -445,7 +445,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    responseEncryptionRequirement = null,
+                    responseEncryptionSpecification = null,
                 )
 
                 testApplication {
@@ -480,7 +480,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    responseEncryptionRequirement = ResponseEncryptionRequirement(
+                    responseEncryptionSpecification = ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),

@@ -44,14 +44,14 @@ internal object ClientMetaDataValidator {
         val verifierAdvertisedKeys = jwks(unvalidated)
         val verifierSupportedEncryptionMethods = responseEncryptionMethodsSupported(unvalidated)
 
-        val responseEncryptionRequirement =
+        val responseEncryptionSpecification =
             if (!responseMode.requiresEncryption()) null
-            else responseEncryptionConfiguration.responseEncryptionRequirement(verifierAdvertisedKeys, verifierSupportedEncryptionMethods)
+            else responseEncryptionConfiguration.responseEncryptionSpecification(verifierAdvertisedKeys, verifierSupportedEncryptionMethods)
 
         val vpFormats = vpFormats(unvalidated)
 
         return ValidatedClientMetaData(
-            responseEncryptionRequirement = responseEncryptionRequirement,
+            responseEncryptionSpecification = responseEncryptionSpecification,
             subjectSyntaxTypesSupported = types,
             vpFormats = vpFormats,
         )
@@ -138,16 +138,16 @@ private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
  * @param verifierSupportedEncryptionMethods the EncryptionMethods advertised by the Verifier in his Client Metadata
  * @receiver the wallet's [ResponseEncryptionConfiguration] encryption parameters supported by the Wallet
  *
- * @return [ResponseEncryptionRequirement] the encryption parameters that can be used by the Wallet to fulfill the
+ * @return [ResponseEncryptionSpecification] the encryption parameters that can be used by the Wallet to fulfill the
  * Verifier's encryption requirements
  * @throws AuthorizationRequestException in case the Wallet does not support any of the encryption parameters that
  * can fulfill the Verifier's  encryption requirements
  */
 @Throws(AuthorizationRequestException::class)
-private fun ResponseEncryptionConfiguration.responseEncryptionRequirement(
+private fun ResponseEncryptionConfiguration.responseEncryptionSpecification(
     verifierAdvertisedKeys: List<JWK>,
     verifierSupportedEncryptionMethods: Set<EncryptionMethod>,
-): ResponseEncryptionRequirement {
+): ResponseEncryptionSpecification {
     ensure(this is ResponseEncryptionConfiguration.Supported) {
         UnsupportedClientMetaData("Wallet doesn't support encrypting authorization responses").asException()
     }
@@ -168,5 +168,5 @@ private fun ResponseEncryptionConfiguration.responseEncryptionRequirement(
         }
     } ?: throw UnsupportedClientMetaData("Wallet doesn't support any of the encryption algorithms supported by verifier").asException()
 
-    return ResponseEncryptionRequirement(encryptionAlgorithm, encryptionMethod, encryptionKey)
+    return ResponseEncryptionSpecification(encryptionAlgorithm, encryptionMethod, encryptionKey)
 }

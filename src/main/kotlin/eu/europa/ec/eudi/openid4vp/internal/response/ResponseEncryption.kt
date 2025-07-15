@@ -27,12 +27,12 @@ import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vp.EncryptionParameters
 import eu.europa.ec.eudi.openid4vp.Jwt
-import eu.europa.ec.eudi.openid4vp.ResponseEncryptionRequirement
+import eu.europa.ec.eudi.openid4vp.ResponseEncryptionSpecification
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
 /**
- * Creates according to the [verifier's requirements][ResponseEncryptionRequirement], an encrypted JWT which encapsulates
+ * Creates according to the [verifier's requirements][ResponseEncryptionSpecification], an encrypted JWT which encapsulates
  * the provided [data]
  *
  * @param data the response to be sent to the verifier
@@ -41,7 +41,7 @@ import kotlinx.serialization.json.*
  * @throws JOSEException in case of an error
  */
 @Throws(JOSEException::class)
-internal fun ResponseEncryptionRequirement.encrypt(data: AuthorizationResponsePayload): Jwt {
+internal fun ResponseEncryptionSpecification.encrypt(data: AuthorizationResponsePayload): Jwt {
     val header = jweHeader(encryptionAlgorithm, encryptionMethod, clientKey, data)
     val claims = JwtPayloadFactory.encryptedJwtClaimSet(data)
     val encrypter = EncrypterFactory.createEncrypter(encryptionAlgorithm, clientKey)

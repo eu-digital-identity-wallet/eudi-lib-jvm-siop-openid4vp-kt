@@ -110,7 +110,7 @@ class AuthorizationResponseBuilderTest {
                 ResolvedRequestObject.SiopAuthentication(
                     idTokenType = listOf(IdTokenType.AttesterSigned),
                     subjectSyntaxTypesSupported = verifierMetaData.subjectSyntaxTypesSupported,
-                    responseEncryptionRequirement = verifierMetaData.responseEncryptionRequirement,
+                    responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
@@ -164,7 +164,7 @@ class AuthorizationResponseBuilderTest {
                                 ),
                             ),
                         ),
-                    responseEncryptionRequirement = verifierMetaData.responseEncryptionRequirement,
+                    responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
                     vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
@@ -185,8 +185,8 @@ class AuthorizationResponseBuilderTest {
 
             assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
             assertIs<AuthorizationResponse.DirectPostJwt>(response)
-            val responseEncryptionRequirement = response.responseEncryptionRequirement
-            assertNotNull(responseEncryptionRequirement)
+            val responseEncryptionSpecification = response.responseEncryptionSpecification
+            assertNotNull(responseEncryptionSpecification)
         }
 
         test(genState())

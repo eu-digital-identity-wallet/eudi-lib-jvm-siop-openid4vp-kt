@@ -73,7 +73,7 @@ internal class DefaultDispatcher(
             }
 
             is DirectPostJwt -> {
-                val encryptedJwt = response.responseEncryptionRequirement.encrypt(response.data)
+                val encryptedJwt = response.responseEncryptionSpecification.encrypt(response.data)
                 val parameters = DirectPostJwtForm.parametersOf(encryptedJwt)
                 response.responseUri to parameters
             }
@@ -157,7 +157,7 @@ internal fun Query.encodeRedirectURI(): URI =
 
 internal fun QueryJwt.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        val encryptedJwt = responseEncryptionRequirement.encrypt(data)
+        val encryptedJwt = responseEncryptionSpecification.encrypt(data)
         parameters.append("response", encryptedJwt)
     }.build().toURI()
 
@@ -171,7 +171,7 @@ internal fun Fragment.encodeRedirectURI(): URI =
 
 internal fun FragmentJwt.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        val encryptedJwt = responseEncryptionRequirement.encrypt(data)
+        val encryptedJwt = responseEncryptionSpecification.encrypt(data)
         fragment = buildMap {
             put("response", encryptedJwt)
         }.map { (key, value) ->

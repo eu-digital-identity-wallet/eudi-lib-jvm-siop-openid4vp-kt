@@ -243,7 +243,7 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * The verifier's requirements, if any, for encrypting  the authorization response.
      */
-    val responseEncryptionRequirement: ResponseEncryptionRequirement?
+    val responseEncryptionSpecification: ResponseEncryptionSpecification?
 
     /**
      * SIOPv2 Authentication request for issuing an id_token
@@ -253,7 +253,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val responseEncryptionRequirement: ResponseEncryptionRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
@@ -271,7 +271,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val responseEncryptionRequirement: ResponseEncryptionRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val vpFormats: VpFormats?,
         val query: DCQL,
         val transactionData: List<TransactionData>?,
@@ -290,7 +290,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val responseEncryptionRequirement: ResponseEncryptionRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val vpFormats: VpFormats?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
@@ -522,7 +522,7 @@ data class ErrorDispatchDetails(
     val nonce: String?,
     val state: String?,
     val clientId: VerifierId?,
-    val responseEncryptionRequirement: ResponseEncryptionRequirement?,
+    val responseEncryptionSpecification: ResponseEncryptionSpecification?,
 ) : Serializable {
     companion object
 }

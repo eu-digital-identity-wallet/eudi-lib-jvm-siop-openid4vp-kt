@@ -41,13 +41,12 @@ internal object ClientMetaDataValidator {
     ): ValidatedClientMetaData {
         val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
 
+        val verifierAdvertisedKeys = jwks(unvalidated)
+        val verifierSupportedEncryptionMethods = responseEncryptionMethodsSupported(unvalidated)
+
         val responseEncryptionRequirement =
             if (!responseMode.requiresEncryption()) null
-            else {
-                val verifierAdvertisedKeys = jwks(unvalidated)
-                val verifierSupportedEncryptionMethods = responseEncryptionMethodsSupported(unvalidated)
-                responseEncryptionConfiguration.responseEncryptionRequirement(verifierAdvertisedKeys, verifierSupportedEncryptionMethods)
-            }
+            else responseEncryptionConfiguration.responseEncryptionRequirement(verifierAdvertisedKeys, verifierSupportedEncryptionMethods)
 
         val vpFormats = vpFormats(unvalidated)
 

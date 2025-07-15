@@ -16,13 +16,14 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSAlgorithm.Family.SIGNATURE
+import com.nimbusds.jose.JWSAlgorithm.parse
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.jose.jwk.KeyUse
 import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.RequestValidationError.InvalidClientMetaData
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.ensure
-import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.response.EncrypterFactory
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -30,11 +31,12 @@ import kotlinx.serialization.json.*
 
 @Serializable
 internal data class UnvalidatedClientMetaData(
-    @SerialName("jwks") val jwks: JsonObject? = null,
+    @SerialName(OpenId4VPSpec.JWKS) val jwks: JsonObject? = null,
     @SerialName("subject_syntax_types_supported") val subjectSyntaxTypesSupported: List<String>? = emptyList(),
-    @SerialName("authorization_signed_response_alg") val authorizationSignedResponseAlg: String? = null,
-    @SerialName("authorization_encrypted_response_alg") val authorizationEncryptedResponseAlg: String? = null,
-    @SerialName("authorization_encrypted_response_enc") val authorizationEncryptedResponseEnc: String? = null,
+
+    @SerialName(OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED)
+    val responseEncryptionMethodsSupported: List<String>? = null,
+
     @SerialName("vp_formats") val vpFormats: VpFormatsTO,
 )
 
@@ -97,69 +99,74 @@ internal class MsoMdocTO(
     }
 }
 
-internal fun List<String>?.algs() = this?.mapNotNull { it.signingAlg() }.orEmpty()
+internal fun List<String>?.algs() = this?.mapNotNull { parse(it).takeIf { SIGNATURE.contains(it) } }.orEmpty()
 
 internal data class ValidatedClientMetaData(
     val jwkSet: JWKSet? = null,
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType> = emptyList(),
-    val authorizationSignedResponseAlg: JWSAlgorithm? = null,
-    val authorizationEncryptedResponseAlg: JWEAlgorithm? = null,
-    val authorizationEncryptedResponseEnc: EncryptionMethod? = null,
+    val responseEncryptionMethodsSupported: List<EncryptionMethod>? = null,
     val vpFormats: VpFormats,
 )
 
 @Throws(AuthorizationRequestException::class)
-internal fun SiopOpenId4VPConfig.jarmRequirement(metaData: ValidatedClientMetaData): JarmRequirement? =
-    jarmConfiguration.jarmRequirement(metaData)
+internal fun SiopOpenId4VPConfig.responseEncryptionRequirement(
+    metadata: ValidatedClientMetaData,
+    responseMode: ResponseMode,
+): ResponseEncryptionRequirement? =
+    responseEncryptionConfiguration.responseEncryptionRequirement(metadata, responseMode)
 
 /**
- * Method checks whether verifier requested from wallet to reply using JARM, via his [metaData].
- * If there are such requirements, it makes sure that the wallet can fulfill those requirements.
+ * Method checks whether verifier requested from wallet to reply using an encrypted authorization response, via his [responseMode].
+ * If there are such requirements, it makes sure that the wallet can fulfill the requirements provided in [metadata].
  *
- * @param metaData verifier's client medata
- * @receiver the wallet's [JarmConfiguration] which be used to validate verifier's JARM requirements
+ * @param metadata verifier's client metadata
+ * @param responseMode verifier requested response mode
+ * @receiver the wallet's [ResponseEncryptionConfiguration] which be used to validate verifier's authorization response encryption requirements
  *
- * @return <em>null</em> value means that the verifier requires a plain response.
- * [JarmRequirement.Signed] means that the verifier has requested a sign response, and wallet has a suitable
- * signer ([JarmConfiguration.Signing] or [JarmConfiguration.SigningAndEncryption]) configured.
- * [JarmRequirement.Encrypted] means that the verifier has requested an encrypted response, and wallet has a
- * suitable option ([JarmConfiguration.Encryption] or [JarmConfiguration.SigningAndEncryption]) configured.
- * [JarmRequirement.SignedAndEncrypted] means that the verifier has requested a signed & encrypted response and
- * wallet has a suitable [JarmConfiguration.SigningAndEncryption] option configured.
+ * @return
+ * * <code>null</code> means that the verifier requires a plain response.
+ * * [ResponseEncryptionRequirement] means that the verifier has requested an encrypted response, and wallet has a
+ * suitable option ([ResponseEncryptionConfiguration.Supported]) configured.
  */
 @Throws(AuthorizationRequestException::class)
-internal fun JarmConfiguration.jarmRequirement(metaData: ValidatedClientMetaData): JarmRequirement? {
-    val signed = metaData.authorizationSignedResponseAlg?.let { alg ->
-        val signingCfg = signingConfig()
-        ensure(signingCfg != null) {
-            UnsupportedClientMetaData("Wallet doesn't support signed JARM").asException()
-        }
-        ensure(alg in signingCfg.signer.supportedJWSAlgorithms()) {
-            UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
-        }
-        JarmRequirement.Signed(alg)
+internal fun ResponseEncryptionConfiguration.responseEncryptionRequirement(
+    metadata: ValidatedClientMetaData,
+    responseMode: ResponseMode,
+): ResponseEncryptionRequirement? {
+    if (!responseMode.requiresEncryption()) {
+        return null
     }
-    val encrypted = metaData.authorizationEncryptedResponseAlg?.let { alg ->
-        val encryptionCfg = encryptionConfig()
-        ensure(encryptionCfg != null) { UnsupportedClientMetaData("Wallet doesn't support encrypted JARM").asException() }
-        ensure(alg in encryptionCfg.supportedAlgorithms) {
-            UnsupportedClientMetaData("Wallet doesn't support $alg ").asException()
-        }
-        metaData.authorizationEncryptedResponseEnc?.let { enc ->
-            ensure(enc in encryptionCfg.supportedMethods) {
-                UnsupportedClientMetaData("Wallet doesn't support $enc ").asException()
-            }
-            val clientKey = metaData.jwkSet?.keys?.firstOrNull { EncrypterFactory.canBeUsed(alg, it) }
-            ensureNotNull(clientKey) {
-                RequestValidationError.InvalidClientMetaData("Client doesn't provide a suitable encryption key for $alg").asException()
-            }
-            JarmRequirement.Encrypted(alg, enc, clientKey)
-        }
+
+    ensure(null != metadata.jwkSet && null != metadata.responseEncryptionMethodsSupported) {
+        InvalidClientMetaData(
+            "Verifier's response mode requires encryption, but no encryption parameters have been provided via Client Metadata",
+        ).asException()
     }
-    return when {
-        signed != null && encrypted != null -> JarmRequirement.SignedAndEncrypted(signed, encrypted)
-        signed != null && encrypted == null -> signed
-        signed == null && encrypted != null -> encrypted
-        else -> null
+    ensure(this is ResponseEncryptionConfiguration.Supported) {
+        UnsupportedClientMetaData("Wallet doesn't support encrypting authorization responses").asException()
     }
+
+    val encryptionMethod = run {
+        val verifierSupportedMethods = metadata.responseEncryptionMethodsSupported.toSet()
+        supportedMethods.firstOrNull {
+                walletSupportedEncryptionMethod ->
+            walletSupportedEncryptionMethod in verifierSupportedMethods
+        } ?: throw UnsupportedClientMetaData("Wallet doesn't support any of the encryption methods supported by verifier").asException()
+    }
+
+    val (encryptionAlgorithm, encryptionKey) = supportedAlgorithms.firstNotNullOfOrNull { walletSupportedEncryptionAlgorithm ->
+        val encryptionKey = metadata.jwkSet.keys.firstOrNull { key ->
+            (null == key.keyUse || KeyUse.ENCRYPTION == key.keyUse) &&
+                walletSupportedEncryptionAlgorithm.name == key.algorithm?.name &&
+                EncrypterFactory.canBeUsed(walletSupportedEncryptionAlgorithm, key)
+        }
+
+        if (null != encryptionKey) {
+            walletSupportedEncryptionAlgorithm to encryptionKey
+        } else {
+            null
+        }
+    } ?: throw UnsupportedClientMetaData("Wallet doesn't support any of the encryption algorithms supported by verifier").asException()
+
+    return ResponseEncryptionRequirement(encryptionAlgorithm, encryptionMethod, encryptionKey)
 }

@@ -35,7 +35,6 @@ import java.net.URL
  * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClientFactory: KtorHttpClientFactory,
 ) : Dispatcher, ErrorDispatcher {
 
@@ -74,8 +73,8 @@ internal class DefaultDispatcher(
             }
 
             is DirectPostJwt -> {
-                val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
-                val parameters = DirectPostJwtForm.parametersOf(jarmJwt)
+                val encryptedJwt = response.responseEncryptionRequirement.encrypt(response.data)
+                val parameters = DirectPostJwtForm.parametersOf(encryptedJwt)
                 response.responseUri to parameters
             }
 
@@ -137,9 +136,9 @@ internal class DefaultDispatcher(
     ): DispatchOutcome.RedirectURI {
         val uri = when (response) {
             is Fragment -> response.encodeRedirectURI()
-            is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
+            is FragmentJwt -> response.encodeRedirectURI()
             is Query -> response.encodeRedirectURI()
-            is QueryJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
+            is QueryJwt -> response.encodeRedirectURI()
             else -> error("Unexpected response $response")
         }
 
@@ -156,10 +155,10 @@ internal fun Query.encodeRedirectURI(): URI =
         }
     }.build().toURI()
 
-internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
+internal fun QueryJwt.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
-        parameters.append("response", jarmJwt)
+        val encryptedJwt = responseEncryptionRequirement.encrypt(data)
+        parameters.append("response", encryptedJwt)
     }.build().toURI()
 
 internal fun Fragment.encodeRedirectURI(): URI =
@@ -170,11 +169,11 @@ internal fun Fragment.encodeRedirectURI(): URI =
             }.joinToString("&")
     }.build().toURI()
 
-internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
+internal fun FragmentJwt.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
+        val encryptedJwt = responseEncryptionRequirement.encrypt(data)
         fragment = buildMap {
-            put("response", jarmJwt)
+            put("response", encryptedJwt)
         }.map { (key, value) ->
             "$key=$value"
         }.joinToString(separator = "&")
@@ -258,9 +257,9 @@ internal fun VerifiablePresentations.asJsonObject(): JsonObject =
 internal fun VerifiablePresentations.asParam(): String = Json.encodeToString(asJsonObject())
 
 internal object DirectPostJwtForm {
-    fun parametersOf(jarmJwt: Jwt): Parameters =
+    fun parametersOf(encryptedJwt: Jwt): Parameters =
         Parameters.build {
-            append("response", jarmJwt)
+            append("response", encryptedJwt)
         }
 }
 

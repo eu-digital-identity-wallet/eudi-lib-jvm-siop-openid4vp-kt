@@ -37,15 +37,20 @@ internal fun AuthorizationRequestError.responseWith(
 private fun responseWith(
     di: ErrorDispatchDetails,
     data: AuthorizationResponsePayload.InvalidRequest,
-): AuthorizationResponse {
-    fun jarmOption() = checkNotNull(di.jarmRequirement)
-
-    return when (val mode = di.responseMode) {
+): AuthorizationResponse =
+    when (val mode = di.responseMode) {
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(mode.responseURI, data)
-        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(mode.responseURI, data, jarmOption())
+        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(
+            mode.responseURI,
+            data,
+            checkNotNull(di.responseEncryptionRequirement),
+        )
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(mode.redirectUri, data, jarmOption())
+        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(
+            mode.redirectUri,
+            data,
+            checkNotNull(di.responseEncryptionRequirement),
+        )
         is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, jarmOption())
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, checkNotNull(di.responseEncryptionRequirement))
     }
-}

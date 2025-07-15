@@ -461,7 +461,7 @@ private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix
                 ),
             ),
         ),
-        jarmConfiguration = JarmConfiguration.Encryption(
+        responseEncryptionConfiguration = ResponseEncryptionConfiguration.Supported(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
             supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),
         ),

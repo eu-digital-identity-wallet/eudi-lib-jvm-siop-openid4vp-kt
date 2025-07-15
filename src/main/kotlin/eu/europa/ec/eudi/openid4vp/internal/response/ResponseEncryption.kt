@@ -25,66 +25,28 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTClaimsSet
-import com.nimbusds.jwt.SignedJWT
-import com.nimbusds.oauth2.sdk.id.Issuer
-import eu.europa.ec.eudi.openid4vp.*
+import eu.europa.ec.eudi.openid4vp.EncryptionParameters
+import eu.europa.ec.eudi.openid4vp.Jwt
+import eu.europa.ec.eudi.openid4vp.ResponseEncryptionRequirement
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import java.time.Duration
-import java.time.Instant
 
 /**
- * Creates according to the [verifier's requirements][jarmRequirement], a JARM JWT which encapsulates
+ * Creates according to the [verifier's requirements][ResponseEncryptionRequirement], an encrypted JWT which encapsulates
  * the provided [data]
  *
  * @param data the response to be sent to the verifier
- * @receiver the wallet configuration
- * @return a JWT containing the [data] which depending on the [jarmRequirement] it could be
- * - a signed JWT
- * - an encrypted JWT
- * - an encrypted JWT containing a signed JWT
+ * @return the serialized encrypted JWT
  *
- * @throws IllegalStateException in case the wallet configuration doesn't support the [jarmRequirement]
- * @throws JOSEException
+ * @throws JOSEException in case of an error
  */
-@Throws(IllegalStateException::class, JOSEException::class)
-internal fun SiopOpenId4VPConfig.jarmJwt(
-    jarmRequirement: JarmRequirement,
-    data: AuthorizationResponsePayload,
-): Jwt = when (jarmRequirement) {
-    is JarmRequirement.Signed -> sign(jarmRequirement, data)
-    is JarmRequirement.Encrypted -> encrypt(jarmRequirement, data)
-    is JarmRequirement.SignedAndEncrypted -> signAndEncrypt(jarmRequirement, data)
-}.serialize()
-
-private fun SiopOpenId4VPConfig.sign(
-    requirement: JarmRequirement.Signed,
-    data: AuthorizationResponsePayload,
-): SignedJWT {
-    val signingCfg = jarmConfiguration.signingConfig()
-    checkNotNull(signingCfg) { "Wallet doesn't support signing JARM" }
-
-    val header = JWSHeader.Builder(requirement.responseSigningAlg)
-        .keyID(signingCfg.signer.getKeyId())
-        .build()
-
-    val claimSet = JwtPayloadFactory.signedJwtClaimSet(data, issuer, Instant.now(), signingCfg.ttl)
-    return SignedJWT(header, claimSet).apply { sign(signingCfg.signer) }
-}
-
-private fun SiopOpenId4VPConfig.encrypt(
-    requirement: JarmRequirement.Encrypted,
-    data: AuthorizationResponsePayload,
-): EncryptedJWT {
-    val encryptionCfg = jarmConfiguration.encryptionConfig()
-    checkNotNull(encryptionCfg) { "Wallet doesn't support encrypted JARM" }
-
-    val (jweAlgorithm, encryptionMethod, verifierKey) = requirement
-    val jweEncrypter = EncrypterFactory.createEncrypter(jweAlgorithm, verifierKey)
-    val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, verifierKey, data)
-
-    val claimSet = JwtPayloadFactory.encryptedJwtClaimSet(data)
-    return EncryptedJWT(jweHeader, claimSet).apply { encrypt(jweEncrypter) }
+@Throws(JOSEException::class)
+internal fun ResponseEncryptionRequirement.encrypt(data: AuthorizationResponsePayload): Jwt {
+    val header = jweHeader(encryptionAlgorithm, encryptionMethod, clientKey, data)
+    val claims = JwtPayloadFactory.encryptedJwtClaimSet(data)
+    val encrypter = EncrypterFactory.createEncrypter(encryptionAlgorithm, clientKey)
+    val encryptedJwt = EncryptedJWT(header, claims).apply { encrypt(encrypter) }
+    return encryptedJwt.serialize()
 }
 
 private fun jweHeader(
@@ -100,37 +62,21 @@ private fun jweHeader(
         }
     }
 
-    val (apv, apu) = when (val encryptionParameters = data.encryptionParameters) {
-        is EncryptionParameters.DiffieHellman -> encryptionParameters.apu
-        else -> null
-    }?.let { Base64URL.encode(data.nonce) to it } ?: (null to null)
+    val (apv, apu) =
+        when (val encryptionParameters = data.encryptionParameters) {
+            is EncryptionParameters.DiffieHellman -> encryptionParameters.apu
+            else -> null
+        }?.let { apu -> data.nonce?.let { apv -> Base64URL.encode(apv) } to apu }
+            ?: (null to null)
 
     return JWEHeader.Builder(jweAlgorithm, encryptionMethod)
         .apply {
             builderAction()
             apv?.let(::agreementPartyVInfo)
             apu?.let(::agreementPartyUInfo)
-            recipientKey.toPublicJWK().keyID?.let(::keyID)
+            keyID(recipientKey.keyID)
         }
         .build()
-}
-
-private fun SiopOpenId4VPConfig.signAndEncrypt(
-    requirement: JarmRequirement.SignedAndEncrypted,
-    data: AuthorizationResponsePayload,
-): JWEObject {
-    check(jarmConfiguration is JarmConfiguration.SigningAndEncryption) {
-        "Wallet doesn't support signing & encrypting JARM"
-    }
-
-    val signedJwt = sign(requirement.signed, data)
-    val (jweAlgorithm, encryptionMethod, verifierKey) = requirement.encryptResponse
-    val jweEncrypter = EncrypterFactory.createEncrypter(jweAlgorithm, verifierKey)
-    val jweHeader = jweHeader(jweAlgorithm, encryptionMethod, verifierKey, data) {
-        contentType("JWT")
-    }
-
-    return JWEObject(jweHeader, Payload(signedJwt)).apply { encrypt(jweEncrypter) }
 }
 
 private object JwtPayloadFactory {
@@ -143,22 +89,6 @@ private object JwtPayloadFactory {
 
     fun encryptedJwtClaimSet(data: AuthorizationResponsePayload): JWTClaimsSet =
         buildJsonObject {
-            payloadClaims(data)
-        }.asJWTClaimSet()
-
-    fun signedJwtClaimSet(
-        data: AuthorizationResponsePayload,
-        issuer: Issuer?,
-        issuedAt: Instant,
-        ttl: Duration?,
-    ): JWTClaimsSet =
-        buildJsonObject {
-            issuer?.let { put("iss", it.value) }
-            data.clientId?.let { put("aud", data.clientId.toString()) }
-            ttl?.let {
-                val exp = issuedAt.plusMillis(ttl.toMillis()).epochSecond
-                put("exp", exp)
-            }
             payloadClaims(data)
         }.asJWTClaimSet()
 
@@ -217,6 +147,7 @@ internal object EncrypterFactory {
                 else -> null
             }
         }
+
     fun canBeUsed(algorithm: JWEAlgorithm, candidateRecipientKey: JWK): Boolean {
         return familyOf(algorithm)?.let { family ->
             when {

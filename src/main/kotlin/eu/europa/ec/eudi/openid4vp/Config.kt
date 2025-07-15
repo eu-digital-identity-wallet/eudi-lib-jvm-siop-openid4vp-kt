@@ -15,15 +15,14 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-import com.nimbusds.jose.*
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDHDecrypter
-import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.oauth2.sdk.id.Issuer
-import eu.europa.ec.eudi.openid4vp.JarmConfiguration.*
+import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import kotlinx.serialization.json.JsonObject
@@ -221,62 +220,26 @@ data class VPConfiguration(
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
 )
 
-interface JarmSigner : JWSSigner {
-    fun getKeyId(): String
-
-    companion object {
-        operator fun invoke(rsaKey: RSAKey): JarmSigner =
-            object : JarmSigner, JWSSigner by RSASSASigner(rsaKey) {
-                override fun getKeyId(): String = rsaKey.keyID
-            }
-
-        operator fun invoke(rsaKey: ECKey): JarmSigner =
-            object : JarmSigner, JWSSigner by ECDSASigner(rsaKey) {
-                override fun getKeyId(): String = rsaKey.keyID
-            }
-    }
-}
-
 /**
- * Configurations options for encrypting and/or signing an authorization response via JARM,
- * if requested by the verifier.
+ * Configurations options for encrypting an authorization response if requested by the verifier.
  *
- * The library can be configured to:
- *
- * - Support only [signing][Signing] the authorization response
- * - Support only [encrypting][Encryption] the authorization response
- * - Support both singing and encrypting [SigningAndEncryption] the authorization response
- * - Not support JARM
- *
- * OpenId4VP recommends supporting [encrypting][Encryption] the authorization response
+ * OpenId4VP recommends supporting [encrypting][Supported] the authorization response
  */
-sealed interface JarmConfiguration {
+sealed interface ResponseEncryptionConfiguration {
 
     /**
-     * The wallet supports only signed authorization responses
+     * The wallet supports encrypting authorization responses
      *
-     * @param signer the JWS algorithms that the wallet can use when signing a JARM response
-     * @param ttl the time the signed authorization response can live
+     * @param supportedAlgorithms the JWE algorithms that the wallet can use
+     * when encrypting the authorization response in order of preference
+     * @param supportedMethods the JWE encryption methods that the wallet can use
+     * when encrypting the authorization response in order of preference
+     * [EncryptionMethod.XC20P] requires the usage of [com.google.crypto.tink:tink](https://central.sonatype.com/artifact/com.google.crypto.tink/tink)
      */
-    data class Signing(
-        val signer: JarmSigner,
-        val ttl: Duration? = Duration.ofMinutes(10),
-    ) : JarmConfiguration {
-        init {
-            require(signer.supportedJWSAlgorithms().isNotEmpty()) { "At least a algorithm must be provided" }
-        }
-    }
-
-    /**
-     * The wallet supports only encrypted authorization responses
-     * @param supportedAlgorithms the JWE algorithms that the wallet can use when encrypting a JARM response
-     * @param supportedMethods the JWE encryption methods that the wallet can use when encrypting a JARM
-     * response
-     */
-    data class Encryption(
+    data class Supported(
         val supportedAlgorithms: List<JWEAlgorithm>,
         val supportedMethods: List<EncryptionMethod>,
-    ) : JarmConfiguration {
+    ) : ResponseEncryptionConfiguration {
         init {
             require(supportedAlgorithms.isNotEmpty()) { "At least an encryption algorithm must be provided" }
             require(supportedMethods.isNotEmpty()) { "At least an encryption method must be provided" }
@@ -284,41 +247,9 @@ sealed interface JarmConfiguration {
     }
 
     /**
-     * The wallet supports any kind of JARM response, signed, encrypted and/or signed and then encrypted
-     *
-     * @param signing the singing options
-     * @param encryption the encryption options
+     * Wallet doesn't support replying using unencrypted authorization responses
      */
-    data class SigningAndEncryption(val signing: Signing, val encryption: Encryption) : JarmConfiguration {
-
-        constructor(
-            signer: JarmSigner,
-            supportedEncryptionAlgorithms: List<JWEAlgorithm>,
-            supportedEncryptionMethods: List<EncryptionMethod>,
-        ) : this(
-            Signing(signer),
-            Encryption(supportedEncryptionAlgorithms, supportedEncryptionMethods),
-        )
-    }
-
-    /**
-     * Wallet doesn't support replying using JARM
-     */
-    data object NotSupported : JarmConfiguration
-}
-
-fun JarmConfiguration.signingConfig(): Signing? = when (this) {
-    is Signing -> this
-    is Encryption -> null
-    is SigningAndEncryption -> signing
-    NotSupported -> null
-}
-
-fun JarmConfiguration.encryptionConfig(): Encryption? = when (this) {
-    is Signing -> null
-    is Encryption -> this
-    is SigningAndEncryption -> encryption
-    NotSupported -> null
+    data object NotSupported : ResponseEncryptionConfiguration
 }
 
 sealed interface VpFormat : java.io.Serializable {
@@ -529,8 +460,8 @@ enum class ErrorDispatchPolicy : java.io.Serializable {
  * @param issuer an optional id for the wallet. If not provided defaults to [SelfIssued].
  * @param jarConfiguration options related to JWT Secure authorization requests.
  * If not provided, it will default to [JarConfiguration.Default]
- * @param jarmConfiguration whether wallet supports JARM. If not specified, it takes the default value
- * [JarmConfiguration.NotSupported].
+ * @param responseEncryptionConfiguration whether wallet supports authorization response encryption. If not specified, it takes the default value
+ * [ResponseEncryptionConfiguration.NotSupported].
  * @param vpConfiguration options about OpenId4VP.
  * @param clock the system Clock. If not provided system's default clock will be used.
  * @param jarClockSkew max acceptable skew between wallet and verifier
@@ -540,7 +471,7 @@ enum class ErrorDispatchPolicy : java.io.Serializable {
 data class SiopOpenId4VPConfig(
     val issuer: Issuer? = SelfIssued,
     val jarConfiguration: JarConfiguration = JarConfiguration.Default,
-    val jarmConfiguration: JarmConfiguration = NotSupported,
+    val responseEncryptionConfiguration: ResponseEncryptionConfiguration = NotSupported,
     val vpConfiguration: VPConfiguration,
     val clock: Clock = Clock.systemDefaultZone(),
     val jarClockSkew: Duration = Duration.ofSeconds(15L),
@@ -554,7 +485,7 @@ data class SiopOpenId4VPConfig(
     constructor(
         issuer: Issuer? = SelfIssued,
         jarConfiguration: JarConfiguration = JarConfiguration.Default,
-        jarmConfiguration: JarmConfiguration = NotSupported,
+        responseEncryptionConfiguration: ResponseEncryptionConfiguration = NotSupported,
         vpConfiguration: VPConfiguration,
         clock: Clock = Clock.systemDefaultZone(),
         jarClockSkew: Duration = Duration.ofSeconds(15L),
@@ -563,7 +494,7 @@ data class SiopOpenId4VPConfig(
     ) : this(
         issuer,
         jarConfiguration,
-        jarmConfiguration,
+        responseEncryptionConfiguration,
         vpConfiguration,
         clock,
         jarClockSkew,

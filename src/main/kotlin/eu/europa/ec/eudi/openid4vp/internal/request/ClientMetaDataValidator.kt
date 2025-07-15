@@ -16,111 +16,36 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.ensure
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import java.text.ParseException
 
 internal object ClientMetaDataValidator {
 
     @Throws(AuthorizationRequestException::class)
-    fun validateClientMetaData(
-        unvalidated: UnvalidatedClientMetaData,
-        responseMode: ResponseMode,
-    ): ValidatedClientMetaData {
+    fun validateClientMetaData(unvalidated: UnvalidatedClientMetaData): ValidatedClientMetaData {
         val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
-        val authSgnRespAlg = authSgnRespAlg(unvalidated, responseMode)
-        val (authEncRespAlg, authEncRespEnc) = authEncRespAlgAndMethod(unvalidated, responseMode)
-        val requiresEncryption = responseMode.isJarm() && null != authEncRespAlg && authEncRespEnc != null
-        val jwkSets = if (requiresEncryption) {
-            jwkSet(unvalidated) ?: throw RequestValidationError.MissingClientMetadataJwks.asException()
-        } else null
-        ensure(!responseMode.isJarm() || !(authSgnRespAlg == null && authEncRespAlg == null && authEncRespEnc == null)) {
-            RequestValidationError.InvalidClientMetaData("None of the JARM related metadata provided").asException()
-        }
+
+        val jwkSet = jwkSet(unvalidated)
+        val responseEncryptionMethodsSupported = responseEncryptionMethodsSupported(unvalidated)
+
         val vpFormats = vpFormats(unvalidated)
+
         return ValidatedClientMetaData(
-            jwkSet = jwkSets,
+            jwkSet = jwkSet,
             subjectSyntaxTypesSupported = types,
-            authorizationSignedResponseAlg = authSgnRespAlg,
-            authorizationEncryptedResponseAlg = authEncRespAlg,
-            authorizationEncryptedResponseEnc = authEncRespEnc,
+            responseEncryptionMethodsSupported = responseEncryptionMethodsSupported,
             vpFormats = vpFormats,
         )
     }
-
-    private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
-        try {
-            unvalidated.vpFormats.toDomain()
-        } catch (_: IllegalArgumentException) {
-            throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
-        }
-
-    private fun jwkSet(clientMetadata: UnvalidatedClientMetaData): JWKSet? {
-        fun JsonObject.asJWKSet(): JWKSet = try {
-            JWKSet.parse(this.toString())
-        } catch (ex: ParseException) {
-            throw ResolutionError.ClientMetadataJwksUnparsable(ex).asException()
-        }
-
-        return clientMetadata.jwks?.asJWKSet()
-    }
-}
-
-internal fun ResponseMode.isJarm() = when (this) {
-    is ResponseMode.DirectPost -> false
-    is ResponseMode.DirectPostJwt -> true
-    is ResponseMode.Fragment -> false
-    is ResponseMode.FragmentJwt -> true
-    is ResponseMode.Query -> false
-    is ResponseMode.QueryJwt -> true
-}
-
-private fun authSgnRespAlg(unvalidated: UnvalidatedClientMetaData, responseMode: ResponseMode): JWSAlgorithm? {
-    val unvalidatedAlg = unvalidated.authorizationSignedResponseAlg
-    return if (!responseMode.isJarm() || unvalidatedAlg.isNullOrEmpty()) null
-    else unvalidatedAlg.signingAlg()
-        ?: throw RequestValidationError.InvalidClientMetaData("Invalid signing algorithm $unvalidatedAlg").asException()
-}
-
-internal fun String.signingAlg(): JWSAlgorithm? =
-    JWSAlgorithm.parse(this).takeIf { JWSAlgorithm.Family.SIGNATURE.contains(it) }
-
-private fun String.encAlg(): JWEAlgorithm? = JWEAlgorithm.parse(this)
-
-private fun String.encMeth(): EncryptionMethod? = EncryptionMethod.parse(this)
-private fun authEncRespAlgAndMethod(
-    unvalidated: UnvalidatedClientMetaData,
-    responseMode: ResponseMode,
-): Pair<JWEAlgorithm?, EncryptionMethod?> {
-    if (!responseMode.isJarm()) return null to null
-
-    val authEncRespAlg = unvalidated.authorizationEncryptedResponseAlg?.let { alg ->
-        alg.encAlg() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption algorithm $alg")
-            .asException()
-    }
-
-    val authEncRespEnc = unvalidated.authorizationEncryptedResponseEnc?.let { encMeth ->
-        encMeth.encMeth() ?: throw RequestValidationError.InvalidClientMetaData("Invalid encryption method $encMeth")
-            .asException()
-    }
-
-    ensure(bothOrNone(authEncRespAlg, authEncRespEnc).invoke { it?.name.isNullOrEmpty() }) {
-        RequestValidationError.InvalidClientMetaData(
-            """
-                Attributes authorization_encrypted_response_alg & authorization_encrypted_response_enc 
-                should be either both provided or not provided to support JARM.
-            """.trimIndent(),
-        ).asException()
-    }
-    return authEncRespAlg to authEncRespEnc
 }
 
 private fun subjectSyntaxTypes(subjectSyntaxTypesSupported: List<String>?): List<SubjectSyntaxType> {
@@ -154,10 +79,46 @@ private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
     }
 }
 
-private fun <T> bothOrNone(left: T, right: T): ((T) -> Boolean) -> Boolean = { test ->
-    when (test(left) to test(right)) {
-        true to true -> true
-        false to false -> true
-        else -> false
+private fun jwkSet(unvalidated: UnvalidatedClientMetaData): JWKSet? {
+    fun JsonObject.asJWKSet(): JWKSet = try {
+        JWKSet.parse(jsonSupport.encodeToString(this))
+    } catch (ex: ParseException) {
+        throw ResolutionError.ClientMetadataJwksUnparsable(ex).asException()
     }
+
+    val jwks = unvalidated.jwks?.asJWKSet()
+    if (null != jwks) {
+        ensure(jwks.keys.isNotEmpty()) {
+            RequestValidationError.InvalidClientMetaData("'${OpenId4VPSpec.JWKS}' cannot be empty").asException()
+        }
+        ensure(jwks.keys.all { jwk -> null != jwk.keyID && null != jwk.algorithm }) {
+            RequestValidationError.InvalidClientMetaData("All JWKS must have `kid` and `alg`").asException()
+        }
+        val keyIds = jwks.keys.map { it.keyID }
+        ensure(keyIds.size == keyIds.toSet().size) {
+            RequestValidationError.InvalidClientMetaData("Each JWK must have a unique `kid`").asException()
+        }
+    }
+
+    return jwks
 }
+
+private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMetaData): List<EncryptionMethod>? {
+    val encryptionMethods = unvalidated.responseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) }
+    if (null != encryptionMethods) {
+        ensure(encryptionMethods.isNotEmpty()) {
+            RequestValidationError.InvalidClientMetaData(
+                "'${OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED}' must not be empty",
+            ).asException()
+        }
+    }
+
+    return encryptionMethods ?: OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT
+}
+
+private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
+    try {
+        unvalidated.vpFormats.toDomain()
+    } catch (_: IllegalArgumentException) {
+        throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
+    }

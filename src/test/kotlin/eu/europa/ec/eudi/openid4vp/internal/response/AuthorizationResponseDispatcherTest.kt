@@ -17,14 +17,10 @@ package eu.europa.ec.eudi.openid4vp.internal.response
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSVerifier
-import com.nimbusds.jose.crypto.RSASSAVerifier
-import com.nimbusds.jose.jwk.KeyUse
-import com.nimbusds.jose.jwk.RSAKey
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import com.nimbusds.jose.JWEObject
+import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.util.Base64URL
-import com.nimbusds.jwt.SignedJWT
+import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingResponseType
@@ -53,37 +49,28 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.InputStream
 import java.time.Clock
-import java.util.*
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class AuthorizationResponseDispatcherTest {
-
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
-
-    private val jarmSigningKeyPair: RSAKey by lazy {
-        RSAKeyGenerator(2048)
-            .keyUse(KeyUse.SIGNATURE)
-            .keyID(UUID.randomUUID().toString())
-            .issueTime(Date(System.currentTimeMillis()))
-            .generate()
-    }
-
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
         vpConfiguration = VPConfiguration(
             vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
         ),
         clock = Clock.systemDefaultZone(),
-        jarmConfiguration = JarmConfiguration.SigningAndEncryption(
-            signer = JarmSigner(jarmSigningKeyPair),
-            supportedEncryptionAlgorithms = listOf(Verifier.jarmEncryptionKeyPair.algorithm as JWEAlgorithm),
-            supportedEncryptionMethods = listOf(EncryptionMethod.A256GCM),
+        responseEncryptionConfiguration = ResponseEncryptionConfiguration.Supported(
+            supportedAlgorithms = listOf(Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm),
+            supportedMethods = listOf(EncryptionMethod.A256GCM),
         ),
     )
 
     private val clientMetadataStr =
         """
-            { "jwks": { "keys": [ { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256", "vp_formats": { "mso_mdoc": {"alg":  ["ES256"]} } }
+            { "jwks": { "keys": [ { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew", "alg": "RSA256" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256", "vp_formats": { "mso_mdoc": {"alg":  ["ES256"]} } }
         """.trimIndent()
 
     private val clientMetaData = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
@@ -94,16 +81,16 @@ class AuthorizationResponseDispatcherTest {
     @Test
     fun `dispatch direct post response`() = runTest {
         fun test(state: String? = null) {
-            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(clientMetaData)
             }
 
+            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val siopAuthRequestObject =
                 ResolvedRequestObject.SiopAuthentication(
                     idTokenType = listOf(IdTokenType.AttesterSigned),
                     subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
-                    jarmRequirement = walletConfig.jarmRequirement(validated),
+                    responseEncryptionRequirement = walletConfig.responseEncryptionRequirement(validated, responseMode),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
@@ -155,7 +142,7 @@ class AuthorizationResponseDispatcherTest {
                     }
                 }
 
-                val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                val dispatcher = DefaultDispatcher { managedHttpClient }
                 val outcome = dispatcher.dispatch(
                     siopAuthRequestObject,
                     idTokenConsensus,
@@ -172,16 +159,15 @@ class AuthorizationResponseDispatcherTest {
     @Test
     fun `dispatch vp_token with direct post`() = runTest {
         fun test(state: String? = null) {
-            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(clientMetaData)
             }
 
             val dcql = Json.decodeFromStream<DCQL>(load("dcql/mDL-example.json")!!)
-
+            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    jarmRequirement = walletConfig.jarmRequirement(validated),
+                    responseEncryptionRequirement = walletConfig.responseEncryptionRequirement(validated, responseMode),
                     vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
@@ -230,7 +216,7 @@ class AuthorizationResponseDispatcherTest {
                     }
                 }
 
-                val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                val dispatcher = DefaultDispatcher { managedHttpClient }
                 val outcome = dispatcher.dispatch(
                     openId4VPAuthRequestObject,
                     vpTokenConsensus,
@@ -256,7 +242,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    jarmRequirement = null,
+                    responseEncryptionRequirement = null,
                 )
 
                 testApplication {
@@ -289,7 +275,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val dispatcher = DefaultDispatcher { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.InvalidClientId,
                         errorDispatchDetails,
@@ -312,7 +298,13 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
+                    responseEncryptionRequirement = ResponseEncryptionRequirement(
+                        encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
+                        encryptionMethod = EncryptionMethod.parse(
+                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                        ),
+                        clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                    ),
                 )
 
                 testApplication {
@@ -347,7 +339,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val dispatcher = DefaultDispatcher { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.InvalidRequestUriMethod,
                         errorDispatchDetails,
@@ -370,7 +362,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    jarmRequirement = null,
+                    responseEncryptionRequirement = null,
                 )
 
                 testApplication {
@@ -380,7 +372,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val dispatcher = DefaultDispatcher { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.SubjectSyntaxTypesNoMatch,
                         errorDispatchDetails,
@@ -406,7 +398,13 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
+                    responseEncryptionRequirement = ResponseEncryptionRequirement(
+                        encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
+                        encryptionMethod = EncryptionMethod.parse(
+                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                        ),
+                        clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                    ),
                 )
 
                 testApplication {
@@ -416,7 +414,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val dispatcher = DefaultDispatcher { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
                         MissingScope,
                         errorDispatchDetails,
@@ -444,7 +442,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    jarmRequirement = null,
+                    responseEncryptionRequirement = null,
                 )
 
                 testApplication {
@@ -454,7 +452,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val dispatcher = DefaultDispatcher { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
                         MissingResponseType,
                         errorDispatchDetails,
@@ -479,7 +477,13 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     nonce = null,
                     clientId = null,
-                    jarmRequirement = JarmRequirement.Signed(JWSAlgorithm.RS256),
+                    responseEncryptionRequirement = ResponseEncryptionRequirement(
+                        encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
+                        encryptionMethod = EncryptionMethod.parse(
+                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                        ),
+                        clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                    ),
                 )
 
                 testApplication {
@@ -489,7 +493,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher(walletConfig) { managedHttpClient }
+                    val dispatcher = DefaultDispatcher { managedHttpClient }
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.MissingResponseUri,
                         errorDispatchDetails,
@@ -510,11 +514,11 @@ class AuthorizationResponseDispatcherTest {
         }
 
         private fun parseJwt(jwt: String): MutableMap<String, Any> {
-            val signedJWT = SignedJWT.parse(jwt)
-
-            val verifier: JWSVerifier = RSASSAVerifier(jarmSigningKeyPair.toRSAPublicKey())
-            assertTrue { signedJWT.verify(verifier) }
-            return signedJWT.jwtClaimsSet.claims
+            val encryptedJwt = EncryptedJWT.parse(jwt)
+            val decrypter = ECDHDecrypter(Verifier.responseEncryptionKeyPair)
+            encryptedJwt.decrypt(decrypter)
+            assert(JWEObject.State.DECRYPTED == encryptedJwt.state)
+            return encryptedJwt.jwtClaimsSet.claims
         }
     }
 

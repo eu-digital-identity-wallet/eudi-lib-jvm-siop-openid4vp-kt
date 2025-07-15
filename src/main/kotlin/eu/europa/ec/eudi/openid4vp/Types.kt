@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
@@ -221,6 +220,16 @@ sealed interface ResponseMode : Serializable {
     data class DirectPostJwt(val responseURI: URL) : ResponseMode
 }
 
+internal fun ResponseMode.requiresEncryption() =
+    when (this) {
+        is ResponseMode.DirectPost -> false
+        is ResponseMode.DirectPostJwt -> true
+        is ResponseMode.Fragment -> false
+        is ResponseMode.FragmentJwt -> true
+        is ResponseMode.Query -> false
+        is ResponseMode.QueryJwt -> true
+    }
+
 typealias Jwt = String
 
 sealed interface VerifiablePresentation {
@@ -250,37 +259,20 @@ enum class IdTokenType {
 }
 
 /**
- * The client's (verifier) requirement to
- * reply to an authorization request with JARM
+ * The client's (verifier) requirement for authorization response encryption that can be fulfilled by the wallet.
  */
-sealed interface JarmRequirement : Serializable {
-    /**
-     * Client requires JARM signed response using the [responseSigningAlg]
-     * signing algorithm
-     */
-    data class Signed(val responseSigningAlg: JWSAlgorithm) : JarmRequirement
-
-    /**
-     * Client requires JARM encrypted response using the
-     * provided [algorithm][responseEncryptionAlg], [encoding method][responseEncryptionEnc]
-     * and [client's encryption key][clientKey]
-     */
-    data class Encrypted(
-        val responseEncryptionAlg: JWEAlgorithm,
-        val responseEncryptionEnc: EncryptionMethod,
-        val clientKey: JWK,
-    ) : JarmRequirement
-
-    /**
-     * Client requires JARM signed and (then) encrypted
-     * using the provided [signing][signed] and [encryption][encryptResponse]
-     * specifications
-     */
-    data class SignedAndEncrypted(val signed: Signed, val encryptResponse: Encrypted) : JarmRequirement
+data class ResponseEncryptionRequirement(
+    val encryptionAlgorithm: JWEAlgorithm,
+    val encryptionMethod: EncryptionMethod,
+    val clientKey: JWK,
+) : Serializable {
+    init {
+        require(encryptionAlgorithm.name == clientKey.algorithm?.name)
+        requireNotNull(clientKey.keyID)
+    }
 }
 
 sealed interface EncryptionParameters : Serializable {
-
     data class DiffieHellman(val apu: Base64URL) : EncryptionParameters
 }
 

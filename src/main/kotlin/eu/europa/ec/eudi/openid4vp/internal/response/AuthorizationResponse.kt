@@ -132,12 +132,12 @@ internal sealed interface AuthorizationResponse : Serializable {
      *
      * @param responseUri the verifier/RP URI where the response will be posted
      * @param data the contents of the authorization response
-     * @param jarmRequirement the verifier/RP's requirements for JARM
+     * @param responseEncryptionRequirement the verifier/RP's requirements for authorization response encryption
      */
     data class DirectPostJwt(
         val responseUri: URL,
         val data: AuthorizationResponsePayload,
-        val jarmRequirement: JarmRequirement,
+        val responseEncryptionRequirement: ResponseEncryptionRequirement,
     ) : AuthorizationResponse
 
     /**
@@ -153,15 +153,15 @@ internal sealed interface AuthorizationResponse : Serializable {
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
-     * query parameters and JARM
+     * query parameters and authorization response encryption
      * @param redirectUri the verifier/RP URI where the response will be redirected to
      * @param data the contents of the authorization request
-     * @param jarmRequirement the verifier/RP's requirements for JARM
+     * @param responseEncryptionRequirement the verifier/RP's requirements for authorization response encryption
      */
     data class QueryJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val jarmRequirement: JarmRequirement,
+        val responseEncryptionRequirement: ResponseEncryptionRequirement,
     ) : AuthorizationResponse
 
     /**
@@ -177,15 +177,15 @@ internal sealed interface AuthorizationResponse : Serializable {
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
-     * fragment and JARM
+     * fragment and authorization response encryption
      * @param redirectUri the verifier/RP URI where the response will be redirected to
      * @param data the contents of the authorization request
-     * @param jarmRequirement the verifier/RP's requirements for JARM
+     * @param responseEncryptionRequirement the verifier/RP's requirements for authorization response encryption
      */
     data class FragmentJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val jarmRequirement: JarmRequirement,
+        val responseEncryptionRequirement: ResponseEncryptionRequirement,
     ) : AuthorizationResponse
 }
 
@@ -248,15 +248,20 @@ private fun ResolvedRequestObject.responsePayload(
 
 private fun ResolvedRequestObject.responseWith(
     data: AuthorizationResponsePayload,
-): AuthorizationResponse {
-    fun jarmOption() = checkNotNull(jarmRequirement)
-
-    return when (val mode = responseMode) {
+): AuthorizationResponse =
+    when (val mode = responseMode) {
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(mode.responseURI, data)
-        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(mode.responseURI, data, jarmOption())
+        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(
+            mode.responseURI,
+            data,
+            checkNotNull(responseEncryptionRequirement),
+        )
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(mode.redirectUri, data, jarmOption())
+        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(
+            mode.redirectUri,
+            data,
+            checkNotNull(responseEncryptionRequirement),
+        )
         is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, jarmOption())
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, checkNotNull(responseEncryptionRequirement))
     }
-}

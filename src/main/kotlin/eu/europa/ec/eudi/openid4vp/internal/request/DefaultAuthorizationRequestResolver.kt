@@ -297,9 +297,9 @@ private fun UnvalidatedRequestObject.responseEncryptionRequirement(
     clientMetaData?.let {
         val decodeFromJsonElement = jsonSupport.decodeFromJsonElement<UnvalidatedClientMetaData>(clientMetaData)
         val resolvedClientMetadata = decodeFromJsonElement.let {
-            ClientMetaDataValidator.validateClientMetaData(it)
+            ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
         }
-        resolvedClientMetadata.let { siopOpenId4VPConfig.responseEncryptionRequirement(it, responseMode) }
+        resolvedClientMetadata.responseEncryptionRequirement
     }
 }
 

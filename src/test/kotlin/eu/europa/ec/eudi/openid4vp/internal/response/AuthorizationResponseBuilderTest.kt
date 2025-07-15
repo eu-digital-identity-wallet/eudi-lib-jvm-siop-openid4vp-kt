@@ -29,7 +29,10 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.dcql.CredentialQuery
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
-import eu.europa.ec.eudi.openid4vp.internal.request.*
+import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
+import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -96,13 +99,18 @@ class AuthorizationResponseBuilderTest {
     @Test
     fun `id token request should produce a response with id token JWT`(): Unit = runTest {
         fun test(state: String? = null) {
-            val verifierMetaData = ClientMetaDataValidator.validateClientMetaData(Verifier.metaDataRequestingNotEncryptedResponse)
             val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
+            val verifierMetaData = ClientMetaDataValidator.validateClientMetaData(
+                Verifier.metaDataRequestingNotEncryptedResponse,
+                responseMode,
+                Wallet.config.responseEncryptionConfiguration,
+            )
+
             val siopAuthRequestObject =
                 ResolvedRequestObject.SiopAuthentication(
                     idTokenType = listOf(IdTokenType.AttesterSigned),
                     subjectSyntaxTypesSupported = verifierMetaData.subjectSyntaxTypesSupported,
-                    responseEncryptionRequirement = Wallet.config.responseEncryptionRequirement(verifierMetaData, responseMode),
+                    responseEncryptionRequirement = verifierMetaData.responseEncryptionRequirement,
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow()),
@@ -137,11 +145,14 @@ class AuthorizationResponseBuilderTest {
     @Test
     fun `when direct_post jwt, builder should return DirectPostJwt with response encryption parameters of correct type`() = runTest {
         fun test(state: String? = null) {
-            val verifierMetaData = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(Verifier.metaDataRequestingEncryptedResponse)
-            }
-
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
+            val verifierMetaData = assertDoesNotThrow {
+                ClientMetaDataValidator.validateClientMetaData(
+                    Verifier.metaDataRequestingEncryptedResponse,
+                    responseMode,
+                    Wallet.config.responseEncryptionConfiguration,
+                )
+            }
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     query =
@@ -153,7 +164,7 @@ class AuthorizationResponseBuilderTest {
                                 ),
                             ),
                         ),
-                    responseEncryptionRequirement = Wallet.config.responseEncryptionRequirement(verifierMetaData, responseMode),
+                    responseEncryptionRequirement = verifierMetaData.responseEncryptionRequirement,
                     vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",

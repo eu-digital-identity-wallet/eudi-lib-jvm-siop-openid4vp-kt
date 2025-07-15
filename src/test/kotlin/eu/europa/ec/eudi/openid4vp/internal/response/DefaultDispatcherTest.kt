@@ -31,7 +31,10 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingNonce
 import eu.europa.ec.eudi.openid4vp.dcql.*
 import eu.europa.ec.eudi.openid4vp.dcql.ClaimPathElement.Claim
-import eu.europa.ec.eudi.openid4vp.internal.request.*
+import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
+import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier.assertIsJwtEncryptedWithVerifiersPublicKey
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
@@ -90,7 +93,11 @@ class DefaultDispatcherTest {
             state: String? = null,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val clientMetadataValidated =
-                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData)
+                ClientMetaDataValidator.validateClientMetaData(
+                    unvalidatedClientMetaData,
+                    responseMode,
+                    Wallet.config.responseEncryptionConfiguration,
+                )
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
                 query =
@@ -102,7 +109,7 @@ class DefaultDispatcherTest {
                             ),
                         ),
                     ),
-                responseEncryptionRequirement = Wallet.config.responseEncryptionRequirement(clientMetadataValidated, responseMode),
+                responseEncryptionRequirement = clientMetadataValidated.responseEncryptionRequirement,
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = CLIENT,
                 nonce = "0S6_WzA2Mj",
@@ -186,11 +193,14 @@ class DefaultDispatcherTest {
 
         @Test
         fun `client metadata does not match with wallet's supported algorithms`(): Unit = runTest {
-            val clientMetaData = ClientMetaDataValidator.validateClientMetaData(Verifier.metaDataRequestingEncryptedResponse)
-
             val responseMode = ResponseMode.QueryJwt(URI.create("foo://bar"))
+
             val exception = assertThrows<AuthorizationRequestException> {
-                ResponseEncryptionConfiguration.NotSupported.responseEncryptionRequirement(clientMetaData, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(
+                    Verifier.metaDataRequestingEncryptedResponse,
+                    responseMode,
+                    ResponseEncryptionConfiguration.NotSupported,
+                )
             }
 
             assertIs<RequestValidationError.UnsupportedClientMetaData>(exception.error)
@@ -400,7 +410,11 @@ class DefaultDispatcherTest {
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val clientMetadataValidated =
-                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData)
+                ClientMetaDataValidator.validateClientMetaData(
+                    unvalidatedClientMetaData,
+                    responseMode,
+                    Wallet.config.responseEncryptionConfiguration,
+                )
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
                 query =
@@ -409,7 +423,7 @@ class DefaultDispatcherTest {
                             testCredentialQuery(),
                         ),
                     ),
-                responseEncryptionRequirement = Wallet.config.responseEncryptionRequirement(clientMetadataValidated, responseMode),
+                responseEncryptionRequirement = clientMetadataValidated.responseEncryptionRequirement,
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
@@ -425,14 +439,18 @@ class DefaultDispatcherTest {
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.SiopOpenId4VPAuthentication {
             val clientMetadataValidated =
-                ClientMetaDataValidator.validateClientMetaData(unvalidatedClientMetaData)
+                ClientMetaDataValidator.validateClientMetaData(
+                    unvalidatedClientMetaData,
+                    responseMode,
+                    Wallet.config.responseEncryptionConfiguration,
+                )
 
             return ResolvedRequestObject.SiopOpenId4VPAuthentication(
                 client = Verifier.CLIENT,
                 responseMode = responseMode,
                 state = genState(),
                 nonce = "0S6_WzA2Mj",
-                responseEncryptionRequirement = Wallet.config.responseEncryptionRequirement(clientMetadataValidated, responseMode),
+                responseEncryptionRequirement = clientMetadataValidated.responseEncryptionRequirement,
                 vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),

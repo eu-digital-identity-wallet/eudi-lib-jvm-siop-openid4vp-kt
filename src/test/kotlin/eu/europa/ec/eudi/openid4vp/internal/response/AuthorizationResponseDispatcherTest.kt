@@ -27,7 +27,10 @@ import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingResponseType
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingScope
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
-import eu.europa.ec.eudi.openid4vp.internal.request.*
+import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.asURI
+import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.INVALID_REQUEST_URI_METHOD
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier
@@ -81,16 +84,16 @@ class AuthorizationResponseDispatcherTest {
     @Test
     fun `dispatch direct post response`() = runTest {
         fun test(state: String? = null) {
+            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(clientMetaData)
+                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode, walletConfig.responseEncryptionConfiguration)
             }
 
-            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val siopAuthRequestObject =
                 ResolvedRequestObject.SiopAuthentication(
                     idTokenType = listOf(IdTokenType.AttesterSigned),
                     subjectSyntaxTypesSupported = validated.subjectSyntaxTypesSupported,
-                    responseEncryptionRequirement = walletConfig.responseEncryptionRequirement(validated, responseMode),
+                    responseEncryptionRequirement = validated.responseEncryptionRequirement,
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
@@ -159,15 +162,15 @@ class AuthorizationResponseDispatcherTest {
     @Test
     fun `dispatch vp_token with direct post`() = runTest {
         fun test(state: String? = null) {
+            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(clientMetaData)
+                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode, walletConfig.responseEncryptionConfiguration)
             }
 
             val dcql = Json.decodeFromStream<DCQL>(load("dcql/mDL-example.json")!!)
-            val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    responseEncryptionRequirement = walletConfig.responseEncryptionRequirement(validated, responseMode),
+                    responseEncryptionRequirement = validated.responseEncryptionRequirement,
                     vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",

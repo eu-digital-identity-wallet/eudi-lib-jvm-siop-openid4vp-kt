@@ -54,7 +54,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             responseMode = responseMode,
             state = state,
             nonce = nonce,
-            responseEncryptionRequirement = clientMetaData?.let { siopOpenId4VPConfig.responseEncryptionRequirement(it, responseMode) },
+            responseEncryptionRequirement = clientMetaData?.responseEncryptionRequirement,
             idTokenType = idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = scope.getOrThrow(),
@@ -69,7 +69,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 responseMode = responseMode,
                 state = state,
                 nonce = nonce,
-                responseEncryptionRequirement = clientMetaData?.let { siopOpenId4VPConfig.responseEncryptionRequirement(it, responseMode) },
+                responseEncryptionRequirement = clientMetaData?.responseEncryptionRequirement,
                 vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
                 query = query,
                 transactionData = transactionData,
@@ -86,7 +86,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 responseMode = responseMode,
                 state = state,
                 nonce = nonce,
-                responseEncryptionRequirement = clientMetaData?.let { siopOpenId4VPConfig.responseEncryptionRequirement(it, responseMode) },
+                responseEncryptionRequirement = clientMetaData?.responseEncryptionRequirement,
                 vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
                 idTokenType = idTokenType,
                 subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
@@ -348,7 +348,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
 
         return when {
             hasCMD -> requiredClientMetaData().let {
-                ClientMetaDataValidator.validateClientMetaData(it)
+                ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
             }
             else -> {
                 ensure(!responseMode.requiresEncryption()) {

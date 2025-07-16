@@ -48,7 +48,8 @@ internal object ClientMetaDataValidator {
             if (!responseMode.requiresEncryption()) null
             else responseEncryptionConfiguration.responseEncryptionSpecification(
                 verifierAdvertisedKeys,
-                verifierSupportedEncryptionMethods ?: OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT.toSet(),
+                verifierSupportedEncryptionMethods
+                    ?: setOf(EncryptionMethod.parse(OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT)),
             )
 
         val vpFormats = vpFormats(unvalidated)

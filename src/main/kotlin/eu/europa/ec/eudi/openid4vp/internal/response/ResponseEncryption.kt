@@ -42,9 +42,9 @@ import kotlinx.serialization.json.*
  */
 @Throws(JOSEException::class)
 internal fun ResponseEncryptionSpecification.encrypt(data: AuthorizationResponsePayload): Jwt {
-    val header = jweHeader(encryptionAlgorithm, encryptionMethod, clientKey, data)
+    val header = jweHeader(encryptionAlgorithm, encryptionMethod, recipientKey, data)
     val claims = JwtPayloadFactory.encryptedJwtClaimSet(data)
-    val encrypter = EncrypterFactory.createEncrypter(encryptionAlgorithm, clientKey)
+    val encrypter = EncrypterFactory.createEncrypter(encryptionAlgorithm, recipientKey)
     val encryptedJwt = EncryptedJWT(header, claims).apply { encrypt(encrypter) }
     return encryptedJwt.serialize()
 }

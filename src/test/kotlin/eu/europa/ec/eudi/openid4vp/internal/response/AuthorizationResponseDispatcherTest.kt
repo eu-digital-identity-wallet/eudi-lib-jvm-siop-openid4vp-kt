@@ -306,7 +306,7 @@ class AuthorizationResponseDispatcherTest {
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
                         ),
-                        clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                        recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
                 )
 
@@ -406,7 +406,7 @@ class AuthorizationResponseDispatcherTest {
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
                         ),
-                        clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                        recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
                 )
 
@@ -485,7 +485,7 @@ class AuthorizationResponseDispatcherTest {
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
                         ),
-                        clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                        recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
                 )
 

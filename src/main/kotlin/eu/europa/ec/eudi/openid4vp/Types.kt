@@ -264,11 +264,11 @@ enum class IdTokenType {
 data class ResponseEncryptionSpecification(
     val encryptionAlgorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
-    val clientKey: JWK,
+    val recipientKey: JWK,
 ) : Serializable {
     init {
-        require(encryptionAlgorithm.name == clientKey.algorithm?.name)
-        requireNotNull(clientKey.keyID)
+        require(encryptionAlgorithm.name == recipientKey.algorithm?.name)
+        requireNotNull(recipientKey.keyID)
     }
 }
 

@@ -616,7 +616,7 @@ class DefaultDispatcherTest {
                         encryptionMethod = EncryptionMethod.parse(
                             Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
                         ),
-                        clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                        recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
                 )
                 val redirectURI = response.encodeRedirectURI()
@@ -808,7 +808,7 @@ class DefaultDispatcherTest {
                             encryptionMethod = EncryptionMethod.parse(
                                 Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
                             ),
-                            clientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
+                            recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                         ),
                     )
                 response.encodeRedirectURI()

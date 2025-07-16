@@ -64,10 +64,12 @@ private fun jweHeader(
 
     val (apv, apu) =
         when (val encryptionParameters = data.encryptionParameters) {
-            is EncryptionParameters.DiffieHellman -> encryptionParameters.apu
-            else -> null
-        }?.let { apu -> data.nonce?.let { apv -> Base64URL.encode(apv) } to apu }
-            ?: (null to null)
+            is EncryptionParameters.DiffieHellman -> {
+                val apv = data.nonce?.let { Base64URL.encode(it) }
+                apv to encryptionParameters.apu
+            }
+            else -> null to null
+        }
 
     return JWEHeader.Builder(jweAlgorithm, encryptionMethod)
         .apply {

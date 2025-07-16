@@ -277,8 +277,7 @@ private fun dispatchDetailsOrNull(
     unvalidatedRequest: UnvalidatedRequestObject,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? {
-    val responseMode = unvalidatedRequest.responseMode()
-    return responseMode?.let {
+    return unvalidatedRequest.responseMode()?.let { responseMode ->
         val responseEncryptionSpecification = unvalidatedRequest.responseEncryptionSpecification(siopOpenId4VPConfig, responseMode)
         ErrorDispatchDetails(
             responseMode = responseMode,

@@ -108,7 +108,9 @@ private fun jwks(unvalidated: UnvalidatedClientMetaData): List<JWK> {
         }
     }
 
-    return jwkSet?.keys.orEmpty().filter { null != it.keyID && null != it.algorithm }
+    return jwkSet?.keys
+        ?.filter { !it.keyID.isNullOrBlank() && !it.algorithm?.name.isNullOrBlank() }
+        .orEmpty()
 }
 
 private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMetaData): Set<EncryptionMethod> {

@@ -22,6 +22,7 @@ import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.ensure
+import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.response.EncrypterFactory
 import io.ktor.client.*
@@ -41,16 +42,34 @@ internal object ClientMetaDataValidator {
     ): ValidatedClientMetaData {
         val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
 
-        val verifierAdvertisedKeys = jwks(unvalidated)
+        val verifierAdvertisedJwkSet = jwks(unvalidated)
         val verifierSupportedEncryptionMethods = responseEncryptionMethodsSupported(unvalidated)
 
         val responseEncryptionSpecification =
-            if (!responseMode.requiresEncryption()) null
-            else responseEncryptionConfiguration.responseEncryptionSpecification(
-                verifierAdvertisedKeys,
-                verifierSupportedEncryptionMethods
-                    ?: setOf(EncryptionMethod.parse(OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT)),
-            )
+            if (!responseMode.requiresEncryption()) {
+                ensure(null == verifierSupportedEncryptionMethods) {
+                    RequestValidationError.InvalidClientMetaData(
+                        "'${OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED}' must not be provided when encryption is not required",
+                    ).asException()
+                }
+                null
+            } else {
+                ensureNotNull(verifierAdvertisedJwkSet) {
+                    RequestValidationError.InvalidClientMetaData(
+                        "'${OpenId4VPSpec.JWKS}' must be provided when encryption is required",
+                    ).asException()
+                }
+
+                val verifierCandidateEncryptionKeys = verifierAdvertisedJwkSet.keys
+                    .filterNot { it.keyID.isNullOrBlank() || it.algorithm?.name.isNullOrBlank() }
+
+                responseEncryptionSpecification(
+                    responseEncryptionConfiguration,
+                    verifierCandidateEncryptionKeys,
+                    verifierSupportedEncryptionMethods
+                        ?: setOf(EncryptionMethod.parse(OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT)),
+                )
+            }
 
         val vpFormats = vpFormats(unvalidated)
 
@@ -93,7 +112,7 @@ private fun parseSubjectSyntaxType(value: String): SubjectSyntaxType? {
     }
 }
 
-private fun jwks(unvalidated: UnvalidatedClientMetaData): List<JWK> {
+private fun jwks(unvalidated: UnvalidatedClientMetaData): JWKSet? {
     fun JsonObject.asJWKSet(): JWKSet = try {
         JWKSet.parse(jsonSupport.encodeToString(this))
     } catch (ex: ParseException) {
@@ -112,9 +131,7 @@ private fun jwks(unvalidated: UnvalidatedClientMetaData): List<JWK> {
         }
     }
 
-    return jwkSet?.keys
-        ?.filter { !it.keyID.isNullOrBlank() && !it.algorithm?.name.isNullOrBlank() }
-        .orEmpty()
+    return jwkSet
 }
 
 private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMetaData): Set<EncryptionMethod>? {
@@ -140,9 +157,9 @@ private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
 /**
  * Method checks whether Wallet can fulfill the Verifier's authorization response encryption requirements.
  *
- * @param verifierAdvertisedKeys the JWKS advertised by the Verifier in his Client Metadata
+ * @param walletConfiguration the [encryption parameters][ResponseEncryptionConfiguration] supported by the Wallet
+ * @param verifierCandidateEncryptionKeys the JWKS advertised by the Verifier in his Client Metadata
  * @param verifierSupportedEncryptionMethods the EncryptionMethods advertised by the Verifier in his Client Metadata
- * @receiver the wallet's [ResponseEncryptionConfiguration] encryption parameters supported by the Wallet
  *
  * @return [ResponseEncryptionSpecification] the encryption parameters that can be used by the Wallet to fulfill the
  * Verifier's encryption requirements
@@ -150,20 +167,31 @@ private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
  * can fulfill the Verifier's  encryption requirements
  */
 @Throws(AuthorizationRequestException::class)
-private fun ResponseEncryptionConfiguration.responseEncryptionSpecification(
-    verifierAdvertisedKeys: List<JWK>,
+private fun responseEncryptionSpecification(
+    walletConfiguration: ResponseEncryptionConfiguration,
+    verifierCandidateEncryptionKeys: List<JWK>,
     verifierSupportedEncryptionMethods: Set<EncryptionMethod>,
 ): ResponseEncryptionSpecification {
-    ensure(this is ResponseEncryptionConfiguration.Supported) {
+    ensure(walletConfiguration is ResponseEncryptionConfiguration.Supported) {
         UnsupportedClientMetaData("Wallet doesn't support encrypting authorization responses").asException()
     }
 
-    val encryptionMethod = supportedMethods.firstOrNull {
+    ensure(verifierSupportedEncryptionMethods.isNotEmpty()) {
+        RequestValidationError.InvalidClientMetaData(
+            "No encryption methods were advertised by the Verifier in his Client Metadata",
+        ).asException()
+    }
+    val encryptionMethod = walletConfiguration.supportedMethods.firstOrNull {
         it in verifierSupportedEncryptionMethods
-    } ?: throw UnsupportedClientMetaData("Wallet doesn't support any of the encryption methods supported by verifier").asException()
+    } ?: throw UnsupportedClientMetaData("Wallet doesn't support any of the encryption methods supported by Verifier").asException()
 
-    val (encryptionAlgorithm, encryptionKey) = supportedAlgorithms.firstNotNullOfOrNull { supportedAlgorithm ->
-        val encryptionKey = verifierAdvertisedKeys.firstOrNull { key ->
+    ensure(verifierCandidateEncryptionKeys.isNotEmpty()) {
+        RequestValidationError.InvalidClientMetaData(
+            "No encryption JWKs were advertised by the Verifier in his Client Metadata",
+        ).asException()
+    }
+    val (encryptionAlgorithm, encryptionKey) = walletConfiguration.supportedAlgorithms.firstNotNullOfOrNull { supportedAlgorithm ->
+        val encryptionKey = verifierCandidateEncryptionKeys.firstOrNull { key ->
             supportedAlgorithm.name == key.algorithm?.name && EncrypterFactory.canBeUsed(supportedAlgorithm, key)
         }
 

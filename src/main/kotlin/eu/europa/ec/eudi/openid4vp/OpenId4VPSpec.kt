@@ -67,6 +67,10 @@ object OpenId4VPSpec {
 
     const val CLIENT_ID_PREFIXES_SUPPORTED = "client_id_prefixes_supported"
     const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
+
+    const val JWKS: String = "jwks"
+    const val RESPONSE_ENCRYPTION_METHODS_SUPPORTED: String = "encrypted_response_enc_values_supported"
+    const val RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT: String = "A128GCM"
 }
 
 object SIOPv2

@@ -54,7 +54,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             responseMode = responseMode,
             state = state,
             nonce = nonce,
-            jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
+            responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
             idTokenType = idTokenType,
             subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
             scope = scope.getOrThrow(),
@@ -69,7 +69,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 responseMode = responseMode,
                 state = state,
                 nonce = nonce,
-                jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
+                responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
                 vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
                 query = query,
                 transactionData = transactionData,
@@ -86,7 +86,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 responseMode = responseMode,
                 state = state,
                 nonce = nonce,
-                jarmRequirement = clientMetaData?.let { siopOpenId4VPConfig.jarmRequirement(it) },
+                responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
                 vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
                 idTokenType = idTokenType,
                 subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
@@ -346,21 +346,12 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             return jsonSupport.decodeFromJsonElement(unvalidated.clientMetaData)
         }
 
-        fun required() = when (responseMode) {
-            is ResponseMode.DirectPost -> false
-            is ResponseMode.DirectPostJwt -> true
-            is ResponseMode.Fragment -> false
-            is ResponseMode.FragmentJwt -> true
-            is ResponseMode.Query -> false
-            is ResponseMode.QueryJwt -> true
-        }
-
         return when {
             hasCMD -> requiredClientMetaData().let {
-                ClientMetaDataValidator.validateClientMetaData(it, responseMode)
+                ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
             }
             else -> {
-                ensure(!required()) {
+                ensure(!responseMode.requiresEncryption()) {
                     InvalidClientMetaData("Missing client metadata").asException()
                 }
                 null

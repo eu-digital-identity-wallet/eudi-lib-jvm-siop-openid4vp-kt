@@ -134,9 +134,6 @@ In the later case, based on the configured [SupportedRequestUriMethods](src/main
 
 Library supports both methods.
 
-> [!NOTE]
-> Library currently does not support encrypted JWT-Secured Authorization Requests.
-
 ### Authorization Request encoding
 
 OAUTH2 foresees that `AuthorizationRequest` is encoded as an HTTP GET request which contains specific HTTP parameters.

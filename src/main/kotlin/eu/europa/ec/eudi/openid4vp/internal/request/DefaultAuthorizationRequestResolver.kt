@@ -295,10 +295,10 @@ private fun UnvalidatedRequestObject.responseEncryptionSpecification(
 ): Result<ResponseEncryptionSpecification?> = runCatching {
     clientMetaData?.let {
         val decodeFromJsonElement = jsonSupport.decodeFromJsonElement<UnvalidatedClientMetaData>(clientMetaData)
-        val resolvedClientMetadata = decodeFromJsonElement.let {
+        val validatedClientMetadata = decodeFromJsonElement.let {
             ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
         }
-        resolvedClientMetadata.responseEncryptionSpecification
+        validatedClientMetadata.responseEncryptionSpecification
     }
 }
 

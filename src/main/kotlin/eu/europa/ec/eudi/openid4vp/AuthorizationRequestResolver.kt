@@ -241,10 +241,9 @@ sealed interface ResolvedRequestObject : Serializable {
     val nonce: String
 
     /**
-     * The verifier's requirements, if any, for encrypting and/or signing the authorization
-     * response using JARM.
+     * The verifier's requirements, if any, for encrypting  the authorization response.
      */
-    val jarmRequirement: JarmRequirement?
+    val responseEncryptionSpecification: ResponseEncryptionSpecification?
 
     /**
      * SIOPv2 Authentication request for issuing an id_token
@@ -254,7 +253,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val jarmRequirement: JarmRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
@@ -272,7 +271,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val jarmRequirement: JarmRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val vpFormats: VpFormats?,
         val query: DCQL,
         val transactionData: List<TransactionData>?,
@@ -291,7 +290,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val jarmRequirement: JarmRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val vpFormats: VpFormats?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
@@ -462,7 +461,6 @@ sealed interface ResolutionError : AuthorizationRequestError {
     data class UnknownScope(val scope: Scope) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwksUnparsable(val cause: Throwable) : ResolutionError
-    data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
     data class InvalidTransactionData(val cause: Throwable) : ResolutionError
     data object ClientVpFormatsNotSupportedFromWallet : ResolutionError {
         @Suppress("unused")
@@ -524,7 +522,7 @@ data class ErrorDispatchDetails(
     val nonce: String?,
     val state: String?,
     val clientId: VerifierId?,
-    val jarmRequirement: JarmRequirement?,
+    val responseEncryptionSpecification: ResponseEncryptionSpecification?,
 ) : Serializable {
     companion object
 }

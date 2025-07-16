@@ -39,7 +39,7 @@ included in ISO 23220-4 and ISO-18013-7 and provides the following features:
 | Wallet metadata                                                                                                           | ✅                                                                                                                                      |
 | [Dispatch positive and negative responses](#dispatch-authorization-response-to-verifier--rp)                              | ✅                                                                                                                                      |
 | [Dispatch authorization error response to verifier when possible](#dispatch-authorization-error-response-to-verifier--rp) | ✅                                                                                                                                      |
-| Signed/Encrypted authorization responses (JARM)                                                                           | ✅                                                                                                                                      |
+| Encrypted authorization responses                                                                                         | ✅                                                                                                                                      |
 | Response modes                                                                                                            | ✅ direct_post, ✅ direct_post.jwt, ✅ query, ✅ query.jwt, ✅ fragment, ✅ fragment.jwt                                                     |
 | Transaction Data                                                                                                          | ✅                                                                                                                                      |
 | Verifier Attestation JWT                                                                                                  | ✅                                                                                                                                      |
@@ -254,9 +254,6 @@ In the later case, based on the configured [SupportedRequestUriMethods](src/main
 - Its [metadata](src/main/kotlin/eu/europa/ec/eudi/openid4vp/internal/request/WalletMetaData.kt)  (via `wallet_metadata` parameter)
 
 Library supports both methods.
-
-> [!NOTE]
-> Library currently does not support encrypted JWT-Secured Authorization Requests.
 
 ### Authorization Request encoding
 

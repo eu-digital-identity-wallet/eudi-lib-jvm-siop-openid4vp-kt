@@ -154,7 +154,6 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is UnableToFetchRequestObject -> INVALID_REQUEST_URI
                 is InvalidJarJwt -> INVALID_REQUEST_OBJECT
 
-                is ClientMetadataJwkResolutionFailed,
                 is DIDResolutionFailed,
                 -> PROCESSING_FAILURE
 

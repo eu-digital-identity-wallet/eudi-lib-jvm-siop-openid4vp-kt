@@ -269,37 +269,36 @@ private fun dispatchDetailsOrNull(
  * trying to resolve the Authorization Request.
  *
  * Such errors are dispatchable when:
- * * the response mode does not require JARM
- * * the response mode requires JARM and we have resolved Client metadata that contain JARM parameters compatible with
+ * * the response mode does not require encryption
+ * * the response mode requires encryption, and we have resolved Client metadata that contains encryption parameters compatible with
  * the configuration of the Wallet
  */
 private fun dispatchDetailsOrNull(
     unvalidatedRequest: UnvalidatedRequestObject,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? {
-    val responseMode = unvalidatedRequest.responseMode()
-    return responseMode?.let {
-        val jarmRequirement = unvalidatedRequest.jarmRequirement(siopOpenId4VPConfig, responseMode)
+    return unvalidatedRequest.responseMode()?.let { responseMode ->
+        val responseEncryptionSpecification = unvalidatedRequest.responseEncryptionSpecification(siopOpenId4VPConfig, responseMode)
         ErrorDispatchDetails(
             responseMode = responseMode,
             nonce = unvalidatedRequest.nonce,
             state = unvalidatedRequest.state,
             clientId = unvalidatedRequest.clientId?.let { VerifierId.parse(it).getOrNull() },
-            jarmRequirement = jarmRequirement.getOrNull(),
+            responseEncryptionSpecification = responseEncryptionSpecification.getOrNull(),
         )
     }
 }
 
-private fun UnvalidatedRequestObject.jarmRequirement(
+private fun UnvalidatedRequestObject.responseEncryptionSpecification(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     responseMode: ResponseMode,
-): Result<JarmRequirement?> = runCatching {
+): Result<ResponseEncryptionSpecification?> = runCatching {
     clientMetaData?.let {
         val decodeFromJsonElement = jsonSupport.decodeFromJsonElement<UnvalidatedClientMetaData>(clientMetaData)
-        val resolvedClientMetadata = decodeFromJsonElement.let {
-            ClientMetaDataValidator.validateClientMetaData(it, responseMode)
+        val validatedClientMetadata = decodeFromJsonElement.let {
+            ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
         }
-        resolvedClientMetadata.let { siopOpenId4VPConfig.jarmRequirement(it) }
+        validatedClientMetadata.responseEncryptionSpecification
     }
 }
 
@@ -344,14 +343,14 @@ private fun JWTClaimsSet.responseMode(): ResponseMode? =
 private fun JWTClaimsSet.dispatchDetailsOrNull(): ErrorDispatchDetails? =
     runCatching {
         responseMode()
-            ?.takeIf { !it.isJarm() }
+            ?.takeIf { !it.requiresEncryption() }
             ?.let { responseMode ->
                 ErrorDispatchDetails(
                     responseMode = responseMode,
                     nonce = getStringClaim("nonce"),
                     state = getStringClaim("state"),
                     clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrNull() },
-                    jarmRequirement = null,
+                    responseEncryptionSpecification = null,
                 )
             }
     }.getOrNull()

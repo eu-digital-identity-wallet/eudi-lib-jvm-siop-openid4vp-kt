@@ -229,7 +229,7 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
-    fun `if response_mode is not JARM related client_metadata are not mandatory to be provided`() = runTest {
+    fun `if response_mode does not require encryption, related client_metadata are not mandatory to be provided`() = runTest {
         suspend fun test(state: String? = null) {
             val authRequest =
                 "https://client.example.org/universal-link?" +

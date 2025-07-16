@@ -46,7 +46,10 @@ internal object ClientMetaDataValidator {
 
         val responseEncryptionSpecification =
             if (!responseMode.requiresEncryption()) null
-            else responseEncryptionConfiguration.responseEncryptionSpecification(verifierAdvertisedKeys, verifierSupportedEncryptionMethods)
+            else responseEncryptionConfiguration.responseEncryptionSpecification(
+                verifierAdvertisedKeys,
+                verifierSupportedEncryptionMethods ?: OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT.toSet(),
+            )
 
         val vpFormats = vpFormats(unvalidated)
 
@@ -113,7 +116,7 @@ private fun jwks(unvalidated: UnvalidatedClientMetaData): List<JWK> {
         .orEmpty()
 }
 
-private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMetaData): Set<EncryptionMethod> {
+private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMetaData): Set<EncryptionMethod>? {
     val encryptionMethods = unvalidated.responseEncryptionMethodsSupported?.map { EncryptionMethod.parse(it) }
     if (null != encryptionMethods) {
         ensure(encryptionMethods.isNotEmpty()) {
@@ -123,7 +126,7 @@ private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMet
         }
     }
 
-    return (encryptionMethods ?: OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT).toSet()
+    return encryptionMethods?.toSet()
 }
 
 private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =

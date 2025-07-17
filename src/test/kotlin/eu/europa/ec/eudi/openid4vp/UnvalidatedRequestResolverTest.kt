@@ -91,7 +91,7 @@ class UnvalidatedRequestResolverTest {
                "mso_mdoc": {
                  "alg": ["ES256"]
                },
-               "vc+sd-jwt": {
+               "dc+sd-jwt": {
                    "sd-jwt_alg_values": ["ES256"],
                    "kb-jwt_alg_values": ["ES256"]
                }
@@ -411,7 +411,7 @@ class UnvalidatedRequestResolverTest {
             """ {
                  "jwks": $jwkSetJO,
                  "vp_formats": {
-                     "vc+sd-jwt": {
+                     "dc+sd-jwt": {
                          "sd-jwt_alg_values": ["ES384"],
                          "kb-jwt_alg_values": ["ES384"]
                      }
@@ -451,12 +451,12 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
-    fun `common ground on vc+sd-jwt vp_format includes only common algorithms`() = runTest {
+    fun `common ground on dc+sd-jwt vp_format includes only common algorithms`() = runTest {
         val clientMetadata =
             """ {
                  "jwks": $jwkSetJO,
                  "vp_formats": {
-                     "vc+sd-jwt": {
+                     "dc+sd-jwt": {
                          "sd-jwt_alg_values": ["RS256", "ES512", "ES256", "ES384"],
                          "kb-jwt_alg_values": ["RS256", "ES512", "ES384"]
                      }

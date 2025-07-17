@@ -357,7 +357,7 @@ private class Wallet(
         val credential = query.credentials.first()
         val verifiablePresentation = when (val format = credential.format.value) {
             "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
-            "vc+sd-jwt", "dc+sd-jwt" -> {
+            "dc+sd-jwt" -> {
                 val vct = credential.metaSdJwtVc?.vctValues?.firstOrNull() ?: error("no vct found")
                 prepareSdJwtVcVerifiablePresentation(
                     request.client,

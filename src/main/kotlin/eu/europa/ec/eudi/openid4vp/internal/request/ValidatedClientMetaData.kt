@@ -35,7 +35,7 @@ internal data class UnvalidatedClientMetaData(
 
 @Serializable
 internal class VpFormatsTO(
-    @SerialName("vc+sd-jwt") val vcSdJwt: VcSdJwtTO? = null,
+    @SerialName("dc+sd-jwt") val vcSdJwt: VcSdJwtTO? = null,
     @SerialName("mso_mdoc") val msoMdoc: MsoMdocTO? = null,
 ) {
 

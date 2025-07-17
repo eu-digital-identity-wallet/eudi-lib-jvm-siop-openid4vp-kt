@@ -175,7 +175,7 @@ private fun assertExpectedVpFormats(
     }
     val sdJwtVcSupport = expectedVpFormats.sdJwtVc
     if (sdJwtVcSupport != null) {
-        val sdJwtVc = assertNotNull(vpFormats["vc+sd-jwt"])
+        val sdJwtVc = assertNotNull(vpFormats["dc+sd-jwt"])
         assertIs<JsonObject>(sdJwtVc)
         val sdJwtAlgs = sdJwtVc["sd-jwt_alg_values"]
         if (sdJwtVcSupport.sdJwtAlgorithms.isNotEmpty()) {

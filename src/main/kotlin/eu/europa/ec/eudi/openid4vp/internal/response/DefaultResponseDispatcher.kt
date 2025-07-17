@@ -31,7 +31,6 @@ import java.net.URL
 /**
  * Default implementation of [Dispatcher]
  *
- * @param siopOpenId4VPConfig the wallet configuration
  * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
@@ -68,13 +67,12 @@ internal class DefaultDispatcher(
     ): Pair<URL, Parameters> =
         when (response) {
             is DirectPost -> {
-                val parameters = DirectPostForm.parametersOf(response.data)
+                val parameters = parametersOf(null, response.data)
                 response.responseUri to parameters
             }
 
             is DirectPostJwt -> {
-                val encryptedJwt = response.responseEncryptionSpecification.encrypt(response.data)
-                val parameters = DirectPostJwtForm.parametersOf(encryptedJwt)
+                val parameters = parametersOf(response.responseEncryptionSpecification, response.data)
                 response.responseUri to parameters
             }
 
@@ -146,37 +144,37 @@ internal class DefaultDispatcher(
     }
 }
 
+internal fun parametersOf(
+    responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    data: AuthorizationResponsePayload,
+): Parameters =
+    responseEncryptionSpecification?.let {
+        DirectPostJwtForm.parametersOf(it.encrypt(data))
+    } ?: DirectPostForm.parametersOf(data)
+
 internal fun Query.encodeRedirectURI(): URI =
-    URLBuilder(redirectUri.toString()).apply {
-        parameters.apply {
-            DirectPostForm.of(data).forEach { (key, value) ->
-                append(key, value)
-            }
-        }
-    }.build().toURI()
+    URLBuilder(redirectUri.toString())
+        .apply {
+            parameters.appendAll(parametersOf(null, data))
+        }.build().toURI()
 
 internal fun QueryJwt.encodeRedirectURI(): URI =
-    URLBuilder(redirectUri.toString()).apply {
-        val encryptedJwt = responseEncryptionSpecification.encrypt(data)
-        parameters.append("response", encryptedJwt)
-    }.build().toURI()
+    URLBuilder(redirectUri.toString())
+        .apply {
+            parameters.appendAll(parametersOf(responseEncryptionSpecification, data))
+        }.build().toURI()
+
+internal fun Parameters.toFragment(): String =
+    entries().flatMap { (key, values) -> values.map { value -> "$key=$value" } }.joinToString("&")
 
 internal fun Fragment.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        fragment = DirectPostForm.of(data)
-            .map { (key, value) ->
-                "$key=$value"
-            }.joinToString("&")
+        fragment = parametersOf(null, data).toFragment()
     }.build().toURI()
 
 internal fun FragmentJwt.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        val encryptedJwt = responseEncryptionSpecification.encrypt(data)
-        fragment = buildMap {
-            put("response", encryptedJwt)
-        }.map { (key, value) ->
-            "$key=$value"
-        }.joinToString(separator = "&")
+        fragment = parametersOf(responseEncryptionSpecification, data).toFragment()
     }.build().toURI()
 
 /**

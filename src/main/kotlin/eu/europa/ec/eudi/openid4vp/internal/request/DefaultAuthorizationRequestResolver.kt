@@ -260,7 +260,7 @@ private fun dispatchDetailsOrNull(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? =
     when (fetchedRequest) {
-        is ReceivedRequest.Signed -> fetchedRequest.toSignedJwts().firstOrNull()?.jwtClaimsSet?.dispatchDetailsOrNull()
+        is ReceivedRequest.Signed -> dispatchDetailsOrNull(fetchedRequest.jwsJson)
         is ReceivedRequest.Unsigned -> dispatchDetailsOrNull(fetchedRequest.requestObject, siopOpenId4VPConfig)
     }
 
@@ -340,19 +340,23 @@ private fun JWTClaimsSet.responseMode(): ResponseMode? =
         }
     }.getOrNull()
 
-private fun JWTClaimsSet.dispatchDetailsOrNull(): ErrorDispatchDetails? =
+private fun dispatchDetailsOrNull(jwsJson: JwsJson): ErrorDispatchDetails? =
     runCatching {
-        responseMode()
-            ?.takeIf { !it.requiresEncryption() }
-            ?.let { responseMode ->
-                ErrorDispatchDetails(
-                    responseMode = responseMode,
-                    nonce = getStringClaim("nonce"),
-                    state = getStringClaim("state"),
-                    clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrNull() },
-                    responseEncryptionSpecification = null,
-                )
+        val signedJwt = jwsJson.flatten().map { SignedJWT.parse("${it.protected}.${it.payload}.${it.signature}") }.firstOrNull()
+        signedJwt?.jwtClaimsSet?.let { jwtClaimsSet ->
+            with(jwtClaimsSet) {
+                responseMode()
+                    ?.let { responseMode ->
+                        ErrorDispatchDetails(
+                            responseMode = responseMode,
+                            nonce = getStringClaim("nonce"),
+                            state = getStringClaim("state"),
+                            clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrNull() },
+                            responseEncryptionSpecification = null,
+                        )
+                    }
             }
+        }
     }.getOrNull()
 
 private fun URI.toKtorUrl(): Url = URLBuilder().takeFrom(this.toString()).build()

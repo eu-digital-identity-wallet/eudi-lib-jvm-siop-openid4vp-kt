@@ -148,9 +148,14 @@ internal fun parametersOf(
     responseEncryptionSpecification: ResponseEncryptionSpecification?,
     data: AuthorizationResponsePayload,
 ): Parameters =
-    responseEncryptionSpecification?.let {
-        DirectPostJwtForm.parametersOf(it.encrypt(data))
-    } ?: DirectPostForm.parametersOf(data)
+    when {
+        null != responseEncryptionSpecification -> {
+            val encryptedJwt = responseEncryptionSpecification.encrypt(data)
+            DirectPostJwtForm.parametersOf(encryptedJwt)
+        }
+
+        else -> DirectPostForm.parametersOf(data)
+    }
 
 internal fun Query.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString())

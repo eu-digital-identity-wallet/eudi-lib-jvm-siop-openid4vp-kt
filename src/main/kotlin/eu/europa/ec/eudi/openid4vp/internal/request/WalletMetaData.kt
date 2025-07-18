@@ -20,6 +20,7 @@ import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.EncryptionRequirement
 import eu.europa.ec.eudi.openid4vp.OpenId4VPSpec
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.toJsonObject
 import kotlinx.serialization.json.*
 
@@ -61,8 +62,7 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         // OpenIdVP
         //
-        val vpFormats =
-            VpFormatsTO.make(cfg.vpConfiguration.vpFormats).let(Json.Default::encodeToJsonElement)
+        val vpFormats = jsonSupport.encodeToJsonElement(SupportedVpFormatsTO.make(cfg.vpConfiguration.supportedVpFormats))
         put(OpenId4VPSpec.VP_FORMATS_SUPPORTED, vpFormats)
         putJsonArray(OpenId4VPSpec.CLIENT_ID_PREFIXES_SUPPORTED) {
             cfg.supportedClientIdPrefixes.forEach { supportedClientIdPrefix ->

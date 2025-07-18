@@ -25,6 +25,8 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.internal.isFullySpecified
+import eu.europa.ec.eudi.openid4vp.internal.isSignature
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.PublicKey
@@ -143,57 +145,6 @@ sealed interface SupportedClientIdPrefix {
     }
 }
 
-data class VpFormats(
-    val sdJwtVc: VpFormat.SdJwtVc? = null,
-    val msoMdoc: VpFormat.MsoMdoc? = null,
-) {
-    init {
-        require(sdJwtVc != null || msoMdoc != null) {
-            "At least one format must be specified."
-        }
-    }
-
-    companion object {
-
-        operator fun invoke(vararg formats: VpFormat) = VpFormats(formats.toList())
-
-        operator fun invoke(formats: List<VpFormat>) {
-            require(formats.isNotEmpty()) { "At least one format must be specified." }
-            ensureUniquePerFormat(formats)
-            val sdJwt = formats.filterIsInstance<VpFormat.SdJwtVc>().firstOrNull()
-            val msoMdoc = formats.filterIsInstance<VpFormat.MsoMdoc>().firstOrNull()
-            VpFormats(sdJwt, msoMdoc)
-        }
-
-        fun intersect(thiz: VpFormats, that: VpFormats): VpFormats? {
-            val scg = thiz.sdJwtVc?.intersect(that.sdJwtVc)
-            val mcg = thiz.msoMdoc?.intersect(that.msoMdoc)
-            return if (scg != null || mcg != null) {
-                VpFormats(scg, mcg)
-            } else null
-        }
-
-        private fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
-            formats
-                .groupBy { it.formatName() }
-                .forEach { (formatName, instances) ->
-                    require(instances.size == 1) {
-                        "Multiple instances ${instances.size} found for $formatName."
-                    }
-                }
-        }
-
-        private enum class FormatName {
-            MSO_MDOC, SD_JWT_VC
-        }
-
-        private fun VpFormat.formatName() = when (this) {
-            is VpFormat.MsoMdoc -> FormatName.MSO_MDOC
-            is VpFormat.SdJwtVc -> FormatName.SD_JWT_VC
-        }
-    }
-}
-
 /**
  * A type of Transaction Data supported by the Wallet.
  */
@@ -211,12 +162,12 @@ data class SupportedTransactionDataType(
  * Configuration options for OpenId4VP
  *
  * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
- * @param vpFormats The formats the wallet supports
+ * @param supportedVpFormats The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
 data class VPConfiguration(
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
-    val vpFormats: VpFormats,
+    val supportedVpFormats: SupportedVpFormats,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
 )
 
@@ -252,46 +203,85 @@ sealed interface ResponseEncryptionConfiguration {
     data object NotSupported : ResponseEncryptionConfiguration
 }
 
-sealed interface VpFormat : java.io.Serializable {
+sealed interface SupportedVpFormat : java.io.Serializable {
+
     data class SdJwtVc(
-        val sdJwtAlgorithms: List<JWSAlgorithm>,
-        val kbJwtAlgorithms: List<JWSAlgorithm>,
-    ) : VpFormat {
+        val sdJwtAlgorithms: Set<JWSAlgorithm>,
+        val kbJwtAlgorithms: Set<JWSAlgorithm>,
+    ) : SupportedVpFormat {
         init {
             require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
-        }
-
-        fun intersect(that: SdJwtVc?): SdJwtVc? {
-            if (that == null) return null
-
-            val kbJwtAlgs = kbJwtAlgorithms.intersect(that.kbJwtAlgorithms.toSet())
-            val sdJwtAlgs = sdJwtAlgorithms.intersect(that.sdJwtAlgorithms.toSet())
-            return if (sdJwtAlgs.isNotEmpty() && kbJwtAlgs.isNotEmpty())
-                SdJwtVc(sdJwtAlgs.toList(), kbJwtAlgs.toList())
-            else null
+            require(sdJwtAlgorithms.all { it.isSignature && it.isFullySpecified }) {
+                "SD-JWT algorithms must be fully specified signature algorithms"
+            }
+            require(kbJwtAlgorithms.isNotEmpty()) { "KeyBinding-JWT algorithms cannot be empty" }
+            require(kbJwtAlgorithms.all { it.isSignature && it.isFullySpecified }) {
+                "KeyBinding-JWT algorithms must be fully specified signature algorithms"
+            }
         }
 
         companion object {
-            val ES256 = SdJwtVc(listOf(JWSAlgorithm.ES256), listOf(JWSAlgorithm.ES256))
+            val ES256: SdJwtVc
+                get() =
+                    SdJwtVc(
+                        sdJwtAlgorithms = setOf(JWSAlgorithm.ES256),
+                        kbJwtAlgorithms = setOf(JWSAlgorithm.ES256),
+                    )
         }
     }
 
-    data class MsoMdoc(val algorithms: List<JWSAlgorithm>) : VpFormat {
+    data class MsoMdoc(
+        val issuerAuthAlgorithms: Set<CoseAlgorithm>,
+        val deviceAuthAlgorithms: Set<CoseAlgorithm>,
+    ) : SupportedVpFormat {
         init {
-            require(algorithms.isNotEmpty()) { "Mso-doc algorithms cannot be empty" }
-        }
-
-        fun intersect(that: MsoMdoc?): MsoMdoc? {
-            if (that == null) return null
-
-            val algs = algorithms.intersect(that.algorithms.toSet())
-            return if (algs.isNotEmpty())
-                MsoMdoc(algs.toList())
-            else null
+            require(issuerAuthAlgorithms.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
+            require(deviceAuthAlgorithms.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
         }
 
         companion object {
-            val ES256 = MsoMdoc(listOf(JWSAlgorithm.ES256))
+            val ES256: MsoMdoc
+                get() =
+                    MsoMdoc(
+                        issuerAuthAlgorithms = setOf(CoseAlgorithm(-7), CoseAlgorithm(-9)),
+                        deviceAuthAlgorithms = setOf(CoseAlgorithm(-7), CoseAlgorithm(-9)),
+                    )
+        }
+    }
+}
+
+data class SupportedVpFormats(
+    val sdJwtVc: SupportedVpFormat.SdJwtVc? = null,
+    val msoMdoc: SupportedVpFormat.MsoMdoc? = null,
+) {
+    init {
+        require(null != sdJwtVc || null != msoMdoc) {
+            "At least one format must be specified."
+        }
+    }
+
+    companion object {
+        operator fun invoke(first: SupportedVpFormat, vararg remaining: SupportedVpFormat): SupportedVpFormats =
+            SupportedVpFormats(listOf(first, *remaining))
+
+        operator fun invoke(supportedVpFormats: Collection<SupportedVpFormat>): SupportedVpFormats {
+            require(supportedVpFormats.isNotEmpty()) { "At least one format must be specified." }
+            ensureUniquePerSupportedVpFormat(supportedVpFormats)
+
+            val sdJwtVc = supportedVpFormats.filterIsInstance<SupportedVpFormat.SdJwtVc>().firstOrNull()
+            val msoMdoc = supportedVpFormats.filterIsInstance<SupportedVpFormat.MsoMdoc>().firstOrNull()
+
+            return SupportedVpFormats(sdJwtVc, msoMdoc)
+        }
+
+        private fun ensureUniquePerSupportedVpFormat(supportedVpFormats: Iterable<SupportedVpFormat>) {
+            supportedVpFormats
+                .groupBy { it::class }
+                .forEach { (type, instances) ->
+                    require(1 == instances.size) {
+                        "Multiple instances found for ${type.simpleName}."
+                    }
+                }
         }
     }
 }

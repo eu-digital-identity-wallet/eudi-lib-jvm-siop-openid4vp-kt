@@ -311,3 +311,8 @@ value class TransactionDataCredentialId(val value: String) : Serializable {
 
     override fun toString(): String = value
 }
+
+@JvmInline
+value class CoseAlgorithm(val value: Int) : Serializable {
+    override fun toString(): String = value.toString()
+}

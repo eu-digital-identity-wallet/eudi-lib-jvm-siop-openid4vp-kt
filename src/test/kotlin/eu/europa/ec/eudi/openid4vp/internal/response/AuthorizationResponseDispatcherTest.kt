@@ -63,7 +63,7 @@ class AuthorizationResponseDispatcherTest {
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+            supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
         ),
         clock = Clock.systemDefaultZone(),
         responseEncryptionConfiguration = ResponseEncryptionConfiguration.Supported(
@@ -74,7 +74,34 @@ class AuthorizationResponseDispatcherTest {
 
     private val clientMetadataStr =
         """
-            { "jwks": { "keys": [ { "kty": "RSA", "e": "AQAB", "use": "sig", "kid": "a4e1bbe6-26e8-480b-a364-f43497894453", "iat": 1683559586, "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew" } ] }, "id_token_encrypted_response_alg": "RS256", "id_token_encrypted_response_enc": "A128CBC-HS256", "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ], "id_token_signed_response_alg": "RS256", "vp_formats": { "mso_mdoc": {"alg":  ["ES256"]} } }
+            {
+                "jwks": {
+                    "keys": [
+                        {
+                            "kty": "RSA",
+                            "e": "AQAB",
+                            "use": "sig",
+                            "kid": "a4e1bbe6-26e8-480b-a364-f43497894453",
+                            "iat": 1683559586,
+                            "n": "xHI9zoXS-fOAFXDhDmPMmT_UrU1MPimy0xfP-sL0Iu4CQJmGkALiCNzJh9v343fqFT2hfrbigMnafB2wtcXZeEDy6Mwu9QcJh1qLnklW5OOdYsLJLTyiNwMbLQXdVxXiGby66wbzpUymrQmT1v80ywuYd8Y0IQVyteR2jvRDNxy88bd2eosfkUdQhNKUsUmpODSxrEU2SJCClO4467fVdPng7lyzF2duStFeA2vUkZubor3EcrJ72JbZVI51YDAqHQyqKZIDGddOOvyGUTyHz9749bsoesqXHOugVXhc2elKvegwBik3eOLgfYKJwisFcrBl62k90RaMZpXCxNO4Ew"
+                        }
+                    ]
+                },
+                "id_token_encrypted_response_alg": "RS256",
+                "id_token_encrypted_response_enc": "A128CBC-HS256",
+                "subject_syntax_types_supported": [
+                    "urn:ietf:params:oauth:jwk-thumbprint",
+                    "did:example",
+                    "did:key"
+                ],
+                "id_token_signed_response_alg": "RS256",
+                "vp_formats_supported": {
+                    "mso_mdoc": {
+                        "issuerauth_alg_values": [-7, -9],
+                        "deviceauth_alg_values": [-7, -9]
+                    }
+                }
+            }
         """.trimIndent()
 
     private val clientMetaData = json.decodeFromString<UnvalidatedClientMetaData>(clientMetadataStr)
@@ -180,7 +207,14 @@ class AuthorizationResponseDispatcherTest {
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     responseEncryptionSpecification = validated.responseEncryptionSpecification,
-                    vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                    requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
+                        RequestedVpFormats(
+                            msoMdoc = RequestedVpFormat(
+                                issuerAuthAlgorithms = issuerAuthAlgorithms,
+                                deviceAuthAlgorithms = deviceAuthAlgorithms,
+                            ),
+                        )
+                    },
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

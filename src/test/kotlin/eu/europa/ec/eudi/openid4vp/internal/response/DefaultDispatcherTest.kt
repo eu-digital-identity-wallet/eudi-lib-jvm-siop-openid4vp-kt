@@ -32,8 +32,8 @@ import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingNonce
 import eu.europa.ec.eudi.openid4vp.dcql.*
 import eu.europa.ec.eudi.openid4vp.dcql.ClaimPathElement.Claim
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.SupportedVpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier.assertIsJwtEncryptedWithVerifiersPublicKey
 import io.ktor.client.*
@@ -72,8 +72,8 @@ class DefaultDispatcherTest {
         val metaDataRequestingEncryptedResponse = UnvalidatedClientMetaData(
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
-            vpFormats = VpFormatsTO.make(
-                VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+            vpFormatsSupported = SupportedVpFormatsTO.make(
+                SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
             ),
         )
 
@@ -110,7 +110,14 @@ class DefaultDispatcherTest {
                         ),
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
+                    RequestedVpFormats(
+                        msoMdoc = RequestedVpFormat(
+                            issuerAuthAlgorithms = issuerAuthAlgorithms,
+                            deviceAuthAlgorithms = deviceAuthAlgorithms,
+                        ),
+                    )
+                },
                 client = CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -133,7 +140,7 @@ class DefaultDispatcherTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -461,7 +468,14 @@ class DefaultDispatcherTest {
                         ),
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
+                    RequestedVpFormats(
+                        msoMdoc = RequestedVpFormat(
+                            issuerAuthAlgorithms = issuerAuthAlgorithms,
+                            deviceAuthAlgorithms = deviceAuthAlgorithms,
+                        ),
+                    )
+                },
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -488,7 +502,14 @@ class DefaultDispatcherTest {
                 state = genState(),
                 nonce = "0S6_WzA2Mj",
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
+                    RequestedVpFormats(
+                        msoMdoc = RequestedVpFormat(
+                            issuerAuthAlgorithms = issuerAuthAlgorithms,
+                            deviceAuthAlgorithms = deviceAuthAlgorithms,
+                        ),
+                    )
+                },
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
                 scope = Scope.OpenId,

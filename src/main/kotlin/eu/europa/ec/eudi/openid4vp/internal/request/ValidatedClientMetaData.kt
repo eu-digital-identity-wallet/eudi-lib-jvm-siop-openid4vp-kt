@@ -15,9 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.JWSAlgorithm.Family.SIGNATURE
-import com.nimbusds.jose.JWSAlgorithm.parse
+import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vp.*
+import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -30,24 +30,24 @@ internal data class UnvalidatedClientMetaData(
     @SerialName(OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED)
     val responseEncryptionMethodsSupported: List<String>? = null,
 
-    @SerialName("vp_formats") val vpFormats: VpFormatsTO,
+    @SerialName(OpenId4VPSpec.VP_FORMATS_SUPPORTED) @Required val vpFormatsSupported: SupportedVpFormatsTO,
 )
 
 @Serializable
-internal class VpFormatsTO(
-    @SerialName("dc+sd-jwt") val vcSdJwt: VcSdJwtTO? = null,
-    @SerialName("mso_mdoc") val msoMdoc: MsoMdocTO? = null,
+internal class SupportedVpFormatsTO(
+    @SerialName(OpenId4VPSpec.FORMAT_SD_JWT_VC) val sdJwtVc: SdVcJwtTO? = null,
+    @SerialName(OpenId4VPSpec.FORMAT_MSO_MDOC) val msoMdoc: MsoMdocTO? = null,
 ) {
-
-    fun toDomain(): VpFormats {
-        return VpFormats(vcSdJwt?.toDomain(), msoMdoc?.toDomain())
-    }
+    fun toDomain(): RequestedVpFormats =
+        RequestedVpFormats(
+            sdJwtVc = sdJwtVc?.toDomain(),
+            msoMdoc = msoMdoc?.toDomain(),
+        )
 
     companion object {
-
-        fun make(fs: VpFormats): VpFormatsTO {
-            return VpFormatsTO(
-                vcSdJwt = fs.sdJwtVc?.let { VcSdJwtTO.make(it) },
+        fun make(fs: SupportedVpFormats): SupportedVpFormatsTO {
+            return SupportedVpFormatsTO(
+                sdJwtVc = fs.sdJwtVc?.let { SdVcJwtTO.make(it) },
                 msoMdoc = fs.msoMdoc?.let { MsoMdocTO.make(it) },
             )
         }
@@ -55,22 +55,21 @@ internal class VpFormatsTO(
 }
 
 @Serializable
-internal class VcSdJwtTO(
-    @SerialName("sd-jwt_alg_values") val sdJwtAlgorithms: List<String>? = null,
-    @SerialName("kb-jwt_alg_values") val kdJwtAlgorithms: List<String>? = null,
+internal class SdVcJwtTO(
+    @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS) val sdJwtAlgorithms: List<String>? = null,
+    @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS) val kdJwtAlgorithms: List<String>? = null,
 ) {
-    fun toDomain(): VpFormat.SdJwtVc {
-        return VpFormat.SdJwtVc(
-            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
-            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
+    fun toDomain(): RequestedVpFormat.SdJwtVc =
+        RequestedVpFormat.SdJwtVc(
+            sdJwtAlgorithms = sdJwtAlgorithms?.map { JWSAlgorithm.parse(it) }?.toSet(),
+            kbJwtAlgorithms = kdJwtAlgorithms?.map { JWSAlgorithm.parse(it) }?.toSet(),
         )
-    }
 
     companion object {
-        fun make(f: VpFormat.SdJwtVc): VcSdJwtTO {
-            return VcSdJwtTO(
-                sdJwtAlgorithms = f.sdJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
-                kdJwtAlgorithms = f.kbJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
+        fun make(f: SupportedVpFormat.SdJwtVc): SdVcJwtTO {
+            return SdVcJwtTO(
+                sdJwtAlgorithms = f.sdJwtAlgorithms.map { it.name },
+                kdJwtAlgorithms = f.kbJwtAlgorithms.map { it.name },
             )
         }
     }
@@ -78,24 +77,27 @@ internal class VcSdJwtTO(
 
 @Serializable
 internal class MsoMdocTO(
-    @SerialName("alg") val alg: List<String>? = null,
+    @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<Int>? = null,
+    @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<Int>? = null,
 ) {
-    fun toDomain(): VpFormat.MsoMdoc {
-        return VpFormat.MsoMdoc(alg.algs())
-    }
+    fun toDomain(): RequestedVpFormat.MsoMdoc =
+        RequestedVpFormat.MsoMdoc(
+            issuerAuthAlgorithms = issuerAuthAlgorithms?.map { CoseAlgorithm(it) }?.toSet(),
+            deviceAuthAlgorithms = deviceAuthAlgorithms?.map { CoseAlgorithm(it) }?.toSet(),
+        )
 
     companion object {
-
-        fun make(f: VpFormat.MsoMdoc): MsoMdocTO {
-            return MsoMdocTO(f.algorithms.map { it.name })
+        fun make(f: SupportedVpFormat.MsoMdoc): MsoMdocTO {
+            return MsoMdocTO(
+                issuerAuthAlgorithms = f.issuerAuthAlgorithms.map { it.value },
+                deviceAuthAlgorithms = f.deviceAuthAlgorithms.map { it.value },
+            )
         }
     }
 }
 
-internal fun List<String>?.algs() = this?.mapNotNull { parse(it).takeIf { SIGNATURE.contains(it) } }.orEmpty()
-
 internal data class ValidatedClientMetaData(
     val responseEncryptionSpecification: ResponseEncryptionSpecification? = null,
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType> = emptyList(),
-    val vpFormats: VpFormats,
+    val vpFormats: RequestedVpFormats,
 )

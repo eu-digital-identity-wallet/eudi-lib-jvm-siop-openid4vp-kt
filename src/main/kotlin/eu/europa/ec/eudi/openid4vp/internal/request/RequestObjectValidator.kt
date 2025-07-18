@@ -70,7 +70,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
+                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
                 query = query,
                 transactionData = transactionData,
                 verifierAttestations = verifierAttestations,
@@ -87,7 +87,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
+                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
                 idTokenType = idTokenType,
                 subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
                 scope = scope.getOrThrow(),
@@ -199,9 +199,9 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         return attestations
     }
 
-    private fun resolveVpFormatsCommonGround(clientVpFormats: VpFormats): VpFormats {
-        val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.vpFormats
-        val commonGround = VpFormats.intersect(walletSupportedVpFormats, clientVpFormats)
+    private fun resolveVpFormatsCommonGround(clientVpFormats: RequestedVpFormats): RequestedVpFormats {
+        val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.supportedVpFormats
+        val commonGround = walletSupportedVpFormats.intersect(clientVpFormats)
         return ensureNotNull(commonGround) {
             ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
         }
@@ -350,6 +350,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             hasCMD -> requiredClientMetaData().let {
                 ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
             }
+
             else -> {
                 ensure(!responseMode.requiresEncryption()) {
                     InvalidClientMetaData("Missing client metadata").asException()
@@ -388,3 +389,56 @@ private enum class ResponseType {
     IdToken,
     VpAndIdToken,
 }
+
+private fun SupportedVpFormats.intersect(requested: RequestedVpFormats): RequestedVpFormats? {
+    val commonSdJwt = intersect(sdJwtVc, requested.sdJwtVc, SupportedVpFormat.SdJwtVc::intersect) { return null }
+    val commonMsoMdoc = intersect(msoMdoc, requested.msoMdoc, SupportedVpFormat.MsoMdoc::intersect) { return null }
+
+    return RequestedVpFormats(sdJwtVc = commonSdJwt, msoMdoc = commonMsoMdoc)
+}
+
+private fun SupportedVpFormat.SdJwtVc.intersect(requested: RequestedVpFormat.SdJwtVc): RequestedVpFormat.SdJwtVc? {
+    val commonSdJwtAlgorithms = intersect(sdJwtAlgorithms, requested.sdJwtAlgorithms) { return null }
+    val commonKbJwtAlgorithms = intersect(kbJwtAlgorithms, requested.kbJwtAlgorithms) { return null }
+
+    return RequestedVpFormat.SdJwtVc(sdJwtAlgorithms = commonSdJwtAlgorithms, kbJwtAlgorithms = commonKbJwtAlgorithms)
+}
+
+private fun SupportedVpFormat.MsoMdoc.intersect(requested: RequestedVpFormat.MsoMdoc): RequestedVpFormat.MsoMdoc? {
+    val commonIssuerAuthAlgorithms = intersect(issuerAuthAlgorithms, requested.issuerAuthAlgorithms) { return null }
+    val commonDeviceAuthAlgorithms = intersect(deviceAuthAlgorithms, requested.deviceAuthAlgorithms) { return null }
+
+    return RequestedVpFormat.MsoMdoc(issuerAuthAlgorithms = commonIssuerAuthAlgorithms, deviceAuthAlgorithms = commonDeviceAuthAlgorithms)
+}
+
+/**
+ * Finds common elements between a [supported] set of elements and a [requested] set of elements.
+ * If nothing was requested, null is returned.
+ * If no common elements exists between supported and requested, [onEmptyIntersection] is returned.
+ * Returns null in all other cases.
+ */
+private inline fun <T> intersect(
+    supported: Set<T>,
+    requested: Set<T>?,
+    onEmptyIntersection: () -> Set<T>,
+): Set<T>? =
+    if (null != requested) supported.intersect(requested).takeIf { it.isNotEmpty() } ?: onEmptyIntersection()
+    else null
+
+/**
+ * Finds common ground between an optionally [supported] elements, and an optionally [requested] element.
+ * If both supported and requested are provided, returns the result of [intersect].
+ * If either interset returns null, or supported is null, [onEmptyIntersection] is returned.
+ * Returns null in all other cases.
+ */
+private inline fun <A, B> intersect(
+    supported: A?,
+    requested: B?,
+    intersect: (A, B) -> B?,
+    onEmptyIntersection: () -> B,
+): B? =
+    when {
+        null != supported && null != requested -> intersect(supported, requested) ?: onEmptyIntersection()
+        null == supported && null != requested -> onEmptyIntersection()
+        else -> null
+    }

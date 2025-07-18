@@ -110,14 +110,9 @@ class DefaultDispatcherTest {
                         ),
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
-                    RequestedVpFormats(
-                        msoMdoc = RequestedVpFormat(
-                            issuerAuthAlgorithms = issuerAuthAlgorithms,
-                            deviceAuthAlgorithms = deviceAuthAlgorithms,
-                        ),
-                    )
-                },
+                requestedVpFormats = RequestedVpFormats(
+                    msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                ),
                 client = CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -468,14 +463,9 @@ class DefaultDispatcherTest {
                         ),
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
-                    RequestedVpFormats(
-                        msoMdoc = RequestedVpFormat(
-                            issuerAuthAlgorithms = issuerAuthAlgorithms,
-                            deviceAuthAlgorithms = deviceAuthAlgorithms,
-                        ),
-                    )
-                },
+                requestedVpFormats = RequestedVpFormats(
+                    msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                ),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
                 responseMode = responseMode,
@@ -502,14 +492,9 @@ class DefaultDispatcherTest {
                 state = genState(),
                 nonce = "0S6_WzA2Mj",
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
-                    RequestedVpFormats(
-                        msoMdoc = RequestedVpFormat(
-                            issuerAuthAlgorithms = issuerAuthAlgorithms,
-                            deviceAuthAlgorithms = deviceAuthAlgorithms,
-                        ),
-                    )
-                },
+                requestedVpFormats = RequestedVpFormats(
+                    msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                ),
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
                 scope = Scope.OpenId,

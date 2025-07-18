@@ -147,9 +147,9 @@ class UnvalidatedRequestResolverTest {
         ),
         vpConfiguration = VPConfiguration(
             supportedVpFormats = SupportedVpFormats(
-                SupportedVpFormat.SdJwtVc(
-                    setOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
-                    setOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
+                SupportedVpFormat(
+                    sdJwtAlgorithms = setOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
+                    kbJwtAlgorithms = setOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
                 ),
                 SupportedVpFormat.MsoMdoc.ES256,
             ),

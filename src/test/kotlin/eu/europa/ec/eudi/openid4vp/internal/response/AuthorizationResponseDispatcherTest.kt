@@ -207,14 +207,9 @@ class AuthorizationResponseDispatcherTest {
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     responseEncryptionSpecification = validated.responseEncryptionSpecification,
-                    requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
-                        RequestedVpFormats(
-                            msoMdoc = RequestedVpFormat(
-                                issuerAuthAlgorithms = issuerAuthAlgorithms,
-                                deviceAuthAlgorithms = deviceAuthAlgorithms,
-                            ),
-                        )
-                    },
+                    requestedVpFormats = RequestedVpFormats(
+                        msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                    ),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

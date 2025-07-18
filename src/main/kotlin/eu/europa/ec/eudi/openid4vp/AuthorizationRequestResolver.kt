@@ -16,11 +16,13 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.hashAlgorithms
+import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
-import eu.europa.ec.eudi.prex.PresentationDefinition
 import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.Required
@@ -40,22 +42,22 @@ sealed interface Client : Serializable {
 
     data class Preregistered(val clientId: OriginalClientId, val legalName: String) : Client
     data class RedirectUri(val clientId: URI) : Client
+    data class DecentralizedIdentifier(val clientId: URI) : Client
+    data class VerifierAttestation(val clientId: OriginalClientId) : Client
     data class X509SanDns(val clientId: OriginalClientId, val cert: X509Certificate) : Client
-    data class X509SanUri(val clientId: URI, val cert: X509Certificate) : Client
-    data class DIDClient(val clientId: URI) : Client
-    data class Attested(val clientId: OriginalClientId) : Client
+    data class X509Hash(val clientId: OriginalClientId, val cert: X509Certificate) : Client
 
     /**
-     * The id of the client prefixed with the client id scheme.
+     * The id of the client prefixed with the client id prefix.
      */
     val id: VerifierId
         get() = when (this) {
-            is Preregistered -> VerifierId(ClientIdScheme.PreRegistered, clientId)
-            is RedirectUri -> VerifierId(ClientIdScheme.RedirectUri, clientId.toString())
-            is X509SanDns -> VerifierId(ClientIdScheme.X509_SAN_DNS, clientId)
-            is X509SanUri -> VerifierId(ClientIdScheme.X509_SAN_URI, clientId.toString())
-            is DIDClient -> VerifierId(ClientIdScheme.DID, clientId.toString())
-            is Attested -> VerifierId(ClientIdScheme.VERIFIER_ATTESTATION, clientId)
+            is Preregistered -> VerifierId(ClientIdPrefix.PreRegistered, clientId)
+            is RedirectUri -> VerifierId(ClientIdPrefix.RedirectUri, clientId.toString())
+            is DecentralizedIdentifier -> VerifierId(ClientIdPrefix.DecentralizedIdentifier, clientId.toString())
+            is VerifierAttestation -> VerifierId(ClientIdPrefix.VerifierAttestation, clientId)
+            is X509SanDns -> VerifierId(ClientIdPrefix.X509SanDns, clientId)
+            is X509Hash -> VerifierId(ClientIdPrefix.X509Hash, clientId)
         }
 }
 
@@ -79,10 +81,10 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
     return when (this) {
         is Preregistered -> this.legalName
         is RedirectUri -> null
+        is DecentralizedIdentifier -> null
+        is VerifierAttestation -> null
         is X509SanDns -> cert.legalName()
-        is X509SanUri -> cert.legalName()
-        is DIDClient -> null
-        is Attested -> null
+        is X509Hash -> cert.legalName()
     }
 }
 
@@ -150,21 +152,15 @@ data class TransactionData private constructor(val value: String) : Serializable
             }
         }
 
-        private fun TransactionData.hasCorrectIds(query: PresentationQuery) {
+        private fun TransactionData.hasCorrectIds(query: DCQL) {
             val requestedCredentialIds = query.requestedCredentialIds()
             require(requestedCredentialIds.containsAll(credentialIds)) {
                 "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
             }
         }
 
-        private fun PresentationQuery.requestedCredentialIds(): List<TransactionDataCredentialId> =
-            when (this) {
-                is PresentationQuery.ByPresentationDefinition ->
-                    value.inputDescriptors.map { TransactionDataCredentialId(it.id.value) }
-
-                is PresentationQuery.ByDigitalCredentialsQuery ->
-                    value.credentials.map { TransactionDataCredentialId(it.id.value) }
-            }
+        private fun DCQL.requestedCredentialIds(): List<TransactionDataCredentialId> =
+            credentials.map { TransactionDataCredentialId(it.id.value) }
 
         internal operator fun invoke(
             type: TransactionDataType,
@@ -192,7 +188,7 @@ data class TransactionData private constructor(val value: String) : Serializable
         internal operator fun invoke(
             s: String,
             supportedTypes: List<SupportedTransactionDataType>,
-            query: PresentationQuery,
+            query: DCQL,
         ): Result<TransactionData> = runCatching {
             parse(s).getOrThrow().also {
                 it.isSupported(supportedTypes)
@@ -245,10 +241,9 @@ sealed interface ResolvedRequestObject : Serializable {
     val nonce: String
 
     /**
-     * The verifier's requirements, if any, for encrypting and/or signing the authorization
-     * response using JARM.
+     * The verifier's requirements, if any, for encrypting  the authorization response.
      */
-    val jarmRequirement: JarmRequirement?
+    val responseEncryptionSpecification: ResponseEncryptionSpecification?
 
     /**
      * SIOPv2 Authentication request for issuing an id_token
@@ -258,7 +253,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val jarmRequirement: JarmRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
@@ -276,9 +271,9 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val jarmRequirement: JarmRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val vpFormats: VpFormats?,
-        val presentationQuery: PresentationQuery,
+        val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
@@ -295,12 +290,12 @@ sealed interface ResolvedRequestObject : Serializable {
         override val responseMode: ResponseMode,
         override val state: String?,
         override val nonce: String,
-        override val jarmRequirement: JarmRequirement?,
+        override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
         val vpFormats: VpFormats?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
-        val presentationQuery: PresentationQuery,
+        val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
     ) : ResolvedRequestObject
@@ -364,13 +359,6 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = InvalidClientId
     }
 
-    data class InvalidPresentationDefinition(val cause: Throwable) : RequestValidationError
-
-    data object InvalidPresentationDefinitionUri : RequestValidationError {
-        @Suppress("unused")
-        private fun readResolve(): Any = InvalidPresentationDefinitionUri
-    }
-
     data class InvalidDigitalCredentialsQuery(val cause: Throwable) : RequestValidationError
 
     data object InvalidRedirectUri : RequestValidationError {
@@ -418,9 +406,9 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = MissingClientId
     }
 
-    data object UnsupportedClientIdScheme : RequestValidationError {
+    data object UnsupportedClientIdPrefix : RequestValidationError {
         @Suppress("unused")
-        private fun readResolve(): Any = UnsupportedClientIdScheme
+        private fun readResolve(): Any = UnsupportedClientIdPrefix
     }
 
     data class UnsupportedClientMetaData(val value: String) : RequestValidationError
@@ -457,7 +445,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
         private fun readResolve(): Any = IdTokenEncryptionMethodMissing
     }
 
-    data class InvalidClientIdScheme(val value: String) : RequestValidationError
+    data class InvalidClientIdPrefix(val value: String) : RequestValidationError
 
     data class InvalidIdTokenType(val value: String) : RequestValidationError
 
@@ -470,20 +458,10 @@ sealed interface RequestValidationError : AuthorizationRequestError {
  * Errors that can occur while resolving an authorization request
  */
 sealed interface ResolutionError : AuthorizationRequestError {
-    data class UnknownScope(val scope: Scope) :
-        ResolutionError
-
-    data object FetchingPresentationDefinitionNotSupported : ResolutionError {
-        @Suppress("unused")
-        private fun readResolve(): Any = FetchingPresentationDefinitionNotSupported
-    }
-
-    data class UnableToFetchPresentationDefinition(val cause: Throwable) : ResolutionError
+    data class UnknownScope(val scope: Scope) : ResolutionError
     data class UnableToFetchRequestObject(val cause: Throwable) : ResolutionError
     data class ClientMetadataJwksUnparsable(val cause: Throwable) : ResolutionError
-    data class ClientMetadataJwkResolutionFailed(val cause: Throwable) : ResolutionError
     data class InvalidTransactionData(val cause: Throwable) : ResolutionError
-
     data object ClientVpFormatsNotSupportedFromWallet : ResolutionError {
         @Suppress("unused")
         private fun readResolve(): Any = ClientVpFormatsNotSupportedFromWallet
@@ -544,7 +522,7 @@ data class ErrorDispatchDetails(
     val nonce: String?,
     val state: String?,
     val clientId: VerifierId?,
-    val jarmRequirement: JarmRequirement?,
+    val responseEncryptionSpecification: ResponseEncryptionSpecification?,
 ) : Serializable {
     companion object
 }
@@ -561,13 +539,4 @@ fun interface AuthorizationRequestResolver {
      * Tries to validate and request the provided [uri] into a [ResolvedRequestObject].
      */
     suspend fun resolveRequestUri(uri: String): Resolution
-}
-
-sealed interface PresentationQuery {
-
-    @JvmInline
-    value class ByPresentationDefinition(val value: PresentationDefinition) : PresentationQuery
-
-    @JvmInline
-    value class ByDigitalCredentialsQuery(val value: DCQL) : PresentationQuery
 }

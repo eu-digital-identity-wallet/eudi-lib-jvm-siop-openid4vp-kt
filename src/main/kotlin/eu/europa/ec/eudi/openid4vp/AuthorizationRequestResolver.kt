@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import com.nimbusds.jose.JWSAlgorithm
 import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
 import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.hashAlgorithms
@@ -227,6 +228,62 @@ value class VerifierAttestations(val value: List<Attestation>) : Serializable {
     }
 }
 
+sealed interface RequestedVpFormat : Serializable {
+
+    data class SdJwtVc(
+        val sdJwtAlgorithms: Set<JWSAlgorithm>? = null,
+        val kbJwtAlgorithms: Set<JWSAlgorithm>? = null,
+    ) : RequestedVpFormat {
+        init {
+            if (null != sdJwtAlgorithms) {
+                require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
+                require(sdJwtAlgorithms.all { it.isSignature && it.isFullySpecified }) {
+                    "SD-JWT algorithms must be fully specified signature algorithms"
+                }
+            }
+
+            if (null != kbJwtAlgorithms) {
+                require(kbJwtAlgorithms.isNotEmpty()) { "KeyBinding-JWT algorithms cannot be empty" }
+                require(kbJwtAlgorithms.all { it.isSignature && it.isFullySpecified }) {
+                    "KeyBinding-JWT algorithms must be fully specified signature algorithms"
+                }
+            }
+        }
+    }
+
+    data class MsoMdoc(
+        val issuerAuthAlgorithms: Set<CoseAlgorithm>? = null,
+        val deviceAuthAlgorithms: Set<CoseAlgorithm>? = null,
+    ) : RequestedVpFormat {
+        init {
+            if (null != issuerAuthAlgorithms) {
+                require(issuerAuthAlgorithms.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
+            }
+
+            if (null != deviceAuthAlgorithms) {
+                require(deviceAuthAlgorithms.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
+            }
+        }
+    }
+
+    companion object {
+        operator fun invoke(
+            sdJwtAlgorithms: Set<JWSAlgorithm>? = null,
+            kbJwtAlgorithms: Set<JWSAlgorithm>? = null,
+        ): SdJwtVc = SdJwtVc(sdJwtAlgorithms = sdJwtAlgorithms, kbJwtAlgorithms = kbJwtAlgorithms)
+
+        operator fun invoke(
+            issuerAuthAlgorithms: Set<CoseAlgorithm>? = null,
+            deviceAuthAlgorithms: Set<CoseAlgorithm>? = null,
+        ): MsoMdoc = MsoMdoc(issuerAuthAlgorithms = issuerAuthAlgorithms, deviceAuthAlgorithms = deviceAuthAlgorithms)
+    }
+}
+
+data class RequestedVpFormats(
+    val sdJwtVc: RequestedVpFormat.SdJwtVc? = null,
+    val msoMdoc: RequestedVpFormat.MsoMdoc? = null,
+) : Serializable
+
 /**
  * Represents an OAUTH2 authorization request. In particular
  * either a [SIOPv2 for id_token][SiopOpenId4VPAuthentication] or
@@ -262,9 +319,9 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * OpenId4VP Authorization request for presenting a vp_token
      *
-     * @param vpFormats Populated when client metadata are provided along with the request or null otherwise. It is the list of formats
-     *   that both wallet and requester support. It is calculated by comparing wallet's configuration (@see [SiopOpenId4VPConfig].vpConfiguration)
-     *   and the formats passed in request's client metadata.
+     * @param requestedVpFormats Populated when client metadata are provided along with the request. It contains the formats
+     *   that both wallet and requester support. It is calculated by comparing wallet's configuration
+     *   (@see [SiopOpenId4VPConfig].vpConfiguration)and the formats passed in request's client metadata.
      */
     data class OpenId4VPAuthorization(
         override val client: Client,
@@ -272,7 +329,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
-        val vpFormats: VpFormats?,
+        val requestedVpFormats: RequestedVpFormats?,
         val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
@@ -281,9 +338,9 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * OpenId4VP combined with SIOPv2 request for presenting an id_token & vp_token
      *
-     * @param vpFormats Populated when client metadata are provided along with the request or null otherwise. It is the list of formats
-     *   that both wallet and requester support. It is calculated by comparing wallet's configuration (@see [SiopOpenId4VPConfig].vpConfiguration)
-     *   and the formats passed in request's client metadata.
+     * @param requestedVpFormats Populated when client metadata are provided along with the request. It contains the formats
+     *   that both wallet and requester support. It is calculated by comparing wallet's configuration
+     *   (@see [SiopOpenId4VPConfig].vpConfiguration) and the formats passed in request's client metadata.
      */
     data class SiopOpenId4VPAuthentication(
         override val client: Client,
@@ -291,7 +348,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
-        val vpFormats: VpFormats?,
+        val requestedVpFormats: RequestedVpFormats?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,

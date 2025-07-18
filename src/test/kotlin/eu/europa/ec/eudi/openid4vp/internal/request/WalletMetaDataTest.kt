@@ -35,9 +35,9 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormat.SdJwtVc.ES256,
-                    VpFormat.MsoMdoc.ES256,
+                supportedVpFormats = SupportedVpFormats(
+                    SupportedVpFormat.SdJwtVc.ES256,
+                    SupportedVpFormat.MsoMdoc.ES256,
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -59,9 +59,9 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormat.SdJwtVc.ES256,
-                    VpFormat.MsoMdoc.ES256,
+                supportedVpFormats = SupportedVpFormats(
+                    SupportedVpFormat.SdJwtVc.ES256,
+                    SupportedVpFormat.MsoMdoc.ES256,
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -88,7 +88,7 @@ private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
             println(jsonSupport.encodeToString(it))
         }
 
-    assertExpectedVpFormats(config.vpConfiguration.vpFormats, walletMetaData)
+    assertExpectedVpFormats(config.vpConfiguration.supportedVpFormats, walletMetaData)
     assertClientIdPrefix(config.supportedClientIdPrefixes, walletMetaData)
     assertPresentationDefinitionUriSupported(walletMetaData)
     assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
@@ -161,7 +161,7 @@ private fun assertClientIdPrefix(
 }
 
 private fun assertExpectedVpFormats(
-    expectedVpFormats: VpFormats,
+    expectedVpFormats: SupportedVpFormats,
     walletMetaData: JsonObject,
 ) {
     val vpFormats = assertIs<JsonObject>(

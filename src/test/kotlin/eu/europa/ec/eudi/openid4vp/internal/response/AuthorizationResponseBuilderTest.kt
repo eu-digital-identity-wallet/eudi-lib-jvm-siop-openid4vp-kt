@@ -30,8 +30,8 @@ import eu.europa.ec.eudi.openid4vp.dcql.CredentialQuery
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
+import eu.europa.ec.eudi.openid4vp.internal.request.SupportedVpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -55,7 +55,7 @@ class AuthorizationResponseBuilderTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -75,16 +75,16 @@ class AuthorizationResponseBuilderTest {
                 "did:example",
                 "did:key",
             ),
-            vpFormats = VpFormatsTO.make(
-                VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+            vpFormatsSupported = SupportedVpFormatsTO.make(
+                SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
             ),
         )
 
         val metaDataRequestingEncryptedResponse = UnvalidatedClientMetaData(
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
-            vpFormats = VpFormatsTO.make(
-                VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+            vpFormatsSupported = SupportedVpFormatsTO.make(
+                SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
             ),
         )
 
@@ -165,7 +165,14 @@ class AuthorizationResponseBuilderTest {
                             ),
                         ),
                     responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
-                    vpFormats = VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                    requestedVpFormats = with(SupportedVpFormat.MsoMdoc.ES256) {
+                        RequestedVpFormats(
+                            msoMdoc = RequestedVpFormat(
+                                issuerAuthAlgorithms = issuerAuthAlgorithms,
+                                deviceAuthAlgorithms = deviceAuthAlgorithms,
+                            ),
+                        )
+                    },
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,

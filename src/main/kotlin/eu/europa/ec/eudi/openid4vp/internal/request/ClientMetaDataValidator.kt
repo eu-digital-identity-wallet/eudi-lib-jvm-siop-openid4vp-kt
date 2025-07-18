@@ -147,9 +147,9 @@ private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMet
     return encryptionMethods?.toSet()
 }
 
-private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
+private fun vpFormats(unvalidated: UnvalidatedClientMetaData): RequestedVpFormats =
     try {
-        unvalidated.vpFormats.toDomain()
+        unvalidated.vpFormatsSupported.toDomain()
     } catch (_: IllegalArgumentException) {
         throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
     }

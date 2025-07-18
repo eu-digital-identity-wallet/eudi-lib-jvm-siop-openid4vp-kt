@@ -248,6 +248,18 @@ sealed interface SupportedVpFormat : java.io.Serializable {
                     )
         }
     }
+
+    companion object {
+        operator fun invoke(
+            sdJwtAlgorithms: Set<JWSAlgorithm>,
+            kbJwtAlgorithms: Set<JWSAlgorithm>,
+        ): SdJwtVc = SdJwtVc(sdJwtAlgorithms = sdJwtAlgorithms, kbJwtAlgorithms = kbJwtAlgorithms)
+
+        operator fun invoke(
+            issuerAuthAlgorithms: Set<CoseAlgorithm>,
+            deviceAuthAlgorithms: Set<CoseAlgorithm>,
+        ): MsoMdoc = MsoMdoc(issuerAuthAlgorithms = issuerAuthAlgorithms, deviceAuthAlgorithms = deviceAuthAlgorithms)
+    }
 }
 
 data class SupportedVpFormats(

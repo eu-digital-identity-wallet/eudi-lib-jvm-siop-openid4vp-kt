@@ -25,6 +25,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
+import kotlinx.serialization.serializer
 
 internal object RFC7515Spec {
 
@@ -148,3 +149,10 @@ internal object Base64UrlNoPaddingSerializer : KSerializer<Base64UrlNoPadding> {
     override fun serialize(encoder: Encoder, value: Base64UrlNoPadding) =
         encoder.encodeString(value.toString())
 }
+
+internal inline fun <reified T> Base64UrlNoPadding.decodeAs(): T =
+    jsonSupport.decodeFromString(
+        base64UrlNoPadding.decode(value).decodeToString(),
+    )
+
+internal inline fun <reified T> JwsJson.decodePayloadAs(): T = payload.decodeAs()

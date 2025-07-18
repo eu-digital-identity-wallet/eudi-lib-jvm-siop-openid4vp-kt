@@ -43,14 +43,20 @@ private fun responseWith(
         is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(
             mode.responseURI,
             data,
-            checkNotNull(di.responseEncryptionSpecification),
+            di.responseEncryptionSpecification,
         )
+
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
         is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(
             mode.redirectUri,
             data,
-            checkNotNull(di.responseEncryptionSpecification),
+            di.responseEncryptionSpecification,
         )
+
         is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, checkNotNull(di.responseEncryptionSpecification))
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(
+            mode.redirectUri,
+            data,
+            di.responseEncryptionSpecification,
+        )
     }

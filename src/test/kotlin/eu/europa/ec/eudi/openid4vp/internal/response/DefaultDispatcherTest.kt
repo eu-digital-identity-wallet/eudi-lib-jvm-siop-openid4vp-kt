@@ -365,6 +365,40 @@ class DefaultDispatcherTest {
             )
         }
 
+        @Test
+        fun `unencrypted errors are sent when using direct_post_jwt`() = runTest {
+            val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
+            val error = ResolutionError.UnknownScope(Scope.OpenId)
+            val state = genState()
+            val errorDispatchDetails = ErrorDispatchDetails(
+                responseMode,
+                "nonce",
+                state,
+                VerifierId.parse("pre-registered").getOrThrow(),
+                responseEncryptionSpecification = null,
+            )
+
+            val errorDispatcher: ErrorDispatcher = DefaultDispatcher {
+                val mockEngine = MockEngine { request ->
+                    val body = assertIs<FormData>(request.body)
+                    assertNull(body.formData["response"])
+                    assertEquals("invalid_scope", body.formData["error"])
+                    assertEquals("UnknownScope(scope=Scope(value=openid))", body.formData["error_description"])
+                    assertEquals(state, body.formData["state"])
+                    respondOk()
+                }
+                HttpClient(mockEngine)
+            }
+
+            val dispatchOutcome = errorDispatcher.dispatchError(
+                error,
+                errorDispatchDetails,
+                encryptionParameters = EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+            )
+            assertIs<DispatchOutcome.VerifierResponse.Accepted>(dispatchOutcome)
+            assertNull(dispatchOutcome.redirectURI)
+        }
+
         private fun vpTokenWithMultipleMixedPresentations(): VerifiablePresentations =
             VerifiablePresentations(
                 mapOf(
@@ -674,6 +708,29 @@ class DefaultDispatcherTest {
             test {}
         }
 
+        @Test
+        fun `unencrypted errors are sent when using query_jwt`() {
+            fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
+                val data =
+                    AuthorizationResponsePayload.InvalidRequest(
+                        MissingNonce,
+                        generateNonce(),
+                        state,
+                        VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
+                    )
+                val response = AuthorizationResponse.QueryJwt(redirectUriBase, data, responseEncryptionSpecification = null)
+                val redirectURI = response.encodeRedirectURI()
+
+                redirectURI.asserter {
+                    val expectedErrorCode = AuthorizationRequestErrorCode.fromError(data.error)
+                    assertEquals(expectedErrorCode.code, getQueryParameter("error"))
+                }
+            }
+
+            genState().let { state -> test(state) { assertQueryURIContainsStateAnd(state, it) } }
+            test { assertQueryURIDoesNotContainStateAnd(it) }
+        }
+
         private fun URI.assertQueryURIContainsStateAnd(expectedState: String, assertions: URI.() -> Unit) {
             assertQueryURI {
                 assertions(this)
@@ -863,6 +920,29 @@ class DefaultDispatcherTest {
 
             test(genState()) {}
             test {}
+        }
+
+        @Test
+        fun `unencrypted errors are sent when using fragment_jwt`() {
+            fun test(state: String? = null, asserter: URI.((Map<String, String>) -> Unit) -> Unit) {
+                val data =
+                    AuthorizationResponsePayload.InvalidRequest(
+                        MissingNonce,
+                        generateNonce(),
+                        state,
+                        VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
+                    )
+                val response = AuthorizationResponse.FragmentJwt(redirectUriBase, data, responseEncryptionSpecification = null)
+
+                response.encodeRedirectURI()
+                    .asserter { fragmentData ->
+                        val expectedErrorCode = AuthorizationRequestErrorCode.fromError(data.error)
+                        assertEquals(expectedErrorCode.code, fragmentData["error"])
+                    }
+            }
+
+            genState().let { state -> test(state) { assertFragmentURIContainsStateAnd(state, it) } }
+            test { assertFragmentURIDoesNotContainStateAnd(it) }
         }
 
         private fun URI.assertFragmentURIContainsStateAnd(

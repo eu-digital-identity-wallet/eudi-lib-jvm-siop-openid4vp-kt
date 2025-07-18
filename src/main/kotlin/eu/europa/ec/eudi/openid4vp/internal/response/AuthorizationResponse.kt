@@ -137,8 +137,14 @@ internal sealed interface AuthorizationResponse : Serializable {
     data class DirectPostJwt(
         val responseUri: URL,
         val data: AuthorizationResponsePayload,
-        val responseEncryptionSpecification: ResponseEncryptionSpecification,
-    ) : AuthorizationResponse
+        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    ) : AuthorizationResponse {
+        init {
+            if (data !is AuthorizationResponsePayload.InvalidRequest) {
+                requireNotNull(responseEncryptionSpecification)
+            }
+        }
+    }
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
@@ -161,8 +167,14 @@ internal sealed interface AuthorizationResponse : Serializable {
     data class QueryJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val responseEncryptionSpecification: ResponseEncryptionSpecification,
-    ) : AuthorizationResponse
+        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    ) : AuthorizationResponse {
+        init {
+            if (data !is AuthorizationResponsePayload.InvalidRequest) {
+                requireNotNull(responseEncryptionSpecification)
+            }
+        }
+    }
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
@@ -185,8 +197,14 @@ internal sealed interface AuthorizationResponse : Serializable {
     data class FragmentJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val responseEncryptionSpecification: ResponseEncryptionSpecification,
-    ) : AuthorizationResponse
+        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    ) : AuthorizationResponse {
+        init {
+            if (data !is AuthorizationResponsePayload.InvalidRequest) {
+                requireNotNull(responseEncryptionSpecification)
+            }
+        }
+    }
 }
 
 internal fun ResolvedRequestObject.responseWith(

@@ -21,6 +21,7 @@ import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.JwsJson
 import eu.europa.ec.eudi.openid4vp.internal.JwsJson.Companion.flatten
+import eu.europa.ec.eudi.openid4vp.internal.decodePayloadAs
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecured.PassByReference
@@ -260,7 +261,7 @@ private fun dispatchDetailsOrNull(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? =
     when (fetchedRequest) {
-        is ReceivedRequest.Signed -> fetchedRequest.toSignedJwts().firstOrNull()?.jwtClaimsSet?.dispatchDetailsOrNull()
+        is ReceivedRequest.Signed -> dispatchDetailsOrNull(fetchedRequest.jwsJson, siopOpenId4VPConfig)
         is ReceivedRequest.Unsigned -> dispatchDetailsOrNull(fetchedRequest.requestObject, siopOpenId4VPConfig)
     }
 
@@ -340,19 +341,15 @@ private fun JWTClaimsSet.responseMode(): ResponseMode? =
         }
     }.getOrNull()
 
-private fun JWTClaimsSet.dispatchDetailsOrNull(): ErrorDispatchDetails? =
+private fun dispatchDetailsOrNull(
+    jwsJson: JwsJson,
+    siopOpenId4VPConfig: SiopOpenId4VPConfig,
+): ErrorDispatchDetails? =
     runCatching {
-        responseMode()
-            ?.takeIf { !it.requiresEncryption() }
-            ?.let { responseMode ->
-                ErrorDispatchDetails(
-                    responseMode = responseMode,
-                    nonce = getStringClaim("nonce"),
-                    state = getStringClaim("state"),
-                    clientId = getStringClaim("client_id")?.let { VerifierId.parse(it).getOrNull() },
-                    responseEncryptionSpecification = null,
-                )
-            }
+        dispatchDetailsOrNull(
+            jwsJson.decodePayloadAs<UnvalidatedRequestObject>(),
+            siopOpenId4VPConfig,
+        )
     }.getOrNull()
 
 private fun URI.toKtorUrl(): Url = URLBuilder().takeFrom(this.toString()).build()

@@ -71,6 +71,11 @@ object OpenId4VPSpec {
     const val JWKS: String = "jwks"
     const val RESPONSE_ENCRYPTION_METHODS_SUPPORTED: String = "encrypted_response_enc_values_supported"
     const val RESPONSE_ENCRYPTION_METHODS_SUPPORTED_DEFAULT: String = "A128GCM"
+
+    const val SD_JWT_VC_SD_JWT_ALGORITHMS: String = "sd-jwt_alg_values"
+    const val SD_JWT_VC_KB_JWT_ALGORITHMS: String = "kb-jwt_alg_values"
+    const val MSO_MDOC_ISSUERAUTH_ALGORITHMS: String = "issuerauth_alg_values"
+    const val MSO_MDOC_DEVICEAUTH_ALGORITHMS: String = "deviceauth_alg_values"
 }
 
 object SIOPv2

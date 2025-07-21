@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:UseSerializers(JWSAlgorithmSerializer::class)
+
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.EncryptionMethod
@@ -23,6 +25,7 @@ import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.JWSAlgorithmSerializer
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.net.URI
@@ -338,16 +341,10 @@ data class VpFormatsSupported(
     @kotlinx.serialization.Serializable
     data class SdJwtVc(
         @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS)
-        val sdJwtAlgorithms: List<
-            @kotlinx.serialization.Serializable(JWSAlgorithmSerializer::class)
-            JWSAlgorithm,
-            >?,
+        val sdJwtAlgorithms: List<JWSAlgorithm>?,
 
         @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS)
-        val kbJwtAlgorithms: List<
-            @kotlinx.serialization.Serializable(JWSAlgorithmSerializer::class)
-            JWSAlgorithm,
-            >?,
+        val kbJwtAlgorithms: List<JWSAlgorithm>?,
 
     ) : Serializable {
         init {

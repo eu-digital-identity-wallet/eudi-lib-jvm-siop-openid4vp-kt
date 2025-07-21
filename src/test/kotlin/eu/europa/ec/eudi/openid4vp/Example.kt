@@ -449,9 +449,9 @@ private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
 private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix) =
     SiopOpenId4VPConfig(
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(
-                VpFormats.SdJwtVc.HAIP,
-                VpFormats.MsoMdoc(
+            vpFormatsSupported = VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc.HAIP,
+                VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),

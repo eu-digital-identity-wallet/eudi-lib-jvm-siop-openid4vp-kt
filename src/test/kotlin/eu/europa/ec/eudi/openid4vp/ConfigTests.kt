@@ -24,9 +24,9 @@ class ConfigTests {
     @Test
     fun `SupportedVpFormats requires at least one SupportedVpFormat`() {
         assertDoesNotThrow {
-            VpFormats(
+            VpFormatsSupported(
                 null,
-                VpFormats.MsoMdoc(
+                VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),
@@ -34,13 +34,13 @@ class ConfigTests {
         }
 
         assertDoesNotThrow {
-            VpFormats(VpFormats.SdJwtVc.HAIP, null)
+            VpFormatsSupported(VpFormatsSupported.SdJwtVc.HAIP, null)
         }
 
         assertDoesNotThrow {
-            VpFormats(
-                VpFormats.SdJwtVc.HAIP,
-                VpFormats.MsoMdoc(
+            VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc.HAIP,
+                VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),
@@ -48,7 +48,7 @@ class ConfigTests {
         }
 
         assertFailsWith<IllegalArgumentException> {
-            VpFormats(null, null)
+            VpFormatsSupported(null, null)
         }
     }
 }

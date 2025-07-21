@@ -62,8 +62,7 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         // OpenIdVP
         //
-        val vpFormats = jsonSupport.encodeToJsonElement(VpFormatsTO.make(cfg.vpConfiguration.vpFormats))
-        put(OpenId4VPSpec.VP_FORMATS_SUPPORTED, vpFormats)
+        put(OpenId4VPSpec.VP_FORMATS_SUPPORTED, jsonSupport.encodeToJsonElement(cfg.vpConfiguration.vpFormatsSupported))
         putJsonArray(OpenId4VPSpec.CLIENT_ID_PREFIXES_SUPPORTED) {
             cfg.supportedClientIdPrefixes.forEach { supportedClientIdPrefix ->
                 add(supportedClientIdPrefix.prefix().value())

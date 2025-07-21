@@ -33,7 +33,6 @@ import eu.europa.ec.eudi.openid4vp.dcql.*
 import eu.europa.ec.eudi.openid4vp.dcql.ClaimPathElement.Claim
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier.assertIsJwtEncryptedWithVerifiersPublicKey
 import io.ktor.client.*
@@ -72,12 +71,10 @@ class DefaultDispatcherTest {
         val metaDataRequestingEncryptedResponse = UnvalidatedClientMetaData(
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
-            vpFormatsSupported = VpFormatsTO.make(
-                VpFormats(
-                    msoMdoc = VpFormats.MsoMdoc(
-                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                    ),
+            vpFormatsSupported = VpFormatsSupported(
+                msoMdoc = VpFormatsSupported.MsoMdoc(
+                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),
             ),
         )
@@ -115,8 +112,8 @@ class DefaultDispatcherTest {
                         ),
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                vpFormats = VpFormats(
-                    msoMdoc = VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    msoMdoc = VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),
@@ -143,9 +140,9 @@ class DefaultDispatcherTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormats.SdJwtVc.HAIP,
-                    VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),
@@ -477,8 +474,8 @@ class DefaultDispatcherTest {
                         ),
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                vpFormats = VpFormats(
-                    msoMdoc = VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    msoMdoc = VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),
@@ -509,8 +506,8 @@ class DefaultDispatcherTest {
                 state = genState(),
                 nonce = "0S6_WzA2Mj",
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
-                vpFormats = VpFormats(
-                    msoMdoc = VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    msoMdoc = VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),

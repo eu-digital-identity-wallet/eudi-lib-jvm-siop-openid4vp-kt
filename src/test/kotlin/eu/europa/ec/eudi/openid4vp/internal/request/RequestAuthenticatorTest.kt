@@ -52,9 +52,9 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormats.SdJwtVc.HAIP,
-                    VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),
@@ -94,9 +94,9 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormats.SdJwtVc.HAIP,
-                    VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),
@@ -145,9 +145,9 @@ class ClientAuthenticatorTest {
                 },
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormats.SdJwtVc.HAIP,
-                    VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),
@@ -256,9 +256,9 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.VerifierAttestation(AttestationIssuer.verifier),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormats.SdJwtVc.HAIP,
-                    VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),

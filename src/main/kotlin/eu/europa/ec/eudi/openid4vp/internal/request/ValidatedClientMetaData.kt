@@ -29,74 +29,11 @@ internal data class UnvalidatedClientMetaData(
     @SerialName(OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED)
     val responseEncryptionMethodsSupported: List<String>? = null,
 
-    @SerialName(OpenId4VPSpec.VP_FORMATS_SUPPORTED) @Required val vpFormatsSupported: VpFormatsTO,
+    @SerialName(OpenId4VPSpec.VP_FORMATS_SUPPORTED) @Required val vpFormatsSupported: VpFormatsSupported,
 )
-
-@Serializable
-internal class VpFormatsTO(
-    @SerialName(OpenId4VPSpec.FORMAT_SD_JWT_VC) val sdJwtVc: SdVcJwtTO? = null,
-    @SerialName(OpenId4VPSpec.FORMAT_MSO_MDOC) val msoMdoc: MsoMdocTO? = null,
-) {
-    fun toDomain(): VpFormats =
-        VpFormats(
-            sdJwtVc = sdJwtVc?.toDomain(),
-            msoMdoc = msoMdoc?.toDomain(),
-        )
-
-    companion object {
-        fun make(fs: VpFormats): VpFormatsTO {
-            return VpFormatsTO(
-                sdJwtVc = fs.sdJwtVc?.let { SdVcJwtTO.make(it) },
-                msoMdoc = fs.msoMdoc?.let { MsoMdocTO.make(it) },
-            )
-        }
-    }
-}
-
-@Serializable
-internal class SdVcJwtTO(
-    @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS) val sdJwtAlgorithms: List<String>? = null,
-    @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS) val kdJwtAlgorithms: List<String>? = null,
-) {
-    fun toDomain(): VpFormats.SdJwtVc =
-        VpFormats.SdJwtVc(
-            sdJwtAlgorithms = sdJwtAlgorithms?.map(FullySpecifiedJoseSigningAlgorithm::parse),
-            kbJwtAlgorithms = kdJwtAlgorithms?.map(FullySpecifiedJoseSigningAlgorithm::parse),
-        )
-
-    companion object {
-        fun make(f: VpFormats.SdJwtVc): SdVcJwtTO {
-            return SdVcJwtTO(
-                sdJwtAlgorithms = f.sdJwtAlgorithms?.map { it.name },
-                kdJwtAlgorithms = f.kbJwtAlgorithms?.map { it.name },
-            )
-        }
-    }
-}
-
-@Serializable
-internal class MsoMdocTO(
-    @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<CoseAlgorithm>? = null,
-    @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<CoseAlgorithm>? = null,
-) {
-    fun toDomain(): VpFormats.MsoMdoc =
-        VpFormats.MsoMdoc(
-            issuerAuthAlgorithms = issuerAuthAlgorithms,
-            deviceAuthAlgorithms = deviceAuthAlgorithms,
-        )
-
-    companion object {
-        fun make(f: VpFormats.MsoMdoc): MsoMdocTO {
-            return MsoMdocTO(
-                issuerAuthAlgorithms = f.issuerAuthAlgorithms,
-                deviceAuthAlgorithms = f.deviceAuthAlgorithms,
-            )
-        }
-    }
-}
 
 internal data class ValidatedClientMetaData(
     val responseEncryptionSpecification: ResponseEncryptionSpecification? = null,
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType> = emptyList(),
-    val vpFormats: VpFormats,
+    val vpFormatsSupported: VpFormatsSupported,
 )

@@ -21,6 +21,8 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
+import eu.europa.ec.eudi.openid4vp.internal.JWSAlgorithmSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.net.URI
@@ -314,42 +316,73 @@ value class TransactionDataCredentialId(val value: String) : Serializable {
 }
 
 @JvmInline
-value class FullySpecifiedJoseSigningAlgorithm(val value: JWSAlgorithm) : Serializable {
-    init {
-        require(value in JWSAlgorithm.Family.SIGNATURE) { "value must be a signature algorithm" }
-        require(value in FullySpecifiedJwsAlgorithms) { "value must be a fully specified signature algorithm" }
-    }
-
-    val name: String
-        get() = value.name
-
-    companion object {
-        fun parse(value: String): FullySpecifiedJoseSigningAlgorithm = FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.parse(value))
-
-        val FullySpecifiedJwsAlgorithms: Set<JWSAlgorithm> by lazy {
-            setOf(
-                JWSAlgorithm.HS256,
-                JWSAlgorithm.HS384,
-                JWSAlgorithm.HS512,
-                JWSAlgorithm.RS256,
-                JWSAlgorithm.RS384,
-                JWSAlgorithm.RS512,
-                JWSAlgorithm.ES256,
-                JWSAlgorithm.ES256K,
-                JWSAlgorithm.ES384,
-                JWSAlgorithm.ES512,
-                JWSAlgorithm.PS256,
-                JWSAlgorithm.PS384,
-                JWSAlgorithm.PS512,
-                JWSAlgorithm.Ed25519,
-                JWSAlgorithm.Ed448,
-            )
-        }
-    }
-}
-
-@JvmInline
 @kotlinx.serialization.Serializable
 value class CoseAlgorithm(val value: Int) : Serializable {
     override fun toString(): String = value.toString()
+}
+
+@kotlinx.serialization.Serializable
+data class VpFormatsSupported(
+    @SerialName(OpenId4VPSpec.FORMAT_SD_JWT_VC) val sdJwtVc: SdJwtVc? = null,
+    @SerialName(OpenId4VPSpec.FORMAT_MSO_MDOC) val msoMdoc: MsoMdoc? = null,
+) : Serializable {
+
+    init {
+        require(null != sdJwtVc || null != msoMdoc) {
+            "At least one format must be specified."
+        }
+    }
+
+    companion object
+
+    @kotlinx.serialization.Serializable
+    data class SdJwtVc(
+        @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS)
+        val sdJwtAlgorithms: List<
+            @kotlinx.serialization.Serializable(JWSAlgorithmSerializer::class)
+            JWSAlgorithm,
+            >?,
+
+        @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS)
+        val kbJwtAlgorithms: List<
+            @kotlinx.serialization.Serializable(JWSAlgorithmSerializer::class)
+            JWSAlgorithm,
+            >?,
+
+    ) : Serializable {
+        init {
+            sdJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
+            }
+            kbJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "KeyBinding-JWT algorithms cannot be empty" }
+            }
+        }
+
+        companion object {
+            val HAIP: SdJwtVc
+                get() =
+                    SdJwtVc(
+                        sdJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+                        kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+                    )
+        }
+    }
+
+    @kotlinx.serialization.Serializable
+    data class MsoMdoc(
+        @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<CoseAlgorithm>?,
+        @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<CoseAlgorithm>?,
+    ) : Serializable {
+        init {
+            issuerAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
+            }
+            deviceAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
+            }
+        }
+
+        companion object
+    }
 }

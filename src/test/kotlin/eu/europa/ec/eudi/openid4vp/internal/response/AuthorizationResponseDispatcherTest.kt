@@ -63,9 +63,9 @@ class AuthorizationResponseDispatcherTest {
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(
-                VpFormats.SdJwtVc.HAIP,
-                VpFormats.MsoMdoc(
+            vpFormatsSupported = VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc.HAIP,
+                VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),
@@ -213,8 +213,8 @@ class AuthorizationResponseDispatcherTest {
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     responseEncryptionSpecification = validated.responseEncryptionSpecification,
-                    vpFormats = VpFormats(
-                        msoMdoc = VpFormats.MsoMdoc(
+                    vpFormatsSupported = VpFormatsSupported(
+                        msoMdoc = VpFormatsSupported.MsoMdoc(
                             issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                             deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         ),

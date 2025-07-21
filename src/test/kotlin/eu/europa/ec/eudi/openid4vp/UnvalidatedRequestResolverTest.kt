@@ -34,7 +34,6 @@ import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -143,20 +142,20 @@ class UnvalidatedRequestResolverTest {
             supportedAlgorithms = listOf(JWSAlgorithm.RS256),
         ),
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(
-                VpFormats.SdJwtVc(
+            vpFormatsSupported = VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc(
                     sdJwtAlgorithms = listOf(
-                        FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES512),
-                        FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES256),
-                        FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.RS256),
+                        JWSAlgorithm.ES512,
+                        JWSAlgorithm.ES256,
+                        JWSAlgorithm.RS256,
                     ),
                     kbJwtAlgorithms = listOf(
-                        FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES512),
-                        FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES256),
-                        FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.RS256),
+                        JWSAlgorithm.ES512,
+                        JWSAlgorithm.ES256,
+                        JWSAlgorithm.RS256,
                     ),
                 ),
-                VpFormats.MsoMdoc(
+                VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),
@@ -293,14 +292,12 @@ class UnvalidatedRequestResolverTest {
                     "did:example",
                     "did:key",
                 ),
-                vpFormatsSupported = VpFormatsTO.make(
-                    VpFormats(
-                        msoMdoc =
-                            VpFormats.MsoMdoc(
-                                issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                                deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                            ),
-                    ),
+                vpFormatsSupported = VpFormatsSupported(
+                    msoMdoc =
+                        VpFormatsSupported.MsoMdoc(
+                            issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                            deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        ),
                 ),
             )
             val jwtClaimsSet = jwtClaimsSet(
@@ -350,14 +347,12 @@ class UnvalidatedRequestResolverTest {
                         "did:example",
                         "did:key",
                     ),
-                    vpFormatsSupported = VpFormatsTO.make(
-                        VpFormats(
-                            msoMdoc =
-                                VpFormats.MsoMdoc(
-                                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                                ),
-                        ),
+                    vpFormatsSupported = VpFormatsSupported(
+                        msoMdoc =
+                            VpFormatsSupported.MsoMdoc(
+                                issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                                deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                            ),
                     ),
                 ),
             )
@@ -401,14 +396,12 @@ class UnvalidatedRequestResolverTest {
                         "did:example",
                         "did:key",
                     ),
-                    vpFormatsSupported = VpFormatsTO.make(
-                        VpFormats(
-                            msoMdoc =
-                                VpFormats.MsoMdoc(
-                                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                                ),
-                        ),
+                    vpFormatsSupported = VpFormatsSupported(
+                        msoMdoc =
+                            VpFormatsSupported.MsoMdoc(
+                                issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                                deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                            ),
                     ),
                 ),
             )
@@ -515,10 +508,10 @@ class UnvalidatedRequestResolverTest {
 
         val resolution = resolver().resolveRequestUri(authRequest)
         with(resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()) {
-            with(assertNotNull(vpFormats)) {
+            with(assertNotNull(vpFormatsSupported)) {
                 assertNotNull(sdJwtVc)
-                assertEquals(listOf(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES512)), sdJwtVc.sdJwtAlgorithms)
-                assertEquals(listOf(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES512)), sdJwtVc.kbJwtAlgorithms)
+                assertEquals(listOf(JWSAlgorithm.ES512), sdJwtVc.sdJwtAlgorithms)
+                assertEquals(listOf(JWSAlgorithm.ES512), sdJwtVc.kbJwtAlgorithms)
                 assertNull(msoMdoc)
             }
         }
@@ -537,7 +530,7 @@ class UnvalidatedRequestResolverTest {
         val resolution = resolver().resolveRequestUri(authRequest)
         val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
 
-        assertNull(request.vpFormats)
+        assertNull(request.vpFormatsSupported)
     }
 
     @Test
@@ -567,19 +560,19 @@ class UnvalidatedRequestResolverTest {
 
         val resolution = resolver().resolveRequestUri(authRequest)
         val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
-        val formats = request.vpFormats
+        val formats = request.vpFormatsSupported
         val sdJwtFormat = assertNotNull(formats?.sdJwtVc)
 
         assertNotNull(sdJwtFormat.kbJwtAlgorithms)
         assertTrue { sdJwtFormat.kbJwtAlgorithms.size == 2 }
-        assertTrue { sdJwtFormat.kbJwtAlgorithms.contains(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES512)) }
-        assertTrue { sdJwtFormat.kbJwtAlgorithms.contains(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.RS256)) }
+        assertTrue { sdJwtFormat.kbJwtAlgorithms.contains(JWSAlgorithm.ES512) }
+        assertTrue { sdJwtFormat.kbJwtAlgorithms.contains(JWSAlgorithm.RS256) }
 
         assertNotNull(sdJwtFormat.sdJwtAlgorithms)
         assertTrue { sdJwtFormat.sdJwtAlgorithms.size == 3 }
-        assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES256)) }
-        assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES512)) }
-        assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.RS256)) }
+        assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(JWSAlgorithm.ES256) }
+        assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(JWSAlgorithm.ES512) }
+        assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(JWSAlgorithm.RS256) }
     }
 
     private fun createSignedRequestJwt(

@@ -196,9 +196,9 @@ private fun config(clientId: String, jarEncryptionRequirement: EncryptionRequire
             ),
         ),
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(
-                VpFormats.SdJwtVc.HAIP,
-                VpFormats.MsoMdoc(
+            vpFormatsSupported = VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc.HAIP,
+                VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),

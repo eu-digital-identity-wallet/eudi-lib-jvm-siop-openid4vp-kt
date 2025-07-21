@@ -71,12 +71,10 @@ internal object ClientMetaDataValidator {
                 )
             }
 
-        val vpFormats = vpFormats(unvalidated)
-
         return ValidatedClientMetaData(
             responseEncryptionSpecification = responseEncryptionSpecification,
             subjectSyntaxTypesSupported = types,
-            vpFormats = vpFormats,
+            vpFormatsSupported = unvalidated.vpFormatsSupported,
         )
     }
 }
@@ -146,13 +144,6 @@ private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMet
 
     return encryptionMethods?.toSet()
 }
-
-private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
-    try {
-        unvalidated.vpFormatsSupported.toDomain()
-    } catch (_: IllegalArgumentException) {
-        throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
-    }
 
 /**
  * Method checks whether Wallet can fulfill the Verifier's authorization response encryption requirements.

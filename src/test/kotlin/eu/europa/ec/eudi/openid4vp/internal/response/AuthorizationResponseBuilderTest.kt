@@ -31,7 +31,6 @@ import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
 import eu.europa.ec.eudi.openid4vp.internal.request.asURL
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -55,9 +54,9 @@ class AuthorizationResponseBuilderTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormats.SdJwtVc.HAIP,
-                    VpFormats.MsoMdoc(
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
                         issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     ),
@@ -81,12 +80,10 @@ class AuthorizationResponseBuilderTest {
                 "did:example",
                 "did:key",
             ),
-            vpFormatsSupported = VpFormatsTO.make(
-                VpFormats(
-                    msoMdoc = VpFormats.MsoMdoc(
-                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                    ),
+            vpFormatsSupported = VpFormatsSupported(
+                msoMdoc = VpFormatsSupported.MsoMdoc(
+                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),
             ),
         )
@@ -94,12 +91,10 @@ class AuthorizationResponseBuilderTest {
         val metaDataRequestingEncryptedResponse = UnvalidatedClientMetaData(
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
-            vpFormatsSupported = VpFormatsTO.make(
-                VpFormats(
-                    msoMdoc = VpFormats.MsoMdoc(
-                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                    ),
+            vpFormatsSupported = VpFormatsSupported(
+                msoMdoc = VpFormatsSupported.MsoMdoc(
+                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                 ),
             ),
         )
@@ -181,8 +176,8 @@ class AuthorizationResponseBuilderTest {
                             ),
                         ),
                     responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
-                    vpFormats = VpFormats(
-                        msoMdoc = VpFormats.MsoMdoc(
+                    vpFormatsSupported = VpFormatsSupported(
+                        msoMdoc = VpFormatsSupported.MsoMdoc(
                             issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                             deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         ),

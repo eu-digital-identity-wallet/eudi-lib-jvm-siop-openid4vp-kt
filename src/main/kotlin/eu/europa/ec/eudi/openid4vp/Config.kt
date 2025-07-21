@@ -204,7 +204,7 @@ sealed interface ResponseEncryptionConfiguration {
 data class VpFormats(
     val sdJwtVc: SdJwtVc? = null,
     val msoMdoc: MsoMdoc? = null,
-) {
+) : java.io.Serializable {
     init {
         require(null != sdJwtVc || null != msoMdoc) {
             "At least one format must be specified."

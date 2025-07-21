@@ -123,7 +123,9 @@ class AuthorizationResponseDispatcherTest {
                 ClientMetaDataValidator.validateClientMetaData(
                     clientMetaData,
                     responseMode,
+                    null,
                     walletConfig.responseEncryptionConfiguration,
+                    walletConfig.vpConfiguration.vpFormatsSupported,
                 )
             }
 
@@ -201,15 +203,17 @@ class AuthorizationResponseDispatcherTest {
     fun `dispatch vp_token with direct post`() = runTest {
         fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
+            val query = Json.decodeFromStream<DCQL>(checkNotNull(load("dcql/mDL-example.json")))
             val validated = assertDoesNotThrow {
                 ClientMetaDataValidator.validateClientMetaData(
                     clientMetaData,
                     responseMode,
+                    query,
                     walletConfig.responseEncryptionConfiguration,
+                    walletConfig.vpConfiguration.vpFormatsSupported,
                 )
             }
 
-            val dcql = Json.decodeFromStream<DCQL>(load("dcql/mDL-example.json")!!)
             val openId4VPAuthRequestObject =
                 ResolvedRequestObject.OpenId4VPAuthorization(
                     responseEncryptionSpecification = validated.responseEncryptionSpecification,
@@ -223,7 +227,7 @@ class AuthorizationResponseDispatcherTest {
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
-                    query = dcql,
+                    query = query,
                     transactionData = null,
                     verifierAttestations = null,
                 )

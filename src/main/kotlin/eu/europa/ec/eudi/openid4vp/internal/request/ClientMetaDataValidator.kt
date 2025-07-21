@@ -21,6 +21,7 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaData
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
@@ -38,7 +39,9 @@ internal object ClientMetaDataValidator {
     fun validateClientMetaData(
         unvalidated: UnvalidatedClientMetaData,
         responseMode: ResponseMode,
+        query: DCQL?,
         responseEncryptionConfiguration: ResponseEncryptionConfiguration,
+        walletSupportedVpFormats: VpFormatsSupported,
     ): ValidatedClientMetaData {
         val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
 
@@ -71,10 +74,15 @@ internal object ClientMetaDataValidator {
                 )
             }
 
+        val vpFormatsSupported =
+            query
+                ?.let { resolveVpFormatsCommonGround(walletSupportedVpFormats, it, unvalidated.vpFormatsSupported) }
+                ?: unvalidated.vpFormatsSupported
+
         return ValidatedClientMetaData(
             responseEncryptionSpecification = responseEncryptionSpecification,
             subjectSyntaxTypesSupported = types,
-            vpFormatsSupported = unvalidated.vpFormatsSupported,
+            vpFormatsSupported = vpFormatsSupported,
         )
     }
 }
@@ -195,3 +203,63 @@ private fun responseEncryptionSpecification(
 
     return ResponseEncryptionSpecification(encryptionAlgorithm, encryptionMethod, encryptionKey)
 }
+
+private fun resolveVpFormatsCommonGround(
+    walletSupportedVpFormats: VpFormatsSupported,
+    query: DCQL,
+    verifierSupportedVpFormatsSupported: VpFormatsSupported,
+): VpFormatsSupported {
+    val queryFormats = query.credentials.map { it.format }.toSet()
+    val commonGround = walletSupportedVpFormats.intersect(queryFormats, verifierSupportedVpFormatsSupported)
+    return ensureNotNull(commonGround) {
+        ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+    }
+}
+
+private fun VpFormatsSupported.intersect(
+    queryFormats: Set<Format>,
+    verifierSupportedVpFormatsSupported: VpFormatsSupported,
+): VpFormatsSupported? {
+    val commonSdJwt =
+        if (Format.SdJwtVc in queryFormats)
+            when {
+                null != sdJwtVc && null != verifierSupportedVpFormatsSupported.sdJwtVc ->
+                    sdJwtVc.intersect(verifierSupportedVpFormatsSupported.sdJwtVc) ?: return null
+
+                null == sdJwtVc && null != verifierSupportedVpFormatsSupported.sdJwtVc -> return null
+
+                else -> null
+            }
+        else null
+
+    val commonMsoMdoc =
+        if (Format.MsoMdoc in queryFormats) verifierSupportedVpFormatsSupported.msoMdoc
+        else null
+
+    return VpFormatsSupported(sdJwtVc = commonSdJwt, msoMdoc = commonMsoMdoc)
+}
+
+private fun VpFormatsSupported.SdJwtVc.intersect(requested: VpFormatsSupported.SdJwtVc): VpFormatsSupported.SdJwtVc? {
+    val commonSdJwtAlgorithms = intersect(sdJwtAlgorithms, requested.sdJwtAlgorithms) { return null }
+    val commonKbJwtAlgorithms = intersect(kbJwtAlgorithms, requested.kbJwtAlgorithms) { return null }
+
+    return VpFormatsSupported.SdJwtVc(sdJwtAlgorithms = commonSdJwtAlgorithms, kbJwtAlgorithms = commonKbJwtAlgorithms)
+}
+
+/**
+ * Finds common elements between [supported] and [requested].
+ * If nothing was requested, null is returned.
+ * If no common elements exists between supported and requested, [onEmptyIntersection] is returned.
+ * Returns null in all other cases.
+ */
+private inline fun <T> intersect(
+    supported: List<T>?,
+    requested: List<T>?,
+    onEmptyIntersection: () -> List<T>?,
+): List<T>? =
+    when {
+        null != supported && null != requested ->
+            supported.intersect(requested).toList().takeIf { it.isNotEmpty() } ?: onEmptyIntersection()
+
+        else -> requested ?: supported
+    }

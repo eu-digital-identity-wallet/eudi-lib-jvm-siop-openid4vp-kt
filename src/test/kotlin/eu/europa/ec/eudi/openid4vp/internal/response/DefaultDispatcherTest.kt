@@ -72,6 +72,7 @@ class DefaultDispatcherTest {
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
             vpFormatsSupported = VpFormatsSupported(
+                sdJwtVc = VpFormatsSupported.SdJwtVc.HAIP,
                 msoMdoc = VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
@@ -94,23 +95,25 @@ class DefaultDispatcherTest {
             responseMode: ResponseMode,
             state: String? = null,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
+            val query = DCQL(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = QueryId("pdId"),
+                        format = Format.SdJwtVc,
+                    ),
+                ),
+            )
             val clientMetadataValidated =
                 ClientMetaDataValidator.validateClientMetaData(
                     unvalidatedClientMetaData,
                     responseMode,
+                    query,
                     Wallet.config.responseEncryptionConfiguration,
+                    Wallet.config.vpConfiguration.vpFormatsSupported,
                 )
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                query =
-                    DCQL(
-                        credentials = listOf(
-                            CredentialQuery(
-                                id = QueryId("pdId"),
-                                format = Format("foo"),
-                            ),
-                        ),
-                    ),
+                query = query,
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 vpFormatsSupported = VpFormatsSupported(
                     msoMdoc = VpFormatsSupported.MsoMdoc(
@@ -212,7 +215,9 @@ class DefaultDispatcherTest {
                 ClientMetaDataValidator.validateClientMetaData(
                     Verifier.metaDataRequestingEncryptedResponse,
                     responseMode,
+                    null,
                     ResponseEncryptionConfiguration.NotSupported,
+                    VpFormatsSupported(VpFormatsSupported.SdJwtVc.HAIP),
                 )
             }
 
@@ -459,20 +464,22 @@ class DefaultDispatcherTest {
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
+            val query = DCQL(
+                credentials = listOf(
+                    testCredentialQuery(),
+                ),
+            )
             val clientMetadataValidated =
                 ClientMetaDataValidator.validateClientMetaData(
                     unvalidatedClientMetaData,
                     responseMode,
+                    query,
                     Wallet.config.responseEncryptionConfiguration,
+                    Wallet.config.vpConfiguration.vpFormatsSupported,
                 )
 
             return ResolvedRequestObject.OpenId4VPAuthorization(
-                query =
-                    DCQL(
-                        credentials = listOf(
-                            testCredentialQuery(),
-                        ),
-                    ),
+                query = query,
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 vpFormatsSupported = VpFormatsSupported(
                     msoMdoc = VpFormatsSupported.MsoMdoc(
@@ -493,11 +500,18 @@ class DefaultDispatcherTest {
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.SiopOpenId4VPAuthentication {
+            val query = DCQL(
+                credentials = listOf(
+                    testCredentialQuery(),
+                ),
+            )
             val clientMetadataValidated =
                 ClientMetaDataValidator.validateClientMetaData(
                     unvalidatedClientMetaData,
                     responseMode,
+                    query,
                     Wallet.config.responseEncryptionConfiguration,
+                    Wallet.config.vpConfiguration.vpFormatsSupported,
                 )
 
             return ResolvedRequestObject.SiopOpenId4VPAuthentication(
@@ -515,12 +529,7 @@ class DefaultDispatcherTest {
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),
                 scope = Scope.OpenId,
-                query =
-                    DCQL(
-                        credentials = listOf(
-                            testCredentialQuery(),
-                        ),
-                    ),
+                query = query,
                 transactionData = null,
                 verifierAttestations = null,
             )

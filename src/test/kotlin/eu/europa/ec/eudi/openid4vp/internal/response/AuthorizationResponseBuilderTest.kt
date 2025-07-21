@@ -92,6 +92,7 @@ class AuthorizationResponseBuilderTest {
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
             vpFormatsSupported = VpFormatsSupported(
+                sdJwtVc = VpFormatsSupported.SdJwtVc.HAIP,
                 msoMdoc = VpFormatsSupported.MsoMdoc(
                     issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                     deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
@@ -114,7 +115,9 @@ class AuthorizationResponseBuilderTest {
             val verifierMetaData = ClientMetaDataValidator.validateClientMetaData(
                 Verifier.metaDataRequestingNotEncryptedResponse,
                 responseMode,
+                null,
                 Wallet.config.responseEncryptionConfiguration,
+                Wallet.config.vpConfiguration.vpFormatsSupported,
             )
 
             val siopAuthRequestObject =
@@ -157,24 +160,26 @@ class AuthorizationResponseBuilderTest {
     fun `when direct_post jwt, builder should return DirectPostJwt with response encryption parameters of correct type`() = runTest {
         fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
+            val query = DCQL(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = QueryId("pdId"),
+                        format = Format.SdJwtVc,
+                    ),
+                ),
+            )
             val verifierMetaData = assertDoesNotThrow {
                 ClientMetaDataValidator.validateClientMetaData(
                     Verifier.metaDataRequestingEncryptedResponse,
                     responseMode,
+                    query,
                     Wallet.config.responseEncryptionConfiguration,
+                    Wallet.config.vpConfiguration.vpFormatsSupported,
                 )
             }
             val resolvedRequest =
                 ResolvedRequestObject.OpenId4VPAuthorization(
-                    query =
-                        DCQL(
-                            credentials = listOf(
-                                CredentialQuery(
-                                    id = QueryId("pdId"),
-                                    format = Format("foo"),
-                                ),
-                            ),
-                        ),
+                    query = query,
                     responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
                     vpFormatsSupported = VpFormatsSupported(
                         msoMdoc = VpFormatsSupported.MsoMdoc(

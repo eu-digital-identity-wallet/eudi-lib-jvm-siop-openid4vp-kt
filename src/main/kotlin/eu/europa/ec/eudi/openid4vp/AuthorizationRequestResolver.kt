@@ -228,12 +228,15 @@ value class VerifierAttestations(val value: List<Attestation>) : Serializable {
     }
 }
 
-sealed interface RequestedVpFormat : Serializable {
+data class RequestedVpFormats(
+    val sdJwtVc: SdJwtVc? = null,
+    val msoMdoc: MsoMdoc? = null,
+) : Serializable {
 
     data class SdJwtVc(
         val sdJwtAlgorithms: Set<JWSAlgorithm>? = null,
         val kbJwtAlgorithms: Set<JWSAlgorithm>? = null,
-    ) : RequestedVpFormat {
+    ) : Serializable {
         init {
             if (null != sdJwtAlgorithms) {
                 require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
@@ -249,12 +252,14 @@ sealed interface RequestedVpFormat : Serializable {
                 }
             }
         }
+
+        companion object
     }
 
     data class MsoMdoc(
         val issuerAuthAlgorithms: Set<CoseAlgorithm>? = null,
         val deviceAuthAlgorithms: Set<CoseAlgorithm>? = null,
-    ) : RequestedVpFormat {
+    ) : Serializable {
         init {
             if (null != issuerAuthAlgorithms) {
                 require(issuerAuthAlgorithms.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
@@ -264,25 +269,12 @@ sealed interface RequestedVpFormat : Serializable {
                 require(deviceAuthAlgorithms.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
             }
         }
+
+        companion object
     }
 
-    companion object {
-        operator fun invoke(
-            sdJwtAlgorithms: Set<JWSAlgorithm>? = null,
-            kbJwtAlgorithms: Set<JWSAlgorithm>? = null,
-        ): SdJwtVc = SdJwtVc(sdJwtAlgorithms = sdJwtAlgorithms, kbJwtAlgorithms = kbJwtAlgorithms)
-
-        operator fun invoke(
-            issuerAuthAlgorithms: Set<CoseAlgorithm>? = null,
-            deviceAuthAlgorithms: Set<CoseAlgorithm>? = null,
-        ): MsoMdoc = MsoMdoc(issuerAuthAlgorithms = issuerAuthAlgorithms, deviceAuthAlgorithms = deviceAuthAlgorithms)
-    }
+    companion object
 }
-
-data class RequestedVpFormats(
-    val sdJwtVc: RequestedVpFormat.SdJwtVc? = null,
-    val msoMdoc: RequestedVpFormat.MsoMdoc? = null,
-) : Serializable
 
 /**
  * Represents an OAUTH2 authorization request. In particular

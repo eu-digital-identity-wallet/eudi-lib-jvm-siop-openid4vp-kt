@@ -55,7 +55,7 @@ class AuthorizationResponseBuilderTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -76,7 +76,7 @@ class AuthorizationResponseBuilderTest {
                 "did:key",
             ),
             vpFormatsSupported = SupportedVpFormatsTO.make(
-                SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
+                SupportedVpFormats(msoMdoc = SupportedVpFormats.MsoMdoc.ES256),
             ),
         )
 
@@ -84,7 +84,7 @@ class AuthorizationResponseBuilderTest {
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
             vpFormatsSupported = SupportedVpFormatsTO.make(
-                SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
+                SupportedVpFormats(msoMdoc = SupportedVpFormats.MsoMdoc.ES256),
             ),
         )
 
@@ -166,7 +166,7 @@ class AuthorizationResponseBuilderTest {
                         ),
                     responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
                     requestedVpFormats = RequestedVpFormats(
-                        msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                        msoMdoc = RequestedVpFormats.MsoMdoc(SupportedVpFormats.MsoMdoc.ES256),
                     ),
                     client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
                     nonce = "0S6_WzA2Mj",

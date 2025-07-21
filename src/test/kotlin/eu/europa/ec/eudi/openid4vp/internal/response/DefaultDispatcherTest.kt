@@ -73,7 +73,7 @@ class DefaultDispatcherTest {
             jwks = JWKSet(responseEncryptionKeyPair).toJsonObject(true),
             responseEncryptionMethodsSupported = listOf(EncryptionMethod.A256GCM.name),
             vpFormatsSupported = SupportedVpFormatsTO.make(
-                SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
+                SupportedVpFormats(msoMdoc = SupportedVpFormats.MsoMdoc.ES256),
             ),
         )
 
@@ -111,7 +111,7 @@ class DefaultDispatcherTest {
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 requestedVpFormats = RequestedVpFormats(
-                    msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                    msoMdoc = RequestedVpFormats.MsoMdoc(SupportedVpFormats.MsoMdoc.ES256),
                 ),
                 client = CLIENT,
                 nonce = "0S6_WzA2Mj",
@@ -135,7 +135,7 @@ class DefaultDispatcherTest {
                 supportedMethods = listOf(EncryptionMethod.A256GCM),
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -464,7 +464,7 @@ class DefaultDispatcherTest {
                     ),
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 requestedVpFormats = RequestedVpFormats(
-                    msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                    msoMdoc = RequestedVpFormats.MsoMdoc(SupportedVpFormats.MsoMdoc.ES256),
                 ),
                 client = Verifier.CLIENT,
                 nonce = "0S6_WzA2Mj",
@@ -493,7 +493,7 @@ class DefaultDispatcherTest {
                 nonce = "0S6_WzA2Mj",
                 responseEncryptionSpecification = clientMetadataValidated.responseEncryptionSpecification,
                 requestedVpFormats = RequestedVpFormats(
-                    msoMdoc = RequestedVpFormat(SupportedVpFormat.MsoMdoc.ES256),
+                    msoMdoc = RequestedVpFormats.MsoMdoc(SupportedVpFormats.MsoMdoc.ES256),
                 ),
                 idTokenType = listOf(IdTokenType.SubjectSigned),
                 subjectSyntaxTypesSupported = listOf(SubjectSyntaxType.DecentralizedIdentifier("")),

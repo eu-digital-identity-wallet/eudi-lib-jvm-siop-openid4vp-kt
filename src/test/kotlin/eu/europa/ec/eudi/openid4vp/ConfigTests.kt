@@ -16,26 +16,27 @@
 package eu.europa.ec.eudi.openid4vp
 
 import org.junit.jupiter.api.assertDoesNotThrow
-import org.junit.jupiter.api.assertThrows
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 
 class ConfigTests {
 
     @Test
-    fun `vp_format with at most one instance per format is ok`() {
+    fun `SupportedVpFormats requires at least one SupportedVpFormat`() {
         assertDoesNotThrow {
-            SupportedVpFormats(SupportedVpFormat.MsoMdoc.ES256, SupportedVpFormat.SdJwtVc.ES256)
-        }
-    }
-
-    @Test
-    fun `vp_format with multiple format instances for a given format is not allowed`() {
-        assertThrows<IllegalArgumentException> {
-            SupportedVpFormats(SupportedVpFormat.MsoMdoc.ES256, SupportedVpFormat.MsoMdoc.ES256)
+            SupportedVpFormats(null, SupportedVpFormats.MsoMdoc.ES256)
         }
 
-        assertThrows<IllegalArgumentException> {
-            SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.SdJwtVc.ES256)
+        assertDoesNotThrow {
+            SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, null)
+        }
+
+        assertDoesNotThrow {
+            SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256)
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            SupportedVpFormats(null, null)
         }
     }
 }

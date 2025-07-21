@@ -15,8 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
-operator fun RequestedVpFormat.Companion.invoke(from: SupportedVpFormat.SdJwtVc): RequestedVpFormat.SdJwtVc =
-    RequestedVpFormat.SdJwtVc(sdJwtAlgorithms = from.sdJwtAlgorithms, kbJwtAlgorithms = from.kbJwtAlgorithms)
+operator fun RequestedVpFormats.SdJwtVc.Companion.invoke(from: SupportedVpFormats.SdJwtVc): RequestedVpFormats.SdJwtVc =
+    RequestedVpFormats.SdJwtVc(sdJwtAlgorithms = from.sdJwtAlgorithms, kbJwtAlgorithms = from.kbJwtAlgorithms)
 
-operator fun RequestedVpFormat.Companion.invoke(from: SupportedVpFormat.MsoMdoc): RequestedVpFormat.MsoMdoc =
-    RequestedVpFormat.MsoMdoc(issuerAuthAlgorithms = from.issuerAuthAlgorithms, deviceAuthAlgorithms = from.issuerAuthAlgorithms)
+operator fun RequestedVpFormats.MsoMdoc.Companion.invoke(from: SupportedVpFormats.MsoMdoc): RequestedVpFormats.MsoMdoc =
+    RequestedVpFormats.MsoMdoc(issuerAuthAlgorithms = from.issuerAuthAlgorithms, deviceAuthAlgorithms = from.issuerAuthAlgorithms)

@@ -147,11 +147,11 @@ class UnvalidatedRequestResolverTest {
         ),
         vpConfiguration = VPConfiguration(
             supportedVpFormats = SupportedVpFormats(
-                SupportedVpFormat(
+                SupportedVpFormats.SdJwtVc(
                     sdJwtAlgorithms = setOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
                     kbJwtAlgorithms = setOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
                 ),
-                SupportedVpFormat.MsoMdoc.ES256,
+                SupportedVpFormats.MsoMdoc.ES256,
             ),
             supportedTransactionDataTypes = listOf(
                 SupportedTransactionDataType(
@@ -286,7 +286,7 @@ class UnvalidatedRequestResolverTest {
                     "did:key",
                 ),
                 vpFormatsSupported = SupportedVpFormatsTO.make(
-                    SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
+                    SupportedVpFormats(msoMdoc = SupportedVpFormats.MsoMdoc.ES256),
                 ),
             )
             val jwtClaimsSet = jwtClaimsSet(
@@ -337,7 +337,7 @@ class UnvalidatedRequestResolverTest {
                         "did:key",
                     ),
                     vpFormatsSupported = SupportedVpFormatsTO.make(
-                        SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
+                        SupportedVpFormats(msoMdoc = SupportedVpFormats.MsoMdoc.ES256),
                     ),
                 ),
             )
@@ -382,7 +382,7 @@ class UnvalidatedRequestResolverTest {
                         "did:key",
                     ),
                     vpFormatsSupported = SupportedVpFormatsTO.make(
-                        SupportedVpFormats(msoMdoc = SupportedVpFormat.MsoMdoc.ES256),
+                        SupportedVpFormats(msoMdoc = SupportedVpFormats.MsoMdoc.ES256),
                     ),
                 ),
             )

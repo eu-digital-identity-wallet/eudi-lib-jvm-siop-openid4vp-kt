@@ -36,8 +36,8 @@ class WalletMetaDataTest {
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
                 supportedVpFormats = SupportedVpFormats(
-                    SupportedVpFormat.SdJwtVc.ES256,
-                    SupportedVpFormat.MsoMdoc.ES256,
+                    SupportedVpFormats.SdJwtVc.ES256,
+                    SupportedVpFormats.MsoMdoc.ES256,
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -60,8 +60,8 @@ class WalletMetaDataTest {
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
                 supportedVpFormats = SupportedVpFormats(
-                    SupportedVpFormat.SdJwtVc.ES256,
-                    SupportedVpFormat.MsoMdoc.ES256,
+                    SupportedVpFormats.SdJwtVc.ES256,
+                    SupportedVpFormats.MsoMdoc.ES256,
                 ),
             ),
             jarConfiguration = JarConfiguration(

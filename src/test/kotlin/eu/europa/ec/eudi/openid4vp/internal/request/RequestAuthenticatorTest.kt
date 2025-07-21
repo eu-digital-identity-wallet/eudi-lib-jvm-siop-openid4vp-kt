@@ -52,7 +52,7 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -88,7 +88,7 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -133,12 +133,12 @@ class ClientAuthenticatorTest {
                 },
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(
-            clientId = clientId.toString(),
+            clientId = clientId,
         )
 
         @Test
@@ -238,7 +238,7 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.VerifierAttestation(AttestationIssuer.verifier),
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormat.SdJwtVc.ES256, SupportedVpFormat.MsoMdoc.ES256),
+                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
             ),
             clock = Clock.systemDefaultZone(),
         )

@@ -59,14 +59,14 @@ internal class SdVcJwtTO(
     @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS) val sdJwtAlgorithms: List<String>? = null,
     @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS) val kdJwtAlgorithms: List<String>? = null,
 ) {
-    fun toDomain(): RequestedVpFormat.SdJwtVc =
-        RequestedVpFormat.SdJwtVc(
+    fun toDomain(): RequestedVpFormats.SdJwtVc =
+        RequestedVpFormats.SdJwtVc(
             sdJwtAlgorithms = sdJwtAlgorithms?.map { JWSAlgorithm.parse(it) }?.toSet(),
             kbJwtAlgorithms = kdJwtAlgorithms?.map { JWSAlgorithm.parse(it) }?.toSet(),
         )
 
     companion object {
-        fun make(f: SupportedVpFormat.SdJwtVc): SdVcJwtTO {
+        fun make(f: SupportedVpFormats.SdJwtVc): SdVcJwtTO {
             return SdVcJwtTO(
                 sdJwtAlgorithms = f.sdJwtAlgorithms.map { it.name },
                 kdJwtAlgorithms = f.kbJwtAlgorithms.map { it.name },
@@ -80,14 +80,14 @@ internal class MsoMdocTO(
     @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<Int>? = null,
     @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<Int>? = null,
 ) {
-    fun toDomain(): RequestedVpFormat.MsoMdoc =
-        RequestedVpFormat.MsoMdoc(
+    fun toDomain(): RequestedVpFormats.MsoMdoc =
+        RequestedVpFormats.MsoMdoc(
             issuerAuthAlgorithms = issuerAuthAlgorithms?.map { CoseAlgorithm(it) }?.toSet(),
             deviceAuthAlgorithms = deviceAuthAlgorithms?.map { CoseAlgorithm(it) }?.toSet(),
         )
 
     companion object {
-        fun make(f: SupportedVpFormat.MsoMdoc): MsoMdocTO {
+        fun make(f: SupportedVpFormats.MsoMdoc): MsoMdocTO {
             return MsoMdocTO(
                 issuerAuthAlgorithms = f.issuerAuthAlgorithms.map { it.value },
                 deviceAuthAlgorithms = f.deviceAuthAlgorithms.map { it.value },

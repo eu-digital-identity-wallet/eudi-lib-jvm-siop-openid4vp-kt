@@ -397,7 +397,7 @@ private fun SupportedVpFormats.intersect(queryFormats: Set<Format>, verifierSupp
             intersect(
                 sdJwtVc,
                 verifierSupportedVpFormats.sdJwtVc,
-                SupportedVpFormat.SdJwtVc::intersect,
+                SupportedVpFormats.SdJwtVc::intersect,
             ) { return null }
         else null
 
@@ -406,25 +406,25 @@ private fun SupportedVpFormats.intersect(queryFormats: Set<Format>, verifierSupp
             intersect(
                 msoMdoc,
                 verifierSupportedVpFormats.msoMdoc,
-                SupportedVpFormat.MsoMdoc::intersect,
+                SupportedVpFormats.MsoMdoc::intersect,
             ) { return null }
         else null
 
     return RequestedVpFormats(sdJwtVc = commonSdJwt, msoMdoc = commonMsoMdoc)
 }
 
-private fun SupportedVpFormat.SdJwtVc.intersect(requested: RequestedVpFormat.SdJwtVc): RequestedVpFormat.SdJwtVc? {
+private fun SupportedVpFormats.SdJwtVc.intersect(requested: RequestedVpFormats.SdJwtVc): RequestedVpFormats.SdJwtVc? {
     val commonSdJwtAlgorithms = intersect(sdJwtAlgorithms, requested.sdJwtAlgorithms) { return null }
     val commonKbJwtAlgorithms = intersect(kbJwtAlgorithms, requested.kbJwtAlgorithms) { return null }
 
-    return RequestedVpFormat.SdJwtVc(sdJwtAlgorithms = commonSdJwtAlgorithms, kbJwtAlgorithms = commonKbJwtAlgorithms)
+    return RequestedVpFormats.SdJwtVc(sdJwtAlgorithms = commonSdJwtAlgorithms, kbJwtAlgorithms = commonKbJwtAlgorithms)
 }
 
-private fun SupportedVpFormat.MsoMdoc.intersect(requested: RequestedVpFormat.MsoMdoc): RequestedVpFormat.MsoMdoc? {
+private fun SupportedVpFormats.MsoMdoc.intersect(requested: RequestedVpFormats.MsoMdoc): RequestedVpFormats.MsoMdoc? {
     val commonIssuerAuthAlgorithms = intersect(issuerAuthAlgorithms, requested.issuerAuthAlgorithms) { return null }
     val commonDeviceAuthAlgorithms = intersect(deviceAuthAlgorithms, requested.deviceAuthAlgorithms) { return null }
 
-    return RequestedVpFormat.MsoMdoc(issuerAuthAlgorithms = commonIssuerAuthAlgorithms, deviceAuthAlgorithms = commonDeviceAuthAlgorithms)
+    return RequestedVpFormats.MsoMdoc(issuerAuthAlgorithms = commonIssuerAuthAlgorithms, deviceAuthAlgorithms = commonDeviceAuthAlgorithms)
 }
 
 /**

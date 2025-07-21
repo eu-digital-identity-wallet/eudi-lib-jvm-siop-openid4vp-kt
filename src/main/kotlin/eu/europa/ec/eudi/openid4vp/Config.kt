@@ -203,12 +203,20 @@ sealed interface ResponseEncryptionConfiguration {
     data object NotSupported : ResponseEncryptionConfiguration
 }
 
-sealed interface SupportedVpFormat : java.io.Serializable {
+data class SupportedVpFormats(
+    val sdJwtVc: SdJwtVc? = null,
+    val msoMdoc: MsoMdoc? = null,
+) {
+    init {
+        require(null != sdJwtVc || null != msoMdoc) {
+            "At least one format must be specified."
+        }
+    }
 
     data class SdJwtVc(
         val sdJwtAlgorithms: Set<JWSAlgorithm>,
         val kbJwtAlgorithms: Set<JWSAlgorithm>,
-    ) : SupportedVpFormat {
+    ) : java.io.Serializable {
         init {
             require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
             require(sdJwtAlgorithms.all { it.isSignature && it.isFullySpecified }) {
@@ -233,7 +241,7 @@ sealed interface SupportedVpFormat : java.io.Serializable {
     data class MsoMdoc(
         val issuerAuthAlgorithms: Set<CoseAlgorithm>,
         val deviceAuthAlgorithms: Set<CoseAlgorithm>,
-    ) : SupportedVpFormat {
+    ) : java.io.Serializable {
         init {
             require(issuerAuthAlgorithms.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
             require(deviceAuthAlgorithms.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
@@ -249,53 +257,7 @@ sealed interface SupportedVpFormat : java.io.Serializable {
         }
     }
 
-    companion object {
-        operator fun invoke(
-            sdJwtAlgorithms: Set<JWSAlgorithm>,
-            kbJwtAlgorithms: Set<JWSAlgorithm>,
-        ): SdJwtVc = SdJwtVc(sdJwtAlgorithms = sdJwtAlgorithms, kbJwtAlgorithms = kbJwtAlgorithms)
-
-        operator fun invoke(
-            issuerAuthAlgorithms: Set<CoseAlgorithm>,
-            deviceAuthAlgorithms: Set<CoseAlgorithm>,
-        ): MsoMdoc = MsoMdoc(issuerAuthAlgorithms = issuerAuthAlgorithms, deviceAuthAlgorithms = deviceAuthAlgorithms)
-    }
-}
-
-data class SupportedVpFormats(
-    val sdJwtVc: SupportedVpFormat.SdJwtVc? = null,
-    val msoMdoc: SupportedVpFormat.MsoMdoc? = null,
-) {
-    init {
-        require(null != sdJwtVc || null != msoMdoc) {
-            "At least one format must be specified."
-        }
-    }
-
-    companion object {
-        operator fun invoke(first: SupportedVpFormat, vararg remaining: SupportedVpFormat): SupportedVpFormats =
-            SupportedVpFormats(listOf(first, *remaining))
-
-        operator fun invoke(supportedVpFormats: Collection<SupportedVpFormat>): SupportedVpFormats {
-            require(supportedVpFormats.isNotEmpty()) { "At least one format must be specified." }
-            ensureUniquePerSupportedVpFormat(supportedVpFormats)
-
-            val sdJwtVc = supportedVpFormats.filterIsInstance<SupportedVpFormat.SdJwtVc>().firstOrNull()
-            val msoMdoc = supportedVpFormats.filterIsInstance<SupportedVpFormat.MsoMdoc>().firstOrNull()
-
-            return SupportedVpFormats(sdJwtVc, msoMdoc)
-        }
-
-        private fun ensureUniquePerSupportedVpFormat(supportedVpFormats: Iterable<SupportedVpFormat>) {
-            supportedVpFormats
-                .groupBy { it::class }
-                .forEach { (type, instances) ->
-                    require(1 == instances.size) {
-                        "Multiple instances found for ${type.simpleName}."
-                    }
-                }
-        }
-    }
+    companion object
 }
 
 sealed interface NonceOption {

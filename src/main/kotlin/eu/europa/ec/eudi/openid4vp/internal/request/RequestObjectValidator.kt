@@ -70,7 +70,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
+                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(query, it.vpFormats) },
                 query = query,
                 transactionData = transactionData,
                 verifierAttestations = verifierAttestations,
@@ -87,7 +87,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
+                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(query, it.vpFormats) },
                 idTokenType = idTokenType,
                 subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
                 scope = scope.getOrThrow(),
@@ -199,9 +199,10 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         return attestations
     }
 
-    private fun resolveVpFormatsCommonGround(clientVpFormats: RequestedVpFormats): RequestedVpFormats {
+    private fun resolveVpFormatsCommonGround(query: DCQL, verifierSupportedVpFormats: RequestedVpFormats): RequestedVpFormats {
         val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.supportedVpFormats
-        val commonGround = walletSupportedVpFormats.intersect(clientVpFormats)
+        val queryFormats = query.credentials.map { it.format }.toSet()
+        val commonGround = walletSupportedVpFormats.intersect(queryFormats, verifierSupportedVpFormats)
         return ensureNotNull(commonGround) {
             ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
         }
@@ -390,9 +391,24 @@ private enum class ResponseType {
     VpAndIdToken,
 }
 
-private fun SupportedVpFormats.intersect(requested: RequestedVpFormats): RequestedVpFormats? {
-    val commonSdJwt = intersect(sdJwtVc, requested.sdJwtVc, SupportedVpFormat.SdJwtVc::intersect) { return null }
-    val commonMsoMdoc = intersect(msoMdoc, requested.msoMdoc, SupportedVpFormat.MsoMdoc::intersect) { return null }
+private fun SupportedVpFormats.intersect(queryFormats: Set<Format>, verifierSupportedVpFormats: RequestedVpFormats): RequestedVpFormats? {
+    val commonSdJwt =
+        if (Format.SdJwtVc in queryFormats)
+            intersect(
+                sdJwtVc,
+                verifierSupportedVpFormats.sdJwtVc,
+                SupportedVpFormat.SdJwtVc::intersect,
+            ) { return null }
+        else null
+
+    val commonMsoMdoc =
+        if (Format.MsoMdoc in queryFormats)
+            intersect(
+                msoMdoc,
+                verifierSupportedVpFormats.msoMdoc,
+                SupportedVpFormat.MsoMdoc::intersect,
+            ) { return null }
+        else null
 
     return RequestedVpFormats(sdJwtVc = commonSdJwt, msoMdoc = commonMsoMdoc)
 }

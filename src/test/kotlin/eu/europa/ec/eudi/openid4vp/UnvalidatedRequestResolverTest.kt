@@ -459,6 +459,46 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
+    fun `if no common ground between wallet and verifier on non query requested vp_formats resolution succeeds`() = runTest {
+        val clientMetadata =
+            """ {
+                 "jwks": $jwkSetJO,
+                 "vp_formats_supported": {
+                     "dc+sd-jwt": {
+                         "sd-jwt_alg_values": ["ES512"],
+                         "kb-jwt_alg_values": ["ES512"]
+                     },
+                     "mso_mdoc": {
+                         "issuerauth_alg_values": [-49, -264],
+                         "deviceauth_alg_values": [-49, -264]
+                     }
+                 }    
+               }
+            """.trimIndent().let {
+                URLEncoder.encode(it, "UTF-8")
+            }
+
+        val authRequest =
+            "https://client.example.org/universal-link?" +
+                "response_type=vp_token" +
+                "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
+                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                "&nonce=n-0S6_WzA2Mj" +
+                "&dcql_query=$dcqlQuery" +
+                "&client_metadata=$clientMetadata"
+
+        val resolution = resolver.resolveRequestUri(authRequest)
+        with(resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()) {
+            with(assertNotNull(requestedVpFormats)) {
+                assertNotNull(sdJwtVc)
+                assertEquals(setOf(JWSAlgorithm.ES512), sdJwtVc.sdJwtAlgorithms)
+                assertEquals(setOf(JWSAlgorithm.ES512), sdJwtVc.kbJwtAlgorithms)
+                assertNull(msoMdoc)
+            }
+        }
+    }
+
+    @Test
     fun `if no client metadata provided no vpFormats are included in the resolved authorization request`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +

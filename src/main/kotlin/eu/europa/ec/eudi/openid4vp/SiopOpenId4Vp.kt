@@ -18,6 +18,7 @@ package eu.europa.ec.eudi.openid4vp
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4Vp.Companion.invoke
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcher
+import io.ktor.client.HttpClient
 
 /**
  * An interface providing support for handling an OAUTH2 request that represents
@@ -38,18 +39,17 @@ interface SiopOpenId4Vp : AuthorizationRequestResolver, Dispatcher, ErrorDispatc
          * Factory method to create a [SiopOpenId4Vp].
          *
          * @param siopOpenId4VPConfig wallet's configuration
-         * @param httpClientFactory a factory to obtain a Ktor http client. This can be used to configure ktor
-         * to use a specific engine. If a factory is not provided, the [DefaultHttpClientFactory] will be used,
-         * which peeks the actual engine from whatever is available in the classpath.
+         * @param httpClient A Ktor http client. This can be used to configure ktor
+         * to use a specific engine.
          *
          * @return a [SiopOpenId4Vp]
          */
         operator fun invoke(
             siopOpenId4VPConfig: SiopOpenId4VPConfig,
-            httpClientFactory: KtorHttpClientFactory = DefaultHttpClientFactory,
+            httpClient: HttpClient,
         ): SiopOpenId4Vp {
-            val requestResolver = DefaultAuthorizationRequestResolver(siopOpenId4VPConfig, httpClientFactory)
-            val dispatcher = DefaultDispatcher(httpClientFactory)
+            val requestResolver = DefaultAuthorizationRequestResolver(siopOpenId4VPConfig, httpClient)
+            val dispatcher = DefaultDispatcher(httpClient)
             return object :
                 AuthorizationRequestResolver by requestResolver,
                 Dispatcher by dispatcher,

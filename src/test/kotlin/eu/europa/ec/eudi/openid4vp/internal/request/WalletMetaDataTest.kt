@@ -35,9 +35,12 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(
-                    SupportedVpFormats.SdJwtVc.ES256,
-                    SupportedVpFormats.MsoMdoc.ES256,
+                vpFormats = VpFormats(
+                    VpFormats.SdJwtVc.HAIP,
+                    VpFormats.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -59,9 +62,12 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(
-                    SupportedVpFormats.SdJwtVc.ES256,
-                    SupportedVpFormats.MsoMdoc.ES256,
+                vpFormats = VpFormats(
+                    VpFormats.SdJwtVc.HAIP,
+                    VpFormats.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -88,7 +94,7 @@ private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
             println(jsonSupport.encodeToString(it))
         }
 
-    assertExpectedVpFormats(config.vpConfiguration.supportedVpFormats, walletMetaData)
+    assertExpectedVpFormats(config.vpConfiguration.vpFormats, walletMetaData)
     assertClientIdPrefix(config.supportedClientIdPrefixes, walletMetaData)
     assertPresentationDefinitionUriSupported(walletMetaData)
     assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
@@ -161,7 +167,7 @@ private fun assertClientIdPrefix(
 }
 
 private fun assertExpectedVpFormats(
-    expectedVpFormats: SupportedVpFormats,
+    expectedVpFormats: VpFormats,
     walletMetaData: JsonObject,
 ) {
     val vpFormats = assertIs<JsonObject>(
@@ -178,7 +184,7 @@ private fun assertExpectedVpFormats(
         val sdJwtVc = assertNotNull(vpFormats["dc+sd-jwt"])
         assertIs<JsonObject>(sdJwtVc)
         val sdJwtAlgs = sdJwtVc["sd-jwt_alg_values"]
-        if (sdJwtVcSupport.sdJwtAlgorithms.isNotEmpty()) {
+        if (!sdJwtVcSupport.sdJwtAlgorithms.isNullOrEmpty()) {
             assertNotNull(sdJwtAlgs)
             assertIs<JsonArray>(sdJwtAlgs)
             assertContentEquals(
@@ -190,7 +196,7 @@ private fun assertExpectedVpFormats(
         }
 
         val kbJwtAlgs = sdJwtVc["kb-jwt_alg_values"]
-        if (sdJwtVcSupport.kbJwtAlgorithms.isNotEmpty()) {
+        if (!sdJwtVcSupport.kbJwtAlgorithms.isNullOrEmpty()) {
             assertNotNull(kbJwtAlgs)
             assertIs<JsonArray>(kbJwtAlgs)
             assertContentEquals(

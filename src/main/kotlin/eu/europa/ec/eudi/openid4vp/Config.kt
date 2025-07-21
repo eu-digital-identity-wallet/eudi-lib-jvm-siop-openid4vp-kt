@@ -25,8 +25,6 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
-import eu.europa.ec.eudi.openid4vp.internal.isFullySpecified
-import eu.europa.ec.eudi.openid4vp.internal.isSignature
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.PublicKey
@@ -162,12 +160,12 @@ data class SupportedTransactionDataType(
  * Configuration options for OpenId4VP
  *
  * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
- * @param supportedVpFormats The formats the wallet supports
+ * @param vpFormats The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
 data class VPConfiguration(
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
-    val supportedVpFormats: SupportedVpFormats,
+    val vpFormats: VpFormats,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
 )
 
@@ -203,7 +201,7 @@ sealed interface ResponseEncryptionConfiguration {
     data object NotSupported : ResponseEncryptionConfiguration
 }
 
-data class SupportedVpFormats(
+data class VpFormats(
     val sdJwtVc: SdJwtVc? = null,
     val msoMdoc: MsoMdoc? = null,
 ) {
@@ -214,47 +212,42 @@ data class SupportedVpFormats(
     }
 
     data class SdJwtVc(
-        val sdJwtAlgorithms: Set<JWSAlgorithm>,
-        val kbJwtAlgorithms: Set<JWSAlgorithm>,
+        val sdJwtAlgorithms: List<FullySpecifiedJoseSigningAlgorithm>?,
+        val kbJwtAlgorithms: List<FullySpecifiedJoseSigningAlgorithm>?,
     ) : java.io.Serializable {
         init {
-            require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
-            require(sdJwtAlgorithms.all { it.isSignature && it.isFullySpecified }) {
-                "SD-JWT algorithms must be fully specified signature algorithms"
+            sdJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
             }
-            require(kbJwtAlgorithms.isNotEmpty()) { "KeyBinding-JWT algorithms cannot be empty" }
-            require(kbJwtAlgorithms.all { it.isSignature && it.isFullySpecified }) {
-                "KeyBinding-JWT algorithms must be fully specified signature algorithms"
+            kbJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "KeyBinding-JWT algorithms cannot be empty" }
             }
         }
 
         companion object {
-            val ES256: SdJwtVc
+            val HAIP: SdJwtVc
                 get() =
                     SdJwtVc(
-                        sdJwtAlgorithms = setOf(JWSAlgorithm.ES256),
-                        kbJwtAlgorithms = setOf(JWSAlgorithm.ES256),
+                        sdJwtAlgorithms = listOf(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES256)),
+                        kbJwtAlgorithms = listOf(FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.ES256)),
                     )
         }
     }
 
     data class MsoMdoc(
-        val issuerAuthAlgorithms: Set<CoseAlgorithm>,
-        val deviceAuthAlgorithms: Set<CoseAlgorithm>,
+        val issuerAuthAlgorithms: List<CoseAlgorithm>?,
+        val deviceAuthAlgorithms: List<CoseAlgorithm>?,
     ) : java.io.Serializable {
         init {
-            require(issuerAuthAlgorithms.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
-            require(deviceAuthAlgorithms.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
+            issuerAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
+            }
+            deviceAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
+            }
         }
 
-        companion object {
-            val ES256: MsoMdoc
-                get() =
-                    MsoMdoc(
-                        issuerAuthAlgorithms = setOf(CoseAlgorithm(-7), CoseAlgorithm(-9)),
-                        deviceAuthAlgorithms = setOf(CoseAlgorithm(-7), CoseAlgorithm(-9)),
-                    )
-        }
+        companion object
     }
 
     companion object

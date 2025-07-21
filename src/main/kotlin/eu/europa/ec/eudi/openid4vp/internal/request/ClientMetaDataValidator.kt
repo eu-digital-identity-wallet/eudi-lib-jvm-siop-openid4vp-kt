@@ -147,7 +147,7 @@ private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMet
     return encryptionMethods?.toSet()
 }
 
-private fun vpFormats(unvalidated: UnvalidatedClientMetaData): RequestedVpFormats =
+private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
     try {
         unvalidated.vpFormatsSupported.toDomain()
     } catch (_: IllegalArgumentException) {

@@ -70,7 +70,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(query, it.vpFormats) },
+                vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(query, it.vpFormats) },
                 query = query,
                 transactionData = transactionData,
                 verifierAttestations = verifierAttestations,
@@ -87,7 +87,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                requestedVpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(query, it.vpFormats) },
+                vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(query, it.vpFormats) },
                 idTokenType = idTokenType,
                 subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
                 scope = scope.getOrThrow(),
@@ -199,8 +199,8 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         return attestations
     }
 
-    private fun resolveVpFormatsCommonGround(query: DCQL, verifierSupportedVpFormats: RequestedVpFormats): RequestedVpFormats {
-        val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.supportedVpFormats
+    private fun resolveVpFormatsCommonGround(query: DCQL, verifierSupportedVpFormats: VpFormats): VpFormats {
+        val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.vpFormats
         val queryFormats = query.credentials.map { it.format }.toSet()
         val commonGround = walletSupportedVpFormats.intersect(queryFormats, verifierSupportedVpFormats)
         return ensureNotNull(commonGround) {
@@ -391,13 +391,13 @@ private enum class ResponseType {
     VpAndIdToken,
 }
 
-private fun SupportedVpFormats.intersect(queryFormats: Set<Format>, verifierSupportedVpFormats: RequestedVpFormats): RequestedVpFormats? {
+private fun VpFormats.intersect(queryFormats: Set<Format>, verifierSupportedVpFormats: VpFormats): VpFormats? {
     val commonSdJwt =
         if (Format.SdJwtVc in queryFormats)
             intersect(
                 sdJwtVc,
                 verifierSupportedVpFormats.sdJwtVc,
-                SupportedVpFormats.SdJwtVc::intersect,
+                VpFormats.SdJwtVc::intersect,
             ) { return null }
         else null
 
@@ -406,46 +406,21 @@ private fun SupportedVpFormats.intersect(queryFormats: Set<Format>, verifierSupp
             intersect(
                 msoMdoc,
                 verifierSupportedVpFormats.msoMdoc,
-                SupportedVpFormats.MsoMdoc::intersect,
+                VpFormats.MsoMdoc::intersect,
             ) { return null }
         else null
 
-    return RequestedVpFormats(sdJwtVc = commonSdJwt, msoMdoc = commonMsoMdoc)
-}
-
-private fun SupportedVpFormats.SdJwtVc.intersect(requested: RequestedVpFormats.SdJwtVc): RequestedVpFormats.SdJwtVc? {
-    val commonSdJwtAlgorithms = intersect(sdJwtAlgorithms, requested.sdJwtAlgorithms) { return null }
-    val commonKbJwtAlgorithms = intersect(kbJwtAlgorithms, requested.kbJwtAlgorithms) { return null }
-
-    return RequestedVpFormats.SdJwtVc(sdJwtAlgorithms = commonSdJwtAlgorithms, kbJwtAlgorithms = commonKbJwtAlgorithms)
-}
-
-private fun SupportedVpFormats.MsoMdoc.intersect(requested: RequestedVpFormats.MsoMdoc): RequestedVpFormats.MsoMdoc? {
-    val commonIssuerAuthAlgorithms = intersect(issuerAuthAlgorithms, requested.issuerAuthAlgorithms) { return null }
-    val commonDeviceAuthAlgorithms = intersect(deviceAuthAlgorithms, requested.deviceAuthAlgorithms) { return null }
-
-    return RequestedVpFormats.MsoMdoc(issuerAuthAlgorithms = commonIssuerAuthAlgorithms, deviceAuthAlgorithms = commonDeviceAuthAlgorithms)
+    return VpFormats(sdJwtVc = commonSdJwt, msoMdoc = commonMsoMdoc)
 }
 
 /**
- * Finds common elements between a [supported] set of elements and a [requested] set of elements.
- * If nothing was requested, null is returned.
- * If no common elements exists between supported and requested, [onEmptyIntersection] is returned.
- * Returns null in all other cases.
- */
-private inline fun <T> intersect(
-    supported: Set<T>,
-    requested: Set<T>?,
-    onEmptyIntersection: () -> Set<T>,
-): Set<T>? =
-    if (null != requested) supported.intersect(requested).takeIf { it.isNotEmpty() } ?: onEmptyIntersection()
-    else null
-
-/**
- * Finds common ground between an optionally [supported] elements, and an optionally [requested] element.
- * If both supported and requested are provided, returns the result of [intersect].
- * If either interset returns null, or supported is null, [onEmptyIntersection] is returned.
- * Returns null in all other cases.
+ * Finds common ground [supported], and [requested].
+ *
+ * @return
+ * * If both supported and requested are provided, returns their [intersection][intersect].
+ * If their intersection is null, returns [onEmptyIntersection]
+ * * If supported is null, but requested is not null, returns [onEmptyIntersection].
+ * * Returns null in all other cases.
  */
 private inline fun <A, B> intersect(
     supported: A?,
@@ -457,4 +432,35 @@ private inline fun <A, B> intersect(
         null != supported && null != requested -> intersect(supported, requested) ?: onEmptyIntersection()
         null == supported && null != requested -> onEmptyIntersection()
         else -> null
+    }
+
+private fun VpFormats.SdJwtVc.intersect(requested: VpFormats.SdJwtVc): VpFormats.SdJwtVc? {
+    val commonSdJwtAlgorithms = intersect(sdJwtAlgorithms, requested.sdJwtAlgorithms) { return null }
+    val commonKbJwtAlgorithms = intersect(kbJwtAlgorithms, requested.kbJwtAlgorithms) { return null }
+
+    return VpFormats.SdJwtVc(sdJwtAlgorithms = commonSdJwtAlgorithms, kbJwtAlgorithms = commonKbJwtAlgorithms)
+}
+
+private fun VpFormats.MsoMdoc.intersect(requested: VpFormats.MsoMdoc): VpFormats.MsoMdoc? {
+    val commonIssuerAuthAlgorithms = intersect(issuerAuthAlgorithms, requested.issuerAuthAlgorithms) { return null }
+    val commonDeviceAuthAlgorithms = intersect(deviceAuthAlgorithms, requested.deviceAuthAlgorithms) { return null }
+
+    return VpFormats.MsoMdoc(issuerAuthAlgorithms = commonIssuerAuthAlgorithms, deviceAuthAlgorithms = commonDeviceAuthAlgorithms)
+}
+
+/**
+ * Finds common elements between [supported] and [requested].
+ * If nothing was requested, null is returned.
+ * If no common elements exists between supported and requested, [onEmptyIntersection] is returned.
+ * Returns null in all other cases.
+ */
+private inline fun <T> intersect(
+    supported: List<T>?,
+    requested: List<T>?,
+    onEmptyIntersection: () -> List<T>?,
+): List<T>? =
+    when {
+        null != supported && null != requested ->
+            supported.intersect(requested).toList().takeIf { it.isNotEmpty() } ?: onEmptyIntersection()
+        else -> requested ?: supported
     }

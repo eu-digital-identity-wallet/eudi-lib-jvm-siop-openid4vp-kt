@@ -196,7 +196,13 @@ private fun config(clientId: String, jarEncryptionRequirement: EncryptionRequire
             ),
         ),
         vpConfiguration = VPConfiguration(
-            supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
+            vpFormats = VpFormats(
+                VpFormats.SdJwtVc.HAIP,
+                VpFormats.MsoMdoc(
+                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                ),
+            ),
         ),
         supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.Preregistered(PreregisteredClient(clientId, clientId))),
     )

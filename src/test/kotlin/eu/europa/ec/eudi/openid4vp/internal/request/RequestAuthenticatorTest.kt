@@ -52,7 +52,13 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
+                vpFormats = VpFormats(
+                    VpFormats.SdJwtVc.HAIP,
+                    VpFormats.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -88,7 +94,13 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
+                vpFormats = VpFormats(
+                    VpFormats.SdJwtVc.HAIP,
+                    VpFormats.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -133,7 +145,13 @@ class ClientAuthenticatorTest {
                 },
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
+                vpFormats = VpFormats(
+                    VpFormats.SdJwtVc.HAIP,
+                    VpFormats.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -238,7 +256,13 @@ class ClientAuthenticatorTest {
                 SupportedClientIdPrefix.VerifierAttestation(AttestationIssuer.verifier),
             ),
             vpConfiguration = VPConfiguration(
-                supportedVpFormats = SupportedVpFormats(SupportedVpFormats.SdJwtVc.ES256, SupportedVpFormats.MsoMdoc.ES256),
+                vpFormats = VpFormats(
+                    VpFormats.SdJwtVc.HAIP,
+                    VpFormats.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
             clock = Clock.systemDefaultZone(),
         )

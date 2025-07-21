@@ -17,6 +17,7 @@ package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
@@ -313,6 +314,42 @@ value class TransactionDataCredentialId(val value: String) : Serializable {
 }
 
 @JvmInline
+value class FullySpecifiedJoseSigningAlgorithm(val value: JWSAlgorithm) : Serializable {
+    init {
+        require(value in JWSAlgorithm.Family.SIGNATURE) { "value must be a signature algorithm" }
+        require(value in FullySpecifiedJwsAlgorithms) { "value must be a fully specified signature algorithm" }
+    }
+
+    val name: String
+        get() = value.name
+
+    companion object {
+        fun parse(value: String): FullySpecifiedJoseSigningAlgorithm = FullySpecifiedJoseSigningAlgorithm(JWSAlgorithm.parse(value))
+
+        val FullySpecifiedJwsAlgorithms: Set<JWSAlgorithm> by lazy {
+            setOf(
+                JWSAlgorithm.HS256,
+                JWSAlgorithm.HS384,
+                JWSAlgorithm.HS512,
+                JWSAlgorithm.RS256,
+                JWSAlgorithm.RS384,
+                JWSAlgorithm.RS512,
+                JWSAlgorithm.ES256,
+                JWSAlgorithm.ES256K,
+                JWSAlgorithm.ES384,
+                JWSAlgorithm.ES512,
+                JWSAlgorithm.PS256,
+                JWSAlgorithm.PS384,
+                JWSAlgorithm.PS512,
+                JWSAlgorithm.Ed25519,
+                JWSAlgorithm.Ed448,
+            )
+        }
+    }
+}
+
+@JvmInline
+@kotlinx.serialization.Serializable
 value class CoseAlgorithm(val value: Int) : Serializable {
     override fun toString(): String = value.toString()
 }

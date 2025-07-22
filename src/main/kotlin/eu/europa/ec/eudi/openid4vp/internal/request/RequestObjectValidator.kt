@@ -147,8 +147,8 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             else -> throw MissingQuerySource.asException()
         }
 
-        val queryFormats = query.credentials.map { it.format }.distinct()
-        ensure(walletSupportsVpFormats.supports(queryFormats)) {
+        val queryFormats = query.credentials.map { it.format }.toSet()
+        ensure(walletSupportsVpFormats.containsAll(queryFormats)) {
             UnsupportedQueryFormats.asException()
         }
 
@@ -401,12 +401,3 @@ private enum class ResponseType {
     IdToken,
     VpAndIdToken,
 }
-
-private fun VpFormatsSupported.supports(formats: Collection<Format>): Boolean =
-    formats.all {
-        when (it) {
-            Format.SdJwtVc -> null != sdJwtVc
-            Format.MsoMdoc -> null != msoMdoc
-            else -> false
-        }
-    }

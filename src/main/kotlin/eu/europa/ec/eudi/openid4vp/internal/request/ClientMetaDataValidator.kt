@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
@@ -74,10 +75,7 @@ internal object ClientMetaDataValidator {
                 )
             }
 
-        val vpFormatsSupported =
-            query
-                ?.let { resolveVpFormatsCommonGround(walletSupportedVpFormats, it, unvalidated.vpFormatsSupported) }
-                ?: unvalidated.vpFormatsSupported
+        val vpFormatsSupported = vpFormats(unvalidated, query, walletSupportedVpFormats)
 
         return ValidatedClientMetaData(
             responseEncryptionSpecification = responseEncryptionSpecification,
@@ -153,6 +151,24 @@ private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMet
     return encryptionMethods?.toSet()
 }
 
+private fun vpFormats(
+    unvalidated: UnvalidatedClientMetaData,
+    query: DCQL?,
+    walletSupportedVpFormats: VpFormatsSupported,
+): VpFormatsSupported =
+    query
+        ?.let {
+            val queryFormats = it.credentials.map { credential -> credential.format }.toSet()
+            ensure(unvalidated.vpFormatsSupported.containsAll(queryFormats)) {
+                RequestValidationError.InvalidClientMetaData(
+                    "Verifier does not support all Formats requested in the DCQL query",
+                ).asException()
+            }
+            val verifierQueryVpFormatsSupported = unvalidated.vpFormatsSupported.filter(queryFormats)
+            resolveCommonGround(walletSupportedVpFormats, verifierQueryVpFormatsSupported)
+        }
+        ?: unvalidated.vpFormatsSupported
+
 /**
  * Method checks whether Wallet can fulfill the Verifier's authorization response encryption requirements.
  *
@@ -204,62 +220,44 @@ private fun responseEncryptionSpecification(
     return ResponseEncryptionSpecification(encryptionAlgorithm, encryptionMethod, encryptionKey)
 }
 
-private fun resolveVpFormatsCommonGround(
-    walletSupportedVpFormats: VpFormatsSupported,
-    query: DCQL,
-    verifierSupportedVpFormatsSupported: VpFormatsSupported,
+private fun resolveCommonGround(
+    walletSupported: VpFormatsSupported,
+    verifierSupported: VpFormatsSupported,
 ): VpFormatsSupported {
-    val queryFormats = query.credentials.map { it.format }.toSet()
-    val commonGround = walletSupportedVpFormats.intersect(queryFormats, verifierSupportedVpFormatsSupported)
-    return ensureNotNull(commonGround) {
+    val sdJwtVc =
+        if (null != verifierSupported.sdJwtVc) {
+            walletSupported.sdJwtVc?.let {
+                resolveCommonGround(walletSupported = it, verifierSupported = verifierSupported.sdJwtVc)
+            }
+        } else null
+    val msoMdoc = verifierSupported.msoMdoc
+
+    ensure(null != sdJwtVc || null != msoMdoc) {
         ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
     }
+
+    return VpFormatsSupported(sdJwtVc, msoMdoc)
 }
 
-private fun VpFormatsSupported.intersect(
-    queryFormats: Set<Format>,
-    verifierSupportedVpFormatsSupported: VpFormatsSupported,
-): VpFormatsSupported? {
-    val commonSdJwt =
-        if (Format.SdJwtVc in queryFormats)
-            when {
-                null != sdJwtVc && null != verifierSupportedVpFormatsSupported.sdJwtVc ->
-                    sdJwtVc.intersect(verifierSupportedVpFormatsSupported.sdJwtVc) ?: return null
-
-                null == sdJwtVc && null != verifierSupportedVpFormatsSupported.sdJwtVc -> return null
-
-                else -> null
+private fun resolveCommonGround(
+    walletSupported: VpFormatsSupported.SdJwtVc,
+    verifierSupported: VpFormatsSupported.SdJwtVc,
+): VpFormatsSupported.SdJwtVc {
+    fun common(
+        walletSupported: List<JWSAlgorithm>?,
+        verifierSupported: List<JWSAlgorithm>?,
+    ): List<JWSAlgorithm>? =
+        when {
+            null != walletSupported && null != verifierSupported -> {
+                val common = walletSupported.intersect(verifierSupported).toList().takeIf { it.isNotEmpty() }
+                ensureNotNull(common) {
+                    ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+                }
             }
-        else null
+            else -> verifierSupported ?: walletSupported
+        }
 
-    val commonMsoMdoc =
-        if (Format.MsoMdoc in queryFormats) verifierSupportedVpFormatsSupported.msoMdoc
-        else null
-
-    return VpFormatsSupported(sdJwtVc = commonSdJwt, msoMdoc = commonMsoMdoc)
+    val sdJwtAlgorithms = common(walletSupported.sdJwtAlgorithms, verifierSupported.sdJwtAlgorithms)
+    val kbJwtAlgorithms = common(walletSupported.kbJwtAlgorithms, verifierSupported.kbJwtAlgorithms)
+    return VpFormatsSupported.SdJwtVc(sdJwtAlgorithms = sdJwtAlgorithms, kbJwtAlgorithms = kbJwtAlgorithms)
 }
-
-private fun VpFormatsSupported.SdJwtVc.intersect(requested: VpFormatsSupported.SdJwtVc): VpFormatsSupported.SdJwtVc? {
-    val commonSdJwtAlgorithms = intersect(sdJwtAlgorithms, requested.sdJwtAlgorithms) { return null }
-    val commonKbJwtAlgorithms = intersect(kbJwtAlgorithms, requested.kbJwtAlgorithms) { return null }
-
-    return VpFormatsSupported.SdJwtVc(sdJwtAlgorithms = commonSdJwtAlgorithms, kbJwtAlgorithms = commonKbJwtAlgorithms)
-}
-
-/**
- * Finds common elements between [supported] and [requested].
- * If nothing was requested, null is returned.
- * If no common elements exists between supported and requested, [onEmptyIntersection] is returned.
- * Returns null in all other cases.
- */
-private inline fun <T> intersect(
-    supported: List<T>?,
-    requested: List<T>?,
-    onEmptyIntersection: () -> List<T>?,
-): List<T>? =
-    when {
-        null != supported && null != requested ->
-            supported.intersect(requested).toList().takeIf { it.isNotEmpty() } ?: onEmptyIntersection()
-
-        else -> requested ?: supported
-    }

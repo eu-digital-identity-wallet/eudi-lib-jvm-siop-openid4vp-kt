@@ -383,3 +383,18 @@ data class VpFormatsSupported(
         companion object
     }
 }
+
+internal fun VpFormatsSupported.containsAll(formats: Collection<Format>): Boolean =
+    formats.all {
+        when (it) {
+            Format.SdJwtVc -> null != sdJwtVc
+            Format.MsoMdoc -> null != msoMdoc
+            else -> false
+        }
+    }
+
+internal fun VpFormatsSupported.filter(formats: Collection<Format>): VpFormatsSupported =
+    VpFormatsSupported(
+        sdJwtVc = sdJwtVc?.takeIf { Format.SdJwtVc in formats },
+        msoMdoc = msoMdoc?.takeIf { Format.MsoMdoc in formats },
+    )

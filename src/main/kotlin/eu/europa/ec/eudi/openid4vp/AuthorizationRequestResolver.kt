@@ -160,7 +160,7 @@ data class TransactionData private constructor(val value: String) : Serializable
         }
 
         private fun DCQL.requestedCredentialIds(): List<TransactionDataCredentialId> =
-            credentials.map { TransactionDataCredentialId(it.id.value) }
+            credentials.ids.map { TransactionDataCredentialId(it.value) }
 
         internal operator fun invoke(
             type: TransactionDataType,

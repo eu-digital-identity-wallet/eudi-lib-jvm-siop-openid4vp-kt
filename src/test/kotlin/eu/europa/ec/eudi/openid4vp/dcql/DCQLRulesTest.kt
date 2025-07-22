@@ -39,7 +39,7 @@ class DCQLRulesTest {
     @Test
     fun whenCredentialsIsEmptyAnExceptionIsRaised() {
         try {
-            DCQL(credentials = emptyList())
+            Credentials(emptyList())
             fail("DCQL cannot have an empty credentials attribute")
         } catch (_: IllegalArgumentException) {
             // ok
@@ -50,11 +50,9 @@ class DCQLRulesTest {
     fun whenCredentialsContainsEntriesWithTheSameIdAnExceptionIsRaised() {
         try {
             val id = QueryId("id")
-            DCQL(
-                credentials = listOf(
-                    CredentialQuery.mdoc(id, DCQLMetaMsoMdocExtensions(MsoMdocDocType("foo"))),
-                    CredentialQuery.sdJwtVc(id, DCQLMetaSdJwtVcExtensions(vctValues = listOf("bar"))),
-                ),
+            Credentials(
+                CredentialQuery.mdoc(id, DCQLMetaMsoMdocExtensions(MsoMdocDocType("foo"))),
+                CredentialQuery.sdJwtVc(id, DCQLMetaSdJwtVcExtensions(vctValues = listOf("bar"))),
             )
             fail("CredentialQuery ids must be unique")
         } catch (_: IllegalArgumentException) {
@@ -65,13 +63,11 @@ class DCQLRulesTest {
     @Test
     fun whenCredentialsSetIsEmptyAnExceptionIsRaised() {
         try {
-            DCQL(
-                credentials = listOf(
-                    CredentialQuery.mdoc(
-                        QueryId("id1"),
-                        DCQLMetaMsoMdocExtensions(MsoMdocDocType("foo")),
-                        claimSets = emptyList(),
-                    ),
+            Credentials(
+                CredentialQuery.mdoc(
+                    QueryId("id1"),
+                    DCQLMetaMsoMdocExtensions(MsoMdocDocType("foo")),
+                    claimSets = emptyList(),
                 ),
             )
             fail("credentialSets, if provided, cannot be empty")

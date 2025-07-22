@@ -24,8 +24,74 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.net.URL
 
-typealias Credentials = List<CredentialQuery>
-typealias CredentialSets = List<CredentialSetQuery>
+@Serializable
+@JvmInline
+value class Credentials(val value: List<CredentialQuery>) {
+
+    init {
+        value.ensureValid()
+    }
+
+    val ids: List<QueryId> get() = value.map { it.id }
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+
+        @JvmStatic
+        @JvmName("of")
+        operator fun invoke(vararg value: CredentialQuery): Credentials = Credentials(value.toList())
+
+        fun List<CredentialQuery>.ensureValid(): Set<QueryId> {
+            require(isNotEmpty()) { "${OpenId4VPSpec.DCQL_CREDENTIALS} cannot be empty" }
+            return ensureUniqueIds()
+        }
+
+        private fun List<CredentialQuery>.ensureUniqueIds(): Set<QueryId> {
+            val uniqueIds = map { it.id }.toSet()
+            require(uniqueIds.size == size) {
+                "Within the Authorization Request, the same credential query id MUST NOT be present more than once"
+            }
+            return uniqueIds
+        }
+    }
+}
+
+@Serializable
+@JvmInline
+value class CredentialSets(val value: List<CredentialSetQuery>) {
+
+    init {
+        value.ensureNotEmpty()
+    }
+
+    fun ensureKnownIds(credentials: Credentials) {
+        value.ensureKnownIds(credentials)
+    }
+
+    companion object {
+        @JvmStatic
+        @JvmName("of")
+        operator fun invoke(vararg value: CredentialSetQuery) =
+            CredentialSets(value.toList())
+
+        private fun List<CredentialSetQuery>.ensureNotEmpty() {
+            require(isNotEmpty()) { "${OpenId4VPSpec.DCQL_CREDENTIAL_SETS} cannot be empty, if provided" }
+        }
+
+        private fun List<CredentialSetQuery>.ensureKnownIds(credentials: Credentials) {
+            forEach { credentialSet -> credentialSet.ensureOptionsWithKnownIds(credentials) }
+        }
+
+        private fun CredentialSetQuery.ensureOptionsWithKnownIds(credentials: Credentials) {
+            val knownIds = credentials.ids
+            options.forEach { credentialSet ->
+                require(credentialSet.all { it in knownIds }) { "Unknown credential query ids in option $credentialSet" }
+            }
+        }
+    }
+}
+
 typealias CredentialSet = Set<QueryId>
 typealias ClaimSet = Set<ClaimId>
 
@@ -58,8 +124,10 @@ data class TrustedAuthority(
     companion object {
         fun authorityKeyIdentifiers(values: List<String>): TrustedAuthority =
             TrustedAuthority(TrustedAuthorityType.AuthorityKeyIdentifier, values)
+
         fun trustedLists(values: List<URL>): TrustedAuthority =
             TrustedAuthority(TrustedAuthorityType.TrustedList, values.map { it.toExternalForm() })
+
         fun federatedEntities(values: List<URL>): TrustedAuthority =
             TrustedAuthority(TrustedAuthorityType.OpenIdFederation, values.map { it.toExternalForm() })
     }
@@ -79,34 +147,7 @@ data class DCQL(
 
 ) {
     init {
-        val uniqueIds = credentials.ensureValid()
-        credentialSets?.apply { ensureValid(uniqueIds) }
-    }
-
-    companion object {
-        private fun Credentials.ensureValid(): Set<QueryId> {
-            require(isNotEmpty()) { "${OpenId4VPSpec.DCQL_CREDENTIALS} cannot be empty" }
-            return ensureUniqueIds()
-        }
-
-        private fun Credentials.ensureUniqueIds(): Set<QueryId> {
-            val uniqueIds = map { it.id }.toSet()
-            require(uniqueIds.size == size) {
-                "Within the Authorization Request, the same credential query id MUST NOT be present more than once"
-            }
-            return uniqueIds
-        }
-
-        private fun CredentialSets.ensureValid(queryIds: Set<QueryId>) {
-            require(isNotEmpty()) { "${OpenId4VPSpec.DCQL_CREDENTIAL_SETS} cannot be empty, if provided" }
-            forEach { credentialSet -> credentialSet.ensureOptionsWithKnownIds(queryIds) }
-        }
-
-        private fun CredentialSetQuery.ensureOptionsWithKnownIds(knownIds: Set<QueryId>) {
-            options.forEach { credentialSet ->
-                require(credentialSet.all { it in knownIds }) { "Unknown credential query ids in option $credentialSet" }
-            }
-        }
+        credentialSets?.apply { ensureKnownIds(credentials) }
     }
 }
 
@@ -287,10 +328,10 @@ data class CredentialSetQuery(
 
     init {
         require(options.isNotEmpty()) { "${OpenId4VPSpec.DCQL_OPTIONS} cannot be empty" }
-        options.forEachIndexed { index, credentialSet ->
-            require(credentialSet.isNotEmpty()) {
-                "Element of ${OpenId4VPSpec.DCQL_OPTIONS} at index $index cannot be empty"
-            }
+        val emptyOptions =
+            options.mapIndexedNotNull { index, credentialSet -> index.takeIf { credentialSet.isEmpty() } }
+        require(emptyOptions.isEmpty()) {
+            "${OpenId4VPSpec.DCQL_OPTIONS} must contain non-empty arrays. Violations at $emptyOptions"
         }
     }
 
@@ -324,6 +365,7 @@ data class ClaimsQuery(
     init {
         values?.ensureContainsOnlyPrimitives()
     }
+
     companion object {
         fun sdJwtVc(
             id: ClaimId? = null,
@@ -362,7 +404,11 @@ data class ClaimsQuery(
         }
 
         fun JsonArray.ensureContainsOnlyPrimitives() {
-            val nonPrimitiveElements = mapIndexedNotNull { index, jsonElement -> if (jsonElement !is JsonPrimitive) { index } else null }
+            val nonPrimitiveElements = mapIndexedNotNull { index, jsonElement ->
+                if (jsonElement !is JsonPrimitive) {
+                    index
+                } else null
+            }
             require(nonPrimitiveElements.isEmpty()) {
                 "${OpenId4VPSpec.DCQL_VALUES} should contain only primitive elements. Violations at $nonPrimitiveElements"
             }

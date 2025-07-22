@@ -135,7 +135,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.mdoc(
                     id = QueryId("my_credential"),
                     msoMdocMeta = DCQLMetaMsoMdocExtensions(MsoMdocDocType("org.iso.7367.1.mVRC")),
@@ -187,7 +187,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.sdJwtVc(
                     id = QueryId("pid"),
                     sdJwtVcMeta = DCQLMetaSdJwtVcExtensions(vctValues = listOf("https://credentials.example.com/identity_credential")),
@@ -297,7 +297,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.sdJwtVc(
                     id = QueryId("pid"),
                     sdJwtVcMeta = DCQLMetaSdJwtVcExtensions(vctValues = listOf("https://credentials.example.com/identity_credential")),
@@ -343,7 +343,7 @@ class DCQLParseTest {
                     ),
                 ),
             ),
-            credentialSets = listOf(
+            credentialSets = CredentialSets(
                 CredentialSetQuery(
                     options = listOf(
                         setOf(QueryId("pid")),
@@ -461,7 +461,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.mdoc(
                     id = QueryId("mdl-id"),
                     msoMdocMeta = DCQLMetaMsoMdocExtensions(MsoMdocDocType("org.iso.18013.5.1.mDL")),
@@ -537,7 +537,7 @@ class DCQLParseTest {
                     ),
                 ),
             ),
-            credentialSets = listOf(
+            credentialSets = CredentialSets(
                 CredentialSetQuery(
                     options = listOf(
                         setOf(QueryId("mdl-id")),
@@ -582,7 +582,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.sdJwtVc(
                     id = QueryId("pid"),
                     sdJwtVcMeta = DCQLMetaSdJwtVcExtensions(vctValues = listOf("https://credentials.example.com/identity_credential")),

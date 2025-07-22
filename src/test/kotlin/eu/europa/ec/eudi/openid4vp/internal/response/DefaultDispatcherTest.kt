@@ -96,7 +96,7 @@ class DefaultDispatcherTest {
             state: String? = null,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val query = DCQL(
-                credentials = listOf(
+                credentials = Credentials(
                     CredentialQuery.sdJwtVc(
                         id = QueryId("query_for_identity"),
                         DCQLMetaSdJwtVcExtensions(listOf("identity_credential")),
@@ -465,7 +465,7 @@ class DefaultDispatcherTest {
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val query = DCQL(
-                credentials = listOf(
+                credentials = Credentials(
                     testCredentialQuery(),
                 ),
             )

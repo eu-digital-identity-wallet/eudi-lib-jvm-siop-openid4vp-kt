@@ -198,7 +198,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 throw invalid("Failed to deserialize verifier_attestations. Cause: ${t.message}")
             }
 
-        val allQueryIds = query.credentials.map { it.id }
+        val allQueryIds = query.credentials.value.map { it.id }
         fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
             if (queryIds.isNullOrEmpty()) true
             else {

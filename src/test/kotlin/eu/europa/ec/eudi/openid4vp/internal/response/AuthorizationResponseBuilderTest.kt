@@ -27,6 +27,7 @@ import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.dcql.CredentialQuery
+import eu.europa.ec.eudi.openid4vp.dcql.Credentials
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.DCQLMetaSdJwtVcExtensions
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
@@ -162,7 +163,7 @@ class AuthorizationResponseBuilderTest {
         fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
             val query = DCQL(
-                credentials = listOf(
+                credentials = Credentials(
                     CredentialQuery.sdJwtVc(
                         id = QueryId("query_for_identity"),
                         DCQLMetaSdJwtVcExtensions(

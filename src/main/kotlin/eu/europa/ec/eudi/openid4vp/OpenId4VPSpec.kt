@@ -15,6 +15,9 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+/**
+ * [OpenId For Verifiable presentations](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
+ */
 object OpenId4VPSpec {
 
     const val RESPONSE_URI = "response_uri"
@@ -48,17 +51,24 @@ object OpenId4VPSpec {
 
     const val DCQL_ID: String = "id"
     const val DCQL_FORMAT: String = "format"
+    const val DCQL_MULTIPLE: String = "multiple"
     const val DCQL_META: String = "meta"
+    const val DCQL_TRUSTED_AUTHORITIES: String = "trusted_authorities"
+    const val DCQL_REQUIRE_CRYPTOGRAPHIC_HB: String = "require_cryptographic_holder_binding"
     const val DCQL_CLAIMS: String = "claims"
     const val DCQL_CLAIM_SETS: String = "claim_sets"
     const val DCQL_OPTIONS: String = "options"
     const val DCQL_REQUIRED: String = "required"
-    const val DCQL_PURPOSE: String = "purpose"
     const val DCQL_PATH: String = "path"
     const val DCQL_VALUES: String = "values"
     const val DCQL_SD_JWT_VC_VCT_VALUES: String = "vct_values"
     const val DCQL_MSO_MDOC_DOCTYPE_VALUE: String = "doctype_value"
-    const val DCQL_MSO_MDOC_INTENT_TO_RETAIN = "intent_to_retain"
+    const val DCQL_MSO_MDOC_INTENT_TO_RETAIN: String = "intent_to_retain"
+    const val DCQL_TRUSTED_AUTHORITY_TYPE: String = "type"
+    const val DCQL_TRUSTED_AUTHORITY_VALUES: String = "values"
+    const val DCQL_TRUSTED_AUTHORITY_TYPE_AKI: String = "aki"
+    const val DCQL_TRUSTED_AUTHORITY_TYPE_ETSI_TL: String = "etsi_tl"
+    const val DCQL_TRUSTED_AUTHORITY_TYPE_OPENID_FEDERATION: String = "openid_federation"
 
     const val TRANSACTION_DATA: String = "transaction_data"
     const val TRANSACTION_DATA_TYPE: String = "type"

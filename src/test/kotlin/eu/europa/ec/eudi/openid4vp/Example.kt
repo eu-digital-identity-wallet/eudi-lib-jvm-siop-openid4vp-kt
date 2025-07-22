@@ -273,7 +273,7 @@ sealed interface Transaction {
 
         val SdJwtVcPidDcql = run {
             val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-pid-dcql-query.json"))
-            val queryId = dcql.credentials.first().id
+            val queryId = dcql.credentials.ids.first()
             val transactionData = TransactionData(
                 TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                 listOf(TransactionDataCredentialId(queryId.value)),
@@ -361,8 +361,8 @@ private class Wallet(
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
         val query = request.query
-        check(1 == query.credentials.size) { "found more than 1 credentials" }
-        val credential = query.credentials.first()
+        check(1 == query.credentials.value.size) { "found more than 1 credentials" }
+        val credential = query.credentials.value.first()
         val verifiablePresentation = when (val format = credential.format.value) {
             "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
             "dc+sd-jwt" -> {

@@ -22,7 +22,6 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier
 import java.net.URL
 
 typealias Credentials = List<CredentialQuery>
@@ -129,6 +128,9 @@ value class QueryId(val value: String) {
  */
 @Serializable
 data class CredentialQuery(
+    /**
+     * A string identifying the Credential in the response and, if provided, the constraints in credential_sets
+     */
     @SerialName(OpenId4VPSpec.DCQL_ID) @Required val id: QueryId,
     @SerialName(OpenId4VPSpec.DCQL_FORMAT) @Required val format: Format,
     /**
@@ -144,6 +146,12 @@ data class CredentialQuery(
      */
     @SerialName(OpenId4VPSpec.DCQL_MULTIPLE) val multiple: Boolean? = null,
     @SerialName(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITIES) val trustedAuthorities: List<TrustedAuthority>? = null,
+    /**
+     * A boolean which indicates whether the Verifier requires a Cryptographic Holder Binding proof.
+     * The default value is true, i.e., a Verifiable Presentation with Cryptographic Holder Binding is required.
+     * If set to false, the Verifier accepts a Credential without Cryptographic Holder Binding proof.
+     */
+    @SerialName(OpenId4VPSpec.DCQL_REQUIRE_CRYPTOGRAPHIC_HB) val requireCryptographicHolderBinding: Boolean? = null,
     /**
      * A non-empty list that specifies claims in the requested Credential.
      */
@@ -161,27 +169,46 @@ data class CredentialQuery(
             claims.ensureValid(format)
             claimSets?.ensureValid(claims)
         } else {
-            require(claimSets == null) { "Cannot provide ${OpenId4VPSpec.DCQL_CLAIM_SETS} without ${OpenId4VPSpec.DCQL_CLAIMS}" }
+            require(claimSets == null) {
+                "Cannot provide ${OpenId4VPSpec.DCQL_CLAIM_SETS} without ${OpenId4VPSpec.DCQL_CLAIMS}"
+            }
         }
         if (null != trustedAuthorities) {
-            require(trustedAuthorities.isNotEmpty()) { "${OpenId4VPSpec.DCQL_TRUSTED_AUTHORITIES} cannot be empty" }
+            require(trustedAuthorities.isNotEmpty()) {
+                "${OpenId4VPSpec.DCQL_TRUSTED_AUTHORITIES} cannot be empty"
+            }
         }
     }
 
-    val multipleOrDefault: Boolean get() = multiple ?: DEFAULT_MULTIPLE_VALUE
+    val multipleOrDefault: Boolean
+        get() = multiple ?: DEFAULT_MULTIPLE_VALUE
+
+    val requireCryptographicHolderBindingOrDefault: Boolean
+        get() = requireCryptographicHolderBinding ?: DEFAULT_REQUIRE_CRYPTOGRAPHIC_HOLDER_BINDING_VALUE
 
     companion object {
         private const val DEFAULT_MULTIPLE_VALUE: Boolean = false
+        private const val DEFAULT_REQUIRE_CRYPTOGRAPHIC_HOLDER_BINDING_VALUE: Boolean = true
         fun sdJwtVc(
             id: QueryId,
             sdJwtVcMeta: DCQLMetaSdJwtVcExtensions,
             multiple: Boolean? = null,
             trustedAuthorities: List<TrustedAuthority>? = null,
+            requireCryptographicHolderBinding: Boolean? = null,
             claims: List<ClaimsQuery>? = null,
             claimSets: List<ClaimSet>? = null,
         ): CredentialQuery {
             val meta = sdJwtVcMeta.let { jsonSupport.encodeToJsonElement(it).jsonObject }
-            return CredentialQuery(id, Format.SdJwtVc, meta, multiple, trustedAuthorities, claims, claimSets)
+            return CredentialQuery(
+                id,
+                Format.SdJwtVc,
+                meta,
+                multiple,
+                trustedAuthorities,
+                requireCryptographicHolderBinding,
+                claims,
+                claimSets,
+            )
         }
 
         fun mdoc(
@@ -189,11 +216,21 @@ data class CredentialQuery(
             msoMdocMeta: DCQLMetaMsoMdocExtensions,
             multiple: Boolean? = null,
             trustedAuthorities: List<TrustedAuthority>? = null,
+            requireCryptographicHolderBinding: Boolean? = null,
             claims: List<ClaimsQuery>? = null,
             claimSets: List<ClaimSet>? = null,
         ): CredentialQuery {
             val meta = msoMdocMeta.let { jsonSupport.encodeToJsonElement(it).jsonObject }
-            return CredentialQuery(id, Format.MsoMdoc, meta, multiple, trustedAuthorities, claims, claimSets)
+            return CredentialQuery(
+                id,
+                Format.MsoMdoc,
+                meta,
+                multiple,
+                trustedAuthorities,
+                requireCryptographicHolderBinding,
+                claims,
+                claimSets,
+            )
         }
 
         private fun List<ClaimsQuery>.ensureValid(format: Format) {
@@ -244,15 +281,8 @@ data class CredentialSetQuery(
      *
      * If omitted, the default value is true
      */
-    @SerialName(OpenId4VPSpec.DCQL_REQUIRED) val required: Boolean? = DefaultRequiredValue,
+    @SerialName(OpenId4VPSpec.DCQL_REQUIRED) val required: Boolean? = null,
 
-    /**
-     *  A string, number or object specifying the purpose of the query.
-     *  [OpenId4VPSpec]  does not define a specific structure or specific values for this property.
-     *  The purpose is intended to be used by the Verifier to communicate the reason for the query to the Wallet.
-     *  The Wallet MAY use this information to show the user the reason for the request
-     */
-    @SerialName(OpenId4VPSpec.DCQL_PURPOSE) val purpose: JsonElement? = null,
 ) {
 
     init {
@@ -261,9 +291,12 @@ data class CredentialSetQuery(
         }
     }
 
+    val requiredOrDefault: Boolean
+        get() = required ?: DEFAULT_REQUIRED_VALUE
+
     companion object {
 
-        val DefaultRequiredValue: Boolean? = true
+        private const val DEFAULT_REQUIRED_VALUE: Boolean = true
     }
 }
 

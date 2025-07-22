@@ -75,7 +75,9 @@ internal object ClientMetaDataValidator {
                 )
             }
 
-        val vpFormatsSupported = vpFormats(unvalidated, query, walletSupportedVpFormats)
+        val vpFormatsSupported =
+            if (null != query) vpFormats(unvalidated, query, walletSupportedVpFormats)
+            else unvalidated.vpFormatsSupported
 
         return ValidatedClientMetaData(
             responseEncryptionSpecification = responseEncryptionSpecification,
@@ -153,21 +155,18 @@ private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMet
 
 private fun vpFormats(
     unvalidated: UnvalidatedClientMetaData,
-    query: DCQL?,
+    query: DCQL,
     walletSupportedVpFormats: VpFormatsSupported,
-): VpFormatsSupported =
-    query
-        ?.let {
-            val queryFormats = it.credentials.map { credential -> credential.format }.toSet()
-            ensure(unvalidated.vpFormatsSupported.containsAll(queryFormats)) {
-                RequestValidationError.InvalidClientMetaData(
-                    "Verifier does not support all Formats requested in the DCQL query",
-                ).asException()
-            }
-            val verifierQueryVpFormatsSupported = unvalidated.vpFormatsSupported.filter(queryFormats)
-            resolveCommonGround(walletSupportedVpFormats, verifierQueryVpFormatsSupported)
-        }
-        ?: unvalidated.vpFormatsSupported
+): VpFormatsSupported {
+    val queryFormats = query.credentials.map { credential -> credential.format }.toSet()
+    ensure(unvalidated.vpFormatsSupported.containsAll(queryFormats)) {
+        RequestValidationError.InvalidClientMetaData(
+            "Verifier does not support all Formats requested in the DCQL query",
+        ).asException()
+    }
+    val verifierQueryVpFormatsSupported = unvalidated.vpFormatsSupported.filter(queryFormats)
+    return resolveCommonGround(walletSupportedVpFormats, verifierQueryVpFormatsSupported)
+}
 
 /**
  * Method checks whether Wallet can fulfill the Verifier's authorization response encryption requirements.
@@ -254,6 +253,7 @@ private fun resolveCommonGround(
                     ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
                 }
             }
+
             else -> verifierSupported ?: walletSupported
         }
 

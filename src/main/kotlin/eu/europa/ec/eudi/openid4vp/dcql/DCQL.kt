@@ -487,12 +487,12 @@ data class ClaimsQuery(
 
         fun JsonArray.ensureContainsOnlyPrimitives() {
             val nonPrimitiveElements = mapIndexedNotNull { index, jsonElement ->
-                if (jsonElement !is JsonPrimitive) {
+                if (jsonElement !is JsonPrimitive || jsonElement == JsonNull) {
                     index
                 } else null
             }
             require(nonPrimitiveElements.isEmpty()) {
-                "${OpenId4VPSpec.DCQL_VALUES} should contain only primitive elements. Violations at $nonPrimitiveElements"
+                "${OpenId4VPSpec.DCQL_VALUES} should contain only primitive, non-null, elements. Violations at $nonPrimitiveElements"
             }
         }
     }

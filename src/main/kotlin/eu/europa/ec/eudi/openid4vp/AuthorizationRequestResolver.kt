@@ -361,6 +361,11 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class InvalidDigitalCredentialsQuery(val cause: Throwable) : RequestValidationError
 
+    data object UnsupportedQueryFormats : RequestValidationError {
+        @Suppress("unused")
+        private fun readResolve(): Any = UnsupportedQueryFormats
+    }
+
     data object InvalidRedirectUri : RequestValidationError {
         @Suppress("unused")
         private fun readResolve(): Any = InvalidRedirectUri

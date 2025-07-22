@@ -63,7 +63,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         }
 
         fun vpToken(): OpenId4VPAuthorization {
-            val query = requiredDcqlQuery(requestObject, nonOpenIdScope)
+            val query = requiredDcqlQuery(requestObject, nonOpenIdScope, siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported)
             val transactionData = optionalTransactionData(requestObject, query)
             val verifierAttestations = optionalVerifierAttestations(query, requestObject)
             val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
@@ -81,7 +81,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         }
 
         fun idAndVpToken(): SiopOpenId4VPAuthentication {
-            val query = requiredDcqlQuery(requestObject, nonOpenIdScope)
+            val query = requiredDcqlQuery(requestObject, nonOpenIdScope, siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported)
             val transactionData = optionalTransactionData(requestObject, query)
             val verifierAttestations = optionalVerifierAttestations(query, requestObject)
             val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
@@ -113,13 +113,15 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
     }
 
     /**
-     * Makes sure that [unvalidated] contains a [DCQL] query.
+     * Makes sure that [unvalidated] contains a [DCQL] query with [Format] the Wallet supports.
      *
      * @param unvalidated the request to validate
+     * @param walletSupportsVpFormats the [VpFormatsSupported] supported by the Wallet
      */
     private fun requiredDcqlQuery(
         unvalidated: UnvalidatedRequestObject,
         scope: Scope?,
+        walletSupportsVpFormats: VpFormatsSupported,
     ): DCQL {
         val hasDcqlQuery = !unvalidated.dcqlQuery.isNullOrEmpty()
         val hasScope = scope != null
@@ -138,12 +140,19 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
 
         val querySourceCount = listOf(hasDcqlQuery, hasScope).count { it }
 
-        return when {
+        val query = when {
             querySourceCount > 1 -> throw MultipleQuerySources.asException()
             hasDcqlQuery -> requiredDcqlQuery()
             hasScope -> requiredScope()
             else -> throw MissingQuerySource.asException()
         }
+
+        val queryFormats = query.credentials.map { it.format }.distinct()
+        ensure(walletSupportsVpFormats.supports(queryFormats)) {
+            UnsupportedQueryFormats.asException()
+        }
+
+        return query
     }
 
     private fun lookupKnownDCQLQueries(scope: Scope): DCQL {
@@ -392,3 +401,12 @@ private enum class ResponseType {
     IdToken,
     VpAndIdToken,
 }
+
+private fun VpFormatsSupported.supports(formats: Collection<Format>): Boolean =
+    formats.all {
+        when (it) {
+            Format.SdJwtVc -> null != sdJwtVc
+            Format.MsoMdoc -> null != msoMdoc
+            else -> false
+        }
+    }

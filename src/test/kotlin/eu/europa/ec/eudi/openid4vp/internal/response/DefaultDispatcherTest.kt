@@ -500,11 +500,7 @@ class DefaultDispatcherTest {
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.SiopOpenId4VPAuthentication {
-            val query = DCQL(
-                credentials = listOf(
-                    testCredentialQuery(),
-                ),
-            )
+            val query = DCQL(Credentials(testCredentialQuery()))
             val clientMetadataValidated =
                 ClientMetaDataValidator.validateClientMetaData(
                     unvalidatedClientMetaData,

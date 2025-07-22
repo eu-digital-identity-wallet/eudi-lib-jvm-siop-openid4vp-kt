@@ -158,7 +158,7 @@ private fun vpFormats(
     query: DCQL,
     walletSupportedVpFormats: VpFormatsSupported,
 ): VpFormatsSupported {
-    val queryFormats = query.credentials.map { credential -> credential.format }.toSet()
+    val queryFormats = query.credentials.value.map { credential -> credential.format }.toSet()
     ensure(unvalidated.vpFormatsSupported.containsAll(queryFormats)) {
         RequestValidationError.InvalidClientMetaData(
             "Verifier does not support all Formats requested in the DCQL query",

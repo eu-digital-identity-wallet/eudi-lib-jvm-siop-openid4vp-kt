@@ -147,7 +147,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             else -> throw MissingQuerySource.asException()
         }
 
-        val queryFormats = query.credentials.map { it.format }.toSet()
+        val queryFormats = query.credentials.value.map { it.format }.toSet()
         ensure(walletSupportsVpFormats.containsAll(queryFormats)) {
             UnsupportedQueryFormats.asException()
         }
@@ -198,7 +198,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 throw invalid("Failed to deserialize verifier_attestations. Cause: ${t.message}")
             }
 
-        val allQueryIds = query.credentials.map { it.id }
+        val allQueryIds = query.credentials.value.map { it.id }
         fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
             if (queryIds.isNullOrEmpty()) true
             else {

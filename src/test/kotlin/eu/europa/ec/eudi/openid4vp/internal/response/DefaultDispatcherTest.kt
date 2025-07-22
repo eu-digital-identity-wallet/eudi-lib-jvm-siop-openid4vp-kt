@@ -96,10 +96,10 @@ class DefaultDispatcherTest {
             state: String? = null,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val query = DCQL(
-                credentials = listOf(
-                    CredentialQuery(
-                        id = QueryId("pdId"),
-                        format = Format.SdJwtVc,
+                credentials = Credentials(
+                    CredentialQuery.sdJwtVc(
+                        id = QueryId("query_for_identity"),
+                        DCQLMetaSdJwtVcExtensions(listOf("identity_credential")),
                     ),
                 ),
             )
@@ -465,7 +465,7 @@ class DefaultDispatcherTest {
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val query = DCQL(
-                credentials = listOf(
+                credentials = Credentials(
                     testCredentialQuery(),
                 ),
             )
@@ -500,11 +500,7 @@ class DefaultDispatcherTest {
             unvalidatedClientMetaData: UnvalidatedClientMetaData,
             responseMode: ResponseMode.DirectPostJwt,
         ): ResolvedRequestObject.SiopOpenId4VPAuthentication {
-            val query = DCQL(
-                credentials = listOf(
-                    testCredentialQuery(),
-                ),
-            )
+            val query = DCQL(Credentials(testCredentialQuery()))
             val clientMetadataValidated =
                 ClientMetaDataValidator.validateClientMetaData(
                     unvalidatedClientMetaData,

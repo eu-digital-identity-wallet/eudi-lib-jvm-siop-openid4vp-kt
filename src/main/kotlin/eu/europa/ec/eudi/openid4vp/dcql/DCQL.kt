@@ -509,8 +509,14 @@ data class DCQLMetaSdJwtVcExtensions(
      * All elements in the array MUST be valid type identifiers.
      * The Wallet may return credentials that inherit from any of the specified types
      */
-    @SerialName(OpenId4VPSpec.DCQL_SD_JWT_VC_VCT_VALUES) val vctValues: List<String>?,
-)
+    @SerialName(OpenId4VPSpec.DCQL_SD_JWT_VC_VCT_VALUES) @Required val vctValues: List<String>,
+
+) {
+    init {
+        require(vctValues.isNotEmpty()) { "${OpenId4VPSpec.DCQL_SD_JWT_VC_VCT_VALUES} cannot be empty" }
+        require(vctValues.all { it.isNotBlank() }) { "${OpenId4VPSpec.DCQL_SD_JWT_VC_VCT_VALUES} cannot contain blank values" }
+    }
+}
 
 //
 //
@@ -537,7 +543,7 @@ data class DCQLMetaMsoMdocExtensions(
      * Specifies an allowed value for the doctype of the requested Verifiable Credential.
      * It MUST be a valid doctype identifier as defined
      */
-    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_DOCTYPE_VALUE) val doctypeValue: MsoMdocDocType?,
+    @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_DOCTYPE_VALUE) @Required val doctypeValue: MsoMdocDocType,
 )
 
 /**

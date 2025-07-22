@@ -22,11 +22,49 @@ import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier
+import java.net.URL
 
 typealias Credentials = List<CredentialQuery>
 typealias CredentialSets = List<CredentialSetQuery>
 typealias CredentialSet = Set<QueryId>
 typealias ClaimSet = Set<ClaimId>
+
+@Serializable
+@JvmInline
+value class TrustedAuthorityType(val value: String) {
+    init {
+        require(value.isNotBlank()) { "TrustedAuthorityType cannot be blank" }
+    }
+
+    override fun toString(): String = value
+
+    companion object {
+        val AuthorityKeyIdentifier: TrustedAuthorityType get() = TrustedAuthorityType(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_TYPE_AKI)
+        val TrustedList: TrustedAuthorityType get() = TrustedAuthorityType(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_TYPE_ETSI_TL)
+        val OpenIdFederation: TrustedAuthorityType get() = TrustedAuthorityType(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_TYPE_OPENID_FEDERATION)
+    }
+}
+
+@Serializable
+data class TrustedAuthority(
+    @SerialName(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_TYPE) @Required val type: TrustedAuthorityType,
+    @SerialName(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_VALUES) @Required val values: List<String>,
+) {
+    init {
+        require(values.isNotEmpty()) { "${OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_VALUES} cannot be empty" }
+        require(values.all { it.isNotBlank() }) { "${OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_VALUES} cannot contain blank values" }
+    }
+
+    companion object {
+        fun authorityKeyIdentifiers(values: List<String>): TrustedAuthority =
+            TrustedAuthority(TrustedAuthorityType.AuthorityKeyIdentifier, values)
+        fun trustedLists(values: List<URL>): TrustedAuthority =
+            TrustedAuthority(TrustedAuthorityType.TrustedList, values.map { it.toExternalForm() })
+        fun federatedEntities(values: List<URL>): TrustedAuthority =
+            TrustedAuthority(TrustedAuthorityType.OpenIdFederation, values.map { it.toExternalForm() })
+    }
+}
 
 @Serializable
 data class DCQL(
@@ -48,7 +86,7 @@ data class DCQL(
 
     companion object {
         private fun Credentials.ensureValid(): Set<QueryId> {
-            require(isNotEmpty()) { "At least one credential must be defined" }
+            require(isNotEmpty()) { "${OpenId4VPSpec.DCQL_CREDENTIALS} cannot be empty" }
             return ensureUniqueIds()
         }
 
@@ -61,7 +99,7 @@ data class DCQL(
         }
 
         private fun CredentialSets.ensureValid(queryIds: Set<QueryId>) {
-            require(isNotEmpty())
+            require(isNotEmpty()) { "${OpenId4VPSpec.DCQL_CREDENTIAL_SETS} cannot be empty, if provided" }
             forEach { credentialSet -> credentialSet.ensureOptionsWithKnownIds(queryIds) }
         }
 
@@ -97,19 +135,19 @@ data class CredentialQuery(
      * An object defining additional properties requested by the Verifier that apply
      * to the metadata and validity data of the Credential.
      * The properties of this object are defined per Credential Format.
-     * If omitted, no specific constraints are placed on the metadata or validity of the requested Credential.
-     *
      * @see [CredentialQuery.metaMsoMdoc]
      * @see [CredentialQuery.metaSdJwtVc]
-     * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1-3.8">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1-3.8</a>
      */
-    @SerialName(OpenId4VPSpec.DCQL_META) val meta: JsonObject? = null,
-
+    @SerialName(OpenId4VPSpec.DCQL_META) @Required val meta: JsonObject,
+    /**
+     * A boolean which indicates whether multiple Credentials can be returned for this Credential Query
+     */
+    @SerialName(OpenId4VPSpec.DCQL_MULTIPLE) val multiple: Boolean? = null,
+    @SerialName(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITIES) val trustedAuthorities: List<TrustedAuthority>? = null,
     /**
      * A non-empty list that specifies claims in the requested Credential.
      */
     @SerialName(OpenId4VPSpec.DCQL_CLAIMS) val claims: List<ClaimsQuery>? = null,
-
     /**
      *A non-empty set containing sets of identifiers for elements in claims that
      * specifies which combinations of claims for the Credential are requested
@@ -125,28 +163,37 @@ data class CredentialQuery(
         } else {
             require(claimSets == null) { "Cannot provide ${OpenId4VPSpec.DCQL_CLAIM_SETS} without ${OpenId4VPSpec.DCQL_CLAIMS}" }
         }
+        if (null != trustedAuthorities) {
+            require(trustedAuthorities.isNotEmpty()) { "${OpenId4VPSpec.DCQL_TRUSTED_AUTHORITIES} cannot be empty" }
+        }
     }
 
-    companion object {
+    val multipleOrDefault: Boolean get() = multiple ?: DEFAULT_MULTIPLE_VALUE
 
+    companion object {
+        private const val DEFAULT_MULTIPLE_VALUE: Boolean = false
         fun sdJwtVc(
             id: QueryId,
-            sdJwtVcMeta: DCQLMetaSdJwtVcExtensions? = null,
+            sdJwtVcMeta: DCQLMetaSdJwtVcExtensions,
+            multiple: Boolean? = null,
+            trustedAuthorities: List<TrustedAuthority>? = null,
             claims: List<ClaimsQuery>? = null,
             claimSets: List<ClaimSet>? = null,
         ): CredentialQuery {
-            val meta = sdJwtVcMeta?.let { jsonSupport.encodeToJsonElement(it).jsonObject }
-            return CredentialQuery(id, Format.SdJwtVc, meta, claims, claimSets)
+            val meta = sdJwtVcMeta.let { jsonSupport.encodeToJsonElement(it).jsonObject }
+            return CredentialQuery(id, Format.SdJwtVc, meta, multiple, trustedAuthorities, claims, claimSets)
         }
 
         fun mdoc(
             id: QueryId,
-            msoMdocMeta: DCQLMetaMsoMdocExtensions? = null,
+            msoMdocMeta: DCQLMetaMsoMdocExtensions,
+            multiple: Boolean? = null,
+            trustedAuthorities: List<TrustedAuthority>? = null,
             claims: List<ClaimsQuery>? = null,
             claimSets: List<ClaimSet>? = null,
         ): CredentialQuery {
-            val meta = msoMdocMeta?.let { jsonSupport.encodeToJsonElement(it).jsonObject }
-            return CredentialQuery(id, Format.MsoMdoc, meta, claims, claimSets)
+            val meta = msoMdocMeta.let { jsonSupport.encodeToJsonElement(it).jsonObject }
+            return CredentialQuery(id, Format.MsoMdoc, meta, multiple, trustedAuthorities, claims, claimSets)
         }
 
         private fun List<ClaimsQuery>.ensureValid(format: Format) {

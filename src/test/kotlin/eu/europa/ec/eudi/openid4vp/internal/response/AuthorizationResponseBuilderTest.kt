@@ -28,6 +28,7 @@ import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.dcql.CredentialQuery
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.dcql.DCQLMetaSdJwtVcExtensions
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
@@ -162,9 +163,11 @@ class AuthorizationResponseBuilderTest {
             val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
             val query = DCQL(
                 credentials = listOf(
-                    CredentialQuery(
-                        id = QueryId("pdId"),
-                        format = Format.SdJwtVc,
+                    CredentialQuery.sdJwtVc(
+                        id = QueryId("query_for_identity"),
+                        DCQLMetaSdJwtVcExtensions(
+                            vctValues = listOf("identity_credential"),
+                        ),
                     ),
                 ),
             )

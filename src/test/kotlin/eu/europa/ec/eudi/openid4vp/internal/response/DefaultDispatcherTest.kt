@@ -97,9 +97,9 @@ class DefaultDispatcherTest {
         ): ResolvedRequestObject.OpenId4VPAuthorization {
             val query = DCQL(
                 credentials = listOf(
-                    CredentialQuery(
-                        id = QueryId("pdId"),
-                        format = Format.SdJwtVc,
+                    CredentialQuery.sdJwtVc(
+                        id = QueryId("query_for_identity"),
+                        DCQLMetaSdJwtVcExtensions(listOf("identity_credential")),
                     ),
                 ),
             )

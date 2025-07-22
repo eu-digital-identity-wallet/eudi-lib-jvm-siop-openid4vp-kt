@@ -286,8 +286,11 @@ data class CredentialSetQuery(
 ) {
 
     init {
-        options.forEach { credentialSet ->
-            require(credentialSet.isNotEmpty()) { "An credentialSet must have at least one CredentialQueryId" }
+        require(options.isNotEmpty()) { "${OpenId4VPSpec.DCQL_OPTIONS} cannot be empty" }
+        options.forEachIndexed { index, credentialSet ->
+            require(credentialSet.isNotEmpty()) {
+                "Element of ${OpenId4VPSpec.DCQL_OPTIONS} at index $index cannot be empty"
+            }
         }
     }
 
@@ -318,6 +321,9 @@ data class ClaimsQuery(
     @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN) override val intentToRetain: Boolean? = null,
 ) : MsoMdocClaimsQueryExtension {
 
+    init {
+        values?.ensureContainsOnlyPrimitives()
+    }
     companion object {
         fun sdJwtVc(
             id: ClaimId? = null,
@@ -352,6 +358,13 @@ data class ClaimsQuery(
         fun ensureNotMsoMdoc(claimsQuery: ClaimsQuery) {
             require(null == claimsQuery.intentToRetain) {
                 "'${OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN}' can be used only with MSO MDoc based formats"
+            }
+        }
+
+        fun JsonArray.ensureContainsOnlyPrimitives() {
+            val nonPrimitiveElements = mapIndexedNotNull { index, jsonElement -> if (jsonElement !is JsonPrimitive) { index } else null }
+            require(nonPrimitiveElements.isEmpty()) {
+                "${OpenId4VPSpec.DCQL_VALUES} should contain only primitive elements. Violations at $nonPrimitiveElements"
             }
         }
     }

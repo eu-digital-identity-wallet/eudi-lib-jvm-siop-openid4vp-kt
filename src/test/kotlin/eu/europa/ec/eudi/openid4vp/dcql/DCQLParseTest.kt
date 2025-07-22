@@ -594,8 +594,8 @@ class DCQLParseTest {
                         ClaimsQuery.sdJwtVc(id = ClaimId("e"), path = ClaimPath.claim("date_of_birth")),
                     ),
                     claimSets = listOf(
-                        setOf(ClaimId("a"), ClaimId("c"), ClaimId("d"), ClaimId("e")),
-                        setOf(ClaimId("a"), ClaimId("b"), ClaimId("e")),
+                        ClaimSet(listOf(ClaimId("a"), ClaimId("c"), ClaimId("d"), ClaimId("e"))),
+                        ClaimSet(listOf(ClaimId("a"), ClaimId("b"), ClaimId("e"))),
                     ),
                 ),
             ),

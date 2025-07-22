@@ -44,6 +44,10 @@ data class DCQL(
     }
 }
 
+/**
+ * A non-empty list of [credential queries][CredentialQuery],
+ * having unique [ids][CredentialQuery.id]
+ */
 @Serializable
 @JvmInline
 value class Credentials(val value: List<CredentialQuery>) {
@@ -77,6 +81,9 @@ value class Credentials(val value: List<CredentialQuery>) {
     }
 }
 
+/**
+ * A non-empty list of [credential set queries][CredentialSetQuery]
+ */
 @Serializable
 @JvmInline
 value class CredentialSets(val value: List<CredentialSetQuery>) {
@@ -85,6 +92,12 @@ value class CredentialSets(val value: List<CredentialSetQuery>) {
         value.ensureNotEmpty()
     }
 
+    /**
+     * Makes sure that all the [credential set queries][value]
+     * have options that reference the ids of the given [Credentials]
+     * @param credentials the queries against which the [credential set queries][value] will be checked
+     * @throws IllegalArgumentException if the above check fails
+     */
     fun ensureKnownIds(credentials: Credentials) {
         value.ensureKnownIds(credentials)
     }
@@ -111,6 +124,9 @@ value class CredentialSets(val value: List<CredentialSetQuery>) {
     }
 }
 
+/**
+ * A non-empty list of [query ids][QueryId]
+ */
 @Serializable
 @JvmInline
 value class CredentialSet(val value: List<QueryId>) {
@@ -119,6 +135,15 @@ value class CredentialSet(val value: List<QueryId>) {
         value.ensureValid()
     }
 
+    /**
+     * Ensures that all query IDs in the current `CredentialSet` are known and present
+     * in the provided `Credentials`. Throws an exception if any unknown IDs are found.
+     *
+     * @param credentials The `Credentials` instance containing the list of recognized query IDs.
+     *                     Used to validate that all IDs in the current `CredentialSet` are known.
+     *
+     * @throws IllegalArgumentException in case the check is not succeeded
+     */
     fun ensureKnownIds(credentials: Credentials) {
         val unknownIds = value.filter { it !in credentials.ids }
         require(unknownIds.isEmpty()) { "Unknown credential query ids in option $unknownIds" }
@@ -145,7 +170,38 @@ value class CredentialSet(val value: List<QueryId>) {
         }
     }
 }
-typealias ClaimSet = Set<ClaimId>
+
+@Serializable
+@JvmInline
+value class ClaimSet(val value: List<ClaimId>) {
+
+    init {
+        value.ensureValid()
+    }
+
+    fun ensureKnownClaimIds(claimIds: List<ClaimId>) {
+        require(value.all { id -> id in claimIds }) { "Unknown claim ids" }
+    }
+    override fun toString(): String = value.toString()
+
+    companion object {
+        private fun List<ClaimId>.ensureValid() {
+            ensureNotEmpty()
+            ensureUniqueIds()
+        }
+        private fun List<ClaimId>.ensureNotEmpty() {
+            require(isNotEmpty()) {
+                "Each element of ${OpenId4VPSpec.DCQL_CLAIM_SETS} cannot be empty"
+            }
+        }
+        private fun List<ClaimId>.ensureUniqueIds() {
+            val uniqueIds = map { it.value }.toSet()
+            require(uniqueIds.size == size) {
+                "Within a ClaimSet, the same claim id MUST NOT be present more than once"
+            }
+        }
+    }
+}
 
 @Serializable
 @JvmInline
@@ -329,13 +385,7 @@ data class CredentialQuery(
             val claimIds = claims.mapNotNull { it.id }
             require(this.isNotEmpty()) { "${OpenId4VPSpec.DCQL_CLAIM_SETS} cannot be empty" }
             this.forEach { claimSet ->
-
-                require(claimSet.isNotEmpty()) {
-                    "Each element of ${OpenId4VPSpec.DCQL_CLAIM_SETS} cannot be empty"
-                }
-                require(claimSet.all { id -> id in claimIds }) {
-                    "Unknown claim ids within $claimSet"
-                }
+                claimSet.ensureKnownClaimIds(claimIds)
             }
         }
     }

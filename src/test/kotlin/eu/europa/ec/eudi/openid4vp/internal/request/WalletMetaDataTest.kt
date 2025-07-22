@@ -35,9 +35,12 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormat.SdJwtVc.ES256,
-                    VpFormat.MsoMdoc.ES256,
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -59,9 +62,12 @@ class WalletMetaDataTest {
         val config = SiopOpenId4VPConfig(
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(
-                    VpFormat.SdJwtVc.ES256,
-                    VpFormat.MsoMdoc.ES256,
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -88,7 +94,7 @@ private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
             println(jsonSupport.encodeToString(it))
         }
 
-    assertExpectedVpFormats(config.vpConfiguration.vpFormats, walletMetaData)
+    assertExpectedVpFormats(config.vpConfiguration.vpFormatsSupported, walletMetaData)
     assertClientIdPrefix(config.supportedClientIdPrefixes, walletMetaData)
     assertPresentationDefinitionUriSupported(walletMetaData)
     assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
@@ -161,24 +167,24 @@ private fun assertClientIdPrefix(
 }
 
 private fun assertExpectedVpFormats(
-    expectedVpFormats: VpFormats,
+    expectedVpFormatsSupported: VpFormatsSupported,
     walletMetaData: JsonObject,
 ) {
     val vpFormats = assertIs<JsonObject>(
         walletMetaData[OpenId4VPSpec.VP_FORMATS_SUPPORTED],
         "Missing ${OpenId4VPSpec.VP_FORMATS_SUPPORTED}",
     )
-    if (expectedVpFormats.msoMdoc != null) {
+    if (expectedVpFormatsSupported.msoMdoc != null) {
         val msoMdoc = assertNotNull(vpFormats["mso_mdoc"])
         assertIs<JsonObject>(msoMdoc)
         assertTrue { msoMdoc.isNotEmpty() }
     }
-    val sdJwtVcSupport = expectedVpFormats.sdJwtVc
+    val sdJwtVcSupport = expectedVpFormatsSupported.sdJwtVc
     if (sdJwtVcSupport != null) {
         val sdJwtVc = assertNotNull(vpFormats["dc+sd-jwt"])
         assertIs<JsonObject>(sdJwtVc)
         val sdJwtAlgs = sdJwtVc["sd-jwt_alg_values"]
-        if (sdJwtVcSupport.sdJwtAlgorithms.isNotEmpty()) {
+        if (!sdJwtVcSupport.sdJwtAlgorithms.isNullOrEmpty()) {
             assertNotNull(sdJwtAlgs)
             assertIs<JsonArray>(sdJwtAlgs)
             assertContentEquals(
@@ -190,7 +196,7 @@ private fun assertExpectedVpFormats(
         }
 
         val kbJwtAlgs = sdJwtVc["kb-jwt_alg_values"]
-        if (sdJwtVcSupport.kbJwtAlgorithms.isNotEmpty()) {
+        if (!sdJwtVcSupport.kbJwtAlgorithms.isNullOrEmpty()) {
             assertNotNull(kbJwtAlgs)
             assertIs<JsonArray>(kbJwtAlgs)
             assertContentEquals(

@@ -25,6 +25,7 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.PublicKey
@@ -143,57 +144,6 @@ sealed interface SupportedClientIdPrefix {
     }
 }
 
-data class VpFormats(
-    val sdJwtVc: VpFormat.SdJwtVc? = null,
-    val msoMdoc: VpFormat.MsoMdoc? = null,
-) {
-    init {
-        require(sdJwtVc != null || msoMdoc != null) {
-            "At least one format must be specified."
-        }
-    }
-
-    companion object {
-
-        operator fun invoke(vararg formats: VpFormat) = VpFormats(formats.toList())
-
-        operator fun invoke(formats: List<VpFormat>) {
-            require(formats.isNotEmpty()) { "At least one format must be specified." }
-            ensureUniquePerFormat(formats)
-            val sdJwt = formats.filterIsInstance<VpFormat.SdJwtVc>().firstOrNull()
-            val msoMdoc = formats.filterIsInstance<VpFormat.MsoMdoc>().firstOrNull()
-            VpFormats(sdJwt, msoMdoc)
-        }
-
-        fun intersect(thiz: VpFormats, that: VpFormats): VpFormats? {
-            val scg = thiz.sdJwtVc?.intersect(that.sdJwtVc)
-            val mcg = thiz.msoMdoc?.intersect(that.msoMdoc)
-            return if (scg != null || mcg != null) {
-                VpFormats(scg, mcg)
-            } else null
-        }
-
-        private fun ensureUniquePerFormat(formats: Iterable<VpFormat>) {
-            formats
-                .groupBy { it.formatName() }
-                .forEach { (formatName, instances) ->
-                    require(instances.size == 1) {
-                        "Multiple instances ${instances.size} found for $formatName."
-                    }
-                }
-        }
-
-        private enum class FormatName {
-            MSO_MDOC, SD_JWT_VC
-        }
-
-        private fun VpFormat.formatName() = when (this) {
-            is VpFormat.MsoMdoc -> FormatName.MSO_MDOC
-            is VpFormat.SdJwtVc -> FormatName.SD_JWT_VC
-        }
-    }
-}
-
 /**
  * A type of Transaction Data supported by the Wallet.
  */
@@ -211,12 +161,12 @@ data class SupportedTransactionDataType(
  * Configuration options for OpenId4VP
  *
  * @param knownDCQLQueriesPerScope a set of DCQL queries that a verifier may request via a pre-agreed scope
- * @param vpFormats The formats the wallet supports
+ * @param vpFormatsSupported The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
 data class VPConfiguration(
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
-    val vpFormats: VpFormats,
+    val vpFormatsSupported: VpFormatsSupported,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
 )
 
@@ -250,50 +200,6 @@ sealed interface ResponseEncryptionConfiguration {
      * Wallet doesn't support replying using unencrypted authorization responses
      */
     data object NotSupported : ResponseEncryptionConfiguration
-}
-
-sealed interface VpFormat : java.io.Serializable {
-    data class SdJwtVc(
-        val sdJwtAlgorithms: List<JWSAlgorithm>,
-        val kbJwtAlgorithms: List<JWSAlgorithm>,
-    ) : VpFormat {
-        init {
-            require(sdJwtAlgorithms.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
-        }
-
-        fun intersect(that: SdJwtVc?): SdJwtVc? {
-            if (that == null) return null
-
-            val kbJwtAlgs = kbJwtAlgorithms.intersect(that.kbJwtAlgorithms.toSet())
-            val sdJwtAlgs = sdJwtAlgorithms.intersect(that.sdJwtAlgorithms.toSet())
-            return if (sdJwtAlgs.isNotEmpty() && kbJwtAlgs.isNotEmpty())
-                SdJwtVc(sdJwtAlgs.toList(), kbJwtAlgs.toList())
-            else null
-        }
-
-        companion object {
-            val ES256 = SdJwtVc(listOf(JWSAlgorithm.ES256), listOf(JWSAlgorithm.ES256))
-        }
-    }
-
-    data class MsoMdoc(val algorithms: List<JWSAlgorithm>) : VpFormat {
-        init {
-            require(algorithms.isNotEmpty()) { "Mso-doc algorithms cannot be empty" }
-        }
-
-        fun intersect(that: MsoMdoc?): MsoMdoc? {
-            if (that == null) return null
-
-            val algs = algorithms.intersect(that.algorithms.toSet())
-            return if (algs.isNotEmpty())
-                MsoMdoc(algs.toList())
-            else null
-        }
-
-        companion object {
-            val ES256 = MsoMdoc(listOf(JWSAlgorithm.ES256))
-        }
-    }
 }
 
 sealed interface NonceOption {

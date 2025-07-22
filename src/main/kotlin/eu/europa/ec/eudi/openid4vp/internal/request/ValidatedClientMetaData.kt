@@ -15,9 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal.request
 
-import com.nimbusds.jose.JWSAlgorithm.Family.SIGNATURE
-import com.nimbusds.jose.JWSAlgorithm.parse
 import eu.europa.ec.eudi.openid4vp.*
+import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -30,72 +29,11 @@ internal data class UnvalidatedClientMetaData(
     @SerialName(OpenId4VPSpec.RESPONSE_ENCRYPTION_METHODS_SUPPORTED)
     val responseEncryptionMethodsSupported: List<String>? = null,
 
-    @SerialName("vp_formats") val vpFormats: VpFormatsTO,
+    @SerialName(OpenId4VPSpec.VP_FORMATS_SUPPORTED) @Required val vpFormatsSupported: VpFormatsSupported,
 )
-
-@Serializable
-internal class VpFormatsTO(
-    @SerialName("dc+sd-jwt") val vcSdJwt: VcSdJwtTO? = null,
-    @SerialName("mso_mdoc") val msoMdoc: MsoMdocTO? = null,
-) {
-
-    fun toDomain(): VpFormats {
-        return VpFormats(vcSdJwt?.toDomain(), msoMdoc?.toDomain())
-    }
-
-    companion object {
-
-        fun make(fs: VpFormats): VpFormatsTO {
-            return VpFormatsTO(
-                vcSdJwt = fs.sdJwtVc?.let { VcSdJwtTO.make(it) },
-                msoMdoc = fs.msoMdoc?.let { MsoMdocTO.make(it) },
-            )
-        }
-    }
-}
-
-@Serializable
-internal class VcSdJwtTO(
-    @SerialName("sd-jwt_alg_values") val sdJwtAlgorithms: List<String>? = null,
-    @SerialName("kb-jwt_alg_values") val kdJwtAlgorithms: List<String>? = null,
-) {
-    fun toDomain(): VpFormat.SdJwtVc {
-        return VpFormat.SdJwtVc(
-            sdJwtAlgorithms = sdJwtAlgorithms.algs(),
-            kbJwtAlgorithms = kdJwtAlgorithms.algs(),
-        )
-    }
-
-    companion object {
-        fun make(f: VpFormat.SdJwtVc): VcSdJwtTO {
-            return VcSdJwtTO(
-                sdJwtAlgorithms = f.sdJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
-                kdJwtAlgorithms = f.kbJwtAlgorithms.takeIf { it.isNotEmpty() }?.map { it.name },
-            )
-        }
-    }
-}
-
-@Serializable
-internal class MsoMdocTO(
-    @SerialName("alg") val alg: List<String>? = null,
-) {
-    fun toDomain(): VpFormat.MsoMdoc {
-        return VpFormat.MsoMdoc(alg.algs())
-    }
-
-    companion object {
-
-        fun make(f: VpFormat.MsoMdoc): MsoMdocTO {
-            return MsoMdocTO(f.algorithms.map { it.name })
-        }
-    }
-}
-
-internal fun List<String>?.algs() = this?.mapNotNull { parse(it).takeIf { SIGNATURE.contains(it) } }.orEmpty()
 
 internal data class ValidatedClientMetaData(
     val responseEncryptionSpecification: ResponseEncryptionSpecification? = null,
     val subjectSyntaxTypesSupported: List<SubjectSyntaxType> = emptyList(),
-    val vpFormats: VpFormats,
+    val vpFormatsSupported: VpFormatsSupported,
 )

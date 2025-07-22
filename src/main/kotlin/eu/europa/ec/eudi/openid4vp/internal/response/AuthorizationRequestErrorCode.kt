@@ -119,6 +119,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 MissingQuerySource,
                 MultipleQuerySources,
                 is InvalidDigitalCredentialsQuery,
+                UnsupportedQueryFormats,
                 MissingRedirectUri,
                 MissingResponseType,
                 MissingResponseUri,

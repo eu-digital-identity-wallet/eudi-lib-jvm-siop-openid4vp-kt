@@ -262,9 +262,9 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * OpenId4VP Authorization request for presenting a vp_token
      *
-     * @param vpFormats Populated when client metadata are provided along with the request or null otherwise. It is the list of formats
-     *   that both wallet and requester support. It is calculated by comparing wallet's configuration (@see [SiopOpenId4VPConfig].vpConfiguration)
-     *   and the formats passed in request's client metadata.
+     * @param vpFormatsSupported Populated when client metadata are provided along with the request. It contains the formats
+     *   that both wallet and requester support. It is calculated by comparing wallet's configuration
+     *   (@see [SiopOpenId4VPConfig].vpConfiguration)and the formats passed in request's client metadata.
      */
     data class OpenId4VPAuthorization(
         override val client: Client,
@@ -272,7 +272,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
-        val vpFormats: VpFormats?,
+        val vpFormatsSupported: VpFormatsSupported?,
         val query: DCQL,
         val transactionData: List<TransactionData>?,
         val verifierAttestations: VerifierAttestations?,
@@ -281,9 +281,9 @@ sealed interface ResolvedRequestObject : Serializable {
     /**
      * OpenId4VP combined with SIOPv2 request for presenting an id_token & vp_token
      *
-     * @param vpFormats Populated when client metadata are provided along with the request or null otherwise. It is the list of formats
-     *   that both wallet and requester support. It is calculated by comparing wallet's configuration (@see [SiopOpenId4VPConfig].vpConfiguration)
-     *   and the formats passed in request's client metadata.
+     * @param vpFormatsSupported Populated when client metadata are provided along with the request. It contains the formats
+     *   that both wallet and requester support. It is calculated by comparing wallet's configuration
+     *   (@see [SiopOpenId4VPConfig].vpConfiguration) and the formats passed in request's client metadata.
      */
     data class SiopOpenId4VPAuthentication(
         override val client: Client,
@@ -291,7 +291,7 @@ sealed interface ResolvedRequestObject : Serializable {
         override val state: String?,
         override val nonce: String,
         override val responseEncryptionSpecification: ResponseEncryptionSpecification?,
-        val vpFormats: VpFormats?,
+        val vpFormatsSupported: VpFormatsSupported?,
         val idTokenType: List<IdTokenType>,
         val subjectSyntaxTypesSupported: List<SubjectSyntaxType>,
         val scope: Scope,
@@ -360,6 +360,11 @@ sealed interface RequestValidationError : AuthorizationRequestError {
     }
 
     data class InvalidDigitalCredentialsQuery(val cause: Throwable) : RequestValidationError
+
+    data object UnsupportedQueryFormats : RequestValidationError {
+        @Suppress("unused")
+        private fun readResolve(): Any = UnsupportedQueryFormats
+    }
 
     data object InvalidRedirectUri : RequestValidationError {
         @Suppress("unused")

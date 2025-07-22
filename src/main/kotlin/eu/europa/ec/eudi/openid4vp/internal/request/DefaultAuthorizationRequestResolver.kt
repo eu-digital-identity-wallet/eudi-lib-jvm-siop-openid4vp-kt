@@ -299,7 +299,9 @@ private fun UnvalidatedRequestObject.responseEncryptionSpecification(
             ClientMetaDataValidator.validateClientMetaData(
                 it,
                 responseMode,
+                null,
                 siopOpenId4VPConfig.responseEncryptionConfiguration,
+                siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported,
             )
         }
         validatedClientMetadata.responseEncryptionSpecification

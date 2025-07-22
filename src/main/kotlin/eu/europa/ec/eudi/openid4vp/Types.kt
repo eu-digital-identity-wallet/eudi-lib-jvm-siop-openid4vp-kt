@@ -13,13 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:UseSerializers(JWSAlgorithmSerializer::class)
+
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
+import eu.europa.ec.eudi.openid4vp.internal.JWSAlgorithmSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.JsonObject
 import java.io.Serializable
 import java.net.URI
@@ -311,3 +317,84 @@ value class TransactionDataCredentialId(val value: String) : Serializable {
 
     override fun toString(): String = value
 }
+
+@JvmInline
+@kotlinx.serialization.Serializable
+value class CoseAlgorithm(val value: Int) : Serializable {
+    override fun toString(): String = value.toString()
+}
+
+@kotlinx.serialization.Serializable
+data class VpFormatsSupported(
+    @SerialName(OpenId4VPSpec.FORMAT_SD_JWT_VC) val sdJwtVc: SdJwtVc? = null,
+    @SerialName(OpenId4VPSpec.FORMAT_MSO_MDOC) val msoMdoc: MsoMdoc? = null,
+) : Serializable {
+
+    init {
+        require(null != sdJwtVc || null != msoMdoc) {
+            "At least one format must be specified."
+        }
+    }
+
+    companion object
+
+    @kotlinx.serialization.Serializable
+    data class SdJwtVc(
+        @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS)
+        val sdJwtAlgorithms: List<JWSAlgorithm>?,
+
+        @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS)
+        val kbJwtAlgorithms: List<JWSAlgorithm>?,
+
+    ) : Serializable {
+        init {
+            sdJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
+            }
+            kbJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "KeyBinding-JWT algorithms cannot be empty" }
+            }
+        }
+
+        companion object {
+            val HAIP: SdJwtVc
+                get() =
+                    SdJwtVc(
+                        sdJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+                        kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+                    )
+        }
+    }
+
+    @kotlinx.serialization.Serializable
+    data class MsoMdoc(
+        @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<CoseAlgorithm>?,
+        @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<CoseAlgorithm>?,
+    ) : Serializable {
+        init {
+            issuerAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
+            }
+            deviceAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
+            }
+        }
+
+        companion object
+    }
+}
+
+internal fun VpFormatsSupported.containsAll(formats: Collection<Format>): Boolean =
+    formats.all {
+        when (it) {
+            Format.SdJwtVc -> null != sdJwtVc
+            Format.MsoMdoc -> null != msoMdoc
+            else -> false
+        }
+    }
+
+internal fun VpFormatsSupported.filter(formats: Collection<Format>): VpFormatsSupported =
+    VpFormatsSupported(
+        sdJwtVc = sdJwtVc?.takeIf { Format.SdJwtVc in formats },
+        msoMdoc = msoMdoc?.takeIf { Format.MsoMdoc in formats },
+    )

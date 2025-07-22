@@ -47,30 +47,33 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         val responseType = requiredResponseType(requestObject)
         val responseMode = requiredResponseMode(client, requestObject)
         val idTokenType = optionalIdTokenType(requestObject)
-        val clientMetaData = optionalClientMetaData(responseMode, requestObject)
 
-        fun idToken(): SiopAuthentication = SiopAuthentication(
-            client = client.toClient(),
-            responseMode = responseMode,
-            state = state,
-            nonce = nonce,
-            responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-            idTokenType = idTokenType,
-            subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
-            scope = scope.getOrThrow(),
-        )
+        fun idToken(): SiopAuthentication {
+            val clientMetaData = optionalClientMetaData(responseMode, null, requestObject)
+            return SiopAuthentication(
+                client = client.toClient(),
+                responseMode = responseMode,
+                state = state,
+                nonce = nonce,
+                responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
+                idTokenType = idTokenType,
+                subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
+                scope = scope.getOrThrow(),
+            )
+        }
 
         fun vpToken(): OpenId4VPAuthorization {
-            val query = requiredDcqlQuery(requestObject, nonOpenIdScope)
+            val query = requiredDcqlQuery(requestObject, nonOpenIdScope, siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported)
             val transactionData = optionalTransactionData(requestObject, query)
             val verifierAttestations = optionalVerifierAttestations(query, requestObject)
+            val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
             return OpenId4VPAuthorization(
                 client = client.toClient(),
                 responseMode = responseMode,
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
+                vpFormatsSupported = clientMetaData?.vpFormatsSupported,
                 query = query,
                 transactionData = transactionData,
                 verifierAttestations = verifierAttestations,
@@ -78,16 +81,17 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         }
 
         fun idAndVpToken(): SiopOpenId4VPAuthentication {
-            val query = requiredDcqlQuery(requestObject, nonOpenIdScope)
+            val query = requiredDcqlQuery(requestObject, nonOpenIdScope, siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported)
             val transactionData = optionalTransactionData(requestObject, query)
             val verifierAttestations = optionalVerifierAttestations(query, requestObject)
+            val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
             return SiopOpenId4VPAuthentication(
                 client = client.toClient(),
                 responseMode = responseMode,
                 state = state,
                 nonce = nonce,
                 responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
-                vpFormats = clientMetaData?.let { resolveVpFormatsCommonGround(it.vpFormats) },
+                vpFormatsSupported = clientMetaData?.vpFormatsSupported,
                 idTokenType = idTokenType,
                 subjectSyntaxTypesSupported = clientMetaData?.subjectSyntaxTypesSupported.orEmpty(),
                 scope = scope.getOrThrow(),
@@ -109,13 +113,15 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
     }
 
     /**
-     * Makes sure that [unvalidated] contains a [DCQL] query.
+     * Makes sure that [unvalidated] contains a [DCQL] query with [Format] the Wallet supports.
      *
      * @param unvalidated the request to validate
+     * @param walletSupportsVpFormats the [VpFormatsSupported] supported by the Wallet
      */
     private fun requiredDcqlQuery(
         unvalidated: UnvalidatedRequestObject,
         scope: Scope?,
+        walletSupportsVpFormats: VpFormatsSupported,
     ): DCQL {
         val hasDcqlQuery = !unvalidated.dcqlQuery.isNullOrEmpty()
         val hasScope = scope != null
@@ -134,12 +140,19 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
 
         val querySourceCount = listOf(hasDcqlQuery, hasScope).count { it }
 
-        return when {
+        val query = when {
             querySourceCount > 1 -> throw MultipleQuerySources.asException()
             hasDcqlQuery -> requiredDcqlQuery()
             hasScope -> requiredScope()
             else -> throw MissingQuerySource.asException()
         }
+
+        val queryFormats = query.credentials.map { it.format }.toSet()
+        ensure(walletSupportsVpFormats.containsAll(queryFormats)) {
+            UnsupportedQueryFormats.asException()
+        }
+
+        return query
     }
 
     private fun lookupKnownDCQLQueries(scope: Scope): DCQL {
@@ -197,14 +210,6 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         }
 
         return attestations
-    }
-
-    private fun resolveVpFormatsCommonGround(clientVpFormats: VpFormats): VpFormats {
-        val walletSupportedVpFormats = siopOpenId4VPConfig.vpConfiguration.vpFormats
-        val commonGround = VpFormats.intersect(walletSupportedVpFormats, clientVpFormats)
-        return ensureNotNull(commonGround) {
-            ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
-        }
     }
 
     private fun optionalIdTokenType(unvalidated: UnvalidatedRequestObject): List<IdTokenType> =
@@ -337,6 +342,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
 
     private fun optionalClientMetaData(
         responseMode: ResponseMode,
+        query: DCQL?,
         unvalidated: UnvalidatedRequestObject,
     ): ValidatedClientMetaData? {
         val hasCMD = !unvalidated.clientMetaData.isNullOrEmpty()
@@ -348,8 +354,15 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
 
         return when {
             hasCMD -> requiredClientMetaData().let {
-                ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
+                ClientMetaDataValidator.validateClientMetaData(
+                    it,
+                    responseMode,
+                    query,
+                    siopOpenId4VPConfig.responseEncryptionConfiguration,
+                    siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported,
+                )
             }
+
             else -> {
                 ensure(!responseMode.requiresEncryption()) {
                     InvalidClientMetaData("Missing client metadata").asException()

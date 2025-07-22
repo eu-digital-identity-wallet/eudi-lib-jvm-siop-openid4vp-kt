@@ -16,11 +16,13 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.ThumbprintURI
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.RequestValidationError.UnsupportedClientMetaData
+import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
@@ -38,7 +40,9 @@ internal object ClientMetaDataValidator {
     fun validateClientMetaData(
         unvalidated: UnvalidatedClientMetaData,
         responseMode: ResponseMode,
+        query: DCQL?,
         responseEncryptionConfiguration: ResponseEncryptionConfiguration,
+        walletSupportedVpFormats: VpFormatsSupported,
     ): ValidatedClientMetaData {
         val types = subjectSyntaxTypes(unvalidated.subjectSyntaxTypesSupported)
 
@@ -71,12 +75,14 @@ internal object ClientMetaDataValidator {
                 )
             }
 
-        val vpFormats = vpFormats(unvalidated)
+        val vpFormatsSupported =
+            if (null != query) vpFormats(unvalidated, query, walletSupportedVpFormats)
+            else unvalidated.vpFormatsSupported
 
         return ValidatedClientMetaData(
             responseEncryptionSpecification = responseEncryptionSpecification,
             subjectSyntaxTypesSupported = types,
-            vpFormats = vpFormats,
+            vpFormatsSupported = vpFormatsSupported,
         )
     }
 }
@@ -147,12 +153,20 @@ private fun responseEncryptionMethodsSupported(unvalidated: UnvalidatedClientMet
     return encryptionMethods?.toSet()
 }
 
-private fun vpFormats(unvalidated: UnvalidatedClientMetaData): VpFormats =
-    try {
-        unvalidated.vpFormats.toDomain()
-    } catch (_: IllegalArgumentException) {
-        throw RequestValidationError.InvalidClientMetaData("Invalid vp_format").asException()
+private fun vpFormats(
+    unvalidated: UnvalidatedClientMetaData,
+    query: DCQL,
+    walletSupportedVpFormats: VpFormatsSupported,
+): VpFormatsSupported {
+    val queryFormats = query.credentials.map { credential -> credential.format }.toSet()
+    ensure(unvalidated.vpFormatsSupported.containsAll(queryFormats)) {
+        RequestValidationError.InvalidClientMetaData(
+            "Verifier does not support all Formats requested in the DCQL query",
+        ).asException()
     }
+    val verifierQueryVpFormatsSupported = unvalidated.vpFormatsSupported.filter(queryFormats)
+    return resolveCommonGround(walletSupportedVpFormats, verifierQueryVpFormatsSupported)
+}
 
 /**
  * Method checks whether Wallet can fulfill the Verifier's authorization response encryption requirements.
@@ -203,4 +217,47 @@ private fun responseEncryptionSpecification(
     } ?: throw UnsupportedClientMetaData("Wallet doesn't support any of the encryption algorithms supported by verifier").asException()
 
     return ResponseEncryptionSpecification(encryptionAlgorithm, encryptionMethod, encryptionKey)
+}
+
+private fun resolveCommonGround(
+    walletSupported: VpFormatsSupported,
+    verifierSupported: VpFormatsSupported,
+): VpFormatsSupported {
+    val sdJwtVc =
+        if (null != verifierSupported.sdJwtVc) {
+            walletSupported.sdJwtVc?.let {
+                resolveCommonGround(walletSupported = it, verifierSupported = verifierSupported.sdJwtVc)
+            }
+        } else null
+    val msoMdoc = verifierSupported.msoMdoc
+
+    ensure(null != sdJwtVc || null != msoMdoc) {
+        ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+    }
+
+    return VpFormatsSupported(sdJwtVc, msoMdoc)
+}
+
+private fun resolveCommonGround(
+    walletSupported: VpFormatsSupported.SdJwtVc,
+    verifierSupported: VpFormatsSupported.SdJwtVc,
+): VpFormatsSupported.SdJwtVc {
+    fun common(
+        walletSupported: List<JWSAlgorithm>?,
+        verifierSupported: List<JWSAlgorithm>?,
+    ): List<JWSAlgorithm>? =
+        when {
+            null != walletSupported && null != verifierSupported -> {
+                val common = walletSupported.intersect(verifierSupported).toList().takeIf { it.isNotEmpty() }
+                ensureNotNull(common) {
+                    ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+                }
+            }
+
+            else -> verifierSupported ?: walletSupported
+        }
+
+    val sdJwtAlgorithms = common(walletSupported.sdJwtAlgorithms, verifierSupported.sdJwtAlgorithms)
+    val kbJwtAlgorithms = common(walletSupported.kbJwtAlgorithms, verifierSupported.kbJwtAlgorithms)
+    return VpFormatsSupported.SdJwtVc(sdJwtAlgorithms = sdJwtAlgorithms, kbJwtAlgorithms = kbJwtAlgorithms)
 }

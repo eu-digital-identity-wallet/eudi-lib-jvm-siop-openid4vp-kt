@@ -34,10 +34,9 @@ import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -48,11 +47,7 @@ import kotlinx.serialization.json.*
 import org.apache.http.NameValuePair
 import org.apache.http.client.utils.URIBuilder
 import org.apache.http.message.BasicNameValuePair
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.*
 import java.io.InputStream
 import java.net.URLEncoder
 import java.security.KeyStore
@@ -60,6 +55,7 @@ import java.security.cert.X509Certificate
 import java.time.Clock
 import java.util.*
 import kotlin.test.*
+import kotlin.test.Test
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UnvalidatedRequestResolverTest {
@@ -114,7 +110,8 @@ class UnvalidatedRequestResolverTest {
     private val vpFormatsJO = Json.parseToJsonElement(
         """ { 
                "mso_mdoc": {
-                 "alg": ["ES256"]
+                 "issuerauth_alg_values": [-7, -9],
+                 "deviceauth_alg_values": [-7, -9]
                },
                "dc+sd-jwt": {
                    "sd-jwt_alg_values": ["ES256"],
@@ -145,12 +142,23 @@ class UnvalidatedRequestResolverTest {
             supportedAlgorithms = listOf(JWSAlgorithm.RS256),
         ),
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(
-                VpFormat.SdJwtVc(
-                    listOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
-                    listOf(JWSAlgorithm.ES512, JWSAlgorithm.ES256, JWSAlgorithm.RS256),
+            vpFormatsSupported = VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc(
+                    sdJwtAlgorithms = listOf(
+                        JWSAlgorithm.ES512,
+                        JWSAlgorithm.ES256,
+                        JWSAlgorithm.RS256,
+                    ),
+                    kbJwtAlgorithms = listOf(
+                        JWSAlgorithm.ES512,
+                        JWSAlgorithm.ES256,
+                        JWSAlgorithm.RS256,
+                    ),
                 ),
-                VpFormat.MsoMdoc.ES256,
+                VpFormatsSupported.MsoMdoc(
+                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                ),
             ),
             supportedTransactionDataTypes = listOf(
                 SupportedTransactionDataType(
@@ -166,7 +174,7 @@ class UnvalidatedRequestResolverTest {
         """ {
              "jwks": $jwkSetJO,              
              "subject_syntax_types_supported": [ "urn:ietf:params:oauth:jwk-thumbprint", "did:example", "did:key" ],
-             "vp_formats": $vpFormatsJO
+             "vp_formats_supported": $vpFormatsJO
             } 
         """.trimIndent().let {
             URLEncoder.encode(it, "UTF-8")
@@ -175,7 +183,7 @@ class UnvalidatedRequestResolverTest {
     private val clientMetadataJwksInlineNoSubjectSyntaxTypes =
         """ {
              "jwks": $jwkSetJO,
-             "vp_formats": $vpFormatsJO
+             "vp_formats_supported": $vpFormatsJO
             } 
         """.trimIndent().let {
             URLEncoder.encode(it, "UTF-8")
@@ -284,8 +292,12 @@ class UnvalidatedRequestResolverTest {
                     "did:example",
                     "did:key",
                 ),
-                vpFormats = VpFormatsTO.make(
-                    VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                vpFormatsSupported = VpFormatsSupported(
+                    msoMdoc =
+                        VpFormatsSupported.MsoMdoc(
+                            issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                            deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        ),
                 ),
             )
             val jwtClaimsSet = jwtClaimsSet(
@@ -335,8 +347,12 @@ class UnvalidatedRequestResolverTest {
                         "did:example",
                         "did:key",
                     ),
-                    vpFormats = VpFormatsTO.make(
-                        VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                    vpFormatsSupported = VpFormatsSupported(
+                        msoMdoc =
+                            VpFormatsSupported.MsoMdoc(
+                                issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                                deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                            ),
                     ),
                 ),
             )
@@ -380,8 +396,12 @@ class UnvalidatedRequestResolverTest {
                         "did:example",
                         "did:key",
                     ),
-                    vpFormats = VpFormatsTO.make(
-                        VpFormats(msoMdoc = VpFormat.MsoMdoc.ES256),
+                    vpFormatsSupported = VpFormatsSupported(
+                        msoMdoc =
+                            VpFormatsSupported.MsoMdoc(
+                                issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                                deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                            ),
                     ),
                 ),
             )
@@ -433,7 +453,7 @@ class UnvalidatedRequestResolverTest {
         val clientMetadata =
             """ {
                  "jwks": $jwkSetJO,
-                 "vp_formats": {
+                 "vp_formats_supported": {
                      "dc+sd-jwt": {
                          "sd-jwt_alg_values": ["ES384"],
                          "kb-jwt_alg_values": ["ES384"]
@@ -458,6 +478,46 @@ class UnvalidatedRequestResolverTest {
     }
 
     @Test
+    fun `if no common ground between wallet and verifier on non query requested vp_formats resolution succeeds`() = runTest {
+        val clientMetadata =
+            """ {
+                 "jwks": $jwkSetJO,
+                 "vp_formats_supported": {
+                     "dc+sd-jwt": {
+                         "sd-jwt_alg_values": ["ES512"],
+                         "kb-jwt_alg_values": ["ES512"]
+                     },
+                     "mso_mdoc": {
+                         "issuerauth_alg_values": [-49, -264],
+                         "deviceauth_alg_values": [-49, -264]
+                     }
+                 }    
+               }
+            """.trimIndent().let {
+                URLEncoder.encode(it, "UTF-8")
+            }
+
+        val authRequest =
+            "https://client.example.org/universal-link?" +
+                "response_type=vp_token" +
+                "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
+                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                "&nonce=n-0S6_WzA2Mj" +
+                "&dcql_query=$dcqlQuery" +
+                "&client_metadata=$clientMetadata"
+
+        val resolution = resolver().resolveRequestUri(authRequest)
+        with(resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()) {
+            with(assertNotNull(vpFormatsSupported)) {
+                assertNotNull(sdJwtVc)
+                assertEquals(listOf(JWSAlgorithm.ES512), sdJwtVc.sdJwtAlgorithms)
+                assertEquals(listOf(JWSAlgorithm.ES512), sdJwtVc.kbJwtAlgorithms)
+                assertNull(msoMdoc)
+            }
+        }
+    }
+
+    @Test
     fun `if no client metadata provided no vpFormats are included in the resolved authorization request`() = runTest {
         val authRequest =
             "https://client.example.org/universal-link?" +
@@ -470,7 +530,7 @@ class UnvalidatedRequestResolverTest {
         val resolution = resolver().resolveRequestUri(authRequest)
         val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
 
-        assertNull(request.vpFormats)
+        assertNull(request.vpFormatsSupported)
     }
 
     @Test
@@ -478,7 +538,7 @@ class UnvalidatedRequestResolverTest {
         val clientMetadata =
             """ {
                  "jwks": $jwkSetJO,
-                 "vp_formats": {
+                 "vp_formats_supported": {
                      "dc+sd-jwt": {
                          "sd-jwt_alg_values": ["RS256", "ES512", "ES256", "ES384"],
                          "kb-jwt_alg_values": ["RS256", "ES512", "ES384"]
@@ -500,13 +560,15 @@ class UnvalidatedRequestResolverTest {
 
         val resolution = resolver().resolveRequestUri(authRequest)
         val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
-        val formats = request.vpFormats
+        val formats = request.vpFormatsSupported
         val sdJwtFormat = assertNotNull(formats?.sdJwtVc)
 
+        assertNotNull(sdJwtFormat.kbJwtAlgorithms)
         assertTrue { sdJwtFormat.kbJwtAlgorithms.size == 2 }
         assertTrue { sdJwtFormat.kbJwtAlgorithms.contains(JWSAlgorithm.ES512) }
         assertTrue { sdJwtFormat.kbJwtAlgorithms.contains(JWSAlgorithm.RS256) }
 
+        assertNotNull(sdJwtFormat.sdJwtAlgorithms)
         assertTrue { sdJwtFormat.sdJwtAlgorithms.size == 3 }
         assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(JWSAlgorithm.ES256) }
         assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(JWSAlgorithm.ES512) }
@@ -710,7 +772,7 @@ class UnvalidatedRequestResolverTest {
             val state = genState()
             val clientMetadata = buildJsonObject {
                 put("jwks", jwkSetJO)
-                put("vp_formats", vpFormatsJO)
+                put("vp_formats_supported", vpFormatsJO)
             }
             val authorizationUrl = URIBuilder("https://client.example.org/universal-link")
                 .addParameter("response_type", "vp_token")

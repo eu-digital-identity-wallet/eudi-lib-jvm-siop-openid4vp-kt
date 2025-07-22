@@ -346,15 +346,15 @@ class DCQLParseTest {
             credentialSets = CredentialSets(
                 CredentialSetQuery(
                     options = listOf(
-                        setOf(QueryId("pid")),
-                        setOf(QueryId("other_pid")),
-                        setOf(QueryId("pid_reduced_cred_1"), QueryId("pid_reduced_cred_2")),
+                        CredentialSet(listOf(QueryId("pid"))),
+                        CredentialSet(listOf(QueryId("other_pid"))),
+                        CredentialSet(listOf(QueryId("pid_reduced_cred_1"), QueryId("pid_reduced_cred_2"))),
                     ),
                 ),
                 CredentialSetQuery(
                     required = false,
                     options = listOf(
-                        setOf(QueryId("nice_to_have")),
+                        CredentialSet(listOf(QueryId("nice_to_have"))),
                     ),
                 ),
             ),
@@ -540,15 +540,15 @@ class DCQLParseTest {
             credentialSets = CredentialSets(
                 CredentialSetQuery(
                     options = listOf(
-                        setOf(QueryId("mdl-id")),
-                        setOf(QueryId("photo_card-id")),
+                        CredentialSet(listOf(QueryId("mdl-id"))),
+                        CredentialSet(listOf(QueryId("photo_card-id"))),
                     ),
                 ),
                 CredentialSetQuery(
                     required = false,
                     options = listOf(
-                        setOf(QueryId("mdl-address")),
-                        setOf(QueryId("photo_card-address")),
+                        CredentialSet(listOf(QueryId("mdl-address"))),
+                        CredentialSet(listOf(QueryId("photo_card-address"))),
                     ),
                 ),
             ),

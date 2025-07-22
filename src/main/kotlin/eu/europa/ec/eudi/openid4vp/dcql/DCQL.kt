@@ -23,6 +23,26 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.net.URL
+import kotlin.collections.isNotEmpty
+import kotlin.collections.mapIndexedNotNull
+
+@Serializable
+data class DCQL(
+    /**
+     * A non-empty list of [Credential Queries][CredentialQuery], that specify the requested Verifiable Credentials
+     */
+    @SerialName(OpenId4VPSpec.DCQL_CREDENTIALS) @Required val credentials: Credentials,
+    /**
+     * A non-empty list of [credential set queries][CredentialSetQuery], that specifies additional constraints
+     * on which of the requested Verifiable Credentials to return
+     */
+    @SerialName(OpenId4VPSpec.DCQL_CREDENTIAL_SETS) val credentialSets: CredentialSets? = null,
+
+) {
+    init {
+        credentialSets?.apply { ensureKnownIds(credentials) }
+    }
+}
 
 @Serializable
 @JvmInline
@@ -69,6 +89,8 @@ value class CredentialSets(val value: List<CredentialSetQuery>) {
         value.ensureKnownIds(credentials)
     }
 
+    override fun toString(): String = value.toString()
+
     companion object {
         @JvmStatic
         @JvmName("of")
@@ -84,15 +106,45 @@ value class CredentialSets(val value: List<CredentialSetQuery>) {
         }
 
         private fun CredentialSetQuery.ensureOptionsWithKnownIds(credentials: Credentials) {
-            val knownIds = credentials.ids
-            options.forEach { credentialSet ->
-                require(credentialSet.all { it in knownIds }) { "Unknown credential query ids in option $credentialSet" }
-            }
+            options.forEach { credentialSet -> credentialSet.ensureKnownIds(credentials) }
         }
     }
 }
 
-typealias CredentialSet = Set<QueryId>
+@Serializable
+@JvmInline
+value class CredentialSet(val value: List<QueryId>) {
+
+    init {
+        value.ensureValid()
+    }
+
+    fun ensureKnownIds(credentials: Credentials) {
+        val unknownIds = value.filter { it !in credentials.ids }
+        require(unknownIds.isEmpty()) { "Unknown credential query ids in option $unknownIds" }
+    }
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+
+        fun List<QueryId>.ensureValid() {
+            ensureNotEmpty()
+            ensureUniqueIds()
+        }
+
+        private fun List<QueryId>.ensureNotEmpty() {
+            require(isNotEmpty()) { "${OpenId4VPSpec.DCQL_OPTIONS} elements cannot be empty" }
+        }
+
+        private fun List<QueryId>.ensureUniqueIds() {
+            val uniqueIds = map { it.value }.toSet()
+            require(uniqueIds.size == size) {
+                "Within a CredentialSet, the same credential query id MUST NOT be present more than once"
+            }
+        }
+    }
+}
 typealias ClaimSet = Set<ClaimId>
 
 @Serializable
@@ -130,24 +182,6 @@ data class TrustedAuthority(
 
         fun federatedEntities(values: List<URL>): TrustedAuthority =
             TrustedAuthority(TrustedAuthorityType.OpenIdFederation, values.map { it.toExternalForm() })
-    }
-}
-
-@Serializable
-data class DCQL(
-    /**
-     * A non-empty list of [Credential Queries][CredentialQuery], that specify the requested Verifiable Credentials
-     */
-    @SerialName(OpenId4VPSpec.DCQL_CREDENTIALS) @Required val credentials: Credentials,
-    /**
-     * A non-empty list of [credential set queries][CredentialSetQuery], that specifies additional constraints
-     * on which of the requested Verifiable Credentials to return
-     */
-    @SerialName(OpenId4VPSpec.DCQL_CREDENTIAL_SETS) val credentialSets: CredentialSets? = null,
-
-) {
-    init {
-        credentialSets?.apply { ensureKnownIds(credentials) }
     }
 }
 
@@ -329,7 +363,7 @@ data class CredentialSetQuery(
     init {
         require(options.isNotEmpty()) { "${OpenId4VPSpec.DCQL_OPTIONS} cannot be empty" }
         val emptyOptions =
-            options.mapIndexedNotNull { index, credentialSet -> index.takeIf { credentialSet.isEmpty() } }
+            options.mapIndexedNotNull { index, credentialSet -> index.takeIf { credentialSet.value.isEmpty() } }
         require(emptyOptions.isEmpty()) {
             "${OpenId4VPSpec.DCQL_OPTIONS} must contain non-empty arrays. Violations at $emptyOptions"
         }

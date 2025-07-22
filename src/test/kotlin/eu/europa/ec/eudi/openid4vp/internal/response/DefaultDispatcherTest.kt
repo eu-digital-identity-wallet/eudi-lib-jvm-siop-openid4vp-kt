@@ -183,7 +183,7 @@ class DefaultDispatcherTest {
                 }
             }
 
-            return DefaultDispatcher { httpClient }
+            return DefaultDispatcher(httpClient)
         }
     }
 
@@ -255,37 +255,39 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `if response direct_post jwt with encryption required, negative consensus must be dispatched in response`() = runTest {
-            val verifierRequest = Verifier.createOpenId4VPRequest(
-                Verifier.metaDataRequestingEncryptedResponse,
-                ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
-            )
+        fun `if response direct_post jwt with encryption required, negative consensus must be dispatched in response`() =
+            runTest {
+                val verifierRequest = Verifier.createOpenId4VPRequest(
+                    Verifier.metaDataRequestingEncryptedResponse,
+                    ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow()),
+                )
 
-            val negativeConsensus = Consensus.NegativeConsensus
+                val negativeConsensus = Consensus.NegativeConsensus
 
-            val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
-                val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPublicKey()
-                assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
-                assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+                val dispatcher = Wallet.createDispatcherWithVerifierAsserting { responseParam ->
+                    val encryptedJwt = responseParam.assertIsJwtEncryptedWithVerifiersPublicKey()
+                    assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
+                    assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
 
-                val jwtClaimSet = encryptedJwt.jwtClaimsSet
-                val errorClam = jwtClaimSet.getStringClaim("error")
-                assertNotNull(errorClam)
-                assertEquals("access_denied", errorClam)
+                    val jwtClaimSet = encryptedJwt.jwtClaimsSet
+                    val errorClam = jwtClaimSet.getStringClaim("error")
+                    assertNotNull(errorClam)
+                    assertEquals("access_denied", errorClam)
+                }
+
+                dispatcher.dispatch(
+                    verifierRequest,
+                    negativeConsensus,
+                    EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                )
             }
-
-            dispatcher.dispatch(
-                verifierRequest,
-                negativeConsensus,
-                EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
-            )
-        }
 
         @Test
         fun `support vp_token with multiple verifiable presentations`() = runTest {
             suspend fun test(verifiablePresentations: VerifiablePresentations, redirectUri: URI? = null) {
                 val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asURL().getOrThrow())
-                val resolvedRequest = Verifier.createOpenId4VPRequest(Verifier.metaDataRequestingEncryptedResponse, responseMode)
+                val resolvedRequest =
+                    Verifier.createOpenId4VPRequest(Verifier.metaDataRequestingEncryptedResponse, responseMode)
                 val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(
                     verifiablePresentations = verifiablePresentations,
                 )
@@ -378,7 +380,7 @@ class DefaultDispatcherTest {
                 responseEncryptionSpecification = null,
             )
 
-            val errorDispatcher: ErrorDispatcher = DefaultDispatcher {
+            val errorDispatcher: ErrorDispatcher = run {
                 val mockEngine = MockEngine { request ->
                     val body = assertIs<FormData>(request.body)
                     assertNull(body.formData["response"])
@@ -387,7 +389,8 @@ class DefaultDispatcherTest {
                     assertEquals(state, body.formData["state"])
                     respondOk()
                 }
-                HttpClient(mockEngine)
+                val httpClient = HttpClient(mockEngine)
+                DefaultDispatcher(httpClient)
             }
 
             val dispatchOutcome = errorDispatcher.dispatchError(
@@ -648,7 +651,8 @@ class DefaultDispatcherTest {
                     ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
-                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty()
+                                .first(),
                         ),
                         recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
@@ -669,44 +673,45 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `when query_jwt with encryption and negative consensus, redirect_uri must contain error ACCESS_DENIED in response`() = runTest {
-            suspend fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
-                val verifierRequest = Verifier.createOpenId4VPRequest(
-                    Verifier.metaDataRequestingEncryptedResponse,
-                    ResponseMode.QueryJwt("https://respond.here".asURL().getOrThrow().toURI()),
-                    state,
-                )
-
-                val dispatcher = DefaultDispatcher { HttpClient() }
-
-                val outcome =
-                    dispatcher.dispatch(
-                        verifierRequest,
-                        Consensus.NegativeConsensus,
-                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+        fun `when query_jwt with encryption and negative consensus, redirect_uri must contain error ACCESS_DENIED in response`() =
+            runTest {
+                suspend fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
+                    val verifierRequest = Verifier.createOpenId4VPRequest(
+                        Verifier.metaDataRequestingEncryptedResponse,
+                        ResponseMode.QueryJwt("https://respond.here".asURL().getOrThrow().toURI()),
+                        state,
                     )
 
-                assertIs<DispatchOutcome.RedirectURI>(outcome)
+                    val outcome = HttpClient().use { httpClient ->
+                        val dispatcher = DefaultDispatcher(httpClient)
+                        dispatcher.dispatch(
+                            verifierRequest,
+                            Consensus.NegativeConsensus,
+                            EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                        )
+                    }
 
-                outcome.value.asserter {
-                    val responseParameter = getQueryParameter("response")
-                    assertNotNull(responseParameter)
-                    val encryptedJwt = responseParameter.assertIsJwtEncryptedWithVerifiersPublicKey()
-                    assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
-                    assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+                    assertIs<DispatchOutcome.RedirectURI>(outcome)
 
-                    val errorClam = encryptedJwt.jwtClaimsSet.getStringClaim("error")
-                    val state = encryptedJwt.jwtClaimsSet.getStringClaim("state")
+                    outcome.value.asserter {
+                        val responseParameter = getQueryParameter("response")
+                        assertNotNull(responseParameter)
+                        val encryptedJwt = responseParameter.assertIsJwtEncryptedWithVerifiersPublicKey()
+                        assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
+                        assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
 
-                    assertNotNull(errorClam)
-                    assertEquals("access_denied", errorClam)
-                    assertEquals(state, errorClam)
+                        val errorClam = encryptedJwt.jwtClaimsSet.getStringClaim("error")
+                        val state = encryptedJwt.jwtClaimsSet.getStringClaim("state")
+
+                        assertNotNull(errorClam)
+                        assertEquals("access_denied", errorClam)
+                        assertEquals(state, errorClam)
+                    }
                 }
-            }
 
-            test(genState()) {}
-            test {}
-        }
+                test(genState()) {}
+                test {}
+            }
 
         @Test
         fun `unencrypted errors are sent when using query_jwt`() {
@@ -718,7 +723,8 @@ class DefaultDispatcherTest {
                         state,
                         VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     )
-                val response = AuthorizationResponse.QueryJwt(redirectUriBase, data, responseEncryptionSpecification = null)
+                val response =
+                    AuthorizationResponse.QueryJwt(redirectUriBase, data, responseEncryptionSpecification = null)
                 val redirectURI = response.encodeRedirectURI()
 
                 redirectURI.asserter {
@@ -863,7 +869,8 @@ class DefaultDispatcherTest {
                         responseEncryptionSpecification = ResponseEncryptionSpecification(
                             encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                             encryptionMethod = EncryptionMethod.parse(
-                                Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                                Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty()
+                                    .first(),
                             ),
                             recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                         ),
@@ -883,44 +890,45 @@ class DefaultDispatcherTest {
         }
 
         @Test
-        fun `when fragment_jwt with encryption and negative consensus, redirect_uri must contain ACCESS_DENIED in response`() = runTest {
-            suspend fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
-                val verifierRequest = Verifier.createOpenId4VPRequest(
-                    Verifier.metaDataRequestingEncryptedResponse,
-                    ResponseMode.FragmentJwt("https://respond.here".asURL().getOrThrow().toURI()),
-                    state,
-                )
-
-                val dispatcher = DefaultDispatcher { HttpClient() }
-
-                val outcome =
-                    dispatcher.dispatch(
-                        verifierRequest,
-                        Consensus.NegativeConsensus,
-                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+        fun `when fragment_jwt with encryption and negative consensus, redirect_uri must contain ACCESS_DENIED in response`() =
+            runTest {
+                suspend fun test(state: String? = null, asserter: URI.(URI.() -> Unit) -> Unit) {
+                    val verifierRequest = Verifier.createOpenId4VPRequest(
+                        Verifier.metaDataRequestingEncryptedResponse,
+                        ResponseMode.FragmentJwt("https://respond.here".asURL().getOrThrow().toURI()),
+                        state,
                     )
 
-                assertIs<DispatchOutcome.RedirectURI>(outcome)
+                    val outcome = HttpClient().use { httpClient ->
+                        val dispatcher = DefaultDispatcher(httpClient)
+                        dispatcher.dispatch(
+                            verifierRequest,
+                            Consensus.NegativeConsensus,
+                            EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
+                        )
+                    }
 
-                outcome.value.asserter {
-                    val responseParameter = getQueryParameter("response")
-                    assertNotNull(responseParameter)
-                    val encryptedJwt = responseParameter.assertIsJwtEncryptedWithVerifiersPublicKey()
-                    assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
-                    assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
+                    assertIs<DispatchOutcome.RedirectURI>(outcome)
 
-                    val errorClam = encryptedJwt.jwtClaimsSet.getStringClaim("error")
-                    val state = encryptedJwt.jwtClaimsSet.getStringClaim("state")
+                    outcome.value.asserter {
+                        val responseParameter = getQueryParameter("response")
+                        assertNotNull(responseParameter)
+                        val encryptedJwt = responseParameter.assertIsJwtEncryptedWithVerifiersPublicKey()
+                        assertEquals(Base64URL.encode(verifierRequest.nonce), encryptedJwt.header.agreementPartyVInfo)
+                        assertEquals(Base64URL.encode("dummy_apu"), encryptedJwt.header.agreementPartyUInfo)
 
-                    assertNotNull(errorClam)
-                    assertEquals("access_denied", errorClam)
-                    assertEquals(state, errorClam)
+                        val errorClam = encryptedJwt.jwtClaimsSet.getStringClaim("error")
+                        val state = encryptedJwt.jwtClaimsSet.getStringClaim("state")
+
+                        assertNotNull(errorClam)
+                        assertEquals("access_denied", errorClam)
+                        assertEquals(state, errorClam)
+                    }
                 }
-            }
 
-            test(genState()) {}
-            test {}
-        }
+                test(genState()) {}
+                test {}
+            }
 
         @Test
         fun `unencrypted errors are sent when using fragment_jwt`() {
@@ -932,7 +940,8 @@ class DefaultDispatcherTest {
                         state,
                         VerifierId(ClientIdPrefix.PreRegistered, "client_id"),
                     )
-                val response = AuthorizationResponse.FragmentJwt(redirectUriBase, data, responseEncryptionSpecification = null)
+                val response =
+                    AuthorizationResponse.FragmentJwt(redirectUriBase, data, responseEncryptionSpecification = null)
 
                 response.encodeRedirectURI()
                     .asserter { fragmentData ->

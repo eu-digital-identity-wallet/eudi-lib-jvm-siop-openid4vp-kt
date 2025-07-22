@@ -59,6 +59,7 @@ import kotlin.test.assertNotNull
 
 class AuthorizationResponseDispatcherTest {
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
+
     private val walletConfig = SiopOpenId4VPConfig(
         supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
         vpConfiguration = VPConfiguration(
@@ -86,7 +87,11 @@ class AuthorizationResponseDispatcherTest {
         fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode, walletConfig.responseEncryptionConfiguration)
+                ClientMetaDataValidator.validateClientMetaData(
+                    clientMetaData,
+                    responseMode,
+                    walletConfig.responseEncryptionConfiguration,
+                )
             }
 
             val siopAuthRequestObject =
@@ -145,7 +150,7 @@ class AuthorizationResponseDispatcherTest {
                     }
                 }
 
-                val dispatcher = DefaultDispatcher { managedHttpClient }
+                val dispatcher = DefaultDispatcher(managedHttpClient)
                 val outcome = dispatcher.dispatch(
                     siopAuthRequestObject,
                     idTokenConsensus,
@@ -164,7 +169,11 @@ class AuthorizationResponseDispatcherTest {
         fun test(state: String? = null) {
             val responseMode = ResponseMode.DirectPost("https://respond.here".asURL().getOrThrow())
             val validated = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(clientMetaData, responseMode, walletConfig.responseEncryptionConfiguration)
+                ClientMetaDataValidator.validateClientMetaData(
+                    clientMetaData,
+                    responseMode,
+                    walletConfig.responseEncryptionConfiguration,
+                )
             }
 
             val dcql = Json.decodeFromStream<DCQL>(load("dcql/mDL-example.json")!!)
@@ -219,7 +228,7 @@ class AuthorizationResponseDispatcherTest {
                     }
                 }
 
-                val dispatcher = DefaultDispatcher { managedHttpClient }
+                val dispatcher = DefaultDispatcher(managedHttpClient)
                 val outcome = dispatcher.dispatch(
                     openId4VPAuthRequestObject,
                     vpTokenConsensus,
@@ -278,7 +287,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher { managedHttpClient }
+                    val dispatcher = DefaultDispatcher(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.InvalidClientId,
                         errorDispatchDetails,
@@ -304,7 +313,8 @@ class AuthorizationResponseDispatcherTest {
                     responseEncryptionSpecification = ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
-                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty()
+                                .first(),
                         ),
                         recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
@@ -342,7 +352,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher { managedHttpClient }
+                    val dispatcher = DefaultDispatcher(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.InvalidRequestUriMethod,
                         errorDispatchDetails,
@@ -375,7 +385,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher { managedHttpClient }
+                    val dispatcher = DefaultDispatcher(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.SubjectSyntaxTypesNoMatch,
                         errorDispatchDetails,
@@ -404,7 +414,8 @@ class AuthorizationResponseDispatcherTest {
                     responseEncryptionSpecification = ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
-                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty()
+                                .first(),
                         ),
                         recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
@@ -417,7 +428,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher { managedHttpClient }
+                    val dispatcher = DefaultDispatcher(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         MissingScope,
                         errorDispatchDetails,
@@ -455,7 +466,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher { managedHttpClient }
+                    val dispatcher = DefaultDispatcher(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         MissingResponseType,
                         errorDispatchDetails,
@@ -483,7 +494,8 @@ class AuthorizationResponseDispatcherTest {
                     responseEncryptionSpecification = ResponseEncryptionSpecification(
                         encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
                         encryptionMethod = EncryptionMethod.parse(
-                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty().first(),
+                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty()
+                                .first(),
                         ),
                         recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
                     ),
@@ -496,7 +508,7 @@ class AuthorizationResponseDispatcherTest {
                         }
                     }
 
-                    val dispatcher = DefaultDispatcher { managedHttpClient }
+                    val dispatcher = DefaultDispatcher(managedHttpClient)
                     val outcome = dispatcher.dispatchError(
                         RequestValidationError.MissingResponseUri,
                         errorDispatchDetails,

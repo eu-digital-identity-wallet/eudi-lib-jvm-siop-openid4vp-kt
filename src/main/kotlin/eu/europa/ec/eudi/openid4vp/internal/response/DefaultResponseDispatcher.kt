@@ -30,11 +30,9 @@ import java.net.URL
 
 /**
  * Default implementation of [Dispatcher]
- *
- * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val httpClient: HttpClient,
 ) : Dispatcher, ErrorDispatcher {
 
     override suspend fun post(
@@ -57,9 +55,7 @@ internal class DefaultDispatcher(
 
     private suspend fun doPost(response: AuthorizationResponse): DispatchOutcome.VerifierResponse {
         val (responseUri, parameters) = formParameters(response)
-        return httpClientFactory().use { httpClient ->
-            submitForm(httpClient, responseUri, parameters)
-        }
+        return submitForm(httpClient, responseUri, parameters)
     }
 
     private fun formParameters(

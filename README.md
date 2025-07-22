@@ -67,7 +67,7 @@ dependencies {
 }
 ```
 
-Entry point to the library is the interface [SiopOpenId4Vp](src/main/kotlin/eu/europa/ec/eudi/openid4vp/SiopOpenId4Vp.kt)
+The entry point to the library is the interface [SiopOpenId4Vp](src/main/kotlin/eu/europa/ec/eudi/openid4vp/SiopOpenId4Vp.kt)
 Currently, the library offers an implementation of this interface based on [Ktor](https://ktor.io/) Http Client.
 Ktor is built from the ground up using Kotlin and Coroutines.
 
@@ -78,8 +78,14 @@ import eu.europa.ec.eudi.openid4vp.*
 
 val walletConfig: SiopOpenId4VPConfig = SiopOpenId4VPConfig(
 )
+val httpClient = HttpClient {
+  install(ContentNegotiation) {
+    json(json)
+  }
+  expectSuccess = true
+}
 
-val siopOpenId4Vp = SiopOpenId4Vp.ktor(walletConfig)
+val siopOpenId4Vp = SiopOpenId4Vp(walletConfig, httpClient)
 ```
 
 ### Resolve an authorization request URI

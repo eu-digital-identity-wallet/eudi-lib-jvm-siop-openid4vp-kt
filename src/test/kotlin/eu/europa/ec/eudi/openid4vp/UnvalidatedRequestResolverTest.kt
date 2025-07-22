@@ -35,6 +35,9 @@ import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
 import eu.europa.ec.eudi.openid4vp.internal.request.VpFormatsTO
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -45,8 +48,11 @@ import kotlinx.serialization.json.*
 import org.apache.http.NameValuePair
 import org.apache.http.client.utils.URIBuilder
 import org.apache.http.message.BasicNameValuePair
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.TestInstance
 import java.io.InputStream
 import java.net.URLEncoder
 import java.security.KeyStore
@@ -55,9 +61,28 @@ import java.time.Clock
 import java.util.*
 import kotlin.test.*
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UnvalidatedRequestResolverTest {
 
     private val json: Json by lazy { Json { ignoreUnknownKeys = true } }
+
+    private lateinit var httpClient: HttpClient
+
+    @BeforeAll
+    fun setup() {
+        httpClient = HttpClient {
+            install(ContentNegotiation) {
+                json(json)
+            }
+            expectSuccess = true
+        }
+    }
+
+    @AfterAll
+    fun teardown() {
+        httpClient.close()
+    }
+    private fun resolver() = DefaultAuthorizationRequestResolver(walletConfig, httpClient)
 
     private val dcqlQuery = readFileAsText("dcql/basic_example.json")
         .replace("\r\n", "")
@@ -137,8 +162,6 @@ class UnvalidatedRequestResolverTest {
         clock = Clock.systemDefaultZone(),
     )
 
-    private val resolver = DefaultAuthorizationRequestResolver(walletConfig, DefaultHttpClientFactory)
-
     private val clientMetadataJwksInline =
         """ {
              "jwks": $jwkSetJO,              
@@ -175,7 +198,7 @@ class UnvalidatedRequestResolverTest {
                     "&dcql_query=$dcqlQuery" +
                     "&client_metadata=$clientMetadataJwksInlineNoSubjectSyntaxTypes"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
             resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
         }
 
@@ -196,7 +219,7 @@ class UnvalidatedRequestResolverTest {
                     "&scope=openid" +
                     "&client_metadata=$clientMetadataJwksInline"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
 
             resolution.validateSuccess<ResolvedRequestObject.SiopAuthentication>()
         }
@@ -219,7 +242,7 @@ class UnvalidatedRequestResolverTest {
                     "&dcql_query=$dcqlQuery" +
                     "&client_metadata=$clientMetadataJwksInline"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
 
             resolution.validateSuccess<ResolvedRequestObject.SiopOpenId4VPAuthentication>()
         }
@@ -241,7 +264,7 @@ class UnvalidatedRequestResolverTest {
                     (state?.let { "&state=$it" } ?: "") +
                     "&dcql_query=$dcqlQuery"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
 
             resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
         }
@@ -277,7 +300,7 @@ class UnvalidatedRequestResolverTest {
              http://localhost:8080/public_url?client_id=Verifier&request=$signedJwt
                 """.trimIndent()
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
             assertions(resolution)
         }
 
@@ -320,7 +343,7 @@ class UnvalidatedRequestResolverTest {
             val signedJwt = createSignedRequestJwt(keyStore, jwtClaimsSet, typ)
             val authRequest = "http://localhost:8080/public_url?client_id=$clientId&request=$signedJwt"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
             assertions(resolution)
         }
 
@@ -365,7 +388,7 @@ class UnvalidatedRequestResolverTest {
             val signedJwt = createSignedRequestJwt(keyStore, jwtClaimsSet, typ)
             val authRequest = "http://localhost:8080/public_url?client_id=$clientIdEncoded&request=$signedJwt"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
             assertions(resolution)
         }
 
@@ -401,7 +424,7 @@ class UnvalidatedRequestResolverTest {
                 "&client_metadata=$clientMetadataNoVpFormats"
 
         assertFailsWith<MissingFieldException> {
-            resolver.resolveRequestUri(authRequest)
+            resolver().resolveRequestUri(authRequest)
         }
     }
 
@@ -430,7 +453,7 @@ class UnvalidatedRequestResolverTest {
                 "&dcql_query=$dcqlQuery" +
                 "&client_metadata=$clientMetadata"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+        val resolution = resolver().resolveRequestUri(authRequest)
         resolution.validateInvalid<ResolutionError.ClientVpFormatsNotSupportedFromWallet>()
     }
 
@@ -444,7 +467,7 @@ class UnvalidatedRequestResolverTest {
                 "&nonce=n-0S6_WzA2Mj" +
                 "&dcql_query=$dcqlQuery"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+        val resolution = resolver().resolveRequestUri(authRequest)
         val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
 
         assertNull(request.vpFormats)
@@ -475,7 +498,7 @@ class UnvalidatedRequestResolverTest {
                 "&dcql_query=$dcqlQuery" +
                 "&client_metadata=$clientMetadata"
 
-        val resolution = resolver.resolveRequestUri(authRequest)
+        val resolution = resolver().resolveRequestUri(authRequest)
         val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
         val formats = request.vpFormats
         val sdJwtFormat = assertNotNull(formats?.sdJwtVc)
@@ -574,7 +597,7 @@ class UnvalidatedRequestResolverTest {
                     (state?.let { "&state=$it" } ?: "") +
                     "&client_metadata=$clientMetadataJwksInline"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
 
             resolution.validateInvalid<RequestValidationError.UnsupportedResponseType>()
         }
@@ -595,7 +618,7 @@ class UnvalidatedRequestResolverTest {
                     (state?.let { "&state=$it" } ?: "") +
                     "&client_metadata=$clientMetadataJwksInline"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
 
             resolution.validateInvalid<RequestValidationError.UnsupportedResponseType>()
         }
@@ -615,7 +638,7 @@ class UnvalidatedRequestResolverTest {
                     "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
                     "&client_metadata=$clientMetadataJwksInline"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
 
             resolution.validateInvalid<RequestValidationError.MissingNonce>()
         }
@@ -635,7 +658,7 @@ class UnvalidatedRequestResolverTest {
                     (state?.let { "&state=$it" } ?: "") +
                     "&client_metadata=$clientMetadataJwksInline"
 
-            val resolution = resolver.resolveRequestUri(authRequest)
+            val resolution = resolver().resolveRequestUri(authRequest)
 
             resolution.validateInvalid<RequestValidationError.MissingClientId>()
         }
@@ -699,7 +722,7 @@ class UnvalidatedRequestResolverTest {
                 .addParameter("client_metadata", clientMetadata.toString())
                 .addParameter("transaction_data", jsonSupport.encodeToString(transactionData))
                 .build()
-            val resolution = resolver.resolveRequestUri(authorizationUrl.toString())
+            val resolution = resolver().resolveRequestUri(authorizationUrl.toString())
             block(resolution)
         }
 

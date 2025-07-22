@@ -16,7 +16,6 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import com.nimbusds.jose.JWSObject
-import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.JwsJson
@@ -184,7 +183,8 @@ internal sealed interface ReceivedRequest {
  */
 private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runCatching {
     require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
-    val compactFormString = "${signedJwt.header.toBase64URL()}.${signedJwt.payload.toBase64URL()}.${signedJwt.signature}"
+    val compactFormString =
+        "${signedJwt.header.toBase64URL()}.${signedJwt.payload.toBase64URL()}.${signedJwt.signature}"
     JwsJson.Companion.from(compactFormString).getOrThrow()
 }
 
@@ -195,14 +195,12 @@ internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
 
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    private val httpKtorHttpClientFactory: KtorHttpClientFactory,
+    private val httpClient: HttpClient,
 ) : AuthorizationRequestResolver {
 
     override suspend fun resolveRequestUri(uri: String): Resolution =
-        httpKtorHttpClientFactory().use { httpClient ->
-            with(httpClient) {
-                resolveRequestUri(uri)
-            }
+        with(httpClient) {
+            resolveRequestUri(uri)
         }
 
     private suspend fun HttpClient.resolveRequestUri(uri: String): Resolution {
@@ -279,7 +277,8 @@ private fun dispatchDetailsOrNull(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? {
     return unvalidatedRequest.responseMode()?.let { responseMode ->
-        val responseEncryptionSpecification = unvalidatedRequest.responseEncryptionSpecification(siopOpenId4VPConfig, responseMode)
+        val responseEncryptionSpecification =
+            unvalidatedRequest.responseEncryptionSpecification(siopOpenId4VPConfig, responseMode)
         ErrorDispatchDetails(
             responseMode = responseMode,
             nonce = unvalidatedRequest.nonce,
@@ -297,7 +296,11 @@ private fun UnvalidatedRequestObject.responseEncryptionSpecification(
     clientMetaData?.let {
         val decodeFromJsonElement = jsonSupport.decodeFromJsonElement<UnvalidatedClientMetaData>(clientMetaData)
         val validatedClientMetadata = decodeFromJsonElement.let {
-            ClientMetaDataValidator.validateClientMetaData(it, responseMode, siopOpenId4VPConfig.responseEncryptionConfiguration)
+            ClientMetaDataValidator.validateClientMetaData(
+                it,
+                responseMode,
+                siopOpenId4VPConfig.responseEncryptionConfiguration,
+            )
         }
         validatedClientMetadata.responseEncryptionSpecification
     }
@@ -324,22 +327,6 @@ private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
         else -> null
     }
 }
-
-private fun JWTClaimsSet.responseMode(): ResponseMode? =
-    runCatching {
-        fun JWTClaimsSet.responseUri(): URL? = getStringClaim(OpenId4VPSpec.RESPONSE_URI)?.let { URL(it) }
-        fun JWTClaimsSet.redirectUri(): URI? = getStringClaim("redirect_uri")?.let { URI.create(it) }
-
-        when (getStringClaim("response_mode")) {
-            "direct_post" -> responseUri()?.let { ResponseMode.DirectPost(it) }
-            "direct_post.jwt" -> responseUri()?.let { ResponseMode.DirectPostJwt(it) }
-            "query" -> redirectUri()?.let { ResponseMode.Query(it) }
-            "query.jwt" -> redirectUri()?.let { ResponseMode.QueryJwt(it) }
-            null, "fragment" -> redirectUri()?.let { ResponseMode.Fragment(it) }
-            "fragment.jwt" -> redirectUri()?.let { ResponseMode.FragmentJwt(it) }
-            else -> null
-        }
-    }.getOrNull()
 
 private fun dispatchDetailsOrNull(
     jwsJson: JwsJson,

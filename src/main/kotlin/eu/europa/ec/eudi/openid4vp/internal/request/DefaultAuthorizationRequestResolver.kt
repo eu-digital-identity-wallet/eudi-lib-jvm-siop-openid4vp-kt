@@ -43,8 +43,24 @@ value class VerifierInfoTO(val value: JsonArray) {
         require(value.all { it is JsonObject })
     }
 
+    override fun toString(): String = value.toString()
+
     val values: List<JsonObject>
         get() = value.map { it.jsonObject }
+}
+
+@Serializable
+@JvmInline
+value class TransactionDataTO(val value: JsonArray) {
+    init {
+        require(value.isNotEmpty())
+        require(value.all { it is JsonPrimitive && it.isString })
+    }
+
+    override fun toString(): String = value.toString()
+
+    val values: List<String>
+        get() = value.map { it.jsonPrimitive.content }
 }
 
 /**
@@ -66,7 +82,7 @@ internal data class UnvalidatedRequestObject(
     @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
     @SerialName("state") val state: String? = null,
     @SerialName("id_token_type") val idTokenType: String? = null,
-    @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: List<String>? = null,
+    @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: TransactionDataTO? = null,
     @SerialName(OpenId4VPSpec.VERIFIER_INFO) val verifierInfo: VerifierInfoTO? = null,
 )
 
@@ -173,7 +189,7 @@ internal sealed interface UnvalidatedRequest {
                     responseUri = requestParams[OpenId4VPSpec.RESPONSE_URI],
                     redirectUri = requestParams["redirect_uri"],
                     state = requestParams["state"],
-                    transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.map { it.jsonPrimitive.content },
+                    transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.let { TransactionDataTO(it) },
                     verifierInfo = jsonArray(OpenId4VPSpec.VERIFIER_INFO)?.let { VerifierInfoTO(it) },
                 ),
             )

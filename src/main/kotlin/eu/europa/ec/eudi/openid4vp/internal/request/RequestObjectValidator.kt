@@ -168,7 +168,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
     ): List<TransactionData>? =
         requestObject.transactionData?.let { unresolvedTransactionData ->
             runCatching {
-                unresolvedTransactionData.map { unresolved ->
+                unresolvedTransactionData.values.map { unresolved ->
                     TransactionData(
                         unresolved,
                         siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes,

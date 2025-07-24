@@ -35,6 +35,18 @@ import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
 
+@Serializable
+@JvmInline
+value class VerifierInfoTO(val value: JsonArray) {
+    init {
+        require(value.isNotEmpty())
+        require(value.all { it is JsonObject })
+    }
+
+    val values: List<JsonObject>
+        get() = value.map { it.jsonObject }
+}
+
 /**
  * The data of an OpenID4VP authorization request or SIOP Authentication request
  * or a combined OpenId4VP & SIOP request
@@ -55,7 +67,7 @@ internal data class UnvalidatedRequestObject(
     @SerialName("state") val state: String? = null,
     @SerialName("id_token_type") val idTokenType: String? = null,
     @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: List<String>? = null,
-    @SerialName("verifier_attestations") val verifierAttestations: JsonArray? = null,
+    @SerialName(OpenId4VPSpec.VERIFIER_INFO) val verifierInfo: VerifierInfoTO? = null,
 )
 
 enum class RequestUriMethod {
@@ -162,7 +174,7 @@ internal sealed interface UnvalidatedRequest {
                     redirectUri = requestParams["redirect_uri"],
                     state = requestParams["state"],
                     transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.map { it.jsonPrimitive.content },
-                    verifierAttestations = jsonArray("verifier_attestations"),
+                    verifierInfo = jsonArray(OpenId4VPSpec.VERIFIER_INFO)?.let { VerifierInfoTO(it) },
                 ),
             )
         }

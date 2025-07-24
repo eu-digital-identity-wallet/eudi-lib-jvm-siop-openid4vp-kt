@@ -126,7 +126,7 @@ class DefaultDispatcherTest {
                 responseMode = responseMode,
                 state = state ?: genState(),
                 transactionData = null,
-                verifierAttestations = null,
+                verifierInfo = null,
             )
         }
     }
@@ -492,7 +492,7 @@ class DefaultDispatcherTest {
                 responseMode = responseMode,
                 state = genState(),
                 transactionData = null,
-                verifierAttestations = null,
+                verifierInfo = null,
             )
         }
 
@@ -527,7 +527,7 @@ class DefaultDispatcherTest {
                 scope = Scope.OpenId,
                 query = query,
                 transactionData = null,
-                verifierAttestations = null,
+                verifierInfo = null,
             )
         }
 

@@ -23,7 +23,6 @@ import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.ensureNotNull
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.net.URI
 import java.net.URL
@@ -65,7 +64,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         fun vpToken(): OpenId4VPAuthorization {
             val query = requiredDcqlQuery(requestObject, nonOpenIdScope, siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported)
             val transactionData = optionalTransactionData(requestObject, query)
-            val verifierAttestations = optionalVerifierAttestations(query, requestObject)
+            val verifierInfo = optionalVerifierInfo(query, requestObject)
             val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
             return OpenId4VPAuthorization(
                 client = client.toClient(),
@@ -76,14 +75,14 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 vpFormatsSupported = clientMetaData?.vpFormatsSupported,
                 query = query,
                 transactionData = transactionData,
-                verifierAttestations = verifierAttestations,
+                verifierInfo = verifierInfo,
             )
         }
 
         fun idAndVpToken(): SiopOpenId4VPAuthentication {
             val query = requiredDcqlQuery(requestObject, nonOpenIdScope, siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported)
             val transactionData = optionalTransactionData(requestObject, query)
-            val verifierAttestations = optionalVerifierAttestations(query, requestObject)
+            val verifierInfo = optionalVerifierInfo(query, requestObject)
             val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
             return SiopOpenId4VPAuthentication(
                 client = client.toClient(),
@@ -97,7 +96,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 scope = scope.getOrThrow(),
                 query = query,
                 transactionData = transactionData,
-                verifierAttestations = verifierAttestations,
+                verifierInfo = verifierInfo,
             )
         }
 
@@ -179,37 +178,36 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
         }
 
-    private fun optionalVerifierAttestations(
+    private fun optionalVerifierInfo(
         query: DCQL,
         unvalidated: UnvalidatedRequestObject,
-    ): VerifierAttestations? =
-        unvalidated.verifierAttestations
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { array -> verifierAttestations(query, array) }
+    ): VerifierInfo? = unvalidated.verifierInfo?.let { verifierInfo(query, it) }
 
-    private fun verifierAttestations(
+    private fun verifierInfo(
         query: DCQL,
-        verifierAttestationsArray: JsonArray,
-    ): VerifierAttestations {
-        fun invalid(s: String) = InvalidVerifierAttestations(s).asException()
+        unvalidated: VerifierInfoTO,
+    ): VerifierInfo {
+        fun invalid(reason: String) = InvalidVerifierInfo(reason).asException()
 
-        val attestations =
-            VerifierAttestations.fromJson(verifierAttestationsArray).getOrElse { t ->
-                throw invalid("Failed to deserialize verifier_attestations. Cause: ${t.message}")
+        val verifierInfo =
+            VerifierInfo.fromJson(unvalidated.value).getOrElse { error ->
+                throw invalid("Failed to deserialize ${OpenId4VPSpec.VERIFIER_INFO}. Cause: ${error.message}")
             }
 
         val allQueryIds = query.credentials.value.map { it.id }
-        fun VerifierAttestations.Attestation.validQueryIds(): Boolean =
-            if (queryIds.isNullOrEmpty()) true
-            else {
-                queryIds.all { it in allQueryIds }
+        fun VerifierInfo.validQueryIds(): Boolean =
+            attestations.all { info ->
+                info.credentialIds
+                    ?.let { credentialIds -> credentialIds.values.all { credentialId -> credentialId in allQueryIds } }
+                    ?: true
             }
-        ensure(attestations.value.all { a -> a.validQueryIds() }) {
+
+        ensure(verifierInfo.validQueryIds()) {
             val error = "There are verifier attestations that use credential_id(s) not present in DCQL"
             invalid(error)
         }
 
-        return attestations
+        return verifierInfo
     }
 
     private fun optionalIdTokenType(unvalidated: UnvalidatedRequestObject): List<IdTokenType> =

@@ -198,32 +198,57 @@ data class TransactionData private constructor(val value: String) : Serializable
     }
 }
 
-@kotlinx.serialization.Serializable
 @JvmInline
-value class VerifierAttestations(val value: List<Attestation>) : Serializable {
-
+value class VerifierInfo(val attestations: List<Attestation>) : Serializable {
     init {
-        require(value.isNotEmpty()) { "Verifier attestations must not be empty" }
+        require(attestations.isNotEmpty())
     }
-
-    override fun toString(): String = value.toString()
-
-    fun filterOrNull(predicate: (Attestation) -> Boolean): VerifierAttestations? {
-        val matches = value.filter(predicate)
-        return matches.takeIf { it.isNotEmpty() }?.let { VerifierAttestations(it) }
-    }
+    override fun toString(): String = attestations.toString()
 
     @kotlinx.serialization.Serializable
     data class Attestation(
-        @SerialName("format") @Required val format: String,
-        @SerialName("data") @Required val data: JsonElement,
-        @SerialName("credential_ids") val queryIds: List<QueryId>? = null,
-    ) : Serializable
+        @SerialName(OpenId4VPSpec.VERIFIER_INFO_FORMAT) @Required val format: Format,
+        @SerialName(OpenId4VPSpec.VERIFIER_INFO_DATA) @Required val data: Data,
+        @SerialName(OpenId4VPSpec.VERIFIER_INFO_CREDENTIAL_IDS) val credentialIds: CredentialIds? = null,
+    ) : Serializable {
+
+        @kotlinx.serialization.Serializable
+        @JvmInline
+        value class Format(val value: String) : Serializable {
+            init {
+                require(value.isNotEmpty())
+            }
+            override fun toString(): String = value
+
+            companion object {
+                val Jwt: Format get() = Format(OpenId4VPSpec.VERIFIER_INFO_FORMAT_JWT)
+            }
+        }
+
+        @kotlinx.serialization.Serializable
+        @JvmInline
+        value class Data(val value: JsonElement) : Serializable {
+            init {
+                require((value is JsonPrimitive && value.isString) || (value is JsonObject))
+            }
+            override fun toString(): String = value.toString()
+        }
+
+        @kotlinx.serialization.Serializable
+        @JvmInline
+        value class CredentialIds(val values: List<QueryId>) : Serializable {
+            init {
+                require(values.isNotEmpty())
+            }
+            override fun toString(): String = values.toString()
+        }
+    }
 
     companion object {
-        fun fromJson(json: JsonArray): Result<VerifierAttestations> = runCatching {
-            jsonSupport.decodeFromJsonElement<List<Attestation>>(json).let(::VerifierAttestations)
-        }
+        fun fromJson(json: JsonArray): Result<VerifierInfo> =
+            runCatching {
+                VerifierInfo(jsonSupport.decodeFromJsonElement(json))
+            }
     }
 }
 
@@ -275,7 +300,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val vpFormatsSupported: VpFormatsSupported?,
         val query: DCQL,
         val transactionData: List<TransactionData>?,
-        val verifierAttestations: VerifierAttestations?,
+        val verifierInfo: VerifierInfo?,
     ) : ResolvedRequestObject
 
     /**
@@ -297,7 +322,7 @@ sealed interface ResolvedRequestObject : Serializable {
         val scope: Scope,
         val query: DCQL,
         val transactionData: List<TransactionData>?,
-        val verifierAttestations: VerifierAttestations?,
+        val verifierInfo: VerifierInfo?,
     ) : ResolvedRequestObject
 }
 
@@ -456,7 +481,7 @@ sealed interface RequestValidationError : AuthorizationRequestError {
 
     data class DIDResolutionFailed(val didUrl: String) : RequestValidationError
 
-    data class InvalidVerifierAttestations(val reason: String) : RequestValidationError
+    data class InvalidVerifierInfo(val reason: String) : RequestValidationError
 }
 
 /**

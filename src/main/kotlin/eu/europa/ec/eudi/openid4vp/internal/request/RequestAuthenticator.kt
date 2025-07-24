@@ -370,7 +370,7 @@ internal fun SignedJWT.requestObject(): UnvalidatedRequestObject {
             supportedAlgorithm = getStringClaim("supported_algorithm"),
             idTokenType = getStringClaim("id_token_type"),
             transactionData = getStringListClaim(OpenId4VPSpec.TRANSACTION_DATA),
-            verifierAttestations = getListClaim("verifier_attestations")?.asJsonArray(),
+            verifierInfo = getListClaim(OpenId4VPSpec.VERIFIER_INFO)?.let { VerifierInfoTO(it.asJsonArray()) },
         )
     }
 }

@@ -86,6 +86,12 @@ object OpenId4VPSpec {
     const val SD_JWT_VC_KB_JWT_ALGORITHMS: String = "kb-jwt_alg_values"
     const val MSO_MDOC_ISSUERAUTH_ALGORITHMS: String = "issuerauth_alg_values"
     const val MSO_MDOC_DEVICEAUTH_ALGORITHMS: String = "deviceauth_alg_values"
+
+    const val VERIFIER_INFO: String = "verifier_info"
+    const val VERIFIER_INFO_FORMAT: String = "format"
+    const val VERIFIER_INFO_FORMAT_JWT: String = "jwt"
+    const val VERIFIER_INFO_DATA: String = "data"
+    const val VERIFIER_INFO_CREDENTIAL_IDS = "credential_ids"
 }
 
 object SIOPv2

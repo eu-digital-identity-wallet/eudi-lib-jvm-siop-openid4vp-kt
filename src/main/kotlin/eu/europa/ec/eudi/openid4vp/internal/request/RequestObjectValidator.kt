@@ -196,8 +196,8 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
 
         val allQueryIds = query.credentials.value.map { it.id }
         fun VerifierInfo.validQueryIds(): Boolean =
-            attestations.all { info ->
-                info.credentialIds
+            attestations.all { attestation ->
+                attestation.credentialIds
                     ?.let { credentialIds -> credentialIds.values.all { credentialId -> credentialId in allQueryIds } }
                     ?: true
             }

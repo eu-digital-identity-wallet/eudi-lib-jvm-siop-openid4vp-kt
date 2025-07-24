@@ -38,7 +38,7 @@ data class DCQL(
      */
     @SerialName(OpenId4VPSpec.DCQL_CREDENTIAL_SETS) val credentialSets: CredentialSets? = null,
 
-) {
+) : java.io.Serializable {
     init {
         credentialSets?.ensureKnownIds(credentials)
     }
@@ -50,7 +50,7 @@ data class DCQL(
  */
 @Serializable
 @JvmInline
-value class Credentials(val value: List<CredentialQuery>) {
+value class Credentials(val value: List<CredentialQuery>) : java.io.Serializable {
 
     init {
         require(value.isNotEmpty()) { "${OpenId4VPSpec.DCQL_CREDENTIALS} cannot be empty" }
@@ -81,7 +81,7 @@ value class Credentials(val value: List<CredentialQuery>) {
  */
 @Serializable
 @JvmInline
-value class CredentialSets(val value: List<CredentialSetQuery>) {
+value class CredentialSets(val value: List<CredentialSetQuery>) : java.io.Serializable {
 
     init {
         require(value.isNotEmpty()) {
@@ -131,7 +131,7 @@ value class CredentialSets(val value: List<CredentialSetQuery>) {
 
 @Serializable
 @JvmInline
-value class TrustedAuthorityType(val value: String) {
+value class TrustedAuthorityType(val value: String) : java.io.Serializable {
     init {
         require(value.isNotBlank()) { "TrustedAuthorityType cannot be blank" }
     }
@@ -149,7 +149,7 @@ value class TrustedAuthorityType(val value: String) {
 data class TrustedAuthority(
     @SerialName(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_TYPE) @Required val type: TrustedAuthorityType,
     @SerialName(OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_VALUES) @Required val values: List<String>,
-) {
+) : java.io.Serializable {
     init {
         require(values.isNotEmpty()) { "${OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_VALUES} cannot be empty" }
         require(values.all { it.isNotBlank() }) { "${OpenId4VPSpec.DCQL_TRUSTED_AUTHORITY_VALUES} cannot contain blank values" }
@@ -173,7 +173,7 @@ data class TrustedAuthority(
  */
 @Serializable
 @JvmInline
-value class QueryId(val value: String) {
+value class QueryId(val value: String) : java.io.Serializable {
     init {
         DCQLId.ensureValid(value)
     }
@@ -220,7 +220,7 @@ data class CredentialQuery(
      */
     @SerialName(OpenId4VPSpec.DCQL_CLAIM_SETS) val claimSets: List<ClaimSet>? = null,
 
-) {
+) : java.io.Serializable {
 
     init {
         if (claims != null) {
@@ -322,7 +322,7 @@ data class CredentialQuery(
 
 @Serializable
 @JvmInline
-value class ClaimSet(val value: List<ClaimId>) {
+value class ClaimSet(val value: List<ClaimId>) : java.io.Serializable {
 
     init {
         value.ensureValid()
@@ -370,7 +370,7 @@ data class CredentialSetQuery(
      * If omitted, the default value is true
      */
     @SerialName(OpenId4VPSpec.DCQL_REQUIRED) val required: Boolean? = null,
-) {
+) : java.io.Serializable {
 
     init {
         require(options.isNotEmpty()) { "${OpenId4VPSpec.DCQL_OPTIONS} cannot be empty" }
@@ -396,7 +396,7 @@ data class CredentialSetQuery(
  */
 @Serializable
 @JvmInline
-value class CredentialSet(val value: List<QueryId>) {
+value class CredentialSet(val value: List<QueryId>) : java.io.Serializable {
 
     init {
         value.ensureValid()
@@ -428,7 +428,7 @@ value class CredentialSet(val value: List<QueryId>) {
 
 @Serializable
 @JvmInline
-value class ClaimId(val value: String) {
+value class ClaimId(val value: String) : java.io.Serializable {
     init {
         DCQLId.ensureValid(value)
     }
@@ -442,7 +442,7 @@ data class ClaimsQuery(
     @Required @SerialName(OpenId4VPSpec.DCQL_PATH) val path: ClaimPath,
     @SerialName(OpenId4VPSpec.DCQL_VALUES) val values: JsonArray? = null,
     @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_INTENT_TO_RETAIN) override val intentToRetain: Boolean? = null,
-) : MsoMdocClaimsQueryExtension {
+) : MsoMdocClaimsQueryExtension, java.io.Serializable {
 
     init {
         values?.ensureContainsOnlyPrimitives()
@@ -511,7 +511,7 @@ data class DCQLMetaSdJwtVcExtensions(
      */
     @SerialName(OpenId4VPSpec.DCQL_SD_JWT_VC_VCT_VALUES) @Required val vctValues: List<String>,
 
-) {
+) : java.io.Serializable {
     init {
         require(vctValues.isNotEmpty()) { "${OpenId4VPSpec.DCQL_SD_JWT_VC_VCT_VALUES} cannot be empty" }
         require(vctValues.all { it.isNotBlank() }) { "${OpenId4VPSpec.DCQL_SD_JWT_VC_VCT_VALUES} cannot contain blank values" }
@@ -525,7 +525,7 @@ data class DCQLMetaSdJwtVcExtensions(
 
 @Serializable
 @JvmInline
-value class MsoMdocDocType(val value: String) {
+value class MsoMdocDocType(val value: String) : java.io.Serializable {
     init {
         require(value.isNotBlank()) { "Doctype can't be blank" }
     }
@@ -544,12 +544,12 @@ data class DCQLMetaMsoMdocExtensions(
      * It MUST be a valid doctype identifier as defined
      */
     @SerialName(OpenId4VPSpec.DCQL_MSO_MDOC_DOCTYPE_VALUE) @Required val doctypeValue: MsoMdocDocType,
-)
+) : java.io.Serializable
 
 /**
  * The following are ISO mdoc specific parameters to be used in a [Claims Query][ClaimsQuery]
  */
-interface MsoMdocClaimsQueryExtension {
+interface MsoMdocClaimsQueryExtension : java.io.Serializable {
 
     /**
      * OPTIONAL. A boolean that is equivalent to IntentToRetain variable defined in Section 8.3.2.1.2.1 of [ISO.18013-5].

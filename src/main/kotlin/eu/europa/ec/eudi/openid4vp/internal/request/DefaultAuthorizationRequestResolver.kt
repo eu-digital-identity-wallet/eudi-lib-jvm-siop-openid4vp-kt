@@ -78,7 +78,6 @@ internal data class UnvalidatedRequestObject(
     @SerialName(OpenId4VPSpec.DCQL_QUERY) val dcqlQuery: JsonObject? = null,
     @SerialName("redirect_uri") val redirectUri: String? = null,
     @SerialName("scope") val scope: String? = null,
-    @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
     @SerialName("state") val state: String? = null,
     @SerialName("id_token_type") val idTokenType: String? = null,
     @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: TransactionDataTO? = null,

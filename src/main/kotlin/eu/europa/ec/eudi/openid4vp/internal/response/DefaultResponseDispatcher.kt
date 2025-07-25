@@ -16,11 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.VpContent.DCQL
-import eu.europa.ec.eudi.openid4vp.VpContent.PresentationExchange
-import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.*
-import eu.europa.ec.eudi.prex.PresentationSubmission
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -34,13 +30,9 @@ import java.net.URL
 
 /**
  * Default implementation of [Dispatcher]
- *
- * @param siopOpenId4VPConfig the wallet configuration
- * @param httpClientFactory factory to obtain [HttpClient]
  */
 internal class DefaultDispatcher(
-    private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
-    private val httpClientFactory: KtorHttpClientFactory,
+    private val httpClient: HttpClient,
 ) : Dispatcher, ErrorDispatcher {
 
     override suspend fun post(
@@ -63,9 +55,7 @@ internal class DefaultDispatcher(
 
     private suspend fun doPost(response: AuthorizationResponse): DispatchOutcome.VerifierResponse {
         val (responseUri, parameters) = formParameters(response)
-        return httpClientFactory().use { httpClient ->
-            submitForm(httpClient, responseUri, parameters)
-        }
+        return submitForm(httpClient, responseUri, parameters)
     }
 
     private fun formParameters(
@@ -73,13 +63,12 @@ internal class DefaultDispatcher(
     ): Pair<URL, Parameters> =
         when (response) {
             is DirectPost -> {
-                val parameters = DirectPostForm.parametersOf(response.data)
+                val parameters = parametersOf(null, response.data)
                 response.responseUri to parameters
             }
 
             is DirectPostJwt -> {
-                val jarmJwt = siopOpenId4VPConfig.jarmJwt(response.jarmRequirement, response.data)
-                val parameters = DirectPostJwtForm.parametersOf(jarmJwt)
+                val parameters = parametersOf(response.responseEncryptionSpecification, response.data)
                 response.responseUri to parameters
             }
 
@@ -141,9 +130,9 @@ internal class DefaultDispatcher(
     ): DispatchOutcome.RedirectURI {
         val uri = when (response) {
             is Fragment -> response.encodeRedirectURI()
-            is FragmentJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
+            is FragmentJwt -> response.encodeRedirectURI()
             is Query -> response.encodeRedirectURI()
-            is QueryJwt -> response.encodeRedirectURI(siopOpenId4VPConfig)
+            is QueryJwt -> response.encodeRedirectURI()
             else -> error("Unexpected response $response")
         }
 
@@ -151,37 +140,42 @@ internal class DefaultDispatcher(
     }
 }
 
-internal fun Query.encodeRedirectURI(): URI =
-    URLBuilder(redirectUri.toString()).apply {
-        parameters.apply {
-            DirectPostForm.of(data).forEach { (key, value) ->
-                append(key, value)
-            }
+internal fun parametersOf(
+    responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    data: AuthorizationResponsePayload,
+): Parameters =
+    when {
+        null != responseEncryptionSpecification -> {
+            val encryptedJwt = responseEncryptionSpecification.encrypt(data)
+            DirectPostJwtForm.parametersOf(encryptedJwt)
         }
-    }.build().toURI()
 
-internal fun QueryJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
-    URLBuilder(redirectUri.toString()).apply {
-        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
-        parameters.append("response", jarmJwt)
-    }.build().toURI()
+        else -> DirectPostForm.parametersOf(data)
+    }
+
+internal fun Query.encodeRedirectURI(): URI =
+    URLBuilder(redirectUri.toString())
+        .apply {
+            parameters.appendAll(parametersOf(null, data))
+        }.build().toURI()
+
+internal fun QueryJwt.encodeRedirectURI(): URI =
+    URLBuilder(redirectUri.toString())
+        .apply {
+            parameters.appendAll(parametersOf(responseEncryptionSpecification, data))
+        }.build().toURI()
+
+internal fun Parameters.toFragment(): String =
+    entries().flatMap { (key, values) -> values.map { value -> "$key=$value" } }.joinToString("&")
 
 internal fun Fragment.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        fragment = DirectPostForm.of(data)
-            .map { (key, value) ->
-                "$key=$value"
-            }.joinToString("&")
+        fragment = parametersOf(null, data).toFragment()
     }.build().toURI()
 
-internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPConfig): URI =
+internal fun FragmentJwt.encodeRedirectURI(): URI =
     URLBuilder(redirectUri.toString()).apply {
-        val jarmJwt = siopOpenId4VPConfig.jarmJwt(jarmRequirement, data)
-        fragment = buildMap {
-            put("response", jarmJwt)
-        }.map { (key, value) ->
-            "$key=$value"
-        }.joinToString(separator = "&")
+        fragment = parametersOf(responseEncryptionSpecification, data).toFragment()
     }.build().toURI()
 
 /**
@@ -190,7 +184,6 @@ internal fun FragmentJwt.encodeRedirectURI(siopOpenId4VPConfig: SiopOpenId4VPCon
  */
 internal object DirectPostForm {
 
-    private const val PRESENTATION_SUBMISSION_FORM_PARAM = "presentation_submission"
     private const val VP_TOKEN_FORM_PARAM = "vp_token"
     private const val STATE_FORM_PARAM = "state"
     private const val ID_TOKEN_FORM_PARAM = "id_token"
@@ -204,21 +197,8 @@ internal object DirectPostForm {
             }
         }
 
-    fun of(p: AuthorizationResponsePayload): Map<String, String> {
-        fun ps(ps: PresentationSubmission) = Json.encodeToString<PresentationSubmission>(ps)
-
-        fun MutableMap<String, String>.put(vpContent: VpContent) {
-            when (vpContent) {
-                is PresentationExchange -> {
-                    put(VP_TOKEN_FORM_PARAM, vpContent.verifiablePresentations.asParam())
-                    put(PRESENTATION_SUBMISSION_FORM_PARAM, ps(vpContent.presentationSubmission))
-                }
-
-                is DCQL -> put(VP_TOKEN_FORM_PARAM, vpContent.verifiablePresentations.asParam())
-            }
-        }
-
-        return when (p) {
+    fun of(p: AuthorizationResponsePayload): Map<String, String> =
+        when (p) {
             is AuthorizationResponsePayload.SiopAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
                 p.state?.let {
@@ -227,7 +207,7 @@ internal object DirectPostForm {
             }
 
             is AuthorizationResponsePayload.OpenId4VPAuthorization -> buildMap {
-                put(p.vpContent)
+                put(VP_TOKEN_FORM_PARAM, p.verifiablePresentations.asParam())
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }
@@ -235,7 +215,7 @@ internal object DirectPostForm {
 
             is AuthorizationResponsePayload.SiopOpenId4VPAuthentication -> buildMap {
                 put(ID_TOKEN_FORM_PARAM, p.idToken)
-                put(p.vpContent)
+                put(VP_TOKEN_FORM_PARAM, p.verifiablePresentations.asParam())
                 p.state?.let {
                     put(STATE_FORM_PARAM, it)
                 }
@@ -256,46 +236,29 @@ internal object DirectPostForm {
                 }
             }
         }
-    }
 }
 
-internal fun Map<QueryId, VerifiablePresentation>.asParam(): String =
+internal fun VerifiablePresentations.asJsonObject(): JsonObject =
     buildJsonObject {
-        for ((key, value) in iterator()) {
-            put(key.value, value.asParam())
-        }
-    }.run(Json::encodeToString)
-
-internal fun List<VerifiablePresentation>.asParam(): String =
-    when (size) {
-        1 -> this.first().asParam()
-        0 -> error("Not expected")
-        else -> {
-            buildJsonArray {
-                for (vp in iterator()) {
-                    add(vp.asJson())
+        value.entries
+            .forEach { (queryId, verifiablePresentations) ->
+                putJsonArray(queryId.value) {
+                    verifiablePresentations.forEach { verifiablePresentation ->
+                        when (verifiablePresentation) {
+                            is VerifiablePresentation.Generic -> add(verifiablePresentation.value)
+                            is VerifiablePresentation.JsonObj -> add(verifiablePresentation.value)
+                        }
+                    }
                 }
-            }.run(Json::encodeToString)
-        }
+            }
     }
 
-internal fun VerifiablePresentation.asParam(): String =
-    when (this) {
-        is VerifiablePresentation.Generic -> value
-        is VerifiablePresentation.JsonObj -> Json.encodeToString(value)
-    }
-
-internal fun VerifiablePresentation.asJson(): JsonElement {
-    return when (this) {
-        is VerifiablePresentation.Generic -> JsonPrimitive(value)
-        is VerifiablePresentation.JsonObj -> value
-    }
-}
+internal fun VerifiablePresentations.asParam(): String = Json.encodeToString(asJsonObject())
 
 internal object DirectPostJwtForm {
-    fun parametersOf(jarmJwt: Jwt): Parameters =
+    fun parametersOf(encryptedJwt: Jwt): Parameters =
         Parameters.build {
-            append("response", jarmJwt)
+            append("response", encryptedJwt)
         }
 }
 

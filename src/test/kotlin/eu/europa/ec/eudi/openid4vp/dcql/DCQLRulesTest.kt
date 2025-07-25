@@ -15,7 +15,6 @@
  */
 package eu.europa.ec.eudi.openid4vp.dcql
 
-import eu.europa.ec.eudi.openid4vp.Format
 import kotlin.test.Test
 import kotlin.test.fail
 
@@ -40,7 +39,7 @@ class DCQLRulesTest {
     @Test
     fun whenCredentialsIsEmptyAnExceptionIsRaised() {
         try {
-            DCQL(credentials = emptyList())
+            Credentials(emptyList())
             fail("DCQL cannot have an empty credentials attribute")
         } catch (_: IllegalArgumentException) {
             // ok
@@ -51,11 +50,9 @@ class DCQLRulesTest {
     fun whenCredentialsContainsEntriesWithTheSameIdAnExceptionIsRaised() {
         try {
             val id = QueryId("id")
-            DCQL(
-                credentials = listOf(
-                    CredentialQuery(id = id, format = Format.MsoMdoc),
-                    CredentialQuery(id = id, format = Format.SdJwtVc),
-                ),
+            Credentials(
+                CredentialQuery.mdoc(id, DCQLMetaMsoMdocExtensions(MsoMdocDocType("foo"))),
+                CredentialQuery.sdJwtVc(id, DCQLMetaSdJwtVcExtensions(vctValues = listOf("bar"))),
             )
             fail("CredentialQuery ids must be unique")
         } catch (_: IllegalArgumentException) {
@@ -66,12 +63,12 @@ class DCQLRulesTest {
     @Test
     fun whenCredentialsSetIsEmptyAnExceptionIsRaised() {
         try {
-            DCQL(
-                credentials = listOf(
-                    CredentialQuery(id = QueryId("id1"), format = Format.MsoMdoc),
-                    CredentialQuery(id = QueryId("id2"), format = Format.SdJwtVc),
+            Credentials(
+                CredentialQuery.mdoc(
+                    QueryId("id1"),
+                    DCQLMetaMsoMdocExtensions(MsoMdocDocType("foo")),
+                    claimSets = emptyList(),
                 ),
-                credentialSets = listOf(),
             )
             fail("credentialSets, if provided, cannot be empty")
         } catch (_: IllegalArgumentException) {

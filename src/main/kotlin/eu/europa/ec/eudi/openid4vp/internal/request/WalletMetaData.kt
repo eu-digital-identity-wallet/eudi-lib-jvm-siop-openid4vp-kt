@@ -18,7 +18,9 @@ package eu.europa.ec.eudi.openid4vp.internal.request
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
 import eu.europa.ec.eudi.openid4vp.EncryptionRequirement
+import eu.europa.ec.eudi.openid4vp.OpenId4VPSpec
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig
+import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.toJsonObject
 import kotlinx.serialization.json.*
 
@@ -27,9 +29,6 @@ private const val JWKS = "jwks"
 private const val AUTHORIZATION_ENCRYPTION_ALG_VALUES_SUPPORTED = "authorization_encryption_alg_values_supported"
 private const val AUTHORIZATION_ENCRYPTION_ENC_VALUES_SUPPORTED = "authorization_encryption_enc_values_supported"
 
-private const val PRESENTATION_DEFINITION_URI_SUPPORTED = "presentation_definition_uri_supported"
-private const val CLIENT_ID_SCHEMES_SUPPORTED = "client_id_schemes_supported"
-private const val VP_FORMATS_SUPPORTED = "vp_formats_supported"
 private const val RESPONSE_TYPES_SUPPOERTED = "response_types_supported"
 private const val RESPONSE_MODES_SUPPORTED = "response_modes_supported"
 
@@ -38,7 +37,7 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         // Authorization Request signature and encryption parameters
         // Uses properties defined in JAR and JARM specs
-        // https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-request-uri-method-post
+        // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request-uri-method-post
         //
 
         // Signature
@@ -63,14 +62,10 @@ internal fun walletMetaData(cfg: SiopOpenId4VPConfig, keys: List<JWK>): JsonObje
         //
         // OpenIdVP
         //
-        put(PRESENTATION_DEFINITION_URI_SUPPORTED, cfg.vpConfiguration.presentationDefinitionUriSupported)
-
-        val vpFormats =
-            VpFormatsTO.make(cfg.vpConfiguration.vpFormats).let(Json.Default::encodeToJsonElement)
-        put(VP_FORMATS_SUPPORTED, vpFormats)
-        putJsonArray(CLIENT_ID_SCHEMES_SUPPORTED) {
-            cfg.supportedClientIdSchemes.forEach { supportedClientIdScheme ->
-                add(supportedClientIdScheme.scheme().value())
+        put(OpenId4VPSpec.VP_FORMATS_SUPPORTED, jsonSupport.encodeToJsonElement(cfg.vpConfiguration.vpFormatsSupported))
+        putJsonArray(OpenId4VPSpec.CLIENT_ID_PREFIXES_SUPPORTED) {
+            cfg.supportedClientIdPrefixes.forEach { supportedClientIdPrefix ->
+                add(supportedClientIdPrefix.prefix().value())
             }
         }
         putJsonArray(RESPONSE_TYPES_SUPPOERTED) {

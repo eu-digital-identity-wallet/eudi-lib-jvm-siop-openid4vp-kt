@@ -95,8 +95,8 @@ internal class RequestFetcherTest {
             requestURIMethod = RequestUriMethod.POST,
         )
 
-        val fetchedRequest = assertIs<FetchedRequest.JwtSecured>(fetcher.fetchRequest(request))
-        assertEquals(signedRequest.serialize(), fetchedRequest.jwt.serialize())
+        val receivedRequest = assertIs<ReceivedRequest.Signed>(fetcher.fetchRequest(request))
+        assertEquals(signedRequest.serialize(), receivedRequest.toSignedJwts()[0].serialize())
     }
 
     @Test
@@ -180,8 +180,8 @@ internal class RequestFetcherTest {
             requestURIMethod = RequestUriMethod.POST,
         )
 
-        val fetchedRequest = assertIs<FetchedRequest.JwtSecured>(fetcher.fetchRequest(request))
-        assertEquals(signedRequest.serialize(), fetchedRequest.jwt.serialize())
+        val receivedRequest = assertIs<ReceivedRequest.Signed>(fetcher.fetchRequest(request))
+        assertEquals(signedRequest.serialize(), receivedRequest.toSignedJwts()[0].serialize())
     }
 }
 
@@ -196,9 +196,15 @@ private fun config(clientId: String, jarEncryptionRequirement: EncryptionRequire
             ),
         ),
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+            vpFormatsSupported = VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc.HAIP,
+                VpFormatsSupported.MsoMdoc(
+                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                ),
+            ),
         ),
-        supportedClientIdSchemes = listOf(SupportedClientIdScheme.Preregistered(PreregisteredClient(clientId, clientId))),
+        supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.Preregistered(PreregisteredClient(clientId, clientId))),
     )
 
 private fun createSignedRequestObject(clientId: String, walletNonce: String): SignedJWT =

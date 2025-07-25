@@ -229,7 +229,7 @@ class AuthorizationResponseDispatcherTest {
                     state = state,
                     query = query,
                     transactionData = null,
-                    verifierAttestations = null,
+                    verifierInfo = null,
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(

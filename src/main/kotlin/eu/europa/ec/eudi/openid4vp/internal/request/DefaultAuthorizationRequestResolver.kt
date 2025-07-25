@@ -28,12 +28,39 @@ import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecure
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.net.URI
 import java.net.URL
+
+@Serializable
+@JvmInline
+internal value class VerifierInfoTO(val value: JsonArray) {
+    init {
+        require(value.isNotEmpty())
+        require(value.all { it is JsonObject })
+    }
+
+    override fun toString(): String = value.toString()
+
+    val values: List<JsonObject>
+        get() = value.map { it.jsonObject }
+}
+
+@Serializable
+@JvmInline
+internal value class TransactionDataTO(val value: JsonArray) {
+    init {
+        require(value.isNotEmpty())
+        require(value.all { it is JsonPrimitive && it.isString })
+    }
+
+    override fun toString(): String = value.toString()
+
+    val values: List<String>
+        get() = value.map { it.jsonPrimitive.content }
+}
 
 /**
  * The data of an OpenID4VP authorization request or SIOP Authentication request
@@ -43,7 +70,7 @@ import java.net.URL
 @Serializable
 internal data class UnvalidatedRequestObject(
     @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    @Required val nonce: String? = null,
+    @SerialName(OpenId4VPSpec.NONCE) val nonce: String? = null,
     @SerialName("client_id") val clientId: String? = null,
     @SerialName("response_type") val responseType: String? = null,
     @SerialName("response_mode") val responseMode: String? = null,
@@ -51,11 +78,10 @@ internal data class UnvalidatedRequestObject(
     @SerialName(OpenId4VPSpec.DCQL_QUERY) val dcqlQuery: JsonObject? = null,
     @SerialName("redirect_uri") val redirectUri: String? = null,
     @SerialName("scope") val scope: String? = null,
-    @SerialName("supported_algorithm") val supportedAlgorithm: String? = null,
     @SerialName("state") val state: String? = null,
     @SerialName("id_token_type") val idTokenType: String? = null,
-    @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: List<String>? = null,
-    @SerialName("verifier_attestations") val verifierAttestations: JsonArray? = null,
+    @SerialName(OpenId4VPSpec.TRANSACTION_DATA) val transactionData: TransactionDataTO? = null,
+    @SerialName(OpenId4VPSpec.VERIFIER_INFO) val verifierInfo: VerifierInfoTO? = null,
 )
 
 enum class RequestUriMethod {
@@ -161,8 +187,8 @@ internal sealed interface UnvalidatedRequest {
                     responseUri = requestParams[OpenId4VPSpec.RESPONSE_URI],
                     redirectUri = requestParams["redirect_uri"],
                     state = requestParams["state"],
-                    transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.map { it.jsonPrimitive.content },
-                    verifierAttestations = jsonArray("verifier_attestations"),
+                    transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.let { TransactionDataTO(it) },
+                    verifierInfo = jsonArray(OpenId4VPSpec.VERIFIER_INFO)?.let { VerifierInfoTO(it) },
                 ),
             )
         }

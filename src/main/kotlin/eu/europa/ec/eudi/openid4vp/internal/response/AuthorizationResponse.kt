@@ -16,14 +16,13 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.*
-import java.io.Serializable
 import java.net.URI
 import java.net.URL
 
 /**
  * The payload of an [AuthorizationResponse]
  */
-internal sealed interface AuthorizationResponsePayload : Serializable {
+internal sealed interface AuthorizationResponsePayload : java.io.Serializable {
 
     val nonce: String?
     val state: String?
@@ -114,7 +113,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
 /**
  * An OAUTH2 authorization response
  */
-internal sealed interface AuthorizationResponse : Serializable {
+internal sealed interface AuthorizationResponse : java.io.Serializable {
 
     /**
      * An authorization response to be communicated to verifier/RP via direct_post method

@@ -196,7 +196,7 @@ class AuthorizationResponseBuilderTest {
                     responseMode = responseMode,
                     state = state,
                     transactionData = null,
-                    verifierAttestations = null,
+                    verifierInfo = null,
                 )
 
             val vpTokenConsensus = Consensus.PositiveConsensus.VPTokenConsensus(

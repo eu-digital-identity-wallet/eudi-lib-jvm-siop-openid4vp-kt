@@ -24,6 +24,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.*
 import com.nimbusds.jose.shaded.gson.Gson
+import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jose.util.X509CertUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
@@ -41,7 +42,6 @@ import io.ktor.client.request.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.*
 import java.net.URI
 import java.security.MessageDigest
 import java.security.PublicKey
@@ -345,35 +345,8 @@ private fun invalidPrefix(cause: String): AuthorizationRequestException =
 private fun invalidJarJwt(cause: String): AuthorizationRequestException =
     RequestValidationError.InvalidJarJwt(cause).asException()
 
-internal fun SignedJWT.requestObject(): UnvalidatedRequestObject {
-    fun Map<String, Any?>.asJsonObject(): JsonObject {
-        val jsonStr = Gson().toJson(this)
-        return Json.parseToJsonElement(jsonStr).jsonObject
-    }
-    fun List<Any>.asJsonArray(): JsonArray {
-        val jsonStr = Gson().toJson(this)
-        return Json.parseToJsonElement(jsonStr).jsonArray
-    }
-
-    return with(jwtClaimsSet) {
-        UnvalidatedRequestObject(
-            responseType = getStringClaim("response_type"),
-            dcqlQuery = getJSONObjectClaim(OpenId4VPSpec.DCQL_QUERY)?.asJsonObject(),
-            scope = getStringClaim("scope"),
-            nonce = getStringClaim("nonce"),
-            responseMode = getStringClaim("response_mode"),
-            clientMetaData = getJSONObjectClaim("client_metadata")?.asJsonObject(),
-            clientId = getStringClaim("client_id"),
-            responseUri = getStringClaim(OpenId4VPSpec.RESPONSE_URI),
-            redirectUri = getStringClaim("redirect_uri"),
-            state = getStringClaim("state"),
-            supportedAlgorithm = getStringClaim("supported_algorithm"),
-            idTokenType = getStringClaim("id_token_type"),
-            transactionData = getListClaim(OpenId4VPSpec.TRANSACTION_DATA)?.let { TransactionDataTO(it.asJsonArray()) },
-            verifierInfo = getListClaim(OpenId4VPSpec.VERIFIER_INFO)?.let { VerifierInfoTO(it.asJsonArray()) },
-        )
-    }
-}
+internal fun SignedJWT.requestObject(): UnvalidatedRequestObject =
+    jsonSupport.decodeFromString(JSONObjectUtils.toJSONString(jwtClaimsSet.toJSONObject()))
 
 internal data class VerifierAttestationClaims(
     val iss: String,

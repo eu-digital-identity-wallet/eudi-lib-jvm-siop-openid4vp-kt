@@ -25,13 +25,13 @@ import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.JWSAlgorithmSerializer
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.JsonObject
-import java.io.Serializable
 import java.net.URI
 import java.net.URL
 
-sealed interface SubjectSyntaxType : Serializable {
+sealed interface SubjectSyntaxType : java.io.Serializable {
 
     @JvmInline
     value class DecentralizedIdentifier(val method: String) : SubjectSyntaxType
@@ -207,7 +207,7 @@ data class VerifierId(
 /**
  * @see <a href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html</a>
  */
-sealed interface ResponseMode : Serializable {
+sealed interface ResponseMode : java.io.Serializable {
 
     /**
      * In this mode, Authorization Response parameters are encoded
@@ -271,14 +271,14 @@ data class ResponseEncryptionSpecification(
     val encryptionAlgorithm: JWEAlgorithm,
     val encryptionMethod: EncryptionMethod,
     val recipientKey: JWK,
-) : Serializable {
+) : java.io.Serializable {
     init {
         require(encryptionAlgorithm.name == recipientKey.algorithm?.name)
         requireNotNull(recipientKey.keyID)
     }
 }
 
-sealed interface EncryptionParameters : Serializable {
+sealed interface EncryptionParameters : java.io.Serializable {
     data class DiffieHellman(val apu: Base64URL) : EncryptionParameters
 }
 
@@ -288,7 +288,7 @@ sealed interface EncryptionParameters : Serializable {
  * @see <a href="https://www.iana.org/assignments/named-information/named-information.xhtml">https://www.iana.org/assignments/named-information/named-information.xhtml</a>
  */
 @JvmInline
-value class HashAlgorithm(val name: String) : Serializable {
+value class HashAlgorithm(val name: String) : java.io.Serializable {
     init {
         require(name.isNotEmpty())
     }
@@ -301,7 +301,7 @@ value class HashAlgorithm(val name: String) : Serializable {
 }
 
 @JvmInline
-value class TransactionDataType(val value: String) : Serializable {
+value class TransactionDataType(val value: String) : java.io.Serializable {
     init {
         require(value.isNotEmpty())
     }
@@ -310,7 +310,7 @@ value class TransactionDataType(val value: String) : Serializable {
 }
 
 @JvmInline
-value class TransactionDataCredentialId(val value: String) : Serializable {
+value class TransactionDataCredentialId(val value: String) : java.io.Serializable {
     init {
         require(value.isNotEmpty())
     }
@@ -319,16 +319,16 @@ value class TransactionDataCredentialId(val value: String) : Serializable {
 }
 
 @JvmInline
-@kotlinx.serialization.Serializable
-value class CoseAlgorithm(val value: Int) : Serializable {
+@Serializable
+value class CoseAlgorithm(val value: Int) : java.io.Serializable {
     override fun toString(): String = value.toString()
 }
 
-@kotlinx.serialization.Serializable
+@Serializable
 data class VpFormatsSupported(
     @SerialName(OpenId4VPSpec.FORMAT_SD_JWT_VC) val sdJwtVc: SdJwtVc? = null,
     @SerialName(OpenId4VPSpec.FORMAT_MSO_MDOC) val msoMdoc: MsoMdoc? = null,
-) : Serializable {
+) : java.io.Serializable {
 
     init {
         require(null != sdJwtVc || null != msoMdoc) {
@@ -338,7 +338,7 @@ data class VpFormatsSupported(
 
     companion object
 
-    @kotlinx.serialization.Serializable
+    @Serializable
     data class SdJwtVc(
         @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS)
         val sdJwtAlgorithms: List<JWSAlgorithm>?,
@@ -346,7 +346,7 @@ data class VpFormatsSupported(
         @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS)
         val kbJwtAlgorithms: List<JWSAlgorithm>?,
 
-    ) : Serializable {
+    ) : java.io.Serializable {
         init {
             sdJwtAlgorithms?.let {
                 require(it.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
@@ -366,11 +366,11 @@ data class VpFormatsSupported(
         }
     }
 
-    @kotlinx.serialization.Serializable
+    @Serializable
     data class MsoMdoc(
         @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<CoseAlgorithm>?,
         @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<CoseAlgorithm>?,
-    ) : Serializable {
+    ) : java.io.Serializable {
         init {
             issuerAuthAlgorithms?.let {
                 require(it.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }

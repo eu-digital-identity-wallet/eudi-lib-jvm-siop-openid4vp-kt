@@ -16,14 +16,13 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
-import java.io.Serializable
 import java.net.URI
 
 /**
  * Representation of holder's consensus to
  * a [ResolvedRequestObject]
  */
-sealed interface Consensus : Serializable {
+sealed interface Consensus : java.io.Serializable {
 
     /**
      * No consensus. Holder decided to reject
@@ -75,7 +74,7 @@ sealed interface Consensus : Serializable {
  * The outcome of dispatching an [Consensus] to
  * verifier/RP.
  */
-sealed interface DispatchOutcome : Serializable {
+sealed interface DispatchOutcome : java.io.Serializable {
 
     /**
      * In case verifier requested response to be redirected to a URI,

@@ -27,18 +27,18 @@ import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
-import java.io.Serializable
 import java.net.URI
 import java.security.cert.X509Certificate
 
 /**
  * Represents an OAuth2 RP that submitted an Authorization Request.
  */
-sealed interface Client : Serializable {
+sealed interface Client : java.io.Serializable {
 
     data class Preregistered(val clientId: OriginalClientId, val legalName: String) : Client
     data class RedirectUri(val clientId: URI) : Client
@@ -96,7 +96,7 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
  * @property credentialIds identifiers of the requested Credentials this Transaction Data is applicable to
  * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
  */
-data class TransactionData private constructor(val value: String) : Serializable {
+data class TransactionData private constructor(val value: String) : java.io.Serializable {
 
     val json: JsonObject by lazy {
         decode(value)
@@ -199,22 +199,22 @@ data class TransactionData private constructor(val value: String) : Serializable
 }
 
 @JvmInline
-value class VerifierInfo(val attestations: List<Attestation>) : Serializable {
+value class VerifierInfo(val attestations: List<Attestation>) : java.io.Serializable {
     init {
         require(attestations.isNotEmpty())
     }
     override fun toString(): String = attestations.toString()
 
-    @kotlinx.serialization.Serializable
+    @Serializable
     data class Attestation(
         @SerialName(OpenId4VPSpec.VERIFIER_INFO_FORMAT) @Required val format: Format,
         @SerialName(OpenId4VPSpec.VERIFIER_INFO_DATA) @Required val data: Data,
         @SerialName(OpenId4VPSpec.VERIFIER_INFO_CREDENTIAL_IDS) val credentialIds: CredentialIds? = null,
-    ) : Serializable {
+    ) : java.io.Serializable {
 
-        @kotlinx.serialization.Serializable
+        @Serializable
         @JvmInline
-        value class Format(val value: String) : Serializable {
+        value class Format(val value: String) : java.io.Serializable {
             init {
                 require(value.isNotEmpty())
             }
@@ -225,18 +225,18 @@ value class VerifierInfo(val attestations: List<Attestation>) : Serializable {
             }
         }
 
-        @kotlinx.serialization.Serializable
+        @Serializable
         @JvmInline
-        value class Data(val value: JsonElement) : Serializable {
+        value class Data(val value: JsonElement) : java.io.Serializable {
             init {
                 require((value is JsonPrimitive && value.isString) || (value is JsonObject))
             }
             override fun toString(): String = value.toString()
         }
 
-        @kotlinx.serialization.Serializable
+        @Serializable
         @JvmInline
-        value class CredentialIds(val values: List<QueryId>) : Serializable {
+        value class CredentialIds(val values: List<QueryId>) : java.io.Serializable {
             init {
                 require(values.isNotEmpty())
             }
@@ -258,7 +258,7 @@ value class VerifierInfo(val attestations: List<Attestation>) : Serializable {
  * a [OpenId4VP for vp_token][OpenId4VPAuthorization] or
  * a [SIOPv2 combined with OpenID4VP][SiopOpenId4VPAuthentication]
  */
-sealed interface ResolvedRequestObject : Serializable {
+sealed interface ResolvedRequestObject : java.io.Serializable {
 
     val client: Client
     val responseMode: ResponseMode
@@ -329,7 +329,7 @@ sealed interface ResolvedRequestObject : Serializable {
 /**
  * Errors that can occur while validating and resolving an authorization request
  */
-sealed interface AuthorizationRequestError : Serializable
+sealed interface AuthorizationRequestError : java.io.Serializable
 
 data class HttpError(val cause: Throwable) : AuthorizationRequestError
 
@@ -553,7 +553,7 @@ data class ErrorDispatchDetails(
     val state: String?,
     val clientId: VerifierId?,
     val responseEncryptionSpecification: ResponseEncryptionSpecification?,
-) : Serializable {
+) : java.io.Serializable {
     companion object
 }
 

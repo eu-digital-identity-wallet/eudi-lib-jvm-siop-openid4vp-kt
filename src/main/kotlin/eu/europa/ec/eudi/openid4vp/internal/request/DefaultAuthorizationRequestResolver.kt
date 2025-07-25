@@ -28,7 +28,6 @@ import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequest.JwtSecure
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -71,7 +70,7 @@ value class TransactionDataTO(val value: JsonArray) {
 @Serializable
 internal data class UnvalidatedRequestObject(
     @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    @Required val nonce: String? = null,
+    val nonce: String? = null,
     @SerialName("client_id") val clientId: String? = null,
     @SerialName("response_type") val responseType: String? = null,
     @SerialName("response_mode") val responseMode: String? = null,

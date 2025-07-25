@@ -187,7 +187,7 @@ internal class RequestFetcherTest {
 
 private fun config(clientId: String, jarEncryptionRequirement: EncryptionRequirement): SiopOpenId4VPConfig =
     SiopOpenId4VPConfig(
-        jarConfiguration = JarConfiguration(
+        signedRequestConfiguration = SignedRequestConfiguration(
             supportedAlgorithms = JWSAlgorithm.Family.EC.toList() - JWSAlgorithm.ES256K,
             supportedRequestUriMethods = SupportedRequestUriMethods.Post(
                 includeWalletMetadata = true,

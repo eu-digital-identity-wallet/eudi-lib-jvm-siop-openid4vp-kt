@@ -19,8 +19,8 @@ import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
 import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.hashAlgorithms
 import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
+import eu.europa.ec.eudi.openid4vp.dcql.CredentialQueryIds
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
-import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import kotlinx.io.bytestring.decodeToByteString
@@ -209,7 +209,7 @@ value class VerifierInfo(val attestations: List<Attestation>) : java.io.Serializ
     data class Attestation(
         @SerialName(OpenId4VPSpec.VERIFIER_INFO_FORMAT) @Required val format: Format,
         @SerialName(OpenId4VPSpec.VERIFIER_INFO_DATA) @Required val data: Data,
-        @SerialName(OpenId4VPSpec.VERIFIER_INFO_CREDENTIAL_IDS) val credentialIds: CredentialIds? = null,
+        @SerialName(OpenId4VPSpec.VERIFIER_INFO_CREDENTIAL_IDS) val credentialIds: CredentialQueryIds? = null,
     ) : java.io.Serializable {
 
         @Serializable
@@ -232,15 +232,6 @@ value class VerifierInfo(val attestations: List<Attestation>) : java.io.Serializ
                 require((value is JsonPrimitive && value.isString) || (value is JsonObject))
             }
             override fun toString(): String = value.toString()
-        }
-
-        @Serializable
-        @JvmInline
-        value class CredentialIds(val values: List<QueryId>) : java.io.Serializable {
-            init {
-                require(values.isNotEmpty())
-            }
-            override fun toString(): String = values.toString()
         }
     }
 

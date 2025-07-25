@@ -23,8 +23,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.net.URL
-import kotlin.collections.isNotEmpty
-import kotlin.collections.mapIndexedNotNull
 
 @Serializable
 data class DCQL(
@@ -362,7 +360,7 @@ internal inline fun <reified T> JsonObject?.metaAs(): T? = this?.let { jsonSuppo
 @Serializable
 data class CredentialSetQuery(
 
-    @SerialName(OpenId4VPSpec.DCQL_OPTIONS) @Required val options: List<CredentialSet>,
+    @SerialName(OpenId4VPSpec.DCQL_OPTIONS) @Required val options: List<CredentialQueryIds>,
     /**
      * A boolean which indicates whether this set of Credentials is required
      * to satisfy the particular use case at the Verifier.
@@ -396,7 +394,7 @@ data class CredentialSetQuery(
  */
 @Serializable
 @JvmInline
-value class CredentialSet(val value: List<QueryId>) : java.io.Serializable {
+value class CredentialQueryIds(val value: List<QueryId>) : java.io.Serializable {
 
     init {
         value.ensureValid()

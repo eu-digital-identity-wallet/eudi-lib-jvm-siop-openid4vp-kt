@@ -194,13 +194,8 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                 throw invalid("Failed to deserialize ${OpenId4VPSpec.VERIFIER_INFO}. Cause: ${error.message}")
             }
 
-        val allQueryIds = query.credentials.value.map { it.id }
         fun VerifierInfo.validQueryIds(): Boolean =
-            attestations.all { attestation ->
-                attestation.credentialIds
-                    ?.let { credentialIds -> credentialIds.values.all { credentialId -> credentialId in allQueryIds } }
-                    ?: true
-            }
+            attestations.all { attestation -> attestation.credentialIds?.unknownIds(query.credentials).isNullOrEmpty() }
 
         ensure(verifierInfo.validQueryIds()) {
             val error = "There are verifier attestations that use credential_id(s) not present in DCQL"

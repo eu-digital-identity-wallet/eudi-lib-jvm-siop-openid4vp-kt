@@ -36,7 +36,7 @@ import java.net.URL
 
 @Serializable
 @JvmInline
-value class VerifierInfoTO(val value: JsonArray) {
+internal value class VerifierInfoTO(val value: JsonArray) {
     init {
         require(value.isNotEmpty())
         require(value.all { it is JsonObject })
@@ -50,7 +50,7 @@ value class VerifierInfoTO(val value: JsonArray) {
 
 @Serializable
 @JvmInline
-value class TransactionDataTO(val value: JsonArray) {
+internal value class TransactionDataTO(val value: JsonArray) {
     init {
         require(value.isNotEmpty())
         require(value.all { it is JsonPrimitive && it.isString })

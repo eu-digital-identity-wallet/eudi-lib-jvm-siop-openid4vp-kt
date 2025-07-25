@@ -70,7 +70,7 @@ internal value class TransactionDataTO(val value: JsonArray) {
 @Serializable
 internal data class UnvalidatedRequestObject(
     @SerialName("client_metadata") val clientMetaData: JsonObject? = null,
-    val nonce: String? = null,
+    @SerialName(OpenId4VPSpec.NONCE) val nonce: String? = null,
     @SerialName("client_id") val clientId: String? = null,
     @SerialName("response_type") val responseType: String? = null,
     @SerialName("response_mode") val responseMode: String? = null,

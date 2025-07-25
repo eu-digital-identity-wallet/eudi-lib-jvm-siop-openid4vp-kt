@@ -20,8 +20,9 @@ package eu.europa.ec.eudi.openid4vp
  */
 object OpenId4VPSpec {
 
-    const val RESPONSE_URI = "response_uri"
-    const val DCQL_QUERY = "dcql_query"
+    const val RESPONSE_URI: String = "response_uri"
+    const val DCQL_QUERY: String = "dcql_query"
+    const val NONCE: String = "nonce"
 
     const val CLIENT_ID_PREFIX_SEPARATOR = ':'
     const val CLIENT_ID_PREFIX_PRE_REGISTERED = "pre-registered"

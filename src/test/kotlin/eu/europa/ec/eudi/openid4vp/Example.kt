@@ -418,7 +418,7 @@ private class Wallet(
                 .claim("sd_hash", sdHash)
                 .apply {
                     if (!transactionData.isNullOrEmpty()) {
-                        check(transactionData.all { HashAlgorithm.SHA_256 in it.hashAlgorithms })
+                        check(transactionData.all { it is TransactionData.SdJwtVc && HashAlgorithm.SHA_256 in it.hashAlgorithms })
 
                         val transactionDataHashes = transactionData.map {
                             val digest = MessageDigest.getInstance("SHA-256")
@@ -457,7 +457,7 @@ private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix
                 ),
             ),
             supportedTransactionDataTypes = listOf(
-                SupportedTransactionDataType(
+                SupportedTransactionDataType.SdJwtVc(
                     TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                     setOf(HashAlgorithm.SHA_256),
                 ),

@@ -17,8 +17,8 @@ package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
 import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
-import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.hashAlgorithms
 import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
+import eu.europa.ec.eudi.openid4vp.TransactionData.SdJwtVc.Companion.hashAlgorithms
 import eu.europa.ec.eudi.openid4vp.dcql.CredentialQueryIds
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.internal.*
@@ -88,111 +88,137 @@ fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate:
     }
 }
 
+typealias Base64UrlSafe = String
+
 /**
  * Represents resolved (i.e., supported by the Wallet) Transaction Data.
  *
+ * @property value the Base64 Url-Safe encoded value of this Transaction Data
  * @property json this Transaction Data as a generic JsonObject
  * @property type the type of the Transaction Data
  * @property credentialIds identifiers of the requested Credentials this Transaction Data is applicable to
- * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
  */
-data class TransactionData private constructor(val value: String) : java.io.Serializable {
-
-    val json: JsonObject by lazy {
-        decode(value)
-    }
-
-    init {
-        json.type()
-        json.hashAlgorithms()
-        json.credentialIds()
-    }
-
+sealed interface TransactionData : java.io.Serializable {
+    val value: Base64UrlSafe
+    val json: JsonObject
     val type: TransactionDataType
-        get() = json.type()
-
     val credentialIds: List<TransactionDataCredentialId>
-        get() = json.credentialIds()
-
-    val hashAlgorithms: List<HashAlgorithm>
-        get() = json.hashAlgorithms()
 
     companion object {
-
-        private val DefaultHashAlgorithm: HashAlgorithm get() = HashAlgorithm.SHA_256
-        private fun decode(s: String): JsonObject {
-            val decoded = base64UrlNoPadding.decodeToByteString(s)
+        private fun decode(value: Base64UrlSafe): JsonObject {
+            val decoded = base64UrlNoPadding.decodeToByteString(value)
             return jsonSupport.decodeFromString(decoded.decodeToString())
         }
 
-        internal fun parse(s: String): Result<TransactionData> = runCatching {
-            TransactionData(s)
-        }
-
         private fun JsonObject.type(): TransactionDataType =
-            TransactionDataType(requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE))
+            requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE)
+                .let(::TransactionDataType)
 
-        private fun JsonObject.hashAlgorithms(): List<HashAlgorithm> =
-            optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
-                ?.map { HashAlgorithm(it) }
-                ?: listOf(DefaultHashAlgorithm)
+        private fun TransactionData.ensureSupportedType(supportedType: TransactionDataType) {
+            val type = this.type
+            require(type == supportedType) { "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
+        }
 
         private fun JsonObject.credentialIds(): List<TransactionDataCredentialId> =
-            requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS).map { TransactionDataCredentialId(it) }
+            requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
+                .map(::TransactionDataCredentialId)
 
-        private fun TransactionData.isSupported(supportedTypes: List<SupportedTransactionDataType>) {
-            val type = this.type
-            val supportedType = supportedTypes.firstOrNull { it.type == type }
-            requireNotNull(supportedType) { "Unsupported transaction_data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
-
-            val hashAlgorithms = hashAlgorithms.toSet()
-            val supportedHashAlgorithms = supportedType.hashAlgorithms
-            require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
-                "Unsupported '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
-            }
-        }
-
-        private fun TransactionData.hasCorrectIds(query: DCQL) {
-            val requestedCredentialIds = query.requestedCredentialIds()
+        private fun TransactionData.ensureCorrectCredentialIds(query: DCQL) {
+            val credentialIds = this.credentialIds
+            val requestedCredentialIds = query.credentials.ids.map { TransactionDataCredentialId(it.value) }
             require(requestedCredentialIds.containsAll(credentialIds)) {
-                "Invalid '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
+                "Invalid Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
             }
         }
 
-        private fun DCQL.requestedCredentialIds(): List<TransactionDataCredentialId> =
-            credentials.ids.map { TransactionDataCredentialId(it.value) }
+        fun parse(
+            value: Base64UrlSafe,
+            supportedTypes: List<SupportedTransactionDataType>,
+            query: DCQL,
+        ): Result<TransactionData> = runCatching {
+            val json = decode(value)
+            val type = json.type()
 
-        internal operator fun invoke(
+            val supportedType = supportedTypes.firstOrNull { it.type == type }
+            requireNotNull(supportedType) { "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
+
+            when (supportedType) {
+                is SupportedTransactionDataType.SdJwtVc -> SdJwtVc.parse(value, supportedType, query).getOrThrow()
+            }
+        }
+
+        operator fun invoke(
             type: TransactionDataType,
             credentialIds: List<TransactionDataCredentialId>,
             hashAlgorithms: List<HashAlgorithm>? = null,
             builder: JsonObjectBuilder.() -> Unit = {},
-        ): TransactionData {
-            val json = buildJsonObject {
-                put(OpenId4VPSpec.TRANSACTION_DATA_TYPE, type.value)
-                putJsonArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS) {
-                    credentialIds.forEach { add(it.value) }
+        ): SdJwtVc = SdJwtVc(type, credentialIds, hashAlgorithms, builder)
+    }
+
+    /**
+     * Represents resolved (i.e., supported by the Wallet) SD-JWT VC Transaction Data.
+     *
+     * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
+     */
+    data class SdJwtVc private constructor(override val value: Base64UrlSafe) : TransactionData {
+        override val json: JsonObject by lazy { decode(value) }
+        override val type: TransactionDataType get() = json.type()
+        override val credentialIds: List<TransactionDataCredentialId> get() = json.credentialIds()
+        val hashAlgorithms: List<HashAlgorithm> get() = json.hashAlgorithms()
+
+        companion object {
+            private val DefaultHashAlgorithm: HashAlgorithm get() = HashAlgorithm.SHA_256
+
+            private fun JsonObject.hashAlgorithms(): List<HashAlgorithm> =
+                optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
+                    ?.map(::HashAlgorithm)
+                    ?: listOf(DefaultHashAlgorithm)
+
+            private fun SdJwtVc.ensureSupportedHashAlgorithms(supportedType: SupportedTransactionDataType.SdJwtVc) {
+                val hashAlgorithms = this.hashAlgorithms
+                val supportedHashAlgorithms = supportedType.hashAlgorithms
+                require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
+                    "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
                 }
-                if (!hashAlgorithms.isNullOrEmpty()) {
-                    putJsonArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS) {
-                        hashAlgorithms.forEach { add(it.name) }
+            }
+
+            fun parse(
+                value: Base64UrlSafe,
+                supportedType: SupportedTransactionDataType.SdJwtVc,
+                query: DCQL,
+            ): Result<SdJwtVc> = runCatching {
+                SdJwtVc(value)
+                    .also {
+                        it.ensureSupportedType(supportedType.type)
+                        it.ensureCorrectCredentialIds(query)
+                        it.ensureSupportedHashAlgorithms(supportedType)
+                    }
+            }
+
+            operator fun invoke(
+                type: TransactionDataType,
+                credentialIds: List<TransactionDataCredentialId>,
+                hashAlgorithms: List<HashAlgorithm>? = null,
+                builder: JsonObjectBuilder.() -> Unit = {},
+            ): SdJwtVc {
+                val json = buildJsonObject {
+                    builder()
+
+                    put(OpenId4VPSpec.TRANSACTION_DATA_TYPE, type.value)
+                    putJsonArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS) {
+                        credentialIds.forEach { add(it.value) }
+                    }
+                    if (!hashAlgorithms.isNullOrEmpty()) {
+                        putJsonArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS) {
+                            hashAlgorithms.forEach { add(it.name) }
+                        }
                     }
                 }
-                builder()
-            }
-            val serialized = jsonSupport.encodeToString(json)
-            val base64 = base64UrlNoPadding.encode(serialized.encodeToByteArray())
-            return TransactionData(base64)
-        }
 
-        internal operator fun invoke(
-            s: String,
-            supportedTypes: List<SupportedTransactionDataType>,
-            query: DCQL,
-        ): Result<TransactionData> = runCatching {
-            parse(s).getOrThrow().also {
-                it.isSupported(supportedTypes)
-                it.hasCorrectIds(query)
+                val serialized = jsonSupport.encodeToString(json)
+                val base64 = base64UrlNoPadding.encode(serialized.encodeToByteArray())
+
+                return SdJwtVc(base64)
             }
         }
     }

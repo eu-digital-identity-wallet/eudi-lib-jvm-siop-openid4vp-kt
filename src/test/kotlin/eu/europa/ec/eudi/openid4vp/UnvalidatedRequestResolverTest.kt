@@ -161,7 +161,7 @@ class UnvalidatedRequestResolverTest {
                 ),
             ),
             supportedTransactionDataTypes = listOf(
-                SupportedTransactionDataType(
+                SupportedTransactionDataType.SdJwtVc(
                     TransactionDataType("basic-transaction-data"),
                     setOf(HashAlgorithm.SHA_256, HashAlgorithm("sha-384")),
                 ),
@@ -867,7 +867,7 @@ class UnvalidatedRequestResolverTest {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
                 val cause = assertIs<IllegalArgumentException>(error.cause)
                 assertEquals(
-                    "Unsupported transaction_data 'type': 'unsupported'",
+                    "Unsupported Transaction Data 'type': 'unsupported'",
                     cause.message,
                 )
             }
@@ -917,7 +917,7 @@ class UnvalidatedRequestResolverTest {
                     val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
                     val cause = assertIs<IllegalArgumentException>(error.cause)
                     assertEquals(
-                        "Invalid 'credential_ids': '[invalid-id]'",
+                        "Invalid Transaction Data 'credential_ids': '[invalid-id]'",
                         cause.message,
                     )
                 }
@@ -933,7 +933,7 @@ class UnvalidatedRequestResolverTest {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
                 val cause = assertIs<IllegalArgumentException>(error.cause)
                 assertEquals(
-                    "Invalid 'credential_ids': '[invalid-id]'",
+                    "Invalid Transaction Data 'credential_ids': '[invalid-id]'",
                     cause.message,
                 )
             }
@@ -990,7 +990,7 @@ class UnvalidatedRequestResolverTest {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
                 val cause = assertIs<IllegalArgumentException>(error.cause)
                 assertEquals(
-                    "Unsupported 'transaction_data_hashes_alg': '[sha-512]'",
+                    "Unsupported Transaction Data 'transaction_data_hashes_alg': '[sha-512]'",
                     cause.message,
                 )
             }
@@ -1008,7 +1008,7 @@ class UnvalidatedRequestResolverTest {
                 val resolvedTransactionData = run {
                     val resolvedTransactionData = assertNotNull(request.transactionData)
                     assertEquals(1, resolvedTransactionData.size)
-                    resolvedTransactionData.first()
+                    assertIs<TransactionData.SdJwtVc>(resolvedTransactionData.first())
                 }
                 assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                 assertEquals(
@@ -1031,7 +1031,7 @@ class UnvalidatedRequestResolverTest {
                 val resolvedTransactionData = run {
                     val resolvedTransactionData = assertNotNull(request.transactionData)
                     assertEquals(1, resolvedTransactionData.size)
-                    resolvedTransactionData.first()
+                    assertIs<TransactionData.SdJwtVc>(resolvedTransactionData.first())
                 }
                 assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                 assertEquals(
@@ -1054,7 +1054,7 @@ class UnvalidatedRequestResolverTest {
                     val resolvedTransactionData = run {
                         val resolvedTransactionData = assertNotNull(request.transactionData)
                         assertEquals(1, resolvedTransactionData.size)
-                        resolvedTransactionData.first()
+                        assertIs<TransactionData.SdJwtVc>(resolvedTransactionData.first())
                     }
                     assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                     assertEquals(
@@ -1078,7 +1078,7 @@ class UnvalidatedRequestResolverTest {
                     val resolvedTransactionData = run {
                         val resolvedTransactionData = assertNotNull(request.transactionData)
                         assertEquals(1, resolvedTransactionData.size)
-                        resolvedTransactionData.first()
+                        assertIs<TransactionData.SdJwtVc>(resolvedTransactionData.first())
                     }
                     assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                     assertEquals(

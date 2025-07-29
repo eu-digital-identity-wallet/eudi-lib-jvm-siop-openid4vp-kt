@@ -164,18 +164,28 @@ sealed interface TransactionData : java.io.Serializable {
         override val json: JsonObject by lazy { decode(value) }
         override val type: TransactionDataType get() = json.type()
         override val credentialIds: List<TransactionDataCredentialId> get() = json.credentialIds()
-        val hashAlgorithms: List<HashAlgorithm> get() = json.hashAlgorithms()
+        val hashAlgorithms: List<HashAlgorithm>? get() = json.hashAlgorithms()
+        val hashAlgorithmsOrDefault: List<HashAlgorithm> get() = hashAlgorithms ?: listOf(DefaultHashAlgorithm)
+
+        init {
+            require(credentialIds.isNotEmpty()) {
+                "Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}' must not be empty'"
+            }
+
+            hashAlgorithms?.let {
+                require(it.isNotEmpty()) { "Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}' must not be empty" }
+            }
+        }
 
         companion object {
             private val DefaultHashAlgorithm: HashAlgorithm get() = HashAlgorithm.SHA_256
 
-            private fun JsonObject.hashAlgorithms(): List<HashAlgorithm> =
+            private fun JsonObject.hashAlgorithms(): List<HashAlgorithm>? =
                 optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
                     ?.map(::HashAlgorithm)
-                    ?: listOf(DefaultHashAlgorithm)
 
             private fun SdJwtVc.ensureSupportedHashAlgorithms(supportedType: SupportedTransactionDataType.SdJwtVc) {
-                val hashAlgorithms = this.hashAlgorithms
+                val hashAlgorithms = this.hashAlgorithmsOrDefault
                 val supportedHashAlgorithms = supportedType.hashAlgorithms
                 require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
                     "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"

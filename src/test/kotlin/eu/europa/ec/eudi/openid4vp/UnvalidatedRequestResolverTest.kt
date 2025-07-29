@@ -1061,7 +1061,7 @@ class UnvalidatedRequestResolverTest {
                         listOf(TransactionDataCredentialId("my_credential")),
                         resolvedTransactionData.credentialIds,
                     )
-                    assertEquals(listOf(HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithms)
+                    assertEquals(listOf(HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithmsOrDefault)
                 }
             }
 

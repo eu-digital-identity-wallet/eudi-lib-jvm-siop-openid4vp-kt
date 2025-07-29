@@ -418,7 +418,7 @@ private class Wallet(
                 .claim("sd_hash", sdHash)
                 .apply {
                     if (!transactionData.isNullOrEmpty()) {
-                        check(transactionData.all { it is TransactionData.SdJwtVc && HashAlgorithm.SHA_256 in it.hashAlgorithms })
+                        check(transactionData.all { it is TransactionData.SdJwtVc && HashAlgorithm.SHA_256 in it.hashAlgorithmsOrDefault })
 
                         val transactionDataHashes = transactionData.map {
                             val digest = MessageDigest.getInstance("SHA-256")

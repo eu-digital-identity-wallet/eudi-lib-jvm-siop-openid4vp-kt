@@ -862,7 +862,7 @@ class UnvalidatedRequestResolverTest {
         fun `if transaction_data contains unsupported type, resolution fails`() = runTest {
             val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("unsupported"),
-                listOf(QueryId("foo")),
+                listOf(QueryId("my_credential")),
             )
             testAndThen(transactionData.json) {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()

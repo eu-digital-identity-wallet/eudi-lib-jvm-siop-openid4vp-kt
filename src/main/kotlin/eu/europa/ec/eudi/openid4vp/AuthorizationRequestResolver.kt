@@ -112,39 +112,33 @@ sealed interface TransactionData : java.io.Serializable {
         }
 
         private fun JsonObject.type(): TransactionDataType =
-            requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE)
-                .let(::TransactionDataType)
-
-        private fun TransactionData.ensureSupportedType(supportedType: TransactionDataType) {
-            val type = this.type
-            require(type == supportedType) { "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
-        }
+            requiredString(OpenId4VPSpec.TRANSACTION_DATA_TYPE).let(::TransactionDataType)
 
         private fun JsonObject.credentialIds(): List<QueryId> =
-            requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
-                .map(::QueryId)
+            requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS).map(::QueryId)
 
-        private fun TransactionData.ensureCorrectCredentialIds(query: DCQL) {
-            val credentialIds = this.credentialIds
-            val requestedCredentialIds = query.credentials.ids
+        private fun JsonObject.typeAndCredentialIds(): Pair<TransactionDataType, List<QueryId>> = type() to credentialIds()
+
+        fun parse(value: Base64UrlSafe, query: DCQL): Result<TransactionData> = runCatching {
+            val json = decode(value)
+
+            // verify required properties are present
+            val (_, credentialIds) = json.typeAndCredentialIds()
+
+            val requestedCredentialIds = query.credentials.ids.toSet()
             require(requestedCredentialIds.containsAll(credentialIds)) {
                 "Invalid Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
             }
-        }
 
-        fun parse(
-            value: Base64UrlSafe,
-            supportedTypes: List<SupportedTransactionDataType>,
-            query: DCQL,
-        ): Result<TransactionData> = runCatching {
-            val json = decode(value)
-            val type = json.type()
+            val credentialFormats = query.credentials.value.filter { it.id in credentialIds }.map { it.format }.toSet()
+            require(1 == credentialFormats.size) {
+                "Transaction Data must refer to Credentials that use the same Format"
+            }
 
-            val supportedType = supportedTypes.firstOrNull { it.type == type }
-            requireNotNull(supportedType) { "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
-
-            when (supportedType) {
-                is SupportedTransactionDataType.SdJwtVc -> SdJwtVc.parse(value, supportedType, query).getOrThrow()
+            val format = credentialFormats.first()
+            when (format) {
+                Format.SdJwtVc -> SdJwtVc(value)
+                else -> throw IllegalArgumentException("Unsupported Transaction Data Format '$format'")
             }
         }
 
@@ -161,7 +155,7 @@ sealed interface TransactionData : java.io.Serializable {
      *
      * @property hashAlgorithms Hash Algorithms with which the Hash of this Transaction Data can be calculated
      */
-    data class SdJwtVc private constructor(override val value: Base64UrlSafe) : TransactionData {
+    data class SdJwtVc internal constructor(override val value: Base64UrlSafe) : TransactionData {
         override val json: JsonObject by lazy { decode(value) }
         override val type: TransactionDataType get() = json.type()
         override val credentialIds: List<QueryId> get() = json.credentialIds()
@@ -182,29 +176,7 @@ sealed interface TransactionData : java.io.Serializable {
             private val DefaultHashAlgorithm: HashAlgorithm get() = HashAlgorithm.SHA_256
 
             private fun JsonObject.hashAlgorithms(): List<HashAlgorithm>? =
-                optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)
-                    ?.map(::HashAlgorithm)
-
-            private fun SdJwtVc.ensureSupportedHashAlgorithms(supportedType: SupportedTransactionDataType.SdJwtVc) {
-                val hashAlgorithms = this.hashAlgorithmsOrDefault
-                val supportedHashAlgorithms = supportedType.hashAlgorithms
-                require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
-                    "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
-                }
-            }
-
-            fun parse(
-                value: Base64UrlSafe,
-                supportedType: SupportedTransactionDataType.SdJwtVc,
-                query: DCQL,
-            ): Result<SdJwtVc> = runCatching {
-                SdJwtVc(value)
-                    .also {
-                        it.ensureSupportedType(supportedType.type)
-                        it.ensureCorrectCredentialIds(query)
-                        it.ensureSupportedHashAlgorithms(supportedType)
-                    }
-            }
+                optionalStringArray(OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS)?.map(::HashAlgorithm)
 
             operator fun invoke(
                 type: TransactionDataType,

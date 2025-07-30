@@ -310,15 +310,6 @@ value class TransactionDataType(val value: String) : java.io.Serializable {
 }
 
 @JvmInline
-value class TransactionDataCredentialId(val value: String) : java.io.Serializable {
-    init {
-        require(value.isNotEmpty())
-    }
-
-    override fun toString(): String = value
-}
-
-@JvmInline
 @Serializable
 value class CoseAlgorithm(val value: Int) : java.io.Serializable {
     override fun toString(): String = value.toString()

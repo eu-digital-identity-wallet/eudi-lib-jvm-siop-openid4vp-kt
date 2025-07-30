@@ -276,7 +276,7 @@ sealed interface Transaction {
             val queryId = dcql.credentials.ids.first()
             val transactionData = TransactionData(
                 TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
-                listOf(TransactionDataCredentialId(queryId.value)),
+                listOf(queryId),
             ) {
                 put("purpose", "We must verify your Family Name")
             }

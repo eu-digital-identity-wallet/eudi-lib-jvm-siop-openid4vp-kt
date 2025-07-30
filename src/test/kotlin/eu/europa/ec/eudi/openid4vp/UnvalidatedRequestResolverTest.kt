@@ -30,6 +30,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultAuthorizationRequestResolver
@@ -861,7 +862,7 @@ class UnvalidatedRequestResolverTest {
         fun `if transaction_data contains unsupported type, resolution fails`() = runTest {
             val transactionData = TransactionData(
                 TransactionDataType("unsupported"),
-                listOf(TransactionDataCredentialId("foo")),
+                listOf(QueryId("foo")),
             )
             testAndThen(transactionData.json) {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
@@ -911,7 +912,7 @@ class UnvalidatedRequestResolverTest {
             runTest {
                 val transactionData = TransactionData(
                     TransactionDataType("basic-transaction-data"),
-                    listOf(TransactionDataCredentialId("invalid-id")),
+                    listOf(QueryId("invalid-id")),
                 )
                 testAndThen(transactionData.json) {
                     val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
@@ -927,7 +928,7 @@ class UnvalidatedRequestResolverTest {
         fun `if transaction_data contains credential_ids that don't match query ids, resolution fails`() = runTest {
             val transactionData = TransactionData(
                 TransactionDataType("basic-transaction-data"),
-                listOf(TransactionDataCredentialId("invalid-id")),
+                listOf(QueryId("invalid-id")),
             )
             testAndThen(transactionData.json, dcqlQuery) {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
@@ -983,7 +984,7 @@ class UnvalidatedRequestResolverTest {
         fun `if transaction_data contains unsupported transaction_data_hashes_alg, resolution fails`() = runTest {
             val transactionData = TransactionData(
                 TransactionDataType("basic-transaction-data"),
-                listOf(TransactionDataCredentialId("my_credential")),
+                listOf(QueryId("my_credential")),
                 listOf(HashAlgorithm("sha-512")),
             )
             testAndThen(transactionData.json, dcqlQuery) {
@@ -1000,7 +1001,7 @@ class UnvalidatedRequestResolverTest {
         fun `if transaction_data is valid, when using dcql, resolution succeeds`() = runTest {
             val transactionData = TransactionData(
                 TransactionDataType("basic-transaction-data"),
-                listOf(TransactionDataCredentialId("my_credential")),
+                listOf(QueryId("my_credential")),
                 listOf(HashAlgorithm.SHA_256),
             )
             testAndThen(transactionData.json, dcqlQuery) {
@@ -1012,7 +1013,7 @@ class UnvalidatedRequestResolverTest {
                 }
                 assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                 assertEquals(
-                    listOf(TransactionDataCredentialId("my_credential")),
+                    listOf(QueryId("my_credential")),
                     resolvedTransactionData.credentialIds,
                 )
                 assertEquals(listOf(HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithms)
@@ -1023,7 +1024,7 @@ class UnvalidatedRequestResolverTest {
         fun `if transaction_data is valid, resolution succeeds`() = runTest {
             val transactionData = TransactionData(
                 TransactionDataType("basic-transaction-data"),
-                listOf(TransactionDataCredentialId("my_credential")),
+                listOf(QueryId("my_credential")),
                 listOf(HashAlgorithm.SHA_256),
             )
             testAndThen(transactionData.json) {
@@ -1035,7 +1036,7 @@ class UnvalidatedRequestResolverTest {
                 }
                 assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                 assertEquals(
-                    listOf(TransactionDataCredentialId("my_credential")),
+                    listOf(QueryId("my_credential")),
                     resolvedTransactionData.credentialIds,
                 )
                 assertEquals(listOf(HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithms)
@@ -1047,7 +1048,7 @@ class UnvalidatedRequestResolverTest {
             runTest {
                 val transactionData = TransactionData(
                     TransactionDataType("basic-transaction-data"),
-                    listOf(TransactionDataCredentialId("my_credential")),
+                    listOf(QueryId("my_credential")),
                 )
                 testAndThen(transactionData.json) {
                     val request = it.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
@@ -1058,7 +1059,7 @@ class UnvalidatedRequestResolverTest {
                     }
                     assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                     assertEquals(
-                        listOf(TransactionDataCredentialId("my_credential")),
+                        listOf(QueryId("my_credential")),
                         resolvedTransactionData.credentialIds,
                     )
                     assertEquals(listOf(HashAlgorithm.SHA_256), resolvedTransactionData.hashAlgorithmsOrDefault)
@@ -1070,7 +1071,7 @@ class UnvalidatedRequestResolverTest {
             runTest {
                 val transactionData = TransactionData(
                     TransactionDataType("basic-transaction-data"),
-                    listOf(TransactionDataCredentialId(("my_credential"))),
+                    listOf(QueryId(("my_credential"))),
                     listOf(HashAlgorithm("sha-384")),
                 )
                 testAndThen(transactionData.json) {
@@ -1082,7 +1083,7 @@ class UnvalidatedRequestResolverTest {
                     }
                     assertEquals(TransactionDataType("basic-transaction-data"), resolvedTransactionData.type)
                     assertEquals(
-                        listOf(TransactionDataCredentialId("my_credential")),
+                        listOf(QueryId("my_credential")),
                         resolvedTransactionData.credentialIds,
                     )
                     assertEquals(listOf(HashAlgorithm("sha-384")), resolvedTransactionData.hashAlgorithms)

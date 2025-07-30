@@ -21,6 +21,7 @@ import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
 import eu.europa.ec.eudi.openid4vp.TransactionData.SdJwtVc.Companion.hashAlgorithms
 import eu.europa.ec.eudi.openid4vp.dcql.CredentialQueryIds
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
+import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.*
 import eu.europa.ec.eudi.openid4vp.internal.request.RequestUriMethod
 import kotlinx.io.bytestring.decodeToByteString
@@ -102,7 +103,7 @@ sealed interface TransactionData : java.io.Serializable {
     val value: Base64UrlSafe
     val json: JsonObject
     val type: TransactionDataType
-    val credentialIds: List<TransactionDataCredentialId>
+    val credentialIds: List<QueryId>
 
     companion object {
         private fun decode(value: Base64UrlSafe): JsonObject {
@@ -119,13 +120,13 @@ sealed interface TransactionData : java.io.Serializable {
             require(type == supportedType) { "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'" }
         }
 
-        private fun JsonObject.credentialIds(): List<TransactionDataCredentialId> =
+        private fun JsonObject.credentialIds(): List<QueryId> =
             requiredStringArray(OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS)
-                .map(::TransactionDataCredentialId)
+                .map(::QueryId)
 
         private fun TransactionData.ensureCorrectCredentialIds(query: DCQL) {
             val credentialIds = this.credentialIds
-            val requestedCredentialIds = query.credentials.ids.map { TransactionDataCredentialId(it.value) }
+            val requestedCredentialIds = query.credentials.ids
             require(requestedCredentialIds.containsAll(credentialIds)) {
                 "Invalid Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_CREDENTIAL_IDS}': '$credentialIds'"
             }
@@ -149,7 +150,7 @@ sealed interface TransactionData : java.io.Serializable {
 
         operator fun invoke(
             type: TransactionDataType,
-            credentialIds: List<TransactionDataCredentialId>,
+            credentialIds: List<QueryId>,
             hashAlgorithms: List<HashAlgorithm>? = null,
             builder: JsonObjectBuilder.() -> Unit = {},
         ): SdJwtVc = SdJwtVc(type, credentialIds, hashAlgorithms, builder)
@@ -163,7 +164,7 @@ sealed interface TransactionData : java.io.Serializable {
     data class SdJwtVc private constructor(override val value: Base64UrlSafe) : TransactionData {
         override val json: JsonObject by lazy { decode(value) }
         override val type: TransactionDataType get() = json.type()
-        override val credentialIds: List<TransactionDataCredentialId> get() = json.credentialIds()
+        override val credentialIds: List<QueryId> get() = json.credentialIds()
         val hashAlgorithms: List<HashAlgorithm>? get() = json.hashAlgorithms()
         val hashAlgorithmsOrDefault: List<HashAlgorithm> get() = hashAlgorithms ?: listOf(DefaultHashAlgorithm)
 
@@ -207,7 +208,7 @@ sealed interface TransactionData : java.io.Serializable {
 
             operator fun invoke(
                 type: TransactionDataType,
-                credentialIds: List<TransactionDataCredentialId>,
+                credentialIds: List<QueryId>,
                 hashAlgorithms: List<HashAlgorithm>? = null,
                 builder: JsonObjectBuilder.() -> Unit = {},
             ): SdJwtVc {

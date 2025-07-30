@@ -25,7 +25,6 @@ import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
 import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import java.net.URI
 import java.security.PublicKey
@@ -147,13 +146,17 @@ sealed interface SupportedClientIdPrefix {
 /**
  * A type of Transaction Data supported by the Wallet.
  */
-data class SupportedTransactionDataType(
-    val type: TransactionDataType,
-    val hashAlgorithms: Set<HashAlgorithm>,
-) {
-    init {
-        require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms cannot be empty" }
-        require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
+sealed interface SupportedTransactionDataType {
+    val type: TransactionDataType
+
+    data class SdJwtVc(
+        override val type: TransactionDataType,
+        val hashAlgorithms: Set<HashAlgorithm>,
+    ) : SupportedTransactionDataType {
+        init {
+            require(hashAlgorithms.isNotEmpty()) { "hashAlgorithms cannot be empty" }
+            require(HashAlgorithm.SHA_256 in hashAlgorithms) { "'${HashAlgorithm.SHA_256.name}' must be a supported hash algorithm" }
+        }
     }
 }
 
@@ -168,7 +171,15 @@ data class VPConfiguration(
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormatsSupported: VpFormatsSupported,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
-)
+) {
+    init {
+        if (null == vpFormatsSupported.sdJwtVc) {
+            require(supportedTransactionDataTypes.none { it is SupportedTransactionDataType.SdJwtVc }) {
+                "SD-JWT VC Transaction Data cannot be used when SD-JWT VC is not supported"
+            }
+        }
+    }
+}
 
 /**
  * Configurations options for encrypting an authorization response if requested by the verifier.

@@ -274,9 +274,9 @@ sealed interface Transaction {
         val SdJwtVcPidDcql = run {
             val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-pid-dcql-query.json"))
             val queryId = dcql.credentials.ids.first()
-            val transactionData = TransactionData(
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
-                listOf(TransactionDataCredentialId(queryId.value)),
+                listOf(queryId),
             ) {
                 put("purpose", "We must verify your Family Name")
             }
@@ -418,7 +418,7 @@ private class Wallet(
                 .claim("sd_hash", sdHash)
                 .apply {
                     if (!transactionData.isNullOrEmpty()) {
-                        check(transactionData.all { HashAlgorithm.SHA_256 in it.hashAlgorithms })
+                        check(transactionData.all { it is TransactionData.SdJwtVc && HashAlgorithm.SHA_256 in it.hashAlgorithmsOrDefault })
 
                         val transactionDataHashes = transactionData.map {
                             val digest = MessageDigest.getInstance("SHA-256")
@@ -457,7 +457,7 @@ private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix
                 ),
             ),
             supportedTransactionDataTypes = listOf(
-                SupportedTransactionDataType(
+                SupportedTransactionDataType.SdJwtVc(
                     TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                     setOf(HashAlgorithm.SHA_256),
                 ),

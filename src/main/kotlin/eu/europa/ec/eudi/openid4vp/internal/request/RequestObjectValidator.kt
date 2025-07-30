@@ -169,11 +169,9 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         requestObject.transactionData?.let { unresolvedTransactionData ->
             runCatching {
                 unresolvedTransactionData.values.map { unresolved ->
-                    TransactionData(
-                        unresolved,
-                        siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes,
-                        query,
-                    ).getOrThrow()
+                    val transactionData = TransactionData.parse(unresolved, query).getOrThrow()
+                    transactionData.ensureSupported(siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes)
+                    transactionData
                 }
             }.getOrElse { error -> throw ResolutionError.InvalidTransactionData(error).asException() }
         }
@@ -393,4 +391,24 @@ private enum class ResponseType {
     VpToken,
     IdToken,
     VpAndIdToken,
+}
+
+private fun TransactionData.ensureSupported(supportedTransactionDataTypes: List<SupportedTransactionDataType>) =
+    when (this) {
+        is TransactionData.SdJwtVc -> ensureSupported(supportedTransactionDataTypes)
+    }
+
+private fun TransactionData.SdJwtVc.ensureSupported(supportedTransactionDataTypes: List<SupportedTransactionDataType>) {
+    val type = this.type
+
+    val supportedType = supportedTransactionDataTypes.firstOrNull { it.type == type }
+    require(supportedType is SupportedTransactionDataType.SdJwtVc) {
+        "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_TYPE}': '$type'"
+    }
+
+    val hashAlgorithms = this.hashAlgorithmsOrDefault
+    val supportedHashAlgorithms = supportedType.hashAlgorithms
+    require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
+        "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
+    }
 }

@@ -171,7 +171,15 @@ data class VPConfiguration(
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormatsSupported: VpFormatsSupported,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
-)
+) {
+    init {
+        if (null == vpFormatsSupported.sdJwtVc) {
+            require(supportedTransactionDataTypes.none { it is SupportedTransactionDataType.SdJwtVc }) {
+                "SD-JWT VC Transaction Data cannot be used when SD-JWT VC is not supported"
+            }
+        }
+    }
+}
 
 /**
  * Configurations options for encrypting an authorization response if requested by the verifier.

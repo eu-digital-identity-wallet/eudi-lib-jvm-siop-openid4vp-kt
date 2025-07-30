@@ -274,7 +274,7 @@ sealed interface Transaction {
         val SdJwtVcPidDcql = run {
             val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-pid-dcql-query.json"))
             val queryId = dcql.credentials.ids.first()
-            val transactionData = TransactionData(
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                 listOf(queryId),
             ) {

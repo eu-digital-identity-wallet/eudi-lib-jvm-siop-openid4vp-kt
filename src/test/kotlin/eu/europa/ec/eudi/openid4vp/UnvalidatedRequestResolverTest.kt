@@ -860,7 +860,7 @@ class UnvalidatedRequestResolverTest {
 
         @Test
         fun `if transaction_data contains unsupported type, resolution fails`() = runTest {
-            val transactionData = TransactionData(
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("unsupported"),
                 listOf(QueryId("foo")),
             )
@@ -910,7 +910,7 @@ class UnvalidatedRequestResolverTest {
         @Test
         fun `if transaction_data contains credential_ids that don't match inputdescriptor ids, resolution fails`() =
             runTest {
-                val transactionData = TransactionData(
+                val transactionData = TransactionData.sdJwtVc(
                     TransactionDataType("basic-transaction-data"),
                     listOf(QueryId("invalid-id")),
                 )
@@ -926,7 +926,7 @@ class UnvalidatedRequestResolverTest {
 
         @Test
         fun `if transaction_data contains credential_ids that don't match query ids, resolution fails`() = runTest {
-            val transactionData = TransactionData(
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("basic-transaction-data"),
                 listOf(QueryId("invalid-id")),
             )
@@ -982,7 +982,7 @@ class UnvalidatedRequestResolverTest {
 
         @Test
         fun `if transaction_data contains unsupported transaction_data_hashes_alg, resolution fails`() = runTest {
-            val transactionData = TransactionData(
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("basic-transaction-data"),
                 listOf(QueryId("my_credential")),
                 listOf(HashAlgorithm("sha-512")),
@@ -999,7 +999,7 @@ class UnvalidatedRequestResolverTest {
 
         @Test
         fun `if transaction_data is valid, when using dcql, resolution succeeds`() = runTest {
-            val transactionData = TransactionData(
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("basic-transaction-data"),
                 listOf(QueryId("my_credential")),
                 listOf(HashAlgorithm.SHA_256),
@@ -1022,7 +1022,7 @@ class UnvalidatedRequestResolverTest {
 
         @Test
         fun `if transaction_data is valid, resolution succeeds`() = runTest {
-            val transactionData = TransactionData(
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("basic-transaction-data"),
                 listOf(QueryId("my_credential")),
                 listOf(HashAlgorithm.SHA_256),
@@ -1046,7 +1046,7 @@ class UnvalidatedRequestResolverTest {
         @Test
         fun `if transaction_data is valid, and contains no transaction_data_hashes_alg, resolution succeeds`() =
             runTest {
-                val transactionData = TransactionData(
+                val transactionData = TransactionData.sdJwtVc(
                     TransactionDataType("basic-transaction-data"),
                     listOf(QueryId("my_credential")),
                 )
@@ -1069,7 +1069,7 @@ class UnvalidatedRequestResolverTest {
         @Test
         fun `if transaction_data is valid, and contains transaction_data_hashes_alg without sha-256, resolution succeeds`() =
             runTest {
-                val transactionData = TransactionData(
+                val transactionData = TransactionData.sdJwtVc(
                     TransactionDataType("basic-transaction-data"),
                     listOf(QueryId(("my_credential"))),
                     listOf(HashAlgorithm("sha-384")),

@@ -148,7 +148,7 @@ sealed interface TransactionData : java.io.Serializable {
             }
         }
 
-        operator fun invoke(
+        fun sdJwtVc(
             type: TransactionDataType,
             credentialIds: List<QueryId>,
             hashAlgorithms: List<HashAlgorithm>? = null,

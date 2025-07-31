@@ -477,7 +477,7 @@ private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix
         ),
         responseEncryptionConfiguration = ResponseEncryptionConfiguration.Supported(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
-            supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),
+            supportedMethods = listOf(EncryptionMethod.A128GCM),
         ),
         supportedClientIdPrefixes = supportedClientIdPrefix,
         clock = Clock.systemDefaultZone(),

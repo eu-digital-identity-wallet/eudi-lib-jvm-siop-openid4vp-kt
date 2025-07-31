@@ -32,19 +32,18 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
     /**
      * One of the following:
      *
-     * The request contains more than one out of the following three options to communicate a requested Credential:
-     * a presentation_definition parameter, a presentation_definition_uri parameter,
-     * or a scope value representing a Presentation Definition
+     * The request contains more than one out of the following two options to communicate a requested Credential:
+     * a dcql_query parameter, or a scope value representing a DQQL Query.
      *
      * The request uses the vp_token Response Type but does not request a Credential using any of the three options
      *
-     * Requested Presentation Definition does not conform to the DIF PEv2 specification
+     * DCQL Query does not conform to the OpenId4VP specification.
      *
-     * The Wallet does not support the Client Identifier Scheme passed in the Authorization Request
+     * The Wallet does not support the Client Identifier Prefix passed in the Authorization Request
      *
-     * The Client Identifier passed in the request did not belong to its Client Identifier scheme,
-     * or requirements of a certain scheme was violated,
-     * for example, an unsigned request was sent with Client Identifier scheme https
+     * The Client Identifier passed in the request did not belong to its Client Identifier prefix,
+     * or requirements of a certain prefix was violated,
+     * for example, an unsigned request was sent with Client Identifier prefix openid_federation
      */
     INVALID_REQUEST("invalid_request"),
 
@@ -69,17 +68,6 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
      * such as those included in the vp_formats registration parameter.
      */
     VP_FORMATS_NOT_SUPPORTED("vp_formats_not_supported"),
-
-    /**
-     * The Presentation Definition URL cannot be reached
-     */
-    INVALID_PRESENTATION_DEFINITION_URI("invalid_presentation_definition_uri"),
-
-    /**
-     * The Presentation Definition URL can be reached, but the specified presentation_definition
-     * cannot be found at the URL
-     */
-    INVALID_PRESENTATION_DEFINITION_REFERENCE("invalid_presentation_definition_reference"),
 
     /**
      * The value of the request_uri_method request parameter is neither get nor post (case-sensitive).
@@ -123,7 +111,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
             return when (error) {
                 is UnknownScope -> INVALID_SCOPE
 
-                is InvalidClientIdScheme,
+                is InvalidClientIdPrefix,
                 InvalidRedirectUri,
                 InvalidResponseUri,
                 MissingClientId,
@@ -131,6 +119,7 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 MissingQuerySource,
                 MultipleQuerySources,
                 is InvalidDigitalCredentialsQuery,
+                UnsupportedQueryFormats,
                 MissingRedirectUri,
                 MissingResponseType,
                 MissingResponseUri,
@@ -148,10 +137,10 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 is HttpError,
                 InvalidUseOfBothRequestAndRequestUri,
                 is UnsupportedRequestUriMethod,
-                is InvalidVerifierAttestations,
+                is InvalidVerifierInfo,
                 -> INVALID_REQUEST
 
-                InvalidClientId, UnsupportedClientIdScheme -> INVALID_CLIENT
+                InvalidClientId, UnsupportedClientIdPrefix -> INVALID_CLIENT
 
                 is InvalidRequestUriMethod -> INVALID_REQUEST_URI_METHOD
 
@@ -163,14 +152,9 @@ internal enum class AuthorizationRequestErrorCode(val code: String) {
                 SubjectSyntaxTypesWrongSyntax,
                 -> SUBJECT_SYNTAX_TYPES_NOT_SUPPORTED
 
-                is InvalidPresentationDefinition -> INVALID_REQUEST
-                is UnableToFetchPresentationDefinition -> INVALID_PRESENTATION_DEFINITION_URI
-                InvalidPresentationDefinitionUri -> INVALID_PRESENTATION_DEFINITION_URI
-                FetchingPresentationDefinitionNotSupported -> REQUEST_URI_NOT_SUPPORTED
                 is UnableToFetchRequestObject -> INVALID_REQUEST_URI
                 is InvalidJarJwt -> INVALID_REQUEST_OBJECT
 
-                is ClientMetadataJwkResolutionFailed,
                 is DIDResolutionFailed,
                 -> PROCESSING_FAILURE
 

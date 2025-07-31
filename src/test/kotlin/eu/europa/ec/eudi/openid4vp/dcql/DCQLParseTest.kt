@@ -17,7 +17,6 @@ package eu.europa.ec.eudi.openid4vp.dcql
 
 import eu.europa.ec.eudi.openid4vp.OpenId4VPSpec
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -128,21 +127,15 @@ class DCQLParseTest {
                     "doctype_value": "org.iso.7367.1.mVRC"
                   },
                   "claims": [
-                    {
-                      "path": ["org.iso.7367.1", "vehicle_holder"],
-                      "intent_to_retain": true
-                    },
-                    {
-                      "path": ["org.iso.18013.5.1", "first_name"],
-                      "intent_to_retain": false
-                    }
+                    { "path": ["org.iso.7367.1", "vehicle_holder"] },
+                    { "path": ["org.iso.18013.5.1", "first_name"] }
                   ]
                 }
               ]
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.mdoc(
                     id = QueryId("my_credential"),
                     msoMdocMeta = DCQLMetaMsoMdocExtensions(MsoMdocDocType("org.iso.7367.1.mVRC")),
@@ -150,12 +143,10 @@ class DCQLParseTest {
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.7367.1",
                             claimName = "vehicle_holder",
-                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.18013.5.1",
                             claimName = "first_name",
-                            intentToRetain = false,
                         ),
                     ),
 
@@ -188,20 +179,15 @@ class DCQLParseTest {
                     "doctype_value": "org.iso.7367.1.mVRC"
                   },
                   "claims": [
-                    {
-                      "path": ["org.iso.7367.1", "vehicle_holder"],
-                      "intent_to_retain": true
-                    },
-                    {
-                      "path": ["org.iso.18013.5.1", "first_name"] 
-                    }
+                    { "path": ["org.iso.7367.1", "vehicle_holder"] },
+                    { "path": ["org.iso.18013.5.1", "first_name"] }
                   ]
                 }
             ]
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.sdJwtVc(
                     id = QueryId("pid"),
                     sdJwtVcMeta = DCQLMetaSdJwtVcExtensions(vctValues = listOf("https://credentials.example.com/identity_credential")),
@@ -218,7 +204,6 @@ class DCQLParseTest {
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.7367.1",
                             claimName = "vehicle_holder",
-                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             namespace = "org.iso.18013.5.1",
@@ -296,7 +281,6 @@ class DCQLParseTest {
               ],
               "credential_sets": [
                 {
-                  "purpose": "Identification",
                   "options": [
                     [ "pid" ],
                     [ "other_pid" ],
@@ -304,7 +288,6 @@ class DCQLParseTest {
                   ]
                 },
                 {
-                  "purpose": "Show your rewards card",
                   "required": false,
                   "options": [
                     [ "nice_to_have" ]
@@ -314,7 +297,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.sdJwtVc(
                     id = QueryId("pid"),
                     sdJwtVcMeta = DCQLMetaSdJwtVcExtensions(vctValues = listOf("https://credentials.example.com/identity_credential")),
@@ -360,20 +343,18 @@ class DCQLParseTest {
                     ),
                 ),
             ),
-            credentialSets = listOf(
+            credentialSets = CredentialSets(
                 CredentialSetQuery(
-                    purpose = JsonPrimitive("Identification"),
                     options = listOf(
-                        setOf(QueryId("pid")),
-                        setOf(QueryId("other_pid")),
-                        setOf(QueryId("pid_reduced_cred_1"), QueryId("pid_reduced_cred_2")),
+                        CredentialQueryIds(listOf(QueryId("pid"))),
+                        CredentialQueryIds(listOf(QueryId("other_pid"))),
+                        CredentialQueryIds(listOf(QueryId("pid_reduced_cred_1"), QueryId("pid_reduced_cred_2"))),
                     ),
                 ),
                 CredentialSetQuery(
-                    purpose = JsonPrimitive("Show your rewards card"),
                     required = false,
                     options = listOf(
-                        setOf(QueryId("nice_to_have")),
+                        CredentialQueryIds(listOf(QueryId("nice_to_have"))),
                     ),
                 ),
             ),
@@ -398,13 +379,11 @@ class DCQLParseTest {
                     },
                     {
                       "id": "family_name",
-                      "path": ["org.iso.18013.5.1", "family_name"],
-                      "intent_to_retain": true
+                      "path": ["org.iso.18013.5.1", "family_name"]
                     },
                     {
                       "id": "portrait",
-                      "path": ["org.iso.18013.5.1", "portrait"],
-                      "intent_to_retain": false
+                      "path": ["org.iso.18013.5.1", "portrait"]
                     }
                   ]
                 },
@@ -438,13 +417,11 @@ class DCQLParseTest {
                     },
                     {
                       "id": "family_name",
-                      "path": ["org.iso.23220.1", "family_name"],
-                      "intent_to_retain": true
+                      "path": ["org.iso.23220.1", "family_name"]
                     },
                     {
                       "id": "portrait",
-                      "path": ["org.iso.23220.1", "portrait"],
-                      "intent_to_retain": false
+                      "path": ["org.iso.23220.1", "portrait"]
                     }
                   ]
                 },
@@ -468,14 +445,12 @@ class DCQLParseTest {
               ],
               "credential_sets": [
                 {
-                  "purpose": "Identification",
                   "options": [
                     [ "mdl-id" ],
                     [ "photo_card-id" ]
                   ]
                 },
                 {
-                  "purpose": "Proof of address",
                   "required": false,
                   "options": [
                     [ "mdl-address" ],
@@ -486,7 +461,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.mdoc(
                     id = QueryId("mdl-id"),
                     msoMdocMeta = DCQLMetaMsoMdocExtensions(MsoMdocDocType("org.iso.18013.5.1.mDL")),
@@ -500,13 +475,11 @@ class DCQLParseTest {
                             id = ClaimId("family_name"),
                             namespace = "org.iso.18013.5.1",
                             claimName = "family_name",
-                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("portrait"),
                             namespace = "org.iso.18013.5.1",
                             claimName = "portrait",
-                            intentToRetain = false,
                         ),
                     ),
                 ),
@@ -539,13 +512,11 @@ class DCQLParseTest {
                             id = ClaimId("family_name"),
                             namespace = "org.iso.23220.1",
                             claimName = "family_name",
-                            intentToRetain = true,
                         ),
                         ClaimsQuery.mdoc(
                             id = ClaimId("portrait"),
                             namespace = "org.iso.23220.1",
                             claimName = "portrait",
-                            intentToRetain = false,
                         ),
                     ),
                 ),
@@ -566,20 +537,18 @@ class DCQLParseTest {
                     ),
                 ),
             ),
-            credentialSets = listOf(
+            credentialSets = CredentialSets(
                 CredentialSetQuery(
-                    purpose = JsonPrimitive("Identification"),
                     options = listOf(
-                        setOf(QueryId("mdl-id")),
-                        setOf(QueryId("photo_card-id")),
+                        CredentialQueryIds(listOf(QueryId("mdl-id"))),
+                        CredentialQueryIds(listOf(QueryId("photo_card-id"))),
                     ),
                 ),
                 CredentialSetQuery(
-                    purpose = JsonPrimitive("Proof of address"),
                     required = false,
                     options = listOf(
-                        setOf(QueryId("mdl-address")),
-                        setOf(QueryId("photo_card-address")),
+                        CredentialQueryIds(listOf(QueryId("mdl-address"))),
+                        CredentialQueryIds(listOf(QueryId("photo_card-address"))),
                     ),
                 ),
             ),
@@ -613,7 +582,7 @@ class DCQLParseTest {
             }
         """.trimIndent(),
         expected = DCQL(
-            credentials = listOf(
+            credentials = Credentials(
                 CredentialQuery.sdJwtVc(
                     id = QueryId("pid"),
                     sdJwtVcMeta = DCQLMetaSdJwtVcExtensions(vctValues = listOf("https://credentials.example.com/identity_credential")),
@@ -625,8 +594,8 @@ class DCQLParseTest {
                         ClaimsQuery.sdJwtVc(id = ClaimId("e"), path = ClaimPath.claim("date_of_birth")),
                     ),
                     claimSets = listOf(
-                        setOf(ClaimId("a"), ClaimId("c"), ClaimId("d"), ClaimId("e")),
-                        setOf(ClaimId("a"), ClaimId("b"), ClaimId("e")),
+                        ClaimSet(listOf(ClaimId("a"), ClaimId("c"), ClaimId("d"), ClaimId("e"))),
+                        ClaimSet(listOf(ClaimId("a"), ClaimId("b"), ClaimId("e"))),
                     ),
                 ),
             ),

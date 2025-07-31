@@ -36,7 +36,6 @@ import com.nimbusds.oauth2.sdk.id.Audience
 import com.nimbusds.oauth2.sdk.id.Issuer
 import com.nimbusds.oauth2.sdk.id.Subject
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
-import java.io.Serializable
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -46,7 +45,7 @@ import java.util.*
 data class HolderInfo(
     val email: String,
     val name: String,
-) : Serializable
+) : java.io.Serializable
 
 object SiopIdTokenBuilder {
 

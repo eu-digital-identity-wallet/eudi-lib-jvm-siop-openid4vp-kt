@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:UseSerializers(JWSAlgorithmSerializer::class)
+
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.EncryptionMethod
@@ -21,13 +23,15 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.Base64URL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
-import eu.europa.ec.eudi.prex.PresentationSubmission
+import eu.europa.ec.eudi.openid4vp.internal.JWSAlgorithmSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.JsonObject
-import java.io.Serializable
 import java.net.URI
 import java.net.URL
 
-sealed interface SubjectSyntaxType : Serializable {
+sealed interface SubjectSyntaxType : java.io.Serializable {
 
     @JvmInline
     value class DecentralizedIdentifier(val method: String) : SubjectSyntaxType
@@ -65,7 +69,7 @@ value class Scope private constructor(val value: String) {
     }
 }
 
-enum class ClientIdScheme {
+enum class ClientIdPrefix {
     /**
      * This value represents the RFC6749 default behavior,
      * i.e., the Client Identifier needs to be known to the Wallet in advance of the Authorization Request
@@ -78,8 +82,7 @@ enum class ClientIdScheme {
      * the value of the Client Identifier. In this case,
      * the Authorization Request MUST NOT be signed,
      * the Verifier MAY omit the redirect_uri Authorization Request parameter,
-     * and all Client metadata parameters MUST be passed using the client_metadata
-     * or client_metadata_uri parameter defined
+     * and all Client metadata parameters MUST be passed using the client_metadata parameter
      */
     RedirectUri,
 
@@ -87,86 +90,89 @@ enum class ClientIdScheme {
      * This value indicates that the Client Identifier is an Entity Identifier
      * defined in OpenID Federation.
      */
-    HTTPS,
+    OpenIdFederation,
 
     /**
      * This value indicates that the Client Identifier is a DID
      */
-    DID,
+    DecentralizedIdentifier,
 
     /**
-     * When the Client Identifier Scheme is x509_san_uri, the Client Identifier
-     * MUST be a URI and match a uniformResourceIdentifier Subject Alternative Name (SAN) RFC5280
-     * entry in the leaf certificate passed with the request
+     * This Client Identifier Prefix allows the Verifier
+     * to authenticate using a JWT that is bound to a certain public key
      */
-    X509_SAN_URI,
+    VerifierAttestation,
 
     /**
-     * When the Client Identifier Scheme is x509_san_dns, the Client Identifier
+     * When the Client Identifier Prefix is x509_san_dns, the Client Identifier
      * MUST be a DNS name and match a dNSName Subject Alternative Name (SAN) RFC5280
      * entry in the leaf certificate passed with the request
      */
-    X509_SAN_DNS,
+    X509SanDns,
 
     /**
-     * This Client Identifier Scheme allows the Verifier
-     * to authenticate using a JWT that is bound to a certain public key
+     * When the Client Identifier Prefix is x509_hash, the original Client Identifier (the part without the x509_hash: prefix)
+     * MUST be a hash and match the hash of the leaf certificate passed with the request.
+     * The request MUST be signed with the private key corresponding to the public key in the leaf X.509 certificate of the certificate
+     * chain added to the request in the x5c JOSE header parameter RFC7515 of the signed request object.
      */
-    VERIFIER_ATTESTATION,
+    X509Hash,
 
     ;
 
     fun value(): String = when (this) {
-        PreRegistered -> OpenId4VPSpec.CLIENT_ID_SCHEME_PRE_REGISTERED
-        RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI
-        HTTPS -> OpenId4VPSpec.CLIENT_ID_SCHEME_HTTPS
-        DID -> OpenId4VPSpec.CLIENT_ID_SCHEME_DID
-        X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI
-        X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS
-        VERIFIER_ATTESTATION -> OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION
+        PreRegistered -> OpenId4VPSpec.CLIENT_ID_PREFIX_PRE_REGISTERED
+        RedirectUri -> OpenId4VPSpec.CLIENT_ID_PREFIX_REDIRECT_URI
+        OpenIdFederation -> OpenId4VPSpec.CLIENT_ID_PREFIX_OPENID_FEDERATION
+        DecentralizedIdentifier -> OpenId4VPSpec.CLIENT_ID_PREFIX_DECENTRALIZED_IDENTIFIER
+        VerifierAttestation -> OpenId4VPSpec.CLIENT_ID_PREFIX_VERIFIER_ATTESTATION
+        X509SanDns -> OpenId4VPSpec.CLIENT_ID_PREFIX_X509_SAN_DNS
+        X509Hash -> OpenId4VPSpec.CLIENT_ID_PREFIX_X509_HASH
     }
 
     companion object {
-        fun make(s: String): ClientIdScheme? = when (s) {
-            OpenId4VPSpec.CLIENT_ID_SCHEME_PRE_REGISTERED -> PreRegistered
-            OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI -> RedirectUri
-            OpenId4VPSpec.CLIENT_ID_SCHEME_HTTPS -> HTTPS
-            OpenId4VPSpec.CLIENT_ID_SCHEME_DID -> DID
-            OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI -> X509_SAN_URI
-            OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS -> X509_SAN_DNS
-            OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION -> VERIFIER_ATTESTATION
+        fun make(s: String): ClientIdPrefix? = when (s) {
+            OpenId4VPSpec.CLIENT_ID_PREFIX_PRE_REGISTERED -> PreRegistered
+            OpenId4VPSpec.CLIENT_ID_PREFIX_REDIRECT_URI -> RedirectUri
+            OpenId4VPSpec.CLIENT_ID_PREFIX_OPENID_FEDERATION -> OpenIdFederation
+            OpenId4VPSpec.CLIENT_ID_PREFIX_DECENTRALIZED_IDENTIFIER -> DecentralizedIdentifier
+            OpenId4VPSpec.CLIENT_ID_PREFIX_VERIFIER_ATTESTATION -> VerifierAttestation
+            OpenId4VPSpec.CLIENT_ID_PREFIX_X509_SAN_DNS -> X509SanDns
+            OpenId4VPSpec.CLIENT_ID_PREFIX_X509_HASH -> X509Hash
             else -> null
         }
     }
 }
 
 /**
- * The Original Client Id of a Verifier, i.e. without a Client Id Scheme prefix.
+ * The Original Client Id of a Verifier, i.e. without a Client Id Prefix.
  */
 typealias OriginalClientId = String
 
 /**
  * The Client Id of a Verifier as defined by OpenId4Vp.
  *
- * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-client-identifier-scheme-an">https://openid.net/specs/openid-4-verifiable-presentations-1_0-24.html#name-client-identifier-scheme-an</a>
+ * @see <a href="https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-prefix-an">https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-client-identifier-prefix-an</a>
  */
 data class VerifierId(
-    val scheme: ClientIdScheme,
+    val prefix: ClientIdPrefix,
     val originalClientId: OriginalClientId,
 ) {
     val clientId: String = run {
-        val prefix = when (scheme) {
-            ClientIdScheme.RedirectUri -> OpenId4VPSpec.CLIENT_ID_SCHEME_REDIRECT_URI
-            ClientIdScheme.X509_SAN_URI -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_URI
-            ClientIdScheme.X509_SAN_DNS -> OpenId4VPSpec.CLIENT_ID_SCHEME_X509_SAN_DNS
-            ClientIdScheme.VERIFIER_ATTESTATION -> OpenId4VPSpec.CLIENT_ID_SCHEME_VERIFIER_ATTESTATION
-            else -> null
+        val prefix = when (prefix) {
+            ClientIdPrefix.PreRegistered -> null
+            ClientIdPrefix.RedirectUri -> OpenId4VPSpec.CLIENT_ID_PREFIX_REDIRECT_URI
+            ClientIdPrefix.OpenIdFederation -> OpenId4VPSpec.CLIENT_ID_PREFIX_OPENID_FEDERATION
+            ClientIdPrefix.DecentralizedIdentifier -> OpenId4VPSpec.CLIENT_ID_PREFIX_DECENTRALIZED_IDENTIFIER
+            ClientIdPrefix.VerifierAttestation -> OpenId4VPSpec.CLIENT_ID_PREFIX_VERIFIER_ATTESTATION
+            ClientIdPrefix.X509SanDns -> OpenId4VPSpec.CLIENT_ID_PREFIX_X509_SAN_DNS
+            ClientIdPrefix.X509Hash -> OpenId4VPSpec.CLIENT_ID_PREFIX_X509_HASH
         }
 
         buildString {
             if (prefix != null) {
                 append(prefix)
-                append(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR)
+                append(OpenId4VPSpec.CLIENT_ID_PREFIX_SEPARATOR)
             }
             append(originalClientId)
         }
@@ -178,20 +184,20 @@ data class VerifierId(
         fun parse(clientId: String): Result<VerifierId> = runCatching {
             fun invalid(message: String): Nothing = throw IllegalArgumentException(message)
 
-            if (OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR !in clientId) {
-                VerifierId(ClientIdScheme.PreRegistered, clientId)
+            if (OpenId4VPSpec.CLIENT_ID_PREFIX_SEPARATOR !in clientId) {
+                VerifierId(ClientIdPrefix.PreRegistered, clientId)
             } else {
-                val parts = clientId.split(OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR, limit = 2)
+                val parts = clientId.split(OpenId4VPSpec.CLIENT_ID_PREFIX_SEPARATOR, limit = 2)
                 val originalClientId = parts[1]
-                val scheme = ClientIdScheme.make(parts[0]) ?: invalid("'$clientId' does not contain a valid Client ID Scheme")
-                when (scheme) {
-                    ClientIdScheme.PreRegistered -> invalid("'${ClientIdScheme.PreRegistered}' cannot be used as a Client ID Scheme")
-                    ClientIdScheme.RedirectUri -> VerifierId(scheme, originalClientId)
-                    ClientIdScheme.HTTPS -> VerifierId(scheme, clientId)
-                    ClientIdScheme.DID -> VerifierId(scheme, clientId)
-                    ClientIdScheme.X509_SAN_URI -> VerifierId(scheme, originalClientId)
-                    ClientIdScheme.X509_SAN_DNS -> VerifierId(scheme, originalClientId)
-                    ClientIdScheme.VERIFIER_ATTESTATION -> VerifierId(scheme, originalClientId)
+                val prefix = ClientIdPrefix.make(parts[0]) ?: invalid("'$clientId' does not contain a valid Client ID prefix")
+                when (prefix) {
+                    ClientIdPrefix.PreRegistered -> invalid("'${ClientIdPrefix.PreRegistered}' cannot be used as a Client ID prefix")
+                    ClientIdPrefix.RedirectUri -> VerifierId(prefix, originalClientId)
+                    ClientIdPrefix.OpenIdFederation -> VerifierId(prefix, originalClientId)
+                    ClientIdPrefix.DecentralizedIdentifier -> VerifierId(prefix, originalClientId)
+                    ClientIdPrefix.VerifierAttestation -> VerifierId(prefix, originalClientId)
+                    ClientIdPrefix.X509SanDns -> VerifierId(prefix, originalClientId)
+                    ClientIdPrefix.X509Hash -> VerifierId(prefix, originalClientId)
                 }
             }
         }
@@ -201,7 +207,7 @@ data class VerifierId(
 /**
  * @see <a href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html</a>
  */
-sealed interface ResponseMode : Serializable {
+sealed interface ResponseMode : java.io.Serializable {
 
     /**
      * In this mode, Authorization Response parameters are encoded
@@ -220,6 +226,16 @@ sealed interface ResponseMode : Serializable {
     data class DirectPostJwt(val responseURI: URL) : ResponseMode
 }
 
+internal fun ResponseMode.requiresEncryption() =
+    when (this) {
+        is ResponseMode.DirectPost -> false
+        is ResponseMode.DirectPostJwt -> true
+        is ResponseMode.Fragment -> false
+        is ResponseMode.FragmentJwt -> true
+        is ResponseMode.Query -> false
+        is ResponseMode.QueryJwt -> true
+    }
+
 typealias Jwt = String
 
 sealed interface VerifiablePresentation {
@@ -231,20 +247,11 @@ sealed interface VerifiablePresentation {
     value class JsonObj(val value: JsonObject) : VerifiablePresentation
 }
 
-sealed interface VpContent {
-    data class PresentationExchange(
-        val verifiablePresentations: List<VerifiablePresentation>,
-        val presentationSubmission: PresentationSubmission,
-    ) : VpContent {
-        init {
-            require(verifiablePresentations.isNotEmpty())
-        }
-    }
-
-    data class DCQL(val verifiablePresentations: Map<QueryId, VerifiablePresentation>) : VpContent {
-        init {
-            require(verifiablePresentations.isNotEmpty())
-        }
+@JvmInline
+value class VerifiablePresentations(val value: Map<QueryId, List<VerifiablePresentation>>) {
+    init {
+        require(value.isNotEmpty())
+        require(value.values.all { it.isNotEmpty() })
     }
 }
 
@@ -258,37 +265,20 @@ enum class IdTokenType {
 }
 
 /**
- * The client's (verifier) requirement to
- * reply to an authorization request with JARM
+ * The client's (verifier) requirement for authorization response encryption that can be fulfilled by the wallet.
  */
-sealed interface JarmRequirement : Serializable {
-    /**
-     * Client requires JARM signed response using the [responseSigningAlg]
-     * signing algorithm
-     */
-    data class Signed(val responseSigningAlg: JWSAlgorithm) : JarmRequirement
-
-    /**
-     * Client requires JARM encrypted response using the
-     * provided [algorithm][responseEncryptionAlg], [encoding method][responseEncryptionEnc]
-     * and [client's encryption key][clientKey]
-     */
-    data class Encrypted(
-        val responseEncryptionAlg: JWEAlgorithm,
-        val responseEncryptionEnc: EncryptionMethod,
-        val clientKey: JWK,
-    ) : JarmRequirement
-
-    /**
-     * Client requires JARM signed and (then) encrypted
-     * using the provided [signing][signed] and [encryption][encryptResponse]
-     * specifications
-     */
-    data class SignedAndEncrypted(val signed: Signed, val encryptResponse: Encrypted) : JarmRequirement
+data class ResponseEncryptionSpecification(
+    val encryptionAlgorithm: JWEAlgorithm,
+    val encryptionMethod: EncryptionMethod,
+    val recipientKey: JWK,
+) : java.io.Serializable {
+    init {
+        require(encryptionAlgorithm.name == recipientKey.algorithm?.name)
+        requireNotNull(recipientKey.keyID)
+    }
 }
 
-sealed interface EncryptionParameters : Serializable {
-
+sealed interface EncryptionParameters : java.io.Serializable {
     data class DiffieHellman(val apu: Base64URL) : EncryptionParameters
 }
 
@@ -298,7 +288,7 @@ sealed interface EncryptionParameters : Serializable {
  * @see <a href="https://www.iana.org/assignments/named-information/named-information.xhtml">https://www.iana.org/assignments/named-information/named-information.xhtml</a>
  */
 @JvmInline
-value class HashAlgorithm(val name: String) : Serializable {
+value class HashAlgorithm(val name: String) : java.io.Serializable {
     init {
         require(name.isNotEmpty())
     }
@@ -311,7 +301,7 @@ value class HashAlgorithm(val name: String) : Serializable {
 }
 
 @JvmInline
-value class TransactionDataType(val value: String) : Serializable {
+value class TransactionDataType(val value: String) : java.io.Serializable {
     init {
         require(value.isNotEmpty())
     }
@@ -320,10 +310,82 @@ value class TransactionDataType(val value: String) : Serializable {
 }
 
 @JvmInline
-value class TransactionDataCredentialId(val value: String) : Serializable {
+@Serializable
+value class CoseAlgorithm(val value: Int) : java.io.Serializable {
+    override fun toString(): String = value.toString()
+}
+
+@Serializable
+data class VpFormatsSupported(
+    @SerialName(OpenId4VPSpec.FORMAT_SD_JWT_VC) val sdJwtVc: SdJwtVc? = null,
+    @SerialName(OpenId4VPSpec.FORMAT_MSO_MDOC) val msoMdoc: MsoMdoc? = null,
+) : java.io.Serializable {
+
     init {
-        require(value.isNotEmpty())
+        require(null != sdJwtVc || null != msoMdoc) {
+            "At least one format must be specified."
+        }
     }
 
-    override fun toString(): String = value
+    companion object
+
+    @Serializable
+    data class SdJwtVc(
+        @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS)
+        val sdJwtAlgorithms: List<JWSAlgorithm>?,
+
+        @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS)
+        val kbJwtAlgorithms: List<JWSAlgorithm>?,
+
+    ) : java.io.Serializable {
+        init {
+            sdJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "SD-JWT algorithms cannot be empty" }
+            }
+            kbJwtAlgorithms?.let {
+                require(it.isNotEmpty()) { "KeyBinding-JWT algorithms cannot be empty" }
+            }
+        }
+
+        companion object {
+            val HAIP: SdJwtVc
+                get() =
+                    SdJwtVc(
+                        sdJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+                        kbJwtAlgorithms = listOf(JWSAlgorithm.ES256),
+                    )
+        }
+    }
+
+    @Serializable
+    data class MsoMdoc(
+        @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<CoseAlgorithm>?,
+        @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<CoseAlgorithm>?,
+    ) : java.io.Serializable {
+        init {
+            issuerAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "IssuerAuth algorithms cannot be empty" }
+            }
+            deviceAuthAlgorithms?.let {
+                require(it.isNotEmpty()) { "DeviceAUth algorithms cannot be empty" }
+            }
+        }
+
+        companion object
+    }
 }
+
+internal fun VpFormatsSupported.containsAll(formats: Collection<Format>): Boolean =
+    formats.all {
+        when (it) {
+            Format.SdJwtVc -> null != sdJwtVc
+            Format.MsoMdoc -> null != msoMdoc
+            else -> false
+        }
+    }
+
+internal fun VpFormatsSupported.filter(formats: Collection<Format>): VpFormatsSupported =
+    VpFormatsSupported(
+        sdJwtVc = sdJwtVc?.takeIf { Format.SdJwtVc in formats },
+        msoMdoc = msoMdoc?.takeIf { Format.MsoMdoc in formats },
+    )

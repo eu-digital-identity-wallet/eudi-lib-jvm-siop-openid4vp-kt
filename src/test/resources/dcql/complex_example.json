@@ -1,0 +1,28 @@
+{
+  "credentials": [
+    {
+      "id": "my_credential_1",
+      "format": "dc+sd-jwt",
+      "meta": {
+        "vct_values": [ "https://credentials.example.com/identity_credential" ]
+      },
+      "claims": [
+        {"path": ["last_name"]},
+        {"path": ["first_name"]},
+        {"path": ["address", "street_address"]}
+      ]
+    },
+    {
+      "id": "my_credential_2",
+      "format": "mso_mdoc",
+      "meta": {
+        "vct_values": [ "https://credentials.example.com/driving_license_credential" ]
+      },
+      "claims": [
+        {"path": ["credentials.example.com", "lastName"]},
+        {"path": ["credentials.example.com","firstName"]},
+        {"path": ["credentials.example.com", "address"]}
+      ]
+    }
+  ]
+}

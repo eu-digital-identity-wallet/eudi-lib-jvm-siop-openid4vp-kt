@@ -25,12 +25,11 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
 import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.Preregistered
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdScheme.X509SanDns
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdPrefix.Preregistered
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdPrefix.X509SanDns
 import eu.europa.ec.eudi.openid4vp.dcql.metaSdJwtVc
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
-import eu.europa.ec.eudi.prex.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -53,6 +52,12 @@ import eu.europa.ec.eudi.openid4vp.dcql.DCQL as DCQLQuery
  * https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
  */
 fun main(): Unit = runBlocking {
+    createHttpClient(enableLogging = true).use { httpClient ->
+        httpClient.program()
+    }
+}
+
+suspend fun HttpClient.program() {
     val verifierApi = URL("https://dev.verifier-backend.eudiw.dev")
     val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
@@ -62,6 +67,7 @@ fun main(): Unit = runBlocking {
             Preregistered(Verifier.asPreregisteredClient(verifierApi)),
             X509SanDns(TrustAnyX509),
         ),
+        httpClient = this@program,
     )
 
     suspend fun runUseCase(transaction: Transaction) = coroutineScope {
@@ -80,9 +86,7 @@ fun main(): Unit = runBlocking {
     }
 
     runUseCase(Transaction.SIOP)
-    runUseCase(Transaction.MsoMdocPidPresentationExchange)
     runUseCase(Transaction.MsoMdocPidDcql)
-    runUseCase(Transaction.SdJwtVcPidPresentationExchange)
     runUseCase(Transaction.SdJwtVcPidDcql)
     runUseCase(Transaction.SdJwtVcEhicDcql)
 }
@@ -90,8 +94,7 @@ fun main(): Unit = runBlocking {
 @Serializable
 data class WalletResponse(
     @SerialName("id_token") val idToken: String? = null,
-    @SerialName("vp_token") val vpToken: JsonElement? = null,
-    @SerialName("presentation_submission") val presentationSubmission: PresentationSubmission? = null,
+    @SerialName("vp_token") val vpToken: JsonObject? = null,
     @SerialName("error") val error: String? = null,
 )
 
@@ -123,7 +126,6 @@ class Verifier private constructor(
 
         walletResponse.idTokenClaimSet(walletPublicKey)?.also { verifierPrintln("Got id_token with payload $it") }
         walletResponse.vpToken?.also { verifierPrintln("Got vp_token with payload $it") }
-        walletResponse.presentationSubmission?.also { verifierPrintln("Got presentation_submission with payload $it") }
         return walletResponse
     }
 
@@ -189,14 +191,8 @@ class Verifier private constructor(
             val request = buildJsonObject {
                 put("type", "vp_token")
                 put("nonce", nonce)
-                when (presentationQuery) {
-                    is Transaction.PresentationQuery.PresentationExchange ->
-                        put("presentation_definition", jsonSupport.encodeToJsonElement(presentationQuery.presentationDefinition))
-                    is Transaction.PresentationQuery.DCQL ->
-                        put("dcql_query", jsonSupport.encodeToJsonElement(presentationQuery.query))
-                }
+                put("dcql_query", jsonSupport.encodeToJsonElement(presentationQuery.query))
                 put("response_mode", "direct_post.jwt")
-                put("presentation_definition_mode", "by_reference")
                 put("jar_mode", "by_reference")
                 put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
                 if (!transactionData.isNullOrEmpty()) {
@@ -253,10 +249,8 @@ sealed interface Transaction {
             is OpenId4VP -> "OpenId4Vp"
         }
 
-    sealed interface PresentationQuery {
-        data class PresentationExchange(val presentationDefinition: PresentationDefinition) : PresentationQuery
-        data class DCQL(val query: DCQLQuery) : PresentationQuery
-    }
+    @JvmInline
+    value class PresentationQuery(val query: DCQLQuery)
 
     data object SIOP : Transaction
     data class OpenId4VP(
@@ -271,49 +265,28 @@ sealed interface Transaction {
     }
 
     companion object {
-        val MsoMdocPidPresentationExchange = OpenId4VP(
-            PresentationQuery.PresentationExchange(
-                jsonSupport.decodeFromString(loadResource("/example/mso_mdoc-pid-presentation-definition.json")),
-            ),
-        )
-
         val MsoMdocPidDcql = OpenId4VP(
-            PresentationQuery.DCQL(
-                jsonSupport.decodeFromString(loadResource("/example/mso_mdoc-pid-dcql-query.json")),
+            PresentationQuery(
+                jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/mso_mdoc-pid-dcql-query.json")),
             ),
         )
-
-        val SdJwtVcPidPresentationExchange = run {
-            val presentationDefinition = jsonSupport.decodeFromString<PresentationDefinition>(
-                loadResource("/example/sd-jwt-vc-pid-presentation-definition.json"),
-            )
-            val inputDescriptorId = presentationDefinition.inputDescriptors.first().id
-            val transactionData = TransactionData(
-                TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
-                listOf(TransactionDataCredentialId(inputDescriptorId.value)),
-            ) {
-                put("purpose", "We must verify your Family Name")
-            }
-
-            OpenId4VP(PresentationQuery.PresentationExchange(presentationDefinition), listOf(transactionData))
-        }
 
         val SdJwtVcPidDcql = run {
             val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-pid-dcql-query.json"))
-            val queryId = dcql.credentials.first().id
-            val transactionData = TransactionData(
+            val queryId = dcql.credentials.ids.first()
+            val transactionData = TransactionData.sdJwtVc(
                 TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
-                listOf(TransactionDataCredentialId(queryId.value)),
+                listOf(queryId),
             ) {
                 put("purpose", "We must verify your Family Name")
             }
 
-            OpenId4VP(PresentationQuery.DCQL(dcql), listOf(transactionData))
+            OpenId4VP(PresentationQuery(dcql), listOf(transactionData))
         }
 
         val SdJwtVcEhicDcql = run {
             val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-ehic-dcql-query.json"))
-            OpenId4VP(PresentationQuery.DCQL(dcql))
+            OpenId4VP(PresentationQuery(dcql))
         }
     }
 }
@@ -330,13 +303,14 @@ private class Wallet(
     private val holder: HolderInfo,
     private val walletConfig: SiopOpenId4VPConfig,
     private val walletKeyPair: RSAKey,
+    private val httpClient: HttpClient,
 ) {
 
     val pubKey: RSAKey
         get() = walletKeyPair.toPublicJWK()
 
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
-        SiopOpenId4Vp(walletConfig) { createHttpClient() }
+        SiopOpenId4Vp(walletConfig, httpClient)
     }
 
     suspend fun handle(uri: URI): DispatchOutcome {
@@ -386,71 +360,31 @@ private class Wallet(
     }
 
     private fun handleOpenId4VP(request: ResolvedRequestObject.OpenId4VPAuthorization): Consensus {
-        return when (val presentationQuery = request.presentationQuery) {
-            is PresentationQuery.ByPresentationDefinition -> {
-                val presentationDefinition = presentationQuery.value
-                check(1 == presentationDefinition.inputDescriptors.size) { "found more than 1 input descriptors" }
-                val inputDescriptor = presentationDefinition.inputDescriptors.first()
-                val requestedFormats =
-                    checkNotNull(
-                        inputDescriptor.format?.jsonObject()?.keys
-                            ?: presentationDefinition.format?.jsonObject()?.keys,
-                    ) { "formats not defined" }
-                check(1 == requestedFormats.size) { "found more than 1 formats" }
-
-                val format = requestedFormats.first()
-                val verifiablePresentation = when (format) {
-                    "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
-                    "vc+sd-jwt" -> prepareSdJwtVcVerifiablePresentation(request.client, request.nonce, request.transactionData)
-                    else -> error("unsupported format $format")
-                }
-
-                Consensus.PositiveConsensus.VPTokenConsensus(
-                    vpContent = VpContent.PresentationExchange(
-                        verifiablePresentations = listOf(verifiablePresentation),
-                        presentationSubmission = PresentationSubmission(
-                            id = Id(UUID.randomUUID().toString()),
-                            definitionId = presentationDefinition.id,
-                            listOf(
-                                DescriptorMap(
-                                    id = inputDescriptor.id,
-                                    format = format,
-                                    path = JsonPath.jsonPath("$")!!,
-                                ),
-                            ),
-                        ),
-                    ),
+        val query = request.query
+        check(1 == query.credentials.value.size) { "found more than 1 credentials" }
+        val credential = query.credentials.value.first()
+        val verifiablePresentation = when (val format = credential.format.value) {
+            "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
+            "dc+sd-jwt" -> {
+                val vct = credential.metaSdJwtVc?.vctValues?.firstOrNull() ?: error("no vct found")
+                prepareSdJwtVcVerifiablePresentation(
+                    request.client,
+                    request.nonce,
+                    request.transactionData,
+                    vct = vct,
                 )
             }
 
-            is PresentationQuery.ByDigitalCredentialsQuery -> {
-                val query = presentationQuery.value
-                check(1 == query.credentials.size) { "found more than 1 credentials" }
-                val credential = query.credentials.first()
-                val verifiablePresentation = when (val format = credential.format.value) {
-                    "mso_mdoc" -> VerifiablePresentation.Generic(loadResource("/example/mso_mdoc_pid-deviceresponse.txt"))
-                    "vc+sd-jwt", "dc+sd-jwt" -> {
-                        val vct = credential.metaSdJwtVc?.vctValues?.firstOrNull() ?: error("no vct found")
-                        prepareSdJwtVcVerifiablePresentation(
-                            request.client,
-                            request.nonce,
-                            request.transactionData,
-                            vct = vct,
-                        )
-                    }
-
-                    else -> error("unsupported format $format")
-                }
-
-                Consensus.PositiveConsensus.VPTokenConsensus(
-                    vpContent = VpContent.DCQL(
-                        verifiablePresentations = mapOf(
-                            credential.id to verifiablePresentation,
-                        ),
-                    ),
-                )
-            }
+            else -> error("unsupported format $format")
         }
+
+        return Consensus.PositiveConsensus.VPTokenConsensus(
+            verifiablePresentations = VerifiablePresentations(
+                value = mapOf(
+                    credential.id to listOf(verifiablePresentation),
+                ),
+            ),
+        )
     }
 
     private fun prepareSdJwtVcVerifiablePresentation(
@@ -484,7 +418,7 @@ private class Wallet(
                 .claim("sd_hash", sdHash)
                 .apply {
                     if (!transactionData.isNullOrEmpty()) {
-                        check(transactionData.all { HashAlgorithm.SHA_256 in it.hashAlgorithms })
+                        check(transactionData.all { it is TransactionData.SdJwtVc && HashAlgorithm.SHA_256 in it.hashAlgorithmsOrDefault })
 
                         val transactionDataHashes = transactionData.map {
                             val digest = MessageDigest.getInstance("SHA-256")
@@ -512,12 +446,18 @@ private val TrustAnyX509: (List<X509Certificate>) -> Boolean = { _ ->
     true
 }
 
-private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme) =
+private fun walletConfig(vararg supportedClientIdPrefix: SupportedClientIdPrefix) =
     SiopOpenId4VPConfig(
         vpConfiguration = VPConfiguration(
-            vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+            vpFormatsSupported = VpFormatsSupported(
+                VpFormatsSupported.SdJwtVc.HAIP,
+                VpFormatsSupported.MsoMdoc(
+                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                ),
+            ),
             supportedTransactionDataTypes = listOf(
-                SupportedTransactionDataType(
+                SupportedTransactionDataType.SdJwtVc(
                     TransactionDataType("eu.europa.ec.eudi.family-name-presentation"),
                     setOf(HashAlgorithm.SHA_256),
                 ),
@@ -535,11 +475,11 @@ private fun walletConfig(vararg supportedClientIdScheme: SupportedClientIdScheme
                 ),
             ),
         ),
-        jarmConfiguration = JarmConfiguration.Encryption(
+        responseEncryptionConfiguration = ResponseEncryptionConfiguration.Supported(
             supportedAlgorithms = listOf(JWEAlgorithm.ECDH_ES),
-            supportedMethods = listOf(EncryptionMethod.A128CBC_HS256, EncryptionMethod.A256GCM),
+            supportedMethods = listOf(EncryptionMethod.A128GCM),
         ),
-        supportedClientIdSchemes = supportedClientIdScheme,
+        supportedClientIdPrefixes = supportedClientIdPrefix,
         clock = Clock.systemDefaultZone(),
     )
 

@@ -29,6 +29,31 @@ import java.net.URL
 
 internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenId4VPConfig) {
 
+    fun validateDCApiRequestObject(request: AuthenticatedRequest): ResolvedRequestObject {
+        val (client, requestObject) = request
+        val state = requestObject.state
+        val nonce = requiredNonce(requestObject)
+        val scope = requiredScope(requestObject)
+        val nonOpenIdScope = with(Scope) { scope.getOrNull()?.items()?.filter { it != OpenId }?.mergeOrNull() }
+        val query = requiredDcqlQuery(requestObject, nonOpenIdScope, siopOpenId4VPConfig.vpConfiguration.vpFormatsSupported)
+        val responseMode = requiredResponseModeOverDCApi(requestObject)
+        val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
+        val transactionData = optionalTransactionData(requestObject, query)
+        val verifierInfo = optionalVerifierInfo(query, requestObject)
+
+        return OpenId4VPAuthorization(
+            client = client.toClient(),
+            responseMode = responseMode,
+            state = state,
+            nonce = nonce,
+            responseEncryptionSpecification = clientMetaData?.responseEncryptionSpecification,
+            vpFormatsSupported = clientMetaData?.vpFormatsSupported,
+            query = query,
+            transactionData = transactionData,
+            verifierInfo = verifierInfo,
+        )
+    }
+
     /**
      * Validates that the given [request] represents a valid and supported [ResolvedRequestObject]
      *
@@ -37,14 +62,14 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
      * raises an AuthorizationRequestException. Validation rules violations are reported using [AuthorizationRequestError]
      * wrapped inside the [specific exception][AuthorizationRequestException]
      */
-    fun validateRequestObject(request: AuthenticatedRequest): ResolvedRequestObject {
+    fun validateHttpRequestObject(request: AuthenticatedRequest): ResolvedRequestObject {
         val (client, requestObject) = request
         val scope = requiredScope(requestObject)
         val nonOpenIdScope = with(Scope) { scope.getOrNull()?.items()?.filter { it != OpenId }?.mergeOrNull() }
         val state = requestObject.state
         val nonce = requiredNonce(requestObject)
         val responseType = requiredResponseType(requestObject)
-        val responseMode = requiredResponseMode(client, requestObject)
+        val responseMode = requiredResponseModeOverHttp(client, requestObject)
         val idTokenType = optionalIdTokenType(requestObject)
 
         fun idToken(): SiopAuthentication {
@@ -216,7 +241,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             }
             ?: emptyList()
 
-    private fun requiredResponseMode(
+    private fun requiredResponseModeOverHttp(
         client: AuthenticatedClient,
         unvalidated: UnvalidatedRequestObject,
     ): ResponseMode {
@@ -272,6 +297,10 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
                     is ResponseMode.FragmentJwt,
                     -> client.claims.redirectUris
 
+                    ResponseMode.DCApi,
+                    ResponseMode.DCApiJwt,
+                    -> error("Unsupported response mode $responseMode")
+
                     is ResponseMode.DirectPost,
                     is ResponseMode.DirectPostJwt,
                     -> client.claims.responseUris
@@ -288,8 +317,20 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
             }
 
             is AuthenticatedClient.X509Hash -> Unit
+
+            is AuthenticatedClient.Origin ->
+                throw IllegalStateException("Origin client is not supported for response_mode: $responseMode")
         }
 
+        return responseMode
+    }
+
+    private fun requiredResponseModeOverDCApi(unvalidated: UnvalidatedRequestObject): ResponseMode {
+        val responseMode = when (unvalidated.responseMode) {
+            "dc_api" -> ResponseMode.DCApi
+            "dc_api.jwt" -> ResponseMode.DCApiJwt
+            else -> throw UnsupportedResponseMode(unvalidated.responseMode).asException()
+        }
         return responseMode
     }
 
@@ -376,6 +417,7 @@ private fun AuthenticatedClient.toClient(): Client =
         is AuthenticatedClient.VerifierAttestation -> Client.VerifierAttestation(clientId)
         is AuthenticatedClient.X509SanDns -> Client.X509SanDns(clientId, chain[0])
         is AuthenticatedClient.X509Hash -> Client.X509Hash(clientId, chain[0])
+        is AuthenticatedClient.Origin -> Client.Origin(clientId)
     }
 
 private fun ResponseMode.uri(): URI = when (this) {
@@ -385,6 +427,9 @@ private fun ResponseMode.uri(): URI = when (this) {
     is ResponseMode.FragmentJwt -> redirectUri
     is ResponseMode.Query -> redirectUri
     is ResponseMode.QueryJwt -> redirectUri
+    ResponseMode.DCApi,
+    ResponseMode.DCApiJwt,
+    -> error("No uri for response mode $this")
 }
 
 private enum class ResponseType {

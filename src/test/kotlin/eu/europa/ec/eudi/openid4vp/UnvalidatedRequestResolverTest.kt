@@ -577,6 +577,53 @@ class UnvalidatedRequestResolverTest {
         assertTrue { sdJwtFormat.sdJwtAlgorithms.contains(JWSAlgorithm.RS256) }
     }
 
+    @Test
+    fun `common ground on msoMdoc vp_format includes only common algorithms`() = runTest {
+        val multipleCredentialsDcqlQuery = readFileAsText("dcql/eudi_msomdoc_pid_dcql_query.json")
+            .replace("\r\n", "")
+            .replace("\r", "")
+            .replace("\n", "")
+            .replace("  ", "")
+            .let { URLEncoder.encode(it, "UTF-8") }
+
+        val clientMetadata =
+            """ {
+                 "jwks": $jwkSetJO,
+                 "vp_formats_supported": {
+                     "mso_mdoc": {
+                         "issuerauth_alg_values": [-49, -7, -264],
+                         "deviceauth_alg_values": [-49, -7, -264]
+                     }
+                 }    
+               }
+            """.trimIndent().let {
+                URLEncoder.encode(it, "UTF-8")
+            }
+
+        val authRequest =
+            "https://client.example.org/universal-link?" +
+                "response_type=vp_token" +
+                "&client_id=redirect_uri%3Ahttps%3A%2F%2Fclient.example.org%2Fcb" +
+                "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb" +
+                "&nonce=n-0S6_WzA2Mj" +
+                "&dcql_query=$multipleCredentialsDcqlQuery" +
+                "&client_metadata=$clientMetadata"
+
+        val resolution = resolver().resolveRequestUri(authRequest)
+        val request = resolution.validateSuccess<ResolvedRequestObject.OpenId4VPAuthorization>()
+        val formats = request.vpFormatsSupported
+        assertNull(formats?.sdJwtVc)
+        val msoMdocFormat = assertNotNull(formats?.msoMdoc)
+
+        assertNotNull(msoMdocFormat.issuerAuthAlgorithms)
+        assertTrue { msoMdocFormat.issuerAuthAlgorithms.size == 1 }
+        assertTrue { msoMdocFormat.issuerAuthAlgorithms.contains(CoseAlgorithm(-7)) }
+
+        assertNotNull(msoMdocFormat.deviceAuthAlgorithms)
+        assertTrue { msoMdocFormat.issuerAuthAlgorithms.size == 1 }
+        assertTrue { msoMdocFormat.issuerAuthAlgorithms.contains(CoseAlgorithm(-7)) }
+    }
+
     private fun createSignedRequestJwt(
         jwkSet: JWKSet,
         jwtClaimsSet: JWTClaimsSet,

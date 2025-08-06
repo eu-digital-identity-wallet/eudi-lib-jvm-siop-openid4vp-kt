@@ -229,7 +229,13 @@ private fun resolveCommonGround(
                 resolveCommonGround(walletSupported = it, verifierSupported = verifierSupported.sdJwtVc)
             }
         } else null
-    val msoMdoc = verifierSupported.msoMdoc
+
+    val msoMdoc =
+        if (null != verifierSupported.msoMdoc) {
+            walletSupported.msoMdoc?.let {
+                resolveCommonGround(walletSupported = it, verifierSupported = verifierSupported.msoMdoc)
+            }
+        } else null
 
     ensure(null != sdJwtVc || null != msoMdoc) {
         ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
@@ -260,4 +266,28 @@ private fun resolveCommonGround(
     val sdJwtAlgorithms = common(walletSupported.sdJwtAlgorithms, verifierSupported.sdJwtAlgorithms)
     val kbJwtAlgorithms = common(walletSupported.kbJwtAlgorithms, verifierSupported.kbJwtAlgorithms)
     return VpFormatsSupported.SdJwtVc(sdJwtAlgorithms = sdJwtAlgorithms, kbJwtAlgorithms = kbJwtAlgorithms)
+}
+
+private fun resolveCommonGround(
+    walletSupported: VpFormatsSupported.MsoMdoc,
+    verifierSupported: VpFormatsSupported.MsoMdoc,
+): VpFormatsSupported.MsoMdoc {
+    fun common(
+        walletSupported: List<CoseAlgorithm>?,
+        verifierSupported: List<CoseAlgorithm>?,
+    ): List<CoseAlgorithm>? =
+        when {
+            null != walletSupported && null != verifierSupported -> {
+                val common = walletSupported.intersect(verifierSupported).toList().takeIf { it.isNotEmpty() }
+                ensureNotNull(common) {
+                    ResolutionError.ClientVpFormatsNotSupportedFromWallet.asException()
+                }
+            }
+
+            else -> verifierSupported ?: walletSupported
+        }
+
+    val issuerAuthAlgorithms = common(walletSupported.issuerAuthAlgorithms, verifierSupported.issuerAuthAlgorithms)
+    val deviceAuthAlgorithms = common(walletSupported.deviceAuthAlgorithms, verifierSupported.deviceAuthAlgorithms)
+    return VpFormatsSupported.MsoMdoc(issuerAuthAlgorithms = issuerAuthAlgorithms, deviceAuthAlgorithms = deviceAuthAlgorithms)
 }

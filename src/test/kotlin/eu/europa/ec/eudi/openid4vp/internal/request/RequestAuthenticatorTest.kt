@@ -48,11 +48,17 @@ class ClientAuthenticatorTest {
     inner class ClientAuthenticatorCommonTest {
 
         private val cfg = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(
-                SupportedClientIdScheme.RedirectUri,
+            supportedClientIdPrefixes = listOf(
+                SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -60,35 +66,41 @@ class ClientAuthenticatorTest {
 
         @Test
         fun `if client_id is missing, authentication fails`() = runTest {
-            val request = UnvalidatedRequestObject(clientId = null).plain()
+            val request = UnvalidatedRequestObject(clientId = null).unsigned()
             assertFailsWithError<RequestValidationError.MissingClientId> {
                 clientAuthenticator.authenticateClient(request)
             }
         }
 
         @Test
-        fun `if client_id scheme is invalid, authentication fails`() = runTest {
+        fun `if client_id prefix is invalid, authentication fails`() = runTest {
             val request = UnvalidatedRequestObject(
                 clientId = "bar:foo",
                 responseMode = "bar",
-            ).plain()
+            ).unsigned()
 
-            assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+            assertFailsWithError<RequestValidationError.InvalidClientIdPrefix> {
                 clientAuthenticator.authenticateClient(request)
             }
         }
     }
 
-    @DisplayName("when handling a request with `redirect_uri` scheme")
+    @DisplayName("when handling a request with `redirect_uri` prefix")
     @Nested
     inner class ClientAuthenticatorWhenUsingRedirectUriTest {
         private val clientId = URI.create("http://localhost:8080")
         private val cfg = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(
-                SupportedClientIdScheme.RedirectUri,
+            supportedClientIdPrefixes = listOf(
+                SupportedClientIdPrefix.RedirectUri,
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
@@ -98,7 +110,7 @@ class ClientAuthenticatorTest {
             runTest {
                 val request = UnvalidatedRequestObject(
                     clientId = "redirect_uri:$clientId",
-                ).plain()
+                ).unsigned()
 
                 val client = clientAuthenticator.authenticateClient(request)
                 assertEquals(AuthenticatedClient.RedirectUri(clientId), client)
@@ -111,40 +123,47 @@ class ClientAuthenticatorTest {
                 clientId = "redirect_uri:$clientId",
             ).signed(alg, key)
 
-            val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+            val error = assertFailsWithError<RequestValidationError.InvalidClientIdPrefix> {
                 clientAuthenticator.authenticateClient(request)
             }
             assertEquals("RedirectUri cannot be used in signed request", error.value)
         }
     }
 
-    @DisplayName("when handling a request with `did` scheme")
+    @DisplayName("when handling a request with `decentralized_identifier` prefix")
     @Nested
     inner class ClientAuthenticatorWhenUsingDIDTest {
-        private val clientId = DID.parse("did:example:123").getOrThrow()
-        private val keyUrl = AbsoluteDIDUrl.parse("$clientId#01").getOrThrow()
+        private val originalClientId = DID.parse("did:example:123").getOrThrow()
+        private val clientId = "decentralized_identifier:$originalClientId"
+        private val keyUrl = AbsoluteDIDUrl.parse("$originalClientId#01").getOrThrow()
         private val algAndKey = randomKey()
         private val cfg = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(
-                SupportedClientIdScheme.DID { url ->
+            supportedClientIdPrefixes = listOf(
+                SupportedClientIdPrefix.DecentralizedIdentifier { url ->
                     assertEquals(keyUrl.uri, url)
                     algAndKey.second.toPublicKey()
                 },
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
         )
         private val clientAuthenticator = ClientAuthenticator(cfg)
         private val requestObject = UnvalidatedRequestObject(
-            clientId = clientId.toString(),
+            clientId = clientId,
         )
 
         @Test
         fun `if request is not signed, authentication fails`() = runTest {
-            val request = requestObject.plain()
+            val request = requestObject.unsigned()
 
-            val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+            val error = assertFailsWithError<RequestValidationError.InvalidClientIdPrefix> {
                 clientAuthenticator.authenticateClient(request)
             }
             assertTrue {
@@ -204,8 +223,8 @@ class ClientAuthenticatorTest {
             }
             val clientAuthenticator = ClientAuthenticator(
                 cfg.copy(
-                    supportedClientIdSchemes = listOf(
-                        SupportedClientIdScheme.DID(failingResolution),
+                    supportedClientIdPrefixes = listOf(
+                        SupportedClientIdPrefix.DecentralizedIdentifier(failingResolution),
                     ),
                 ),
             )
@@ -221,11 +240,11 @@ class ClientAuthenticatorTest {
             val (alg, key) = algAndKey
             val request = requestObject.signed(alg, key) { keyID(keyUrl.toString()) }
             val client = clientAuthenticator.authenticateClient(request)
-            assertEquals(AuthenticatedClient.DIDClient(clientId, key.toPublicKey()), client)
+            assertEquals(AuthenticatedClient.DecentralizedIdentifier(originalClientId, key.toPublicKey()), client)
         }
     }
 
-    @DisplayName("when handling a request with `verifier_attestation` scheme")
+    @DisplayName("when handling a request with `verifier_attestation` prefix")
     @Nested
     inner class ClientAuthenticatorWhenUsingVerifierAttestationTest {
 
@@ -233,11 +252,17 @@ class ClientAuthenticatorTest {
         private val algAndKey = randomKey()
 
         private val cfg = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(
-                SupportedClientIdScheme.VerifierAttestation(AttestationIssuer.verifier),
+            supportedClientIdPrefixes = listOf(
+                SupportedClientIdPrefix.VerifierAttestation(AttestationIssuer.verifier),
             ),
             vpConfiguration = VPConfiguration(
-                vpFormats = VpFormats(VpFormat.SdJwtVc.ES256, VpFormat.MsoMdoc.ES256),
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
+                ),
             ),
             clock = Clock.systemDefaultZone(),
         )
@@ -248,9 +273,9 @@ class ClientAuthenticatorTest {
 
         @Test
         fun `if request is unsigned, authentication fails`() = runTest {
-            val request = requestObject.plain()
+            val request = requestObject.unsigned()
 
-            val error = assertFailsWithError<RequestValidationError.InvalidClientIdScheme> {
+            val error = assertFailsWithError<RequestValidationError.InvalidClientIdPrefix> {
                 clientAuthenticator.authenticateClient(request)
             }
             assertTrue {
@@ -282,7 +307,7 @@ class ClientAuthenticatorTest {
             val request = requestObject.signedWithAttestation(alg, key, verifierAttestation)
 
             val client = clientAuthenticator.authenticateClient(request)
-            assertIs<AuthenticatedClient.Attested>(client)
+            assertIs<AuthenticatedClient.VerifierAttestation>(client)
             assertEquals(clientId, client.clientId)
             assertEquals(AttestationIssuer.ID, client.claims.iss)
             assertEquals(clientId, client.claims.sub)
@@ -308,8 +333,8 @@ class ClientAuthenticatorTest {
 
             val clientAuthenticator = ClientAuthenticator(
                 cfg.copy(
-                    supportedClientIdSchemes = listOf(
-                        SupportedClientIdScheme.VerifierAttestation(
+                    supportedClientIdPrefixes = listOf(
+                        SupportedClientIdPrefix.VerifierAttestation(
                             notTrustingVerifier,
                         ),
                     ),
@@ -336,14 +361,14 @@ private inline fun <reified E : AuthorizationRequestError> assertFailsWithError(
     return assertIs<E>(exception.error)
 }
 
-private fun UnvalidatedRequestObject.plain(): FetchedRequest.Plain =
-    FetchedRequest.Plain(this)
+private fun UnvalidatedRequestObject.unsigned(): ReceivedRequest.Unsigned =
+    ReceivedRequest.Unsigned(this)
 
 private fun UnvalidatedRequestObject.signedWithAttestation(
     alg: JWSAlgorithm,
     key: JWK,
     attestation: SignedJWT,
-): FetchedRequest.JwtSecured = signed(alg, key) {
+): ReceivedRequest.Signed = signed(alg, key) {
     this.customParam("jwt", attestation.serialize())
 }
 
@@ -351,21 +376,19 @@ private fun UnvalidatedRequestObject.signed(
     alg: JWSAlgorithm,
     key: JWK,
     headerCustomization: (JWSHeader.Builder).() -> Unit = {},
-): FetchedRequest.JwtSecured = FetchedRequest.JwtSecured(
-    clientId = checkNotNull(clientId),
-    jwt = run {
-        val header = with(JWSHeader.Builder(alg)) {
-            type(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE))
-            headerCustomization()
-            build()
-        }
-        val claimsSet = toJWTClaimSet()
-        SignedJWT(header, claimsSet).apply {
-            val signer = DefaultJWSSignerFactory().createJWSSigner(key, alg)
-            sign(signer)
-        }
-    },
-)
+): ReceivedRequest.Signed {
+    val header = with(JWSHeader.Builder(alg)) {
+        type(JOSEObjectType(OpenId4VPSpec.AUTHORIZATION_REQUEST_OBJECT_TYPE))
+        headerCustomization()
+        build()
+    }
+    val claimsSet = toJWTClaimSet()
+    val jwt = SignedJWT(header, claimsSet).apply {
+        val signer = DefaultJWSSignerFactory().createJWSSigner(key, alg)
+        sign(signer)
+    }
+    return ReceivedRequest.Signed(jwt)
+}
 
 private fun UnvalidatedRequestObject.toJWTClaimSet(): JWTClaimsSet {
     val json = Json.encodeToString(this)

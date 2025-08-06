@@ -33,13 +33,14 @@ class WalletMetaDataTest {
     @Test
     fun `test with jar encryption`() = runTest {
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+            supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                presentationDefinitionUriSupported = false,
-                knownPresentationDefinitionsPerScope = emptyMap(),
-                vpFormats = VpFormats(
-                    VpFormat.SdJwtVc.ES256,
-                    VpFormat.MsoMdoc.ES256,
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -59,13 +60,14 @@ class WalletMetaDataTest {
     @Test
     fun `test without jar encryption`() = runTest {
         val config = SiopOpenId4VPConfig(
-            supportedClientIdSchemes = listOf(SupportedClientIdScheme.X509SanDns.NoValidation),
+            supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
             vpConfiguration = VPConfiguration(
-                presentationDefinitionUriSupported = false,
-                knownPresentationDefinitionsPerScope = emptyMap(),
-                vpFormats = VpFormats(
-                    VpFormat.SdJwtVc.ES256,
-                    VpFormat.MsoMdoc.ES256,
+                vpFormatsSupported = VpFormatsSupported(
+                    VpFormatsSupported.SdJwtVc.HAIP,
+                    VpFormatsSupported.MsoMdoc(
+                        issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                        deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                    ),
                 ),
             ),
             jarConfiguration = JarConfiguration(
@@ -92,9 +94,9 @@ private suspend fun assertMetadata(config: SiopOpenId4VPConfig) {
             println(jsonSupport.encodeToString(it))
         }
 
-    assertExpectedVpFormats(config.vpConfiguration.vpFormats, walletMetaData)
-    assertClientIdScheme(config.supportedClientIdSchemes, walletMetaData)
-    assertPresentationDefinitionUriSupported(config.vpConfiguration, walletMetaData)
+    assertExpectedVpFormats(config.vpConfiguration.vpFormatsSupported, walletMetaData)
+    assertClientIdPrefix(config.supportedClientIdPrefixes, walletMetaData)
+    assertPresentationDefinitionUriSupported(walletMetaData)
     assertJarSigning(config.jarConfiguration.supportedAlgorithms, walletMetaData)
     assertJarEncryption(encryptionRequirement, ephemeralJarEncryptionJwks, walletMetaData)
     assertResponseTypes(walletMetaData)
@@ -141,53 +143,48 @@ private fun assertJarEncryption(
     }
 }
 
-private fun assertPresentationDefinitionUriSupported(vpConfiguration: VPConfiguration, walletMetaData: JsonObject) {
+private fun assertPresentationDefinitionUriSupported(walletMetaData: JsonObject) {
     val value = walletMetaData["presentation_definition_uri_supported"]
-    if (vpConfiguration.presentationDefinitionUriSupported) {
-        assertIs<JsonPrimitive>(value)
-        assertTrue { value.boolean }
-    } else {
-        assertTrue {
-            value == null || (value is JsonPrimitive && !value.boolean)
-        }
+    assertTrue {
+        value == null || (value is JsonPrimitive && !value.boolean)
     }
 }
 
-private fun assertClientIdScheme(
-    supportedClientIdSchemes: List<SupportedClientIdScheme>,
+private fun assertClientIdPrefix(
+    supportedClientIdPrefixes: List<SupportedClientIdPrefix>,
     walletMetaData: JsonObject,
 ) {
-    val schemes = walletMetaData["client_id_schemes_supported"]
-    if (supportedClientIdSchemes.isNotEmpty()) {
-        assertIs<JsonArray>(schemes)
+    val prefixes = walletMetaData[OpenId4VPSpec.CLIENT_ID_PREFIXES_SUPPORTED]
+    if (supportedClientIdPrefixes.isNotEmpty()) {
+        assertIs<JsonArray>(prefixes)
         assertContentEquals(
-            supportedClientIdSchemes.map { it.scheme().value() },
-            schemes.mapNotNull { it.jsonPrimitive.contentOrNull },
+            supportedClientIdPrefixes.map { it.prefix().value() },
+            prefixes.mapNotNull { it.jsonPrimitive.contentOrNull },
         )
     } else {
-        assertNull(schemes)
+        assertNull(prefixes)
     }
 }
 
 private fun assertExpectedVpFormats(
-    expectedVpFormats: VpFormats,
+    expectedVpFormatsSupported: VpFormatsSupported,
     walletMetaData: JsonObject,
 ) {
     val vpFormats = assertIs<JsonObject>(
-        walletMetaData["vp_formats_supported"],
-        "Missing vp_formats_supported",
+        walletMetaData[OpenId4VPSpec.VP_FORMATS_SUPPORTED],
+        "Missing ${OpenId4VPSpec.VP_FORMATS_SUPPORTED}",
     )
-    if (expectedVpFormats.msoMdoc != null) {
+    if (expectedVpFormatsSupported.msoMdoc != null) {
         val msoMdoc = assertNotNull(vpFormats["mso_mdoc"])
         assertIs<JsonObject>(msoMdoc)
         assertTrue { msoMdoc.isNotEmpty() }
     }
-    val sdJwtVcSupport = expectedVpFormats.sdJwtVc
+    val sdJwtVcSupport = expectedVpFormatsSupported.sdJwtVc
     if (sdJwtVcSupport != null) {
-        val sdJwtVc = assertNotNull(vpFormats["vc+sd-jwt"])
+        val sdJwtVc = assertNotNull(vpFormats["dc+sd-jwt"])
         assertIs<JsonObject>(sdJwtVc)
         val sdJwtAlgs = sdJwtVc["sd-jwt_alg_values"]
-        if (sdJwtVcSupport.sdJwtAlgorithms.isNotEmpty()) {
+        if (!sdJwtVcSupport.sdJwtAlgorithms.isNullOrEmpty()) {
             assertNotNull(sdJwtAlgs)
             assertIs<JsonArray>(sdJwtAlgs)
             assertContentEquals(
@@ -199,7 +196,7 @@ private fun assertExpectedVpFormats(
         }
 
         val kbJwtAlgs = sdJwtVc["kb-jwt_alg_values"]
-        if (sdJwtVcSupport.kbJwtAlgorithms.isNotEmpty()) {
+        if (!sdJwtVcSupport.kbJwtAlgorithms.isNullOrEmpty()) {
             assertNotNull(kbJwtAlgs)
             assertIs<JsonArray>(kbJwtAlgs)
             assertContentEquals(

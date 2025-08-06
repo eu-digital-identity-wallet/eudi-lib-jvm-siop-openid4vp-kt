@@ -16,14 +16,13 @@
 package eu.europa.ec.eudi.openid4vp.internal.response
 
 import eu.europa.ec.eudi.openid4vp.*
-import java.io.Serializable
 import java.net.URI
 import java.net.URL
 
 /**
  * The payload of an [AuthorizationResponse]
  */
-internal sealed interface AuthorizationResponsePayload : Serializable {
+internal sealed interface AuthorizationResponsePayload : java.io.Serializable {
 
     val nonce: String?
     val state: String?
@@ -51,13 +50,13 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * In response to a [ResolvedRequestObject.OpenId4VPAuthorization]
      * and holder's [Consensus.PositiveConsensus.VPTokenConsensus]
      *
-     * @param vpContent the vp related information
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationQuery]
+     * @param verifiablePresentations the vp related information
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param state the state of the [ request][ResolvedRequestObject.OpenId4VPAuthorization.state]
      * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */
     data class OpenId4VPAuthorization(
-        val vpContent: VpContent,
+        val verifiablePresentations: VerifiablePresentations,
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
@@ -69,14 +68,14 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
      * and holder's [Consensus.PositiveConsensus.IdAndVPTokenConsensus]
      *
      * @param idToken The id_token produced by the wallet
-     * @param vpContent the vp related information
-     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.presentationQuery]
+     * @param verifiablePresentations the vp related information
+     * that fulfils the [ResolvedRequestObject.OpenId4VPAuthorization.query]
      * @param state the state of the [request][ResolvedRequestObject.SiopOpenId4VPAuthentication.state]
      * @param encryptionParameters the encryption parameters that may be needed during the response dispatch
      */
     data class SiopOpenId4VPAuthentication(
         val idToken: Jwt,
-        val vpContent: VpContent,
+        val verifiablePresentations: VerifiablePresentations,
         override val nonce: String,
         override val state: String?,
         override val clientId: VerifierId,
@@ -114,7 +113,7 @@ internal sealed interface AuthorizationResponsePayload : Serializable {
 /**
  * An OAUTH2 authorization response
  */
-internal sealed interface AuthorizationResponse : Serializable {
+internal sealed interface AuthorizationResponse : java.io.Serializable {
 
     /**
      * An authorization response to be communicated to verifier/RP via direct_post method
@@ -132,13 +131,19 @@ internal sealed interface AuthorizationResponse : Serializable {
      *
      * @param responseUri the verifier/RP URI where the response will be posted
      * @param data the contents of the authorization response
-     * @param jarmRequirement the verifier/RP's requirements for JARM
+     * @param responseEncryptionSpecification the verifier/RP's requirements for authorization response encryption
      */
     data class DirectPostJwt(
         val responseUri: URL,
         val data: AuthorizationResponsePayload,
-        val jarmRequirement: JarmRequirement,
-    ) : AuthorizationResponse
+        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    ) : AuthorizationResponse {
+        init {
+            if (data !is AuthorizationResponsePayload.InvalidRequest) {
+                requireNotNull(responseEncryptionSpecification)
+            }
+        }
+    }
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
@@ -153,16 +158,22 @@ internal sealed interface AuthorizationResponse : Serializable {
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
-     * query parameters and JARM
+     * query parameters and authorization response encryption
      * @param redirectUri the verifier/RP URI where the response will be redirected to
      * @param data the contents of the authorization request
-     * @param jarmRequirement the verifier/RP's requirements for JARM
+     * @param responseEncryptionSpecification the verifier/RP's requirements for authorization response encryption
      */
     data class QueryJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val jarmRequirement: JarmRequirement,
-    ) : AuthorizationResponse
+        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    ) : AuthorizationResponse {
+        init {
+            if (data !is AuthorizationResponsePayload.InvalidRequest) {
+                requireNotNull(responseEncryptionSpecification)
+            }
+        }
+    }
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
@@ -177,16 +188,22 @@ internal sealed interface AuthorizationResponse : Serializable {
 
     /**
      * An authorization response to be communicated to verifier/RP via redirect using
-     * fragment and JARM
+     * fragment and authorization response encryption
      * @param redirectUri the verifier/RP URI where the response will be redirected to
      * @param data the contents of the authorization request
-     * @param jarmRequirement the verifier/RP's requirements for JARM
+     * @param responseEncryptionSpecification the verifier/RP's requirements for authorization response encryption
      */
     data class FragmentJwt(
         val redirectUri: URI,
         val data: AuthorizationResponsePayload,
-        val jarmRequirement: JarmRequirement,
-    ) : AuthorizationResponse
+        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
+    ) : AuthorizationResponse {
+        init {
+            if (data !is AuthorizationResponsePayload.InvalidRequest) {
+                requireNotNull(responseEncryptionSpecification)
+            }
+        }
+    }
 }
 
 internal fun ResolvedRequestObject.responseWith(
@@ -196,15 +213,6 @@ internal fun ResolvedRequestObject.responseWith(
     val payload = responsePayload(consensus, encryptionParameters)
     return responseWith(payload)
 }
-
-private fun requireCompatibleVpContent(presentationQuery: PresentationQuery, vpContent: VpContent) =
-    when (presentationQuery) {
-        is PresentationQuery.ByPresentationDefinition ->
-            require(vpContent is VpContent.PresentationExchange) { "PresentationExchange expected" }
-
-        is PresentationQuery.ByDigitalCredentialsQuery ->
-            require(vpContent is VpContent.DCQL) { "DCQL expected" }
-    }
 
 private fun ResolvedRequestObject.responsePayload(
     consensus: Consensus,
@@ -232,9 +240,8 @@ private fun ResolvedRequestObject.responsePayload(
 
         is ResolvedRequestObject.OpenId4VPAuthorization -> {
             require(consensus is Consensus.PositiveConsensus.VPTokenConsensus) { "VPTokenConsensus expected" }
-            requireCompatibleVpContent(presentationQuery, consensus.vpContent)
             AuthorizationResponsePayload.OpenId4VPAuthorization(
-                consensus.vpContent,
+                consensus.verifiablePresentations,
                 nonce,
                 state,
                 client.id,
@@ -244,10 +251,9 @@ private fun ResolvedRequestObject.responsePayload(
 
         is ResolvedRequestObject.SiopOpenId4VPAuthentication -> {
             require(consensus is Consensus.PositiveConsensus.IdAndVPTokenConsensus) { "IdAndVPTokenConsensus expected" }
-            requireCompatibleVpContent(presentationQuery, consensus.vpContent)
             AuthorizationResponsePayload.SiopOpenId4VPAuthentication(
                 consensus.idToken,
-                consensus.vpContent,
+                consensus.verifiablePresentations,
                 nonce,
                 state,
                 client.id,
@@ -259,15 +265,20 @@ private fun ResolvedRequestObject.responsePayload(
 
 private fun ResolvedRequestObject.responseWith(
     data: AuthorizationResponsePayload,
-): AuthorizationResponse {
-    fun jarmOption() = checkNotNull(jarmRequirement)
-
-    return when (val mode = responseMode) {
+): AuthorizationResponse =
+    when (val mode = responseMode) {
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(mode.responseURI, data)
-        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(mode.responseURI, data, jarmOption())
+        is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(
+            mode.responseURI,
+            data,
+            checkNotNull(responseEncryptionSpecification),
+        )
         is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(mode.redirectUri, data, jarmOption())
+        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(
+            mode.redirectUri,
+            data,
+            checkNotNull(responseEncryptionSpecification),
+        )
         is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, jarmOption())
+        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(mode.redirectUri, data, checkNotNull(responseEncryptionSpecification))
     }
-}

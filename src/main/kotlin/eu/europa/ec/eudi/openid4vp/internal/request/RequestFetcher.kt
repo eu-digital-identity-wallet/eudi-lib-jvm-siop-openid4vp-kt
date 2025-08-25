@@ -192,7 +192,7 @@ private fun HttpRequestBuilder.addAcceptContentTypeJwt() {
 
 private const val CONTENT_TYPE_JWT = "JWT"
 
-private fun Jwt.decrypt(recipientKey: ECKey): Result<Jwt> = runCatching {
+private fun Jwt.decrypt(recipientKey: ECKey): Result<Jwt> = runCatchingCancellable {
     val jwe = JWEObject.parse(this)
     require(CONTENT_TYPE_JWT == jwe.header.contentType) { "JWEObject must contain a JWT Payload" }
 

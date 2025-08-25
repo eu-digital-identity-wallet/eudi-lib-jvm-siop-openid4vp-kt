@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal
 
+import eu.europa.ec.eudi.openid4vp.runCatchingCancellable
 import java.net.URI
 
 @JvmInline
@@ -24,7 +25,7 @@ internal value class AbsoluteDIDUrl private constructor(val uri: URI) {
 
     companion object {
 
-        fun parse(s: String): Result<AbsoluteDIDUrl> = runCatching {
+        fun parse(s: String): Result<AbsoluteDIDUrl> = runCatchingCancellable {
             fun isNotDID() = DID.parse(s).getOrNull() == null
             if (DID_URL_SYNTAX.matches(s) && isNotDID())
                 AbsoluteDIDUrl(URI.create(s))
@@ -39,7 +40,7 @@ internal value class DID private constructor(val uri: URI) {
     override fun toString(): String = uri.toString()
 
     companion object {
-        fun parse(s: String): Result<DID> = runCatching {
+        fun parse(s: String): Result<DID> = runCatchingCancellable {
             if (DID_SYNTAX.matches(s)) DID(URI.create(s))
             else error("Not a DID")
         }

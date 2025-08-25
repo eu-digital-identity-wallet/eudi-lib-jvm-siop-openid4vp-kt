@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal
 
+import eu.europa.ec.eudi.openid4vp.runCatchingCancellable
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -44,7 +45,7 @@ internal value class Base64UrlNoPadding private constructor(val value: String) {
 
     companion object {
 
-        operator fun invoke(value: String): Result<Base64UrlNoPadding> = runCatching {
+        operator fun invoke(value: String): Result<Base64UrlNoPadding> = runCatchingCancellable {
             require(value.isNotBlank()) { "Value must not be empty" }
             // Try to parse the passed value as base64 url encoded no-padding string
             base64UrlNoPadding.decode(value)
@@ -100,7 +101,7 @@ internal sealed interface JwsJson {
         /**
          * Parses an input string representing a JWS in compact form into a [JwsJson.Flattened] object.
          */
-        fun from(compact: String): Result<JwsJson> = runCatching {
+        fun from(compact: String): Result<JwsJson> = runCatchingCancellable {
             require(compact.isNotBlank()) { "Input must not be empty" }
             compact.split(".").let { parts ->
                 require(parts.size == 3) { "Input must be a JWS in compact form" }

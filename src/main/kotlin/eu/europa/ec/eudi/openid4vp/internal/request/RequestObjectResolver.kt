@@ -152,7 +152,7 @@ internal class RequestObjectResolver(
         query: PresentationQuery,
         unresolvedTransactionData: List<String>,
     ): List<TransactionData> =
-        runCatching {
+        runCatchingCancellable {
             unresolvedTransactionData.map { unresolved ->
                 TransactionData(
                     unresolved,

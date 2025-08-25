@@ -123,7 +123,7 @@ data class TransactionData private constructor(val value: String) : Serializable
             return jsonSupport.decodeFromString(decoded.decodeToString())
         }
 
-        internal fun parse(s: String): Result<TransactionData> = runCatching {
+        internal fun parse(s: String): Result<TransactionData> = runCatchingCancellable {
             TransactionData(s)
         }
 
@@ -193,7 +193,7 @@ data class TransactionData private constructor(val value: String) : Serializable
             s: String,
             supportedTypes: List<SupportedTransactionDataType>,
             query: PresentationQuery,
-        ): Result<TransactionData> = runCatching {
+        ): Result<TransactionData> = runCatchingCancellable {
             parse(s).getOrThrow().also {
                 it.isSupported(supportedTypes)
                 it.hasCorrectIds(query)
@@ -225,7 +225,7 @@ value class VerifierAttestations(val value: List<Attestation>) : Serializable {
     ) : Serializable
 
     companion object {
-        fun fromJson(json: JsonArray): Result<VerifierAttestations> = runCatching {
+        fun fromJson(json: JsonArray): Result<VerifierAttestations> = runCatchingCancellable {
             jsonSupport.decodeFromJsonElement<List<Attestation>>(json).let(::VerifierAttestations)
         }
     }

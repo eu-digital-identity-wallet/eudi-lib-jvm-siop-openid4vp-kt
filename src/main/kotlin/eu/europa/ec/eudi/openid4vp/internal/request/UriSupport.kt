@@ -16,6 +16,7 @@
 package eu.europa.ec.eudi.openid4vp.internal.request
 
 import eu.europa.ec.eudi.openid4vp.internal.mapError
+import eu.europa.ec.eudi.openid4vp.runCatchingCancellable
 import java.net.URI
 import java.net.URL
 
@@ -23,10 +24,10 @@ import java.net.URL
  * Convenient method for parsing a string into a [URL]
  */
 internal fun String.asURL(onError: (Throwable) -> Throwable = { it }): Result<URL> =
-    runCatching { URL(this) }.mapError(onError)
+    runCatchingCancellable { URL(this) }.mapError(onError)
 
 /**
  * Convenient method for parsing a string into a [URI]
  */
 internal fun String.asURI(onError: (Throwable) -> Throwable = { it }): Result<URI> =
-    runCatching { URI(this) }.mapError(onError)
+    runCatchingCancellable { URI(this) }.mapError(onError)

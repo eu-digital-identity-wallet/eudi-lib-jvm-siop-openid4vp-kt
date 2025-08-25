@@ -100,7 +100,7 @@ internal sealed interface UnvalidatedRequest {
         /**
          * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
          */
-        fun make(uriStr: String): Result<UnvalidatedRequest> = runCatching {
+        fun make(uriStr: String): Result<UnvalidatedRequest> = runCatchingCancellable {
             val requestParams = with(URI.create(uriStr)) {
                 toKtorUrl().parameters.toMap().mapValues { it.value.first() }
             }
@@ -287,7 +287,7 @@ private fun dispatchDetailsOrNull(
 ): ErrorDispatchDetails? {
     val jarmRequirement by lazy {
         clientMetaData?.let {
-            runCatching { siopOpenId4VPConfig.jarmRequirement(it) }.getOrNull()
+            runCatchingCancellable { siopOpenId4VPConfig.jarmRequirement(it) }.getOrNull()
         }
     }
     val responseMode = validatedRequestObject.responseMode
@@ -315,12 +315,12 @@ private fun dispatchDetailsOrNull(
 private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
     fun UnvalidatedRequestObject.responseUri(): URL? =
         responseUri?.let {
-            runCatching { URL(it) }.getOrNull()
+            runCatchingCancellable { URL(it) }.getOrNull()
         }
 
     fun UnvalidatedRequestObject.redirectUri(): URI? =
         redirectUri?.let {
-            runCatching { URI.create(it) }.getOrNull()
+            runCatchingCancellable { URI.create(it) }.getOrNull()
         }
 
     return when (responseMode) {
@@ -358,7 +358,7 @@ private val AuthenticatedClient.clientId: VerifierId
     }
 
 private fun JWTClaimsSet.responseMode(): ResponseMode? =
-    runCatching {
+    runCatchingCancellable {
         fun JWTClaimsSet.responseUri(): URL? = getStringClaim(OpenId4VPSpec.RESPONSE_URI)?.let { URL(it) }
         fun JWTClaimsSet.redirectUri(): URI? = getStringClaim("redirect_uri")?.let { URI.create(it) }
 
@@ -374,7 +374,7 @@ private fun JWTClaimsSet.responseMode(): ResponseMode? =
     }.getOrNull()
 
 private fun JWTClaimsSet.dispatchDetailsOrNull(): ErrorDispatchDetails? =
-    runCatching {
+    runCatchingCancellable {
         responseMode()
             ?.takeIf { !it.isJarm() }
             ?.let { responseMode ->

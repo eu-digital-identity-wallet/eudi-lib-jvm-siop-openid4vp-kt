@@ -15,6 +15,7 @@
  */
 package eu.europa.ec.eudi.openid4vp.internal
 
+import eu.europa.ec.eudi.openid4vp.runCatchingCancellable
 import java.security.cert.X509Certificate
 
 fun X509Certificate.sanOfUniformResourceIdentifier(): Result<List<String>> =
@@ -22,7 +23,7 @@ fun X509Certificate.sanOfUniformResourceIdentifier(): Result<List<String>> =
 fun X509Certificate.sanOfDNSName(): Result<List<String>> =
     san(X509SubjectAlternativeNameType.DNSName)
 
-private fun X509Certificate.san(type: X509SubjectAlternativeNameType): Result<List<String>> = runCatching {
+private fun X509Certificate.san(type: X509SubjectAlternativeNameType): Result<List<String>> = runCatchingCancellable {
     buildList {
         subjectAlternativeNames
             ?.filter { subjectAltNames -> !subjectAltNames.isNullOrEmpty() && subjectAltNames.size == 2 }

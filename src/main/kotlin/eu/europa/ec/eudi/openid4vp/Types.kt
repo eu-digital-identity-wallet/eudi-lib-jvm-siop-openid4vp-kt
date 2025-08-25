@@ -175,7 +175,7 @@ data class VerifierId(
     override fun toString(): String = clientId
 
     companion object {
-        fun parse(clientId: String): Result<VerifierId> = runCatching {
+        fun parse(clientId: String): Result<VerifierId> = runCatchingCancellable {
             fun invalid(message: String): Nothing = throw IllegalArgumentException(message)
 
             if (OpenId4VPSpec.CLIENT_ID_SCHEME_SEPARATOR !in clientId) {

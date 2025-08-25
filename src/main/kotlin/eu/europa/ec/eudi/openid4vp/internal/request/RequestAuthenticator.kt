@@ -180,7 +180,7 @@ internal class ClientAuthenticator(private val siopOpenId4VPConfig: SiopOpenId4V
     ): List<X509Certificate> {
         val x5c = request.jwt.header?.x509CertChain
         ensureNotNull(x5c) { invalidJarJwt("Missing x5c") }
-        val pubCertChain = x5c.mapNotNull { runCatching { X509CertUtils.parse(it.decode()) }.getOrNull() }
+        val pubCertChain = x5c.mapNotNull { runCatchingCancellable { X509CertUtils.parse(it.decode()) }.getOrNull() }
         ensure(pubCertChain.isNotEmpty()) { invalidJarJwt("Invalid x5c") }
 
         val alternativeNames = pubCertChain[0].subjectAlternativeNames()
@@ -208,7 +208,7 @@ private suspend fun lookupKeyByDID(
     ensure(keyUrl.toString().startsWith(clientId.toString())) {
         invalidJarJwt("kid should be DID URL sub-resource of $clientId but is $keyUrl")
     }
-    val key = runCatching { lookupPublicKeyByDIDUrl.resolveKey(keyUrl.uri) }.getOrNull()
+    val key = runCatchingCancellable { lookupPublicKeyByDIDUrl.resolveKey(keyUrl.uri) }.getOrNull()
     ensureNotNull(key) {
         RequestValidationError.DIDResolutionFailed(keyUrl.toString()).asException()
     }
@@ -229,7 +229,7 @@ private fun verifierAttestation(
         ensureNotNull(jwtString) { invalidJarJwt("Missing jwt JOSE Header") }
         ensure(jwtString is String) { invalidJarJwt("jwt JOSE Header doesn't contain a JWT") }
 
-        val parsedJwt = runCatching { SignedJWT.parse(jwtString) }.getOrElse { error ->
+        val parsedJwt = runCatchingCancellable { SignedJWT.parse(jwtString) }.getOrElse { error ->
             throw invalidVerifierAttestationJwt("Cannot be parsed  $error")
         }
         val expectedType = "verifier-attestation+jwt"
@@ -237,7 +237,7 @@ private fun verifierAttestation(
             invalidVerifierAttestationJwt("typ is not $expectedType ")
         }
         parsedJwt.apply {
-            runCatching { verify(trust) }.getOrElse { throw invalidVerifierAttestationJwt("Not trusted. $it") }
+            runCatchingCancellable { verify(trust) }.getOrElse { throw invalidVerifierAttestationJwt("Not trusted. $it") }
         }
     }
 
@@ -388,7 +388,7 @@ private fun SignedJWT.verifierAttestationClaims(): VerifierAttestationClaims =
             nbf = notBeforeTime?.toInstant(),
             verifierPubJwk = run {
                 val cnf = requireNotNull(getJSONObjectClaim("cnf")) { "Missing cnf" }
-                val jwk = runCatching {
+                val jwk = runCatchingCancellable {
                     val jwkObj = requireNotNull(cnf["jwk"]) { "Missing jwk" }
                     JWK.parse(Gson().toJson(jwkObj))
                 }.getOrNull()

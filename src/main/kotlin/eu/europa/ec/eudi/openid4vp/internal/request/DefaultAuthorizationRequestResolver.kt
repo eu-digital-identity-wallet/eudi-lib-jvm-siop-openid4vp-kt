@@ -126,7 +126,7 @@ internal sealed interface UnvalidatedRequest {
         /**
          * Convenient method for parsing a URI representing an OAUTH2 Authorization request.
          */
-        fun make(uriStr: String): Result<UnvalidatedRequest> = runCatching {
+        fun make(uriStr: String): Result<UnvalidatedRequest> = runCatchingCancellable {
             val requestParams = with(URI.create(uriStr)) {
                 toKtorUrl().parameters.toMap().mapValues { it.value.first() }
             }
@@ -207,7 +207,7 @@ internal sealed interface ReceivedRequest {
 /**
  * Decomposes a Nimbus [SignedJWT] into [JwsJson].
  */
-private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runCatching {
+private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runCatchingCancellable {
     require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
     val compactFormString =
         "${signedJwt.header.toBase64URL()}.${signedJwt.payload.toBase64URL()}.${signedJwt.signature}"
@@ -318,7 +318,7 @@ private fun dispatchDetailsOrNull(
 private fun UnvalidatedRequestObject.responseEncryptionSpecification(
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
     responseMode: ResponseMode,
-): Result<ResponseEncryptionSpecification?> = runCatching {
+): Result<ResponseEncryptionSpecification?> = runCatchingCancellable {
     clientMetaData?.let {
         val decodeFromJsonElement = jsonSupport.decodeFromJsonElement<UnvalidatedClientMetaData>(clientMetaData)
         val validatedClientMetadata = decodeFromJsonElement.let {
@@ -337,12 +337,12 @@ private fun UnvalidatedRequestObject.responseEncryptionSpecification(
 private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
     fun UnvalidatedRequestObject.responseUri(): URL? =
         responseUri?.let {
-            runCatching { URL(it) }.getOrNull()
+            runCatchingCancellable { URL(it) }.getOrNull()
         }
 
     fun UnvalidatedRequestObject.redirectUri(): URI? =
         redirectUri?.let {
-            runCatching { URI.create(it) }.getOrNull()
+            runCatchingCancellable { URI.create(it) }.getOrNull()
         }
 
     return when (responseMode) {
@@ -360,7 +360,7 @@ private fun dispatchDetailsOrNull(
     jwsJson: JwsJson,
     siopOpenId4VPConfig: SiopOpenId4VPConfig,
 ): ErrorDispatchDetails? =
-    runCatching {
+    runCatchingCancellable {
         dispatchDetailsOrNull(
             jwsJson.decodePayloadAs<UnvalidatedRequestObject>(),
             siopOpenId4VPConfig,

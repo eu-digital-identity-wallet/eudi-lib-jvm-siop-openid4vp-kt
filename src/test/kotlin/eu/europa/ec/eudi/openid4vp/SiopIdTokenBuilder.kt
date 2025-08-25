@@ -49,7 +49,7 @@ data class HolderInfo(
 
 object SiopIdTokenBuilder {
 
-    fun decodeAndVerify(jwt: String, walletPubKey: RSAKey): Result<IDTokenClaimsSet> = runCatching {
+    fun decodeAndVerify(jwt: String, walletPubKey: RSAKey): Result<IDTokenClaimsSet> = runCatchingCancellable {
         val jwtProcessor = DefaultJWTProcessor<SecurityContext>().also {
             it.jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(JOSEObjectType.JWT)
             val jwsAlg = JWSAlgorithm.RS256
@@ -75,7 +75,7 @@ object SiopIdTokenBuilder {
         rsaJWK: RSAKey,
         clock: Clock = Clock.systemDefaultZone(),
     ): String {
-        fun sign(claimSet: IDTokenClaimsSet): Result<JWT> = runCatching {
+        fun sign(claimSet: IDTokenClaimsSet): Result<JWT> = runCatchingCancellable {
             val header = JWSHeader.Builder(JWSAlgorithm.RS256)
                 .keyID(rsaJWK.keyID)
                 .type(JOSEObjectType.JWT)

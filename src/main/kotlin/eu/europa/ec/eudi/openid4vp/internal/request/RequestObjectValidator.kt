@@ -167,7 +167,7 @@ internal class RequestObjectValidator(private val siopOpenId4VPConfig: SiopOpenI
         query: DCQL,
     ): List<TransactionData>? =
         requestObject.transactionData?.let { unresolvedTransactionData ->
-            runCatching {
+            runCatchingCancellable {
                 unresolvedTransactionData.values.map { unresolved ->
                     val transactionData = TransactionData.parse(unresolved, query).getOrThrow()
                     transactionData.ensureSupported(siopOpenId4VPConfig.vpConfiguration.supportedTransactionDataTypes)

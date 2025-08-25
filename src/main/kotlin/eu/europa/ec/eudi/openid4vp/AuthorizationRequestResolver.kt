@@ -119,7 +119,7 @@ sealed interface TransactionData : java.io.Serializable {
 
         private fun JsonObject.typeAndCredentialIds(): Pair<TransactionDataType, List<QueryId>> = type() to credentialIds()
 
-        fun parse(value: Base64UrlSafe, query: DCQL): Result<TransactionData> = runCatching {
+        fun parse(value: Base64UrlSafe, query: DCQL): Result<TransactionData> = runCatchingCancellable {
             val json = decode(value)
 
             // verify required properties are present
@@ -246,7 +246,7 @@ value class VerifierInfo(val attestations: List<Attestation>) : java.io.Serializ
 
     companion object {
         fun fromJson(json: JsonArray): Result<VerifierInfo> =
-            runCatching {
+            runCatchingCancellable {
                 VerifierInfo(jsonSupport.decodeFromJsonElement(json))
             }
     }

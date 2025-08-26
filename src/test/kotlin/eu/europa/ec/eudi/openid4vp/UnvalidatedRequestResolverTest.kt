@@ -43,12 +43,15 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.apache.http.NameValuePair
 import org.apache.http.client.utils.URIBuilder
 import org.apache.http.message.BasicNameValuePair
-import org.junit.jupiter.api.*
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.TestInstance
 import java.io.InputStream
 import java.net.URLEncoder
 import java.security.KeyStore
@@ -57,6 +60,7 @@ import java.time.Clock
 import java.util.*
 import kotlin.test.*
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class UnvalidatedRequestResolverTest {
@@ -873,7 +877,7 @@ class UnvalidatedRequestResolverTest {
                 val error = it.validateInvalid<ResolutionError.InvalidTransactionData>()
                 val cause = assertIs<SerializationException>(error.cause)
                 assertEquals(
-                    "Unexpected JSON token at offset 0: Expected start of the object '{', but had 'f' instead at path: \$\nJSON input: foo",
+                    "Unexpected JSON token at offset 0: Expected start of the object '{', but had 'f' instead at path: $\nJSON input: foo",
                     cause.message,
                 )
             }

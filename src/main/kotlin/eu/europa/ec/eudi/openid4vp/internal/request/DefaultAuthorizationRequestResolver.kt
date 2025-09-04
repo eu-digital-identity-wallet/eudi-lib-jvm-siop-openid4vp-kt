@@ -211,7 +211,7 @@ private fun JwsJson.Companion.from(signedJwt: SignedJWT): Result<JwsJson> = runC
     require(signedJwt.state == JWSObject.State.SIGNED) { "JWS is not signed" }
     val compactFormString =
         "${signedJwt.header.toBase64URL()}.${signedJwt.payload.toBase64URL()}.${signedJwt.signature}"
-    JwsJson.Companion.from(compactFormString).getOrThrow()
+    JwsJson.from(compactFormString).getOrThrow()
 }
 
 internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
@@ -219,6 +219,7 @@ internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
         SignedJWT.parse("${it.protected}.${it.payload}.${it.signature}")
     }
 
+@Suppress("kotlin:S6312")
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClient: HttpClient,

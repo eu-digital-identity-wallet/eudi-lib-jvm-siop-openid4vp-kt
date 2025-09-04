@@ -29,7 +29,7 @@ private fun X509Certificate.san(type: X509SubjectAlternativeNameType): Result<Li
             ?.filter { subjectAltNames -> !subjectAltNames.isNullOrEmpty() && subjectAltNames.size == 2 }
             ?.forEach { entry ->
                 val altNameType = entry[0] as Int
-                entry[1]?.takeIf { altNameType == type.asInt() }?.let { add(it as String) }
+                entry[1].takeIf { altNameType == type.asInt() }?.let { add(it as String) }
             }
     }
 }

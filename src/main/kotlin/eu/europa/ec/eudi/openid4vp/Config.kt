@@ -23,7 +23,6 @@ import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
-import eu.europa.ec.eudi.openid4vp.SiopOpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import kotlinx.serialization.json.JsonObject
 import java.net.URI

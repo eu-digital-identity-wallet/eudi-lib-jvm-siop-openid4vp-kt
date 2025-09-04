@@ -30,7 +30,6 @@ import eu.europa.ec.eudi.openid4vp.internal.response.EncrypterFactory
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import java.text.ParseException
 

@@ -219,7 +219,6 @@ internal fun ReceivedRequest.Signed.toSignedJwts(): List<SignedJWT> =
         SignedJWT.parse("${it.protected}.${it.payload}.${it.signature}")
     }
 
-@Suppress("kotlin:S6312")
 internal class DefaultAuthorizationRequestResolver(
     private val siopOpenId4VPConfig: SiopOpenId4VPConfig,
     private val httpClient: HttpClient,

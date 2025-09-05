@@ -78,7 +78,7 @@ internal sealed interface JwsJson {
         val signatures: List<Signature>,
     ) : JwsJson {
         init {
-            require(!signatures.isEmpty()) { "At least one signature is required" }
+            require(signatures.isNotEmpty()) { "At least one signature is required" }
         }
     }
 

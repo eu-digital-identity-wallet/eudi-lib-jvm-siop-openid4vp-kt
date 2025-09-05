@@ -394,17 +394,13 @@ private class TimeChecks(
         val skewInSeconds = skew.inWholeSeconds
 
         val exp = claimsSet.expirationTime
-        if (exp != null) {
-            if (!DateUtils.isAfter(exp, now, skewInSeconds)) {
-                throw BadJWTException("Expired JWT")
-            }
+        if (exp != null && !DateUtils.isAfter(exp, now, skewInSeconds)) {
+            throw BadJWTException("Expired JWT")
         }
 
         val nbf = claimsSet.notBeforeTime
-        if (nbf != null) {
-            if (!DateUtils.isBefore(nbf, now, skewInSeconds)) {
-                throw BadJWTException("JWT before use time")
-            }
+        if (nbf != null && !DateUtils.isBefore(nbf, now, skewInSeconds)) {
+            throw BadJWTException("JWT before use time")
         }
     }
 }

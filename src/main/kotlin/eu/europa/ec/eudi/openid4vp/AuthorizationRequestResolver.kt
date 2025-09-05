@@ -16,9 +16,6 @@
 package eu.europa.ec.eudi.openid4vp
 
 import eu.europa.ec.eudi.openid4vp.Client.*
-import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.credentialIds
-import eu.europa.ec.eudi.openid4vp.TransactionData.Companion.type
-import eu.europa.ec.eudi.openid4vp.TransactionData.SdJwtVc.Companion.hashAlgorithms
 import eu.europa.ec.eudi.openid4vp.dcql.CredentialQueryIds
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
@@ -29,7 +26,6 @@ import kotlinx.io.bytestring.decodeToString
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle

@@ -28,7 +28,6 @@ import com.nimbusds.jwt.JWTClaimsSet
 import eu.europa.ec.eudi.openid4vp.EncryptionParameters
 import eu.europa.ec.eudi.openid4vp.Jwt
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionSpecification
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
 /**

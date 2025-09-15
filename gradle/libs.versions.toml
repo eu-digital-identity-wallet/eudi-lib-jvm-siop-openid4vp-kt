@@ -1,9 +1,9 @@
 [versions]
 java = "17"
-kotlin = "2.1.21"
+kotlin = "2.2.20"
 coroutines = "1.10.2"
-ktor = "3.2.3"
-nimbus-sdk = "11.20.1"
+ktor = "3.3.0"
+nimbus-sdk = "11.28"
 fasterxml-jackson = "2.18.2"
 bouncyCastle = "1.80"
 spotless = "7.0.2"

@@ -332,10 +332,10 @@ data class VpFormatsSupported(
     @Serializable
     data class SdJwtVc(
         @SerialName(OpenId4VPSpec.SD_JWT_VC_SD_JWT_ALGORITHMS)
-        val sdJwtAlgorithms: List<JWSAlgorithm>?,
+        val sdJwtAlgorithms: List<JWSAlgorithm>? = null,
 
         @SerialName(OpenId4VPSpec.SD_JWT_VC_KB_JWT_ALGORITHMS)
-        val kbJwtAlgorithms: List<JWSAlgorithm>?,
+        val kbJwtAlgorithms: List<JWSAlgorithm>? = null,
 
     ) : java.io.Serializable {
         init {
@@ -359,8 +359,8 @@ data class VpFormatsSupported(
 
     @Serializable
     data class MsoMdoc(
-        @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<CoseAlgorithm>?,
-        @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<CoseAlgorithm>?,
+        @SerialName(OpenId4VPSpec.MSO_MDOC_ISSUERAUTH_ALGORITHMS) val issuerAuthAlgorithms: List<CoseAlgorithm>? = null,
+        @SerialName(OpenId4VPSpec.MSO_MDOC_DEVICEAUTH_ALGORITHMS) val deviceAuthAlgorithms: List<CoseAlgorithm>? = null,
     ) : java.io.Serializable {
         init {
             issuerAuthAlgorithms?.let {

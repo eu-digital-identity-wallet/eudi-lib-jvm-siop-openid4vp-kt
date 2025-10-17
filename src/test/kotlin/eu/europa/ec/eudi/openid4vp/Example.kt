@@ -19,14 +19,11 @@ import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import com.nimbusds.openid.connect.sdk.Nonce
-import com.nimbusds.openid.connect.sdk.claims.IDTokenClaimsSet
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdPrefix.Preregistered
-import eu.europa.ec.eudi.openid4vp.SupportedClientIdPrefix.X509SanDns
+import eu.europa.ec.eudi.openid4vp.SupportedClientIdPrefix.*
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import io.ktor.client.*
@@ -58,13 +55,11 @@ fun main(): Unit = runBlocking {
 
 suspend fun HttpClient.program() {
     val verifierApi = URL("https://dev.verifier-backend.eudiw.dev")
-    val walletKeyPair = SiopIdTokenBuilder.randomKey()
     val wallet = Wallet(
-        walletKeyPair = walletKeyPair,
-        holder = HolderInfo("walletHolder@foo.bar.com", "Wallet Holder"),
         walletConfig = walletConfig(
             Preregistered(Verifier.asPreregisteredClient(verifierApi)),
             X509SanDns(TrustAnyX509),
+            X509Hash(TrustAnyX509),
         ),
         httpClient = this@program,
     )
@@ -73,7 +68,6 @@ suspend fun HttpClient.program() {
         println("Running ${transaction.name} ...")
         val verifier = Verifier.make(
             verifierApi = verifierApi,
-            walletPublicKey = wallet.pubKey,
             transaction = transaction,
         )
 
@@ -84,27 +78,21 @@ suspend fun HttpClient.program() {
         }
     }
 
-    runUseCase(Transaction.SIOP)
     runUseCase(Transaction.MsoMdocPidDcql)
     runUseCase(Transaction.SdJwtVcPidDcql)
 }
 
 @Serializable
 data class WalletResponse(
-    @SerialName("id_token") val idToken: String? = null,
     @SerialName("vp_token") val vpToken: JsonObject? = null,
     @SerialName("error") val error: String? = null,
 )
-
-fun WalletResponse.idTokenClaimSet(walletPublicKey: RSAKey): IDTokenClaimsSet? =
-    idToken?.let { SiopIdTokenBuilder.decodeAndVerify(it, walletPublicKey).getOrThrow() }
 
 /**
  * This class is a minimal Verifier / RP application
  */
 class Verifier private constructor(
     private val verifierApi: URL,
-    private val walletPublicKey: RSAKey,
     private val presentationId: String,
     val authorizationRequestUri: URI,
 ) {
@@ -122,7 +110,6 @@ class Verifier private constructor(
             }
         }.body<WalletResponse>()
 
-        walletResponse.idTokenClaimSet(walletPublicKey)?.also { verifierPrintln("Got id_token with payload $it") }
         walletResponse.vpToken?.also { verifierPrintln("Got vp_token with payload $it") }
         return walletResponse
     }
@@ -141,55 +128,34 @@ class Verifier private constructor(
          * Creates a new verifier that knows (out of bound) the
          * wallet's public key
          */
-        suspend fun make(verifierApi: URL, walletPublicKey: RSAKey, transaction: Transaction): Verifier =
+        suspend fun make(verifierApi: URL, transaction: Transaction): Verifier =
             coroutineScope {
                 verifierPrintln("Initializing Verifier ...")
                 withContext(Dispatchers.IO + CoroutineName("wallet-initTransaction")) {
                     createHttpClient().use { client ->
                         val nonce = randomNonce()
-                        val initTransactionResponse = transaction.fold(
-                            ifSiop = {
-                                initSiopTransaction(client, verifierApi, nonce)
-                            },
-                            ifOpenId4VP = { presentationQuery, transactionData ->
-                                initOpenId4VpTransaction(client, verifierApi, nonce, presentationQuery, transactionData)
-                            },
-                        )
+                        val initTransactionResponse =
+                            initOpenId4VpTransaction(client, verifierApi, nonce, transaction.query, transaction.transactionData)
                         val presentationId = initTransactionResponse["transaction_id"]!!.jsonPrimitive.content
                         val uri = formatAuthorizationRequest(initTransactionResponse)
-                        Verifier(verifierApi, walletPublicKey, presentationId, uri).also {
+                        Verifier(verifierApi, presentationId, uri).also {
                             verifierPrintln("Initialized $it")
                         }
                     }
                 }
             }
 
-        private suspend fun initSiopTransaction(client: HttpClient, verifierApi: URL, nonce: String): JsonObject {
-            verifierPrintln("Placing to verifier endpoint SIOP authentication request ...")
-            val request = buildJsonObject {
-                put("type", "id_token")
-                put("nonce", nonce)
-                put("id_token_type", "subject_signed_id_token")
-                put("response_mode", "direct_post.jwt")
-                put("jar_mode", "by_reference")
-                put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
-                put("request_uri_method", "post")
-            }
-            return initTransaction(client, verifierApi, request)
-        }
-
         private suspend fun initOpenId4VpTransaction(
             client: HttpClient,
             verifierApi: URL,
             nonce: String,
-            presentationQuery: Transaction.PresentationQuery,
+            query: DCQLQuery,
             transactionData: List<TransactionData>?,
         ): JsonObject {
             verifierPrintln("Placing to verifier endpoint OpenId4Vp authorization request  ...")
             val request = buildJsonObject {
-                put("type", "vp_token")
                 put("nonce", nonce)
-                put("dcql_query", jsonSupport.encodeToJsonElement(presentationQuery.query))
+                put("dcql_query", jsonSupport.encodeToJsonElement(query))
                 put("response_mode", "direct_post.jwt")
                 put("jar_mode", "by_reference")
                 put("wallet_response_redirect_uri_template", "https://foo?response_code={RESPONSE_CODE}")
@@ -239,37 +205,24 @@ class Verifier private constructor(
     }
 }
 
-sealed interface Transaction {
-
-    val name: String
-        get() = when (this) {
-            is SIOP -> "SIOP"
-            is OpenId4VP -> "OpenId4Vp"
-        }
-
-    @JvmInline
-    value class PresentationQuery(val query: DCQLQuery)
-
-    data object SIOP : Transaction
-    data class OpenId4VP(
-        val presentationQuery: PresentationQuery,
-        val transactionData: List<TransactionData>? = null,
-    ) : Transaction {
-        init {
-            transactionData?.let {
-                require(it.isNotEmpty()) { "transactionData must not be empty if provided" }
-            }
+data class Transaction(
+    val query: DCQLQuery,
+    val transactionData: List<TransactionData>? = null,
+) {
+    init {
+        transactionData?.let {
+            require(it.isNotEmpty()) { "transactionData must not be empty if provided" }
         }
     }
 
+    val name: String = "OpenId4Vp"
+
     companion object {
-        val MsoMdocPidDcql = OpenId4VP(
-            PresentationQuery(
-                jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/mso_mdoc-pid-dcql-query.json")),
-            ),
+        val MsoMdocPidDcql: Transaction = Transaction(
+            jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/mso_mdoc-pid-dcql-query.json")),
         )
 
-        val SdJwtVcPidDcql = run {
+        val SdJwtVcPidDcql: Transaction = run {
             val dcql = jsonSupport.decodeFromString<DCQLQuery>(loadResource("/example/sd-jwt-vc-pid-dcql-query.json"))
             val queryId = dcql.credentials.ids.first()
             val transactionData = TransactionData.sdJwtVc(
@@ -279,29 +232,15 @@ sealed interface Transaction {
                 put("purpose", "We must verify your Family Name")
             }
 
-            OpenId4VP(PresentationQuery(dcql), listOf(transactionData))
+            Transaction(dcql, listOf(transactionData))
         }
     }
 }
 
-suspend fun <T> Transaction.fold(
-    ifSiop: suspend () -> T,
-    ifOpenId4VP: suspend (Transaction.PresentationQuery, List<TransactionData>?) -> T,
-): T = when (this) {
-    Transaction.SIOP -> ifSiop()
-    is Transaction.OpenId4VP -> ifOpenId4VP(presentationQuery, transactionData)
-}
-
 private class Wallet(
-    private val holder: HolderInfo,
     private val walletConfig: SiopOpenId4VPConfig,
-    private val walletKeyPair: RSAKey,
     private val httpClient: HttpClient,
 ) {
-
-    val pubKey: RSAKey
-        get() = walletKeyPair.toPublicJWK()
-
     private val siopOpenId4Vp: SiopOpenId4Vp by lazy {
         SiopOpenId4Vp(walletConfig, httpClient)
     }
@@ -330,25 +269,8 @@ private class Wallet(
 
     suspend fun holderConsent(request: ResolvedRequestObject): Consensus = withContext(Dispatchers.Default) {
         when (request) {
-            is ResolvedRequestObject.SiopAuthentication -> handleSiop(request)
             is ResolvedRequestObject.OpenId4VPAuthorization -> handleOpenId4VP(request)
             else -> Consensus.NegativeConsensus
-        }
-    }
-
-    @Suppress("KotlinConstantConditions")
-    private fun handleSiop(request: ResolvedRequestObject.SiopAuthentication): Consensus {
-        walletPrintln("Received an SiopAuthentication request")
-        fun showScreen() = true.also {
-            walletPrintln("User consensus was $it")
-        }
-
-        val userConsent: Boolean = showScreen()
-        return if (userConsent) {
-            val idToken = SiopIdTokenBuilder.build(request, holder, walletKeyPair)
-            Consensus.PositiveConsensus.IdTokenConsensus(idToken)
-        } else {
-            Consensus.NegativeConsensus
         }
     }
 

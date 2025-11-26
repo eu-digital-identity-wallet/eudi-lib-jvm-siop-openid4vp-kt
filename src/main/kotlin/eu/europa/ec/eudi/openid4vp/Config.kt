@@ -487,7 +487,7 @@ fun interface RegistrationCertificatePolicy {
  *
  * At minimum, a wallet configuration should define at least a [supportedClientIdPrefixes]
  *
- * @param issuer an optional id for the wallet. If not provided defaults to [SelfIssued].
+ * @param issuer an id for the wallet, defaults to [SelfIssued].
  * @param signedRequestConfiguration options related to JWT Secure authorization requests.
  * If not provided, it will default to [SignedRequestConfiguration.Default]
  * @param responseEncryptionConfiguration whether wallet supports authorization response encryption. If not specified, it takes the default value
@@ -501,7 +501,7 @@ fun interface RegistrationCertificatePolicy {
  * @param registrationCertificatePolicy wallet's policy regarding Wallet Relying Party Registration Certificates processing
  */
 data class OpenId4VPConfig(
-    val issuer: Issuer? = SelfIssued,
+    val issuer: Issuer = SelfIssued,
     val signedRequestConfiguration: SignedRequestConfiguration = SignedRequestConfiguration.Default,
     val responseEncryptionConfiguration: ResponseEncryptionConfiguration = NotSupported,
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
@@ -532,7 +532,7 @@ data class OpenId4VPConfig(
     }
 
     constructor(
-        issuer: Issuer? = SelfIssued,
+        issuer: Issuer = SelfIssued,
         signedRequestConfiguration: SignedRequestConfiguration = SignedRequestConfiguration.Default,
         responseEncryptionConfiguration: ResponseEncryptionConfiguration = NotSupported,
         knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
@@ -557,7 +557,7 @@ data class OpenId4VPConfig(
 
     @Deprecated(message = "VPConfiguration merged in OpenId4VPConfig", replaceWith = ReplaceWith("OpenId4VPConfig"))
     constructor(
-        issuer: Issuer? = SelfIssued,
+        issuer: Issuer = SelfIssued,
         signedRequestConfiguration: SignedRequestConfiguration = SignedRequestConfiguration.Default,
         responseEncryptionConfiguration: ResponseEncryptionConfiguration = NotSupported,
         vpConfiguration: VPConfiguration,

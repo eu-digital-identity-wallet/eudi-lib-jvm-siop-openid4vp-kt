@@ -39,6 +39,13 @@ private const val RESPONSE_MODES_SUPPORTED = "response_modes_supported"
 internal fun walletMetaData(cfg: OpenId4VPConfig, clientId: String, keys: List<JWK>): JsonObject =
     buildJsonObject {
         //
+        // Authorization Server Metadata
+        //
+        if (null != cfg.issuer) {
+            put(RFC8414.ISSUER, cfg.issuer.value)
+        }
+
+        //
         // Authorization Request signature and encryption parameters
         // Uses properties defined in JAR and JARM specs
         // https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-request-uri-method-post

@@ -98,7 +98,11 @@ internal class RequestFetcher(
                 jwt.decrypt(ephemeralJarEncryptionKey!!, postOptions.jarEncryption).getOrThrow()
             } else jwt
 
-            return Triple(signedJwt, walletNonce, openId4VPConfig.issuer.value)
+            val audience =
+                if (null != walletMetaData) openId4VPConfig.issuer.value
+                else SelfIssued.value
+
+            return Triple(signedJwt, walletNonce, audience)
         }
 
         return when (requestUriMethod) {

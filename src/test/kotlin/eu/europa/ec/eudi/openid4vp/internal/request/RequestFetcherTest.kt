@@ -141,6 +141,39 @@ internal class RequestFetcherTest {
     }
 
     @Test
+    fun `request uri method post - fetch signed request object on audience mismatch with check disabled`() = runTest {
+        val issuer = "eudi_wallet"
+        val clientId = "verifier"
+        val jarEncryptionRequirement = EncryptionRequirement.NotRequired
+        val config = config(issuer = issuer, clientId = clientId, jarEncryptionRequirement, requestObjectAudienceCheckEnabled = false)
+        val requestUri = URI.create("https://verifier/signed-request")
+
+        lateinit var signedRequest: SignedJWT
+        val engine = MockEngine(requestUri, jarEncryptionRequirement) { encryptionKey, walletNonce ->
+            assertNull(encryptionKey)
+
+            signedRequest = createSignedRequestObject(audience = SelfIssued.value, clientId = clientId, walletNonce = walletNonce)
+
+            respond(
+                content = signedRequest.serialize(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType to listOf("application/oauth-authz-req+jwt")),
+            )
+        }
+        val client = createHttpClient(httpEngine = engine)
+
+        val fetcher = RequestFetcher(client, config)
+        val request = UnvalidatedRequest.JwtSecured.PassByReference(
+            clientId = clientId,
+            jwtURI = requestUri.toURL(),
+            requestURIMethod = RequestUriMethod.POST,
+        )
+
+        val receivedRequest = assertIs<ReceivedRequest.Signed>(fetcher.fetchRequest(request))
+        assertEquals(signedRequest.serialize(), receivedRequest.toSignedJwts()[0].serialize())
+    }
+
+    @Test
     fun `request uri method post - decryption fails when jar is not encrypted with jwk in jwks`() = runTest {
         val issuer = "eudi_wallet"
         val clientId = "verifier"
@@ -232,16 +265,18 @@ private fun config(
     issuer: String,
     clientId: String,
     jarEncryptionRequirement: EncryptionRequirement,
+    requestObjectAudienceCheckEnabled: Boolean = true,
 ): OpenId4VPConfig =
     OpenId4VPConfig(
-        issuer = Issuer(issuer),
         signedRequestConfiguration = SignedRequestConfiguration(
             supportedAlgorithms = JWSAlgorithm.Family.EC.toList() - JWSAlgorithm.ES256K,
             supportedRequestUriMethods = SupportedRequestUriMethods.Post(
                 includeWalletMetadata = true,
                 jarEncryption = jarEncryptionRequirement,
                 useWalletNonce = NonceOption.Use(),
+                issuer = Issuer(issuer),
             ),
+            requestObjectAudienceCheckEnabled = requestObjectAudienceCheckEnabled,
         ),
         vpFormatsSupported = VpFormatsSupported(
             VpFormatsSupported.SdJwtVc.HAIP,

@@ -224,15 +224,13 @@ class ConfigTests {
     @Test
     fun `fails when using request uri method post, wallet metadata, and no issuer`() {
         val exception = assertFailsWith<IllegalArgumentException> {
-            OpenId4VPConfig(
+            SupportedRequestUriMethods.Post(
+                includeWalletMetadata = true,
                 issuer = null,
-                signedRequestConfiguration = SignedRequestConfiguration.Default,
-                vpFormatsSupported = VpFormatsSupported(sdJwtVc = VpFormatsSupported.SdJwtVc.HAIP),
-                supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns { true }),
             )
         }
         assertEquals(
-            "Wrong configuration. Issuer must be provided when using Request URI Method POST and including Wallet Metadata.",
+            "Issuer must be provided when Wallet Metadata is sent",
             exception.message,
         )
     }

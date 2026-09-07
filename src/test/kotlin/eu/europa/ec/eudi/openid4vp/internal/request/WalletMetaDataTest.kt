@@ -49,6 +49,7 @@ class WalletMetaDataTest {
                         ephemeralEncryptionKeyCurve = Curve.P_521,
                     ),
                 ),
+                requestObjectAudienceCheckEnabled = true,
             ),
         )
         assertMetadata(config, "x509_san_dns:verifier.example.com")
@@ -120,7 +121,8 @@ private suspend fun assertMetadata(config: OpenId4VPConfig, clientId: String) {
     assertJarSigning(config, clientId, walletMetaData)
     assertJarEncryption(encryptionRequirement, ephemeralJarEncryptionJwks, walletMetaData)
     assertResponseTypes(walletMetaData)
-    assertIssuer(config.issuer, walletMetaData)
+    val issuer = config.signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()?.issuer
+    assertIssuer(issuer, walletMetaData)
 }
 
 private fun assertJarSigning(config: OpenId4VPConfig, clientId: String, walletMetaData: JsonObject) {

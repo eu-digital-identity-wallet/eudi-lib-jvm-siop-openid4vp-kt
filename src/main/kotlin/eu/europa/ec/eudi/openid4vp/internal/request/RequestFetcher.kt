@@ -99,7 +99,7 @@ internal class RequestFetcher(
             } else jwt
 
             val audience =
-                if (null != walletMetaData) openId4VPConfig.issuer.value
+                if (null != walletMetaData) checkNotNull(openId4VPConfig.issuer?.value)
                 else SelfIssued.value
 
             return Triple(signedJwt, walletNonce, audience)

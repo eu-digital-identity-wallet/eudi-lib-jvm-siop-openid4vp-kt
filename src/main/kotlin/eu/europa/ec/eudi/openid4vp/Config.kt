@@ -529,6 +529,13 @@ data class OpenId4VPConfig(
                 "SD-JWT VC Transaction Data cannot be used when SD-JWT VC is not supported"
             }
         }
+
+        val postOptions = signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()
+        if (null != postOptions && postOptions.includeWalletMetadata) {
+            requireNotNull(issuer) {
+                "Wrong configuration. Issuer must be provided when using Request URI Method POST and including Wallet Metadata."
+            }
+        }
     }
 
     constructor(

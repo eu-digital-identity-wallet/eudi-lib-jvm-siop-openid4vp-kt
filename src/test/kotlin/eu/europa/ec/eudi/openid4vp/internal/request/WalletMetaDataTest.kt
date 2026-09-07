@@ -74,22 +74,6 @@ class WalletMetaDataTest {
     }
 
     @Test
-    fun `test without issuer`() = runTest {
-        val config = OpenId4VPConfig(
-            issuer = null,
-            supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
-            vpFormatsSupported = VpFormatsSupported(
-                VpFormatsSupported.SdJwtVc.HAIP,
-                VpFormatsSupported.MsoMdoc(
-                    issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                    deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                ),
-            ),
-        )
-        assertMetadata(config, "x509_san_dns:verifier.example.com")
-    }
-
-    @Test
     fun `when clientId permits signed Request Objects, request_object_signing_alg_values_supported MUST be included`() = runTest {
         val config = OpenId4VPConfig(
             supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),

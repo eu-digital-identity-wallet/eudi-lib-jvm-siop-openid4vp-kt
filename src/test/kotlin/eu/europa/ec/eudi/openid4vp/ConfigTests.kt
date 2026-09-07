@@ -27,6 +27,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import java.time.Duration
 import java.util.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class ConfigTests {
@@ -218,5 +219,21 @@ class ConfigTests {
                 supportedMethods = emptyList(),
             )
         }
+    }
+
+    @Test
+    fun `fails when using request uri method post, wallet metadata, and no issuer`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            OpenId4VPConfig(
+                issuer = null,
+                signedRequestConfiguration = SignedRequestConfiguration.Default,
+                vpFormatsSupported = VpFormatsSupported(sdJwtVc = VpFormatsSupported.SdJwtVc.HAIP),
+                supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns { true }),
+            )
+        }
+        assertEquals(
+            "Wrong configuration. Issuer must be provided when using Request URI Method POST and including Wallet Metadata.",
+            exception.message,
+        )
     }
 }

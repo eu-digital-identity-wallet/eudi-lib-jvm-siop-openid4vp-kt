@@ -41,9 +41,8 @@ internal fun walletMetaData(cfg: OpenId4VPConfig, clientId: String, keys: List<J
         //
         // Authorization Server Metadata
         //
-        cfg.signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()?.issuer?.value?.let { issuer ->
-            put(RFC8414.ISSUER, issuer)
-        }
+        val issuer = checkNotNull(cfg.signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()?.issuer)
+        put(RFC8414.ISSUER, issuer.value)
 
         //
         // Authorization Request signature and encryption parameters

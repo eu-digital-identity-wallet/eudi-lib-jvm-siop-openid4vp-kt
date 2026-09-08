@@ -68,7 +68,7 @@ class WalletMetaDataTest {
             ),
             signedRequestConfiguration = SignedRequestConfiguration(
                 supportedAlgorithms = SignedRequestConfiguration.Default.supportedAlgorithms,
-                supportedRequestUriMethods = SupportedRequestUriMethods.Get,
+                supportedRequestUriMethods = SupportedRequestUriMethods.Default,
             ),
         )
         assertMetadata(config, "x509_san_dns:verifier.example.com")

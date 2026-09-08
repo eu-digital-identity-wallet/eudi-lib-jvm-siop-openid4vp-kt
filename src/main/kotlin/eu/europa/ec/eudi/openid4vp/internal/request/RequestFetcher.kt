@@ -37,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.URL
 import java.text.ParseException
 
@@ -100,10 +101,12 @@ internal class RequestFetcher(
             } else jwt
 
             val audience =
-                walletMetaData?.let {
-                    val issuer = openId4VPConfig.signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()?.issuer
-                    Audience(checkNotNull(issuer))
-                } ?: Audience(SelfIssued)
+                if (null != walletMetaData) {
+                    val issuer = checkNotNull(walletMetaData[RFC8414.ISSUER]?.jsonPrimitive?.content)
+                    Audience(issuer)
+                } else {
+                    Audience(SelfIssued)
+                }
 
             return Triple(signedJwt, walletNonce, audience)
         }

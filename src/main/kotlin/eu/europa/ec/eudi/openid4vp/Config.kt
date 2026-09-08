@@ -392,14 +392,14 @@ sealed interface MultiSignedRequestsPolicy {
  * @param supportedRequestUriMethods which of the `request_uri_method` methods are supported
  * @param multiSignedRequestsPolicy whether the wallet supports multi-signed requests and if so, what is the expected client prefix
  * @param clockSkew max acceptable skew between wallet and verifier when performing request signature validation, up to 60 sec. Defaults to 15 sec
- * @param requestObjectAudienceCheckEnabled whether the audience of the request object is checked or not, defaults to `false`
+ * @param requestObjectAudienceCheckEnabled whether the audience of the request object is checked or not, defaults to `true`
  */
 data class SignedRequestConfiguration(
     val supportedAlgorithms: List<JWSAlgorithm>,
     val supportedRequestUriMethods: SupportedRequestUriMethods = SupportedRequestUriMethods.Default,
     val multiSignedRequestsPolicy: MultiSignedRequestsPolicy = MultiSignedRequestsPolicy.NotSupported,
     val clockSkew: Duration = Duration.ofSeconds(15L),
-    val requestObjectAudienceCheckEnabled: Boolean = false,
+    val requestObjectAudienceCheckEnabled: Boolean = true,
 ) {
     init {
         require(supportedAlgorithms.isNotEmpty()) { "JAR signing algorithms cannot be empty" }

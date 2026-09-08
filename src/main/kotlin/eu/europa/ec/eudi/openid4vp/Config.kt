@@ -23,6 +23,7 @@ import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.oauth2.sdk.id.Issuer
+import eu.europa.ec.eudi.openid4vp.OpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import java.net.URI
@@ -326,15 +327,23 @@ sealed interface SupportedRequestUriMethods {
      * @param includeWalletMetadata whether to include wallet metadata or not
      * @param jarEncryption whether to request JAR be encrypted or not
      * @param useWalletNonce whether to use wallet_nonce
+     * @param issuer the unique identifier of the wallet, defaults to [SelfIssued]
      */
     data class Post(
         val includeWalletMetadata: Boolean = true,
         val jarEncryption: EncryptionRequirement = EncryptionRequirement.NotRequired,
         val useWalletNonce: NonceOption = NonceOption.Use(),
+        val issuer: Issuer? = SelfIssued,
     ) : SupportedRequestUriMethods {
         init {
             require(EncryptionRequirement.NotRequired == jarEncryption || includeWalletMetadata) {
                 "Wallet Metadata must be included when JAR encryption is required"
+            }
+
+            if (includeWalletMetadata) {
+                requireNotNull(issuer) {
+                    "Issuer must be provided when Wallet Metadata is sent"
+                }
             }
         }
     }
@@ -383,12 +392,14 @@ sealed interface MultiSignedRequestsPolicy {
  * @param supportedRequestUriMethods which of the `request_uri_method` methods are supported
  * @param multiSignedRequestsPolicy whether the wallet supports multi-signed requests and if so, what is the expected client prefix
  * @param clockSkew max acceptable skew between wallet and verifier when performing request signature validation, up to 60 sec. Defaults to 15 sec
+ * @param requestObjectAudienceCheckEnabled whether the audience of the request object is checked or not, defaults to `true`
  */
 data class SignedRequestConfiguration(
     val supportedAlgorithms: List<JWSAlgorithm>,
     val supportedRequestUriMethods: SupportedRequestUriMethods = SupportedRequestUriMethods.Default,
     val multiSignedRequestsPolicy: MultiSignedRequestsPolicy = MultiSignedRequestsPolicy.NotSupported,
     val clockSkew: Duration = Duration.ofSeconds(15L),
+    val requestObjectAudienceCheckEnabled: Boolean = true,
 ) {
     init {
         require(supportedAlgorithms.isNotEmpty()) { "JAR signing algorithms cannot be empty" }
@@ -501,7 +512,7 @@ fun interface RegistrationCertificatePolicy {
  * @param registrationCertificatePolicy wallet's policy regarding Wallet Relying Party Registration Certificates processing
  */
 data class OpenId4VPConfig(
-    val issuer: Issuer? = SelfIssued,
+    @Deprecated("Unused property. Use SupportedRequestUriMethods.Post.issuer instead.") val issuer: Issuer? = SelfIssued,
     val signedRequestConfiguration: SignedRequestConfiguration = SignedRequestConfiguration.Default,
     val responseEncryptionConfiguration: ResponseEncryptionConfiguration = NotSupported,
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),

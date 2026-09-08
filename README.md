@@ -472,6 +472,33 @@ Library parses and validates the verifier metadata.
 
 Library currently supports `response_type` equal to `vp_token`
 
+### Request Object Audience Check
+
+By default, the library verifies the Audience of the Resolved Request Object is:
+
+* `https://self-issued.me/v2` when Request URI Method `GET` was used
+* `https://self-issued.me/v2` when Request URI Method `POST` was used and **NO** Wallet Metadata were included in the request
+* The value of `SupportedRequestUriMethods.Post.issuer` when Request URI Method `POST` was used and Wallet Metadata were included in the request
+
+
+To disable this check, set `SignedRequestConfiguration.requestObjectAudienceCheckEnabled` to `false`.
+
+Example configuration:
+
+```kotlin
+OpenId4VPConfig(
+    ...,
+    signedRequestConfiguration = SignedRequestConfiguration(
+        ...,
+        supportedRequestUriMethods = SupportedRequestUriMethods.Post(
+            ...,
+            issuer = Issuer("eudi_wallet"),
+        ),
+        requestObjectAudienceCheckEnabled = true,
+    ),
+)
+```
+
 ## How to contribute
 
 We welcome contributions to this project. To ensure that the process is smooth for everyone

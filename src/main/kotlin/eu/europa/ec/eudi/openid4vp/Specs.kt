@@ -113,3 +113,17 @@ object ETSI119472Part2 {
 object ETSI119475 {
     const val REG_CERT_HEADER_TYPE = "rc-wrp+jwt"
 }
+
+/**
+ * [OAuth 2.0 Authorization Server Metadata](https://www.rfc-editor.org/rfc/rfc8414.txt)
+ */
+object RFC8414 {
+    const val ISSUER: String = "issuer"
+}
+
+/**
+ * [JSON Web Token (JWT)](https://www.rfc-editor.org/rfc/rfc7519.html)
+ */
+object RFC7519 {
+    const val AUDIENCE: String = "aud"
+}

@@ -20,6 +20,7 @@ import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.JWKSet
+import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import kotlinx.coroutines.test.runTest
@@ -48,6 +49,7 @@ class WalletMetaDataTest {
                         ephemeralEncryptionKeyCurve = Curve.P_521,
                     ),
                 ),
+                requestObjectAudienceCheckEnabled = true,
             ),
         )
         assertMetadata(config, "x509_san_dns:verifier.example.com")
@@ -66,7 +68,7 @@ class WalletMetaDataTest {
             ),
             signedRequestConfiguration = SignedRequestConfiguration(
                 supportedAlgorithms = SignedRequestConfiguration.Default.supportedAlgorithms,
-                supportedRequestUriMethods = SupportedRequestUriMethods.Get,
+                supportedRequestUriMethods = SupportedRequestUriMethods.Default,
             ),
         )
         assertMetadata(config, "x509_san_dns:verifier.example.com")
@@ -119,6 +121,8 @@ private suspend fun assertMetadata(config: OpenId4VPConfig, clientId: String) {
     assertJarSigning(config, clientId, walletMetaData)
     assertJarEncryption(encryptionRequirement, ephemeralJarEncryptionJwks, walletMetaData)
     assertResponseTypes(walletMetaData)
+    val issuer = config.signedRequestConfiguration.supportedRequestUriMethods.isPostSupported()?.issuer
+    assertIssuer(issuer, walletMetaData)
 }
 
 private fun assertJarSigning(config: OpenId4VPConfig, clientId: String, walletMetaData: JsonObject) {
@@ -241,4 +245,14 @@ private fun assertResponseTypes(walletMetadata: JsonObject) {
     val values = types.map { it.jsonPrimitive.content }
     assertEquals(1, values.size, "'unexpected number of 'response_types_supported'")
     assert("vp_token" in values) { "'response_types_supported' misses 'vp_token'" }
+}
+
+private fun assertIssuer(issuer: Issuer?, walletMetadata: JsonObject) {
+    if (null != issuer) {
+        val issuerInWalletMetadata = assertIs<JsonPrimitive>(walletMetadata[RFC8414.ISSUER])
+        assertTrue(issuerInWalletMetadata.isString)
+        assertEquals(issuer.value, issuerInWalletMetadata.content)
+    } else {
+        assertNull(walletMetadata[RFC8414.ISSUER])
+    }
 }

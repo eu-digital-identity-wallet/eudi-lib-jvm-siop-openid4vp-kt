@@ -27,6 +27,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import java.time.Duration
 import java.util.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class ConfigTests {
@@ -218,5 +219,19 @@ class ConfigTests {
                 supportedMethods = emptyList(),
             )
         }
+    }
+
+    @Test
+    fun `fails when using request uri method post, wallet metadata, and no issuer`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            SupportedRequestUriMethods.Post(
+                includeWalletMetadata = true,
+                issuer = null,
+            )
+        }
+        assertEquals(
+            "Issuer must be provided when Wallet Metadata is sent",
+            exception.message,
+        )
     }
 }
